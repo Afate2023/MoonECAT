@@ -1,7 +1,22 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "afate/MoonECAT/mailbox"
 
+import {
+  "afate/MoonECAT/hal",
+}
+
 // Values
+pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
+
+pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
+
+pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
+
+pub fn parse_sii_header(Bytes) -> SiiData raise @hal.EcError
+
+pub fn parse_sii_sm(Bytes) -> Array[SiiSmEntry]
+
+pub let sii_category_start : Int
 
 // Errors
 
@@ -94,6 +109,12 @@ pub(all) enum SiiCategory {
 pub impl Eq for SiiCategory
 pub impl Show for SiiCategory
 
+pub(all) struct SiiCategoryEntry {
+  category : SiiCategory
+  data : Bytes
+}
+pub impl Show for SiiCategoryEntry
+
 pub(all) struct SiiData {
   vendor_id : UInt
   product_code : UInt
@@ -107,6 +128,31 @@ pub(all) struct SiiData {
 }
 pub impl Eq for SiiData
 pub impl Show for SiiData
+
+pub(all) struct SiiGeneral {
+  group_idx : Byte
+  image_idx : Byte
+  order_idx : Byte
+  name_idx : Byte
+  coe_details : Byte
+  foe_supported : Bool
+  eoe_supported : Bool
+  soe_supported : Bool
+  flags : Byte
+  current_on_ebus : UInt
+}
+pub impl Eq for SiiGeneral
+pub impl Show for SiiGeneral
+
+pub(all) struct SiiSmEntry {
+  physical_start : UInt
+  length : UInt
+  control : Byte
+  enable : Bool
+  sm_type : SmType
+}
+pub impl Eq for SiiSmEntry
+pub impl Show for SiiSmEntry
 
 pub(all) struct SmConfig {
   physical_start : UInt

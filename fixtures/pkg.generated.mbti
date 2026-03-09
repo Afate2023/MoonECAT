@@ -10,6 +10,8 @@ pub fn minimal_nop_frame() -> Bytes
 
 pub fn sample_ek1100_identity() -> @hal.SlaveIdentity
 
+pub fn sample_sii_eeprom() -> Bytes
+
 // Errors
 
 // Types and methods

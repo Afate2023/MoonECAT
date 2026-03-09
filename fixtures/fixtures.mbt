@@ -36,3 +36,91 @@ pub fn sample_ek1100_identity() -> @hal.SlaveIdentity {
     serial: 0x0U,
   }
 }
+
+///|
+/// Synthetic SII EEPROM image for testing SII parser.
+/// Layout: 128 words (256 bytes) with Beckhoff EK1100-like header + categories.
+pub fn sample_sii_eeprom() -> Bytes {
+  // Create a 256-byte buffer initialized to 0
+  let data = FixedArray::make(256, b'\x00')
+  // Word 8-9: Vendor ID = 0x00000002 (Beckhoff)
+  data[16] = b'\x02'
+  data[17] = b'\x00'
+  data[18] = b'\x00'
+  data[19] = b'\x00'
+  // Word 10-11: Product Code = 0x044C2C52
+  data[20] = b'\x52'
+  data[21] = b'\x2C'
+  data[22] = b'\x4C'
+  data[23] = b'\x04'
+  // Word 12-13: Revision = 0x00110000
+  data[24] = b'\x00'
+  data[25] = b'\x00'
+  data[26] = b'\x11'
+  data[27] = b'\x00'
+  // Word 14-15: Serial = 0x00000000
+  // (already zero)
+  // Word 24: Standard RX Mailbox Offset = 0x1000
+  data[48] = b'\x00'
+  data[49] = b'\x10'
+  // Word 25: Standard RX Mailbox Size = 128
+  data[50] = b'\x80'
+  data[51] = b'\x00'
+  // Word 26: Standard TX Mailbox Offset = 0x1080
+  data[52] = b'\x80'
+  data[53] = b'\x10'
+  // Word 27: Standard TX Mailbox Size = 128
+  data[54] = b'\x80'
+  data[55] = b'\x00'
+  // Word 28: Mailbox Protocol = 0x000C (CoE + FoE)
+  data[56] = b'\x0C'
+  data[57] = b'\x00'
+  // Category area starts at word 64 (byte 128)
+  // Category 1: General (type=30, size=8 words = 16 bytes)
+  data[128] = b'\x1E' // type = 30
+  data[129] = b'\x00'
+  data[130] = b'\x08' // size = 8 words
+  data[131] = b'\x00'
+  // General category data (16 bytes starting at byte 132)
+  data[132] = b'\x01' // group_idx
+  data[133] = b'\x02' // image_idx
+  data[134] = b'\x03' // order_idx
+  data[135] = b'\x04' // name_idx
+  data[136] = b'\x00' // reserved
+  data[137] = b'\x07' // coe_details
+  data[138] = b'\x03' // flags: FoE(0x01) + EoE(0x02) supported
+  // Category 2: FMMU (type=40, size=1 word = 2 bytes)
+  data[148] = b'\x28' // type = 40
+  data[149] = b'\x00'
+  data[150] = b'\x01' // size = 1 word
+  data[151] = b'\x00'
+  data[152] = b'\x01' // FMMU0: Outputs (Read)
+  data[153] = b'\x02' // FMMU1: Inputs (Write)
+  // Category 3: SM (type=41, size=8 words = 16 bytes, 2 SM entries)
+  data[154] = b'\x29' // type = 41
+  data[155] = b'\x00'
+  data[156] = b'\x08' // size = 8 words
+  data[157] = b'\x00'
+  // SM0: MailboxOut at 0x1000, size 128
+  data[158] = b'\x00'
+  data[159] = b'\x10' // physical_start = 0x1000
+  data[160] = b'\x80'
+  data[161] = b'\x00' // length = 128
+  data[162] = b'\x26' // control
+  data[163] = b'\x01' // type = MailboxOut
+  data[164] = b'\x01' // enable = true
+  data[165] = b'\x00'
+  // SM1: MailboxIn at 0x1080, size 128
+  data[166] = b'\x80'
+  data[167] = b'\x10' // physical_start = 0x1080
+  data[168] = b'\x80'
+  data[169] = b'\x00' // length = 128
+  data[170] = b'\x22' // control
+  data[171] = b'\x02' // type = MailboxIn
+  data[172] = b'\x01' // enable = true
+  data[173] = b'\x00'
+  // End marker: 0x7FFF
+  data[174] = b'\xFF'
+  data[175] = b'\x7F'
+  Bytes::makei(data.length(), fn(i) { data[i] })
+}
