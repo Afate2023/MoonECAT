@@ -3,6 +3,7 @@ package "afate/MoonECAT/runtime"
 
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/protocol",
 }
 
 // Values
@@ -10,12 +11,50 @@ import {
 // Errors
 
 // Types and methods
+pub(all) struct CycleResult {
+  wkc : UInt
+  expected_wkc : UInt
+  ok : Bool
+}
+pub impl Eq for CycleResult
+pub impl Show for CycleResult
+
+pub(all) enum DcState {
+  Disabled
+  Measuring
+  Locked
+  Drifting(Int64)
+}
+pub impl Show for DcState
+
 pub(all) enum RunMode {
   FreeRun
   DcSync
 }
 pub impl Eq for RunMode
 pub impl Show for RunMode
+
+pub(all) struct Runtime {
+  mut state : RuntimeState
+  telemetry : Telemetry
+  config : @hal.MasterConfig
+  mut pdo_ctx : @protocol.PdoContext?
+  mut expected_wkc : UInt
+  max_wkc_errors : Int
+  mut consecutive_wkc_errors : Int
+  mut dc_state : DcState
+}
+pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
+pub fn Runtime::get_telemetry(Self) -> Telemetry
+pub fn Runtime::needs_recovery(Self) -> Bool
+pub fn Runtime::new(@hal.MasterConfig) -> Self
+pub fn Runtime::record_retry(Self) -> Unit
+pub fn Runtime::record_timeout(Self) -> Unit
+pub fn Runtime::reset_error_counter(Self) -> Unit
+pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> CycleResult raise @hal.EcError
+pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
+pub fn Runtime::set_state(Self, RuntimeState) -> Unit
+pub impl Show for Runtime
 
 pub(all) enum RuntimeState {
   Idle

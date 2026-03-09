@@ -1,3 +1,9 @@
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/protocol",
 }
+
+import {
+  "afate/MoonECAT/hal/mock",
+  "afate/MoonECAT/mailbox",
+} for "test"
