@@ -755,3 +755,156 @@ test "read_al_status_code via mock" {
   // MockNic returns zeroed data, so status code = 0
   assert_eq(code, 0U)
 }
+
+///|
+test "ProcessImage construction" {
+  let img = @protocol.ProcessImage::new(32, 16)
+  assert_eq(img.output_size, 32)
+  assert_eq(img.input_size, 16)
+  assert_eq(img.outputs.length(), 32)
+  assert_eq(img.inputs.length(), 16)
+}
+
+///|
+test "PdoContext build from slave mappings" {
+  let sm1 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 32,
+    input_bytes: 16,
+  }
+  let sm2 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 8,
+    input_bytes: 4,
+  }
+  let ctx = @protocol.PdoContext::build(
+    [(sm1, 0x1001U), (sm2, 0x1002U)],
+    0x10000U,
+  )
+  assert_eq(ctx.mappings.length(), 2)
+  assert_eq(ctx.image.output_size, 40) // 32 + 8
+  assert_eq(ctx.image.input_size, 20) // 16 + 4
+  assert_eq(ctx.logical_size, 60) // 40 + 20
+  // First slave starts at logical base
+  assert_eq(ctx.mappings[0].output_logical, 0x10000U)
+  assert_eq(ctx.mappings[0].output_offset, 0)
+  assert_eq(ctx.mappings[0].output_length, 32)
+  // Second slave follows
+  assert_eq(ctx.mappings[1].output_offset, 32)
+  assert_eq(ctx.mappings[1].input_offset, 16)
+}
+
+///|
+test "PdoContext set and get slave data" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  // Set outputs for slave
+  let out_data = Bytes::from_array([b'\xAA', b'\xBB', b'\xCC', b'\xDD'])
+  ctx.set_slave_outputs(0x1001U, out_data)
+  assert_eq(ctx.image.outputs[0], b'\xAA')
+  assert_eq(ctx.image.outputs[3], b'\xDD')
+  // Get inputs (initially zero)
+  let in_data = ctx.get_slave_inputs(0x1001U)
+  assert_eq(in_data.length(), 2)
+  assert_eq(in_data[0], b'\x00')
+}
+
+///|
+test "PdoContext set_slave_outputs rejects wrong length" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let result = try? ctx.set_slave_outputs(0x1001U, Bytes::new(2))
+  assert_true(result is Err(_))
+}
+
+///|
+test "PdoContext set_slave_outputs rejects unknown station" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let result = try? ctx.set_slave_outputs(0x9999U, Bytes::new(4))
+  assert_true(result is Err(_))
+}
+
+///|
+test "PdoContext get_slave_inputs rejects unknown station" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 4,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let result = try? ctx.get_slave_inputs(0x9999U)
+  assert_true(result is Err(_))
+}
+
+///|
+test "pdo_exchange via mock loopback" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
+  assert_eq(wkc, 0U) // MockNic echoes, WKC=0
+}
+
+///|
+test "pdo_read via mock loopback" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 8,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_read(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_write via mock loopback" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 8,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_write(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_exchange with empty context" {
+  let ctx = @protocol.PdoContext::build([], 0U)
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
+  assert_eq(wkc, 0U) // no data to exchange
+}

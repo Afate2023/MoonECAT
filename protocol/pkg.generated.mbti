@@ -45,6 +45,12 @@ pub fn logical_address(UInt) -> UInt
 
 pub let max_pdus_per_frame : Int
 
+pub fn[N : @hal.Nic] pdo_exchange(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] pdo_read(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] pdo_write(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
+
 pub let pdu_header_len : Int
 
 pub fn[N : @hal.Nic] read_al_status(N, UInt, @hal.Duration) -> EsmState raise @hal.EcError
@@ -185,6 +191,29 @@ pub fn FrameBuilder::new() -> Self
 pub fn FrameBuilder::reset(Self) -> Unit
 pub impl Show for FrameBuilder
 
+pub(all) struct PdoContext {
+  image : ProcessImage
+  mappings : Array[PdoMapping]
+  logical_base : UInt
+  logical_size : Int
+}
+pub fn PdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
+pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError
+pub fn PdoContext::set_slave_outputs(Self, UInt, Bytes) -> Unit raise @hal.EcError
+pub impl Show for PdoContext
+
+pub(all) struct PdoMapping {
+  station : UInt
+  output_logical : UInt
+  output_offset : Int
+  output_length : Int
+  input_logical : UInt
+  input_offset : Int
+  input_length : Int
+}
+pub impl Eq for PdoMapping
+pub impl Show for PdoMapping
+
 pub(all) struct Pdu {
   header : PduHeader
   data : Bytes
@@ -201,6 +230,15 @@ pub(all) struct PduHeader {
 }
 pub impl Eq for PduHeader
 pub impl Show for PduHeader
+
+pub(all) struct ProcessImage {
+  mut outputs : Bytes
+  mut inputs : Bytes
+  output_size : Int
+  input_size : Int
+}
+pub fn ProcessImage::new(Int, Int) -> Self
+pub impl Show for ProcessImage
 
 pub(all) struct ScanResult {
   slave_count : Int
