@@ -19,6 +19,22 @@ let sii_revision : Int = 12
 let sii_serial : Int = 14
 
 ///|
+/// Bootstrap Receive Mailbox Offset (word 20).
+let sii_bootstrap_rx_offset : Int = 20
+
+///|
+/// Bootstrap Receive Mailbox Size (word 21).
+let sii_bootstrap_rx_size : Int = 21
+
+///|
+/// Bootstrap Send Mailbox Offset (word 22).
+let sii_bootstrap_tx_offset : Int = 22
+
+///|
+/// Bootstrap Send Mailbox Size (word 23).
+let sii_bootstrap_tx_size : Int = 23
+
+///|
 /// Standard Receive Mailbox Offset (word 24).
 let sii_std_rx_offset : Int = 24
 
@@ -100,6 +116,10 @@ pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
     product_code: read_sii_dword(data, sii_product_code),
     revision: read_sii_dword(data, sii_revision),
     serial: read_sii_dword(data, sii_serial),
+    bootstrap_rx_offset: read_sii_word(data, sii_bootstrap_rx_offset),
+    bootstrap_rx_size: read_sii_word(data, sii_bootstrap_rx_size),
+    bootstrap_tx_offset: read_sii_word(data, sii_bootstrap_tx_offset),
+    bootstrap_tx_size: read_sii_word(data, sii_bootstrap_tx_size),
     mailbox_rx_offset: read_sii_word(data, sii_std_rx_offset),
     mailbox_rx_size: read_sii_word(data, sii_std_rx_size),
     mailbox_tx_offset: read_sii_word(data, sii_std_tx_offset),
@@ -190,21 +210,22 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
     name_idx: data[3],
     coe_details: data[5],
     foe_supported: (data[6].to_int() & 0x01) != 0,
-    eoe_supported: (data[6].to_int() & 0x02) != 0,
-    soe_supported: (data[6].to_int() & 0x04) != 0,
-    flags: data[10],
+    eoe_supported: (data[7].to_int() & 0x01) != 0,
+    soe_supported: data[8] != b'\x00',
+    flags: data[11],
     current_on_ebus: read_sii_word(data, 6),
   }
 }
 
 ///|
 /// Parse the FMMU category data. Each entry is 1 byte indicating FMMU usage.
+/// Per ETG1000.6 Table 22: 0x01 = Outputs (master→slave), 0x02 = Inputs (slave→master).
 pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
   let result : Array[FmmuDirection] = []
   for i = 0; i < data.length(); i = i + 1 {
     match data[i] {
-      b'\x01' => result.push(Read)
-      b'\x02' => result.push(Write)
+      b'\x01' => result.push(Outputs)
+      b'\x02' => result.push(Inputs)
       _ => ()
     }
   }
@@ -232,7 +253,7 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
     let length = read_sii_word(data, offset / 2 + 1)
     let control = data[offset + 4]
     let enable = (data[offset + 6].to_int() & 0x01) != 0
-    let type_byte = data[offset + 5]
+    let type_byte = data[offset + 7]
     let sm_type : SmType = match type_byte {
       b'\x01' => MailboxOut
       b'\x02' => MailboxIn
@@ -242,6 +263,81 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
     }
     result.push({ physical_start: phys, length, control, enable, sm_type })
     offset = offset + entry_size
+  }
+  result
+}
+
+///|
+/// Parse the Strings category data (ETG1000.6 Table 20).
+/// Returns an array of strings indexed from 1 (index 0 is unused by convention).
+pub fn parse_sii_strings(data : Bytes) -> Array[String] {
+  let result : Array[String] = []
+  if data.length() < 1 {
+    return result
+  }
+  let n_strings = data[0].to_int()
+  let mut offset = 1
+  for _i = 0; _i < n_strings; _i = _i + 1 {
+    if offset >= data.length() {
+      break
+    }
+    let str_len = data[offset].to_int()
+    offset = offset + 1
+    if offset + str_len > data.length() {
+      break
+    }
+    let bytes = Bytes::makei(str_len, fn(j) { data[offset + j] })
+    result.push(bytes.to_unchecked_string())
+    offset = offset + str_len
+  }
+  result
+}
+
+///|
+/// Parse TxPdo or RxPdo category data (ETG1000.6 Tables 24+25).
+/// Each PDO has a fixed 8-byte header followed by nEntry × 8-byte entries.
+pub fn parse_sii_pdo(data : Bytes) -> Array[SiiPdo] {
+  let result : Array[SiiPdo] = []
+  let mut offset = 0
+  while offset + 8 <= data.length() {
+    let pdo_index = read_sii_word(data, offset / 2)
+    let entry_count = data[offset + 2]
+    let sync_manager = data[offset + 3]
+    let synchronization = data[offset + 4]
+    let name_idx = data[offset + 5]
+    let flags = read_sii_word(data, (offset + 6) / 2)
+    let n_entries = entry_count.to_int()
+    offset = offset + 8
+    let entries : Array[SiiPdoEntry] = []
+    for _j = 0; _j < n_entries; _j = _j + 1 {
+      if offset + 8 > data.length() {
+        break
+      }
+      let entry_index = read_sii_word(data, offset / 2)
+      let subindex = data[offset + 2]
+      let entry_name_idx = data[offset + 3]
+      let data_type = data[offset + 4]
+      let bit_length = data[offset + 5]
+      let entry_flags = read_sii_word(data, (offset + 6) / 2)
+      entries.push({
+        entry_index,
+        subindex,
+        name_idx: entry_name_idx,
+        data_type,
+        bit_length,
+        flags: entry_flags,
+      })
+      offset = offset + 8
+    }
+    result.push({
+      pdo_index,
+      entry_count,
+      sync_manager,
+      synchronization,
+      name_idx,
+      flags,
+      entries,
+    })
   }
   result
 }

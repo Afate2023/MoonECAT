@@ -26,7 +26,11 @@ pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
 
 pub fn parse_sii_header(Bytes) -> SiiData raise @hal.EcError
 
+pub fn parse_sii_pdo(Bytes) -> Array[SiiPdo]
+
 pub fn parse_sii_sm(Bytes) -> Array[SiiSmEntry]
+
+pub fn parse_sii_strings(Bytes) -> Array[String]
 
 pub let sii_category_start : Int
 
@@ -60,8 +64,8 @@ pub impl Eq for FmmuConfig
 pub impl Show for FmmuConfig
 
 pub(all) enum FmmuDirection {
-  Read
-  Write
+  Outputs
+  Inputs
 }
 pub impl Eq for FmmuDirection
 pub impl Show for FmmuDirection
@@ -160,6 +164,10 @@ pub(all) struct SiiData {
   product_code : UInt
   revision : UInt
   serial : UInt
+  bootstrap_rx_offset : UInt
+  bootstrap_rx_size : UInt
+  bootstrap_tx_offset : UInt
+  bootstrap_tx_size : UInt
   mailbox_rx_offset : UInt
   mailbox_rx_size : UInt
   mailbox_tx_offset : UInt
@@ -183,6 +191,29 @@ pub(all) struct SiiGeneral {
 }
 pub impl Eq for SiiGeneral
 pub impl Show for SiiGeneral
+
+pub(all) struct SiiPdo {
+  pdo_index : UInt
+  entry_count : Byte
+  sync_manager : Byte
+  synchronization : Byte
+  name_idx : Byte
+  flags : UInt
+  entries : Array[SiiPdoEntry]
+}
+pub impl Eq for SiiPdo
+pub impl Show for SiiPdo
+
+pub(all) struct SiiPdoEntry {
+  entry_index : UInt
+  subindex : Byte
+  name_idx : Byte
+  data_type : Byte
+  bit_length : Byte
+  flags : UInt
+}
+pub impl Eq for SiiPdoEntry
+pub impl Show for SiiPdoEntry
 
 pub(all) struct SiiSmEntry {
   physical_start : UInt

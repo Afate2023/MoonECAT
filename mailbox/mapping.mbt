@@ -67,8 +67,8 @@ pub fn calculate_fmmu_configs(
   for i = 0; i < fmmu_directions.length(); i = i + 1 {
     let dir = fmmu_directions[i]
     let target_type : SmType = match dir {
-      Read => ProcessDataOut
-      Write => ProcessDataIn
+      Outputs => ProcessDataOut
+      Inputs => ProcessDataIn
     }
     // find matching SM
     let sm_idx = find_unassigned_sm(sm_configs, sm_used, target_type)
@@ -89,8 +89,8 @@ pub fn calculate_fmmu_configs(
         })
         let byte_len = length.reinterpret_as_int()
         match dir {
-          Read => total_output = total_output + byte_len
-          Write => total_input = total_input + byte_len
+          Outputs => total_output = total_output + byte_len
+          Inputs => total_input = total_input + byte_len
         }
         current_offset = current_offset + length
       }
@@ -99,7 +99,7 @@ pub fn calculate_fmmu_configs(
         // available, try to match a mailbox SM as a fallback (some slaves
         // use FMMU for mailbox).
         match dir {
-          Read => {
+          Outputs => {
             let mb_idx = find_unassigned_sm(sm_configs, sm_used, MailboxOut)
             match mb_idx {
               Some(idx) => {
@@ -120,7 +120,7 @@ pub fn calculate_fmmu_configs(
               None => ()
             }
           }
-          Write => {
+          Inputs => {
             let mb_idx = find_unassigned_sm(sm_configs, sm_used, MailboxIn)
             match mb_idx {
               Some(idx) => {
@@ -240,10 +240,11 @@ pub fn FmmuConfig::to_bytes(self : FmmuConfig) -> Bytes {
   )
   // Byte 10: physical start bit
   buf.write_byte(self.physical_start_bit)
-  // Byte 11: direction (0x01 = read/output, 0x02 = write/input)
+  // Byte 11: FMMU type register — 0x02 = write access (outputs, master→slave),
+  // 0x01 = read access (inputs, slave→master). Per ESC register spec.
   let dir_byte : Byte = match self.direction {
-    Read => b'\x01'
-    Write => b'\x02'
+    Outputs => b'\x02'
+    Inputs => b'\x01'
   }
   buf.write_byte(dir_byte)
   // Byte 12: activate

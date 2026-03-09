@@ -12,8 +12,8 @@ test "SiiCategory display" {
 
 ///|
 test "FmmuDirection display" {
-  inspect(@mailbox.FmmuDirection::Read, content="Read")
-  inspect(@mailbox.FmmuDirection::Write, content="Write")
+  inspect(@mailbox.FmmuDirection::Outputs, content="Outputs")
+  inspect(@mailbox.FmmuDirection::Inputs, content="Inputs")
 }
 
 ///|
@@ -82,8 +82,8 @@ test "parse_sii_fmmu from fixture" {
   let fmmu_data = categories[1].data
   let fmmu_dirs = @mailbox.parse_sii_fmmu(fmmu_data)
   assert_eq(fmmu_dirs.length(), 2)
-  assert_eq(fmmu_dirs[0], @mailbox.FmmuDirection::Read)
-  assert_eq(fmmu_dirs[1], @mailbox.FmmuDirection::Write)
+  assert_eq(fmmu_dirs[0], @mailbox.FmmuDirection::Outputs)
+  assert_eq(fmmu_dirs[1], @mailbox.FmmuDirection::Inputs)
 }
 
 ///|
@@ -108,6 +108,10 @@ test "calculate_sm_configs uses sii header for mailbox" {
     product_code: 0U,
     revision: 0U,
     serial: 0U,
+    bootstrap_rx_offset: 0U,
+    bootstrap_rx_size: 0U,
+    bootstrap_tx_offset: 0U,
+    bootstrap_tx_size: 0U,
     mailbox_rx_offset: 0x1000U,
     mailbox_rx_size: 128U,
     mailbox_tx_offset: 0x1080U,
@@ -176,23 +180,23 @@ test "calculate_fmmu_configs maps process data" {
     },
   ]
   let fmmu_dirs : Array[@mailbox.FmmuDirection] = [
-    @mailbox.FmmuDirection::Read,
-    @mailbox.FmmuDirection::Write,
+    @mailbox.FmmuDirection::Outputs,
+    @mailbox.FmmuDirection::Inputs,
   ]
   let (fmmus, output_bytes, input_bytes) = @mailbox.calculate_fmmu_configs(
     fmmu_dirs, sm_configs, 0x00000000U,
   )
   assert_eq(fmmus.length(), 2)
-  // FMMU0: Read -> maps to ProcessDataOut SM at 0x1100
+  // FMMU0: Outputs -> maps to ProcessDataOut SM at 0x1100
   assert_eq(fmmus[0].physical_start, 0x1100U)
   assert_eq(fmmus[0].length, 32U)
   assert_eq(fmmus[0].logical_start, 0U)
-  assert_eq(fmmus[0].direction, @mailbox.FmmuDirection::Read)
-  // FMMU1: Write -> maps to ProcessDataIn SM at 0x1200
+  assert_eq(fmmus[0].direction, @mailbox.FmmuDirection::Outputs)
+  // FMMU1: Inputs -> maps to ProcessDataIn SM at 0x1200
   assert_eq(fmmus[1].physical_start, 0x1200U)
   assert_eq(fmmus[1].length, 16U)
   assert_eq(fmmus[1].logical_start, 32U) // offset by previous 32 bytes
-  assert_eq(fmmus[1].direction, @mailbox.FmmuDirection::Write)
+  assert_eq(fmmus[1].direction, @mailbox.FmmuDirection::Inputs)
   assert_eq(output_bytes, 32)
   assert_eq(input_bytes, 16)
 }
@@ -244,7 +248,7 @@ test "FmmuConfig to_bytes roundtrip" {
     logical_end_bit: b'\x07',
     physical_start: 0x1100U,
     physical_start_bit: b'\x00',
-    direction: @mailbox.FmmuDirection::Read,
+    direction: @mailbox.FmmuDirection::Outputs,
     activate: true,
   }
   let encoded = fmmu.to_bytes()
@@ -260,8 +264,8 @@ test "FmmuConfig to_bytes roundtrip" {
   // Physical start LE: 0x00, 0x11
   assert_eq(encoded[8], b'\x00')
   assert_eq(encoded[9], b'\x11')
-  // Direction: Read = 0x01
-  assert_eq(encoded[11], b'\x01')
+  // Direction: Outputs = 0x02 (write access in ESC register)
+  assert_eq(encoded[11], b'\x02')
   // Activate
   assert_eq(encoded[12], b'\x01')
 }
@@ -339,7 +343,10 @@ test "calculate_fmmu_configs with no FMMU directions" {
 ///|
 test "calculate_fmmu_configs with no matching SM" {
   // FMMU directions exist but no matching SM types
-  let fmmu_dirs = [@mailbox.FmmuDirection::Read, @mailbox.FmmuDirection::Write]
+  let fmmu_dirs = [
+    @mailbox.FmmuDirection::Outputs,
+    @mailbox.FmmuDirection::Inputs,
+  ]
   let (fmmus, out, inp) = @mailbox.calculate_fmmu_configs(fmmu_dirs, [], 0U)
   assert_eq(fmmus.length(), 0)
   assert_eq(out, 0)
@@ -400,12 +407,12 @@ test "FmmuConfig to_bytes length is always 16" {
     logical_end_bit: b'\x07',
     physical_start: 0xFFFFU,
     physical_start_bit: b'\x07',
-    direction: @mailbox.FmmuDirection::Write,
+    direction: @mailbox.FmmuDirection::Inputs,
     activate: true,
   }
   assert_eq(fmmu.to_bytes().length(), 16)
-  // Direction Write should be byte 0x02
-  assert_eq(fmmu.to_bytes()[11], b'\x02')
+  // Direction Inputs = 0x01 (read access in ESC register)
+  assert_eq(fmmu.to_bytes()[11], b'\x01')
 }
 
 // ========== CoE/SDO Engine Tests ==========

@@ -13,8 +13,8 @@ pub(all) struct FmmuConfig {
 
 ///|
 pub(all) enum FmmuDirection {
-  Read
-  Write
+  Outputs
+  Inputs
 } derive(Eq, Show)
 
 ///|
