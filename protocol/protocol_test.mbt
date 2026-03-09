@@ -262,3 +262,71 @@ test "find_pdu_by_index returns None for missing index" {
   }
   assert_true(@protocol.find_pdu_by_index(frame, b'\xFF') is None)
 }
+
+///|
+test "transact loopback - NOP roundtrip via MockNic" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = Bytes::new(0)
+  let pdu = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::NOP,
+    0U,
+    data,
+    timeout,
+  )
+  // MockNic echoes the sent frame, so the response PDU should match
+  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  assert_eq(pdu.wkc, 0U)
+}
+
+///|
+test "transact loopback - BRD with payload via MockNic" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04'])
+  let pdu = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::BRD,
+    @protocol.broadcast_address(0x0130U),
+    data,
+    timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
+  assert_eq(pdu.data, data)
+}
+
+///|
+test "transact loopback - full frame transaction via MockNic" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let builder = @protocol.FrameBuilder::new()
+  let idx0 = builder.add(@protocol.EcCommand::APRD, 0U, Bytes::new(2))
+  let idx1 = builder.add(
+    @protocol.EcCommand::FPWR,
+    @protocol.configured_address(0x1001U, 0x0130U),
+    Bytes::from_array([b'\xAA', b'\xBB']),
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  // Both PDUs should be present in the echoed response
+  let pdu0 = @protocol.find_pdu_by_index(response, idx0)
+  let pdu1 = @protocol.find_pdu_by_index(response, idx1)
+  assert_true(pdu0 is Some(_))
+  assert_true(pdu1 is Some(_))
+}
+
+///|
+test "transact_pdu_retry - succeeds on first try" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let pdu = @protocol.transact_pdu_retry(
+    nic,
+    @protocol.EcCommand::BRD,
+    0U,
+    Bytes::new(0),
+    timeout,
+    3,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
+}

@@ -38,6 +38,12 @@ pub fn read_command(AddressType) -> EcCommand
 
 pub fn readwrite_command(AddressType) -> EcCommand
 
+pub fn[N : @hal.Nic] transact(N, EcFrame, @hal.Duration) -> EcFrame raise @hal.EcError
+
+pub fn[N : @hal.Nic] transact_pdu(N, EcCommand, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] transact_pdu_retry(N, EcCommand, UInt, Bytes, @hal.Duration, Int) -> Pdu raise @hal.EcError
+
 pub let wkc_len : Int
 
 pub fn write_command(AddressType) -> EcCommand

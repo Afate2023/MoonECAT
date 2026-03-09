@@ -5,4 +5,6 @@ import {
 
 import {
   "afate/MoonECAT/fixtures",
+  "afate/MoonECAT/hal",
+  "afate/MoonECAT/hal/mock",
 } for "test"
