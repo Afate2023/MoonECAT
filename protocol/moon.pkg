@@ -1,7 +1,8 @@
 import {
   "afate/MoonECAT/hal",
+  "moonbitlang/core/buffer",
 }
 
 import {
-  "afate/MoonECAT/hal",
+  "afate/MoonECAT/fixtures",
 } for "test"

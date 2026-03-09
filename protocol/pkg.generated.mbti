@@ -58,6 +58,8 @@ pub(all) struct EcFrame {
   src_mac : FixedArray[Byte]
   pdus : Array[Pdu]
 }
+pub fn EcFrame::decode(Bytes) -> Self raise @hal.EcError
+pub fn EcFrame::encode(Self) -> Bytes
 pub impl Eq for EcFrame
 pub impl Show for EcFrame
 
