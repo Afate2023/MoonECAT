@@ -332,6 +332,48 @@ test "transact_pdu_retry - succeeds on first try" {
 }
 
 ///|
+test "count_slaves via mock loopback" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic echoes frames, so WKC will be 0 (no real slaves)
+  let count = @protocol.count_slaves(nic, timeout)
+  assert_eq(count, 0)
+}
+
+///|
+test "register read/write helpers compile and run" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // Test that read_register_ap sends the right command
+  let pdu = @protocol.read_register_ap(
+    nic, 0U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::APRD)
+}
+
+///|
+test "SlaveInfo construction" {
+  let info : @protocol.SlaveInfo = {
+    position: 0,
+    configured_address: 0x1001U,
+    identity: @fixtures.sample_ek1100_identity(),
+    al_status: Init,
+    dl_status: 0U,
+    sii: None,
+  }
+  assert_eq(info.position, 0)
+  assert_eq(info.configured_address, 0x1001U)
+  assert_true(info.sii is None)
+}
+
+///|
+test "ScanResult construction" {
+  let scan : @protocol.ScanResult = { slave_count: 0, slaves: [] }
+  assert_eq(scan.slave_count, 0)
+  assert_eq(scan.slaves.length(), 0)
+}
+
+///|
 test "EcFrame roundtrip preserves large PDU data" {
   // Create a PDU with 256 bytes of payload
   let data = Bytes::makei(256, fn(i) { (i % 256).to_byte() })

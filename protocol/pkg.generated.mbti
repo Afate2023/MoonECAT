@@ -3,12 +3,15 @@ package "afate/MoonECAT/protocol"
 
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/mailbox",
 }
 
 // Values
 pub fn address_offset(UInt) -> UInt
 
 pub fn address_station(UInt) -> UInt
+
+pub fn[N : @hal.Nic] assign_station_address(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn auto_increment_address(UInt) -> UInt
 
@@ -17,6 +20,8 @@ pub fn broadcast_address(UInt) -> UInt
 pub let broadcast_mac : FixedArray[Byte]
 
 pub fn configured_address(UInt, UInt) -> UInt
+
+pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
 
 pub let default_master_mac : FixedArray[Byte]
 
@@ -28,6 +33,8 @@ pub let ethernet_header_len : Int
 
 pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
 
+pub let fmmu_entry_size : Int
+
 pub fn logical_address(UInt) -> UInt
 
 pub let max_pdus_per_frame : Int
@@ -36,7 +43,41 @@ pub let pdu_header_len : Int
 
 pub fn read_command(AddressType) -> EcCommand
 
+pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
+
 pub fn readwrite_command(AddressType) -> EcCommand
+
+pub let reg_al_control : UInt
+
+pub let reg_al_status : UInt
+
+pub let reg_al_status_code : UInt
+
+pub let reg_build : UInt
+
+pub let reg_dl_status : UInt
+
+pub let reg_fmmu_base : UInt
+
+pub let reg_revision : UInt
+
+pub let reg_sii_address : UInt
+
+pub let reg_sii_control : UInt
+
+pub let reg_sii_data : UInt
+
+pub let reg_sm_base : UInt
+
+pub let reg_station_address : UInt
+
+pub let reg_station_alias : UInt
+
+pub let reg_type : UInt
+
+pub let sm_entry_size : Int
 
 pub fn[N : @hal.Nic] transact(N, EcFrame, @hal.Duration) -> EcFrame raise @hal.EcError
 
@@ -47,6 +88,10 @@ pub fn[N : @hal.Nic] transact_pdu_retry(N, EcCommand, UInt, Bytes, @hal.Duration
 pub let wkc_len : Int
 
 pub fn write_command(AddressType) -> EcCommand
+
+pub fn[N : @hal.Nic] write_register_ap(N, UInt, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] write_register_fp(N, UInt, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
 
 // Errors
 
@@ -142,6 +187,22 @@ pub(all) struct PduHeader {
 }
 pub impl Eq for PduHeader
 pub impl Show for PduHeader
+
+pub(all) struct ScanResult {
+  slave_count : Int
+  slaves : Array[SlaveInfo]
+}
+pub impl Show for ScanResult
+
+pub(all) struct SlaveInfo {
+  position : Int
+  mut configured_address : UInt
+  identity : @hal.SlaveIdentity
+  mut al_status : EsmState
+  dl_status : UInt
+  mut sii : @mailbox.SiiData?
+}
+pub impl Show for SlaveInfo
 
 // Type aliases
 

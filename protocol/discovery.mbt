@@ -1,0 +1,184 @@
+///|
+/// EtherCAT register addresses used during discovery and configuration.
+pub let reg_type : UInt = 0x0000U
+
+///|
+pub let reg_revision : UInt = 0x0001U
+
+///|
+pub let reg_build : UInt = 0x0002U
+
+///|
+/// DL Status register: link status, loop status, signal detection.
+pub let reg_dl_status : UInt = 0x0110U
+
+///|
+/// AL Status register: current ESM state and error indication.
+pub let reg_al_status : UInt = 0x0130U
+
+///|
+/// AL Status Code register: error code for failed ESM transitions.
+pub let reg_al_status_code : UInt = 0x0134U
+
+///|
+/// AL Control register: request ESM state transition.
+pub let reg_al_control : UInt = 0x0120U
+
+///|
+/// Configured Station Address register.
+pub let reg_station_address : UInt = 0x0010U
+
+///|
+/// Configured Station Alias register.
+pub let reg_station_alias : UInt = 0x0012U
+
+///|
+/// SII (EEPROM) control/status register.
+pub let reg_sii_control : UInt = 0x0502U
+
+///|
+/// SII address register (word address for EEPROM read/write).
+pub let reg_sii_address : UInt = 0x0504U
+
+///|
+/// SII data register (EEPROM data, 4 or 8 bytes depending on operation).
+pub let reg_sii_data : UInt = 0x0508U
+
+///|
+/// FMMU base register (FMMU0 starts at 0x0600, each FMMU is 16 bytes).
+pub let reg_fmmu_base : UInt = 0x0600U
+
+///|
+/// FMMU entry size in bytes.
+pub let fmmu_entry_size : Int = 16
+
+///|
+/// Sync Manager base register (SM0 starts at 0x0800, each SM is 8 bytes).
+pub let reg_sm_base : UInt = 0x0800U
+
+///|
+/// Sync Manager entry size in bytes.
+pub let sm_entry_size : Int = 8
+
+///|
+/// SlaveInfo represents a discovered slave on the network.
+pub(all) struct SlaveInfo {
+  /// Position on the bus (0 = first slave)
+  position : Int
+  /// Configured station address (assigned during configuration)
+  mut configured_address : UInt
+  /// Identity from SII EEPROM
+  identity : @hal.SlaveIdentity
+  /// Current ESM state
+  mut al_status : EsmState
+  /// DL status (link/signal)
+  dl_status : UInt
+  /// SII data read from EEPROM
+  mut sii : @mailbox.SiiData?
+} derive(Show)
+
+///|
+/// Result of a bus scan operation.
+pub(all) struct ScanResult {
+  /// Number of slaves found
+  slave_count : Int
+  /// Detailed information per slave
+  slaves : Array[SlaveInfo]
+} derive(Show)
+
+///|
+/// Count the number of slaves on the bus by sending a BRD to register 0x0000.
+/// The working counter indicates how many slaves responded.
+pub fn[N : @hal.Nic] count_slaves(
+  nic : N,
+  timeout : @hal.Duration,
+) -> Int raise @hal.EcError {
+  let pdu = transact_pdu(
+    nic,
+    EcCommand::BRD,
+    broadcast_address(reg_type),
+    Bytes::new(1),
+    timeout,
+  )
+  pdu.wkc.reinterpret_as_int()
+}
+
+///|
+/// Read a register from a slave using auto-increment addressing.
+pub fn[N : @hal.Nic] read_register_ap(
+  nic : N,
+  position : UInt,
+  register : UInt,
+  length : Int,
+  timeout : @hal.Duration,
+) -> Pdu raise @hal.EcError {
+  let addr = auto_increment_address(position) | (register << 16)
+  transact_pdu(nic, EcCommand::APRD, addr, Bytes::new(length), timeout)
+}
+
+///|
+/// Write a register to a slave using auto-increment addressing.
+pub fn[N : @hal.Nic] write_register_ap(
+  nic : N,
+  position : UInt,
+  register : UInt,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Pdu raise @hal.EcError {
+  let addr = auto_increment_address(position) | (register << 16)
+  transact_pdu(nic, EcCommand::APWR, addr, data, timeout)
+}
+
+///|
+/// Read a register from a slave using configured station addressing.
+pub fn[N : @hal.Nic] read_register_fp(
+  nic : N,
+  station : UInt,
+  register : UInt,
+  length : Int,
+  timeout : @hal.Duration,
+) -> Pdu raise @hal.EcError {
+  let addr = configured_address(station, register)
+  transact_pdu(nic, EcCommand::FPRD, addr, Bytes::new(length), timeout)
+}
+
+///|
+/// Write a register to a slave using configured station addressing.
+pub fn[N : @hal.Nic] write_register_fp(
+  nic : N,
+  station : UInt,
+  register : UInt,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Pdu raise @hal.EcError {
+  let addr = configured_address(station, register)
+  transact_pdu(nic, EcCommand::FPWR, addr, data, timeout)
+}
+
+///|
+/// Assign a configured station address to a slave at the given position.
+pub fn[N : @hal.Nic] assign_station_address(
+  nic : N,
+  position : UInt,
+  station_address : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let buf = @buffer.new(size_hint=2)
+  buf.write_byte((station_address & 0xFFU).reinterpret_as_int().to_byte())
+  buf.write_byte(
+    ((station_address >> 8) & 0xFFU).reinterpret_as_int().to_byte(),
+  )
+  let pdu = write_register_ap(
+    nic,
+    position,
+    reg_station_address,
+    buf.to_bytes(),
+    timeout,
+  )
+  if pdu.wkc == 0U {
+    raise @hal.EcError::SendFailed(
+      "station address assignment failed for position " +
+      position.reinterpret_as_int().to_string(),
+    )
+  }
+}
