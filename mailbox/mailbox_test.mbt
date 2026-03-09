@@ -100,3 +100,180 @@ test "parse_sii_sm from fixture" {
   assert_eq(sm_entries[1].physical_start, 0x1080U)
   assert_eq(sm_entries[1].sm_type, @mailbox.SmType::MailboxIn)
 }
+
+///|
+test "calculate_sm_configs uses sii header for mailbox" {
+  let sii_header : @mailbox.SiiData = {
+    vendor_id: 2U,
+    product_code: 0U,
+    revision: 0U,
+    serial: 0U,
+    mailbox_rx_offset: 0x1000U,
+    mailbox_rx_size: 128U,
+    mailbox_tx_offset: 0x1080U,
+    mailbox_tx_size: 128U,
+    mailbox_protocols: 0xCU,
+  }
+  let sm_entries : Array[@mailbox.SiiSmEntry] = [
+    {
+      physical_start: 0U,
+      length: 0U,
+      control: b'\x26',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxOut,
+    },
+    {
+      physical_start: 0U,
+      length: 0U,
+      control: b'\x22',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxIn,
+    },
+  ]
+  let configs = @mailbox.calculate_sm_configs(sii_header, sm_entries)
+  assert_eq(configs.length(), 2)
+  // Mailbox SM should use header offsets, not the SII SM entry values
+  assert_eq(configs[0].physical_start, 0x1000U)
+  assert_eq(configs[0].length, 128U)
+  assert_eq(configs[1].physical_start, 0x1080U)
+  assert_eq(configs[1].length, 128U)
+}
+
+///|
+test "calculate_fmmu_configs maps process data" {
+  let sm_configs : Array[@mailbox.SmConfig] = [
+    {
+      physical_start: 0x1000U,
+      length: 128U,
+      control: b'\x26',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxOut,
+    },
+    {
+      physical_start: 0x1080U,
+      length: 128U,
+      control: b'\x22',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxIn,
+    },
+    {
+      physical_start: 0x1100U,
+      length: 32U,
+      control: b'\x64',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataOut,
+    },
+    {
+      physical_start: 0x1200U,
+      length: 16U,
+      control: b'\x20',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataIn,
+    },
+  ]
+  let fmmu_dirs : Array[@mailbox.FmmuDirection] = [
+    @mailbox.FmmuDirection::Read,
+    @mailbox.FmmuDirection::Write,
+  ]
+  let (fmmus, output_bytes, input_bytes) = @mailbox.calculate_fmmu_configs(
+    fmmu_dirs, sm_configs, 0x00000000U,
+  )
+  assert_eq(fmmus.length(), 2)
+  // FMMU0: Read -> maps to ProcessDataOut SM at 0x1100
+  assert_eq(fmmus[0].physical_start, 0x1100U)
+  assert_eq(fmmus[0].length, 32U)
+  assert_eq(fmmus[0].logical_start, 0U)
+  assert_eq(fmmus[0].direction, @mailbox.FmmuDirection::Read)
+  // FMMU1: Write -> maps to ProcessDataIn SM at 0x1200
+  assert_eq(fmmus[1].physical_start, 0x1200U)
+  assert_eq(fmmus[1].length, 16U)
+  assert_eq(fmmus[1].logical_start, 32U) // offset by previous 32 bytes
+  assert_eq(fmmus[1].direction, @mailbox.FmmuDirection::Write)
+  assert_eq(output_bytes, 32)
+  assert_eq(input_bytes, 16)
+}
+
+///|
+test "calculate_slave_mapping end-to-end" {
+  let eeprom = @fixtures.sample_sii_eeprom_with_pdo()
+  let mapping = @mailbox.calculate_slave_mapping(eeprom, 0x10000U)
+  assert_eq(mapping.sm_configs.length(), 4)
+  assert_eq(mapping.fmmu_configs.length(), 2)
+  assert_eq(mapping.output_bytes, 32)
+  assert_eq(mapping.input_bytes, 16)
+  // First FMMU should start at logical base
+  assert_eq(mapping.fmmu_configs[0].logical_start, 0x10000U)
+  // Second FMMU starts after first
+  assert_eq(mapping.fmmu_configs[1].logical_start, 0x10020U) // 0x10000 + 32
+}
+
+///|
+test "SmConfig to_bytes roundtrip" {
+  let sm : @mailbox.SmConfig = {
+    physical_start: 0x1000U,
+    length: 128U,
+    control: b'\x26',
+    status: b'\x00',
+    enable: true,
+    sm_type: @mailbox.SmType::MailboxOut,
+  }
+  let encoded = sm.to_bytes()
+  assert_eq(encoded.length(), 8)
+  // Physical start LE: 0x00, 0x10
+  assert_eq(encoded[0], b'\x00')
+  assert_eq(encoded[1], b'\x10')
+  // Length LE: 0x80, 0x00
+  assert_eq(encoded[2], b'\x80')
+  assert_eq(encoded[3], b'\x00')
+  // Control
+  assert_eq(encoded[4], b'\x26')
+  // Enable
+  assert_eq(encoded[6], b'\x01')
+}
+
+///|
+test "FmmuConfig to_bytes roundtrip" {
+  let fmmu : @mailbox.FmmuConfig = {
+    logical_start: 0x00010000U,
+    length: 32U,
+    logical_start_bit: b'\x00',
+    logical_end_bit: b'\x07',
+    physical_start: 0x1100U,
+    physical_start_bit: b'\x00',
+    direction: @mailbox.FmmuDirection::Read,
+    activate: true,
+  }
+  let encoded = fmmu.to_bytes()
+  assert_eq(encoded.length(), 16)
+  // Logical start LE: 0x00, 0x00, 0x01, 0x00
+  assert_eq(encoded[0], b'\x00')
+  assert_eq(encoded[1], b'\x00')
+  assert_eq(encoded[2], b'\x01')
+  assert_eq(encoded[3], b'\x00')
+  // Length LE: 0x20, 0x00
+  assert_eq(encoded[4], b'\x20')
+  assert_eq(encoded[5], b'\x00')
+  // Physical start LE: 0x00, 0x11
+  assert_eq(encoded[8], b'\x00')
+  assert_eq(encoded[9], b'\x11')
+  // Direction: Read = 0x01
+  assert_eq(encoded[11], b'\x01')
+  // Activate
+  assert_eq(encoded[12], b'\x01')
+}
+
+///|
+test "calculate_slave_mapping mailbox-only slave" {
+  // The basic fixture has only mailbox SMs, no process data SMs
+  let eeprom = @fixtures.sample_sii_eeprom()
+  let mapping = @mailbox.calculate_slave_mapping(eeprom, 0U)
+  assert_eq(mapping.sm_configs.length(), 2)
+  // FMMU should fall back to mailbox SMs
+  assert_eq(mapping.fmmu_configs.length(), 2)
+  assert_eq(mapping.output_bytes, 0) // mailbox doesn't count as PDO
+  assert_eq(mapping.input_bytes, 0)
+}

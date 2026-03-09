@@ -124,3 +124,73 @@ pub fn sample_sii_eeprom() -> Bytes {
   data[175] = b'\x7F'
   Bytes::makei(data.length(), fn(i) { data[i] })
 }
+
+///|
+/// Synthetic SII EEPROM image with process-data SM entries for mapping tests.
+/// Has 4 SM entries: SM0=MailboxOut, SM1=MailboxIn, SM2=ProcessDataOut(32B), SM3=ProcessDataIn(16B)
+/// And 2 FMMU directions: Read (outputs), Write (inputs).
+pub fn sample_sii_eeprom_with_pdo() -> Bytes {
+  let data = FixedArray::make(320, b'\x00')
+  // Word 8-9: Vendor ID = 0x00000002
+  data[16] = b'\x02'
+  // Word 10-11: Product Code = 0x044C2C52
+  data[20] = b'\x52'
+  data[21] = b'\x2C'
+  data[22] = b'\x4C'
+  data[23] = b'\x04'
+  // Word 12-13: Revision = 0x00110000
+  data[26] = b'\x11'
+  // Word 24: RX Mailbox Offset = 0x1000
+  data[48] = b'\x00'
+  data[49] = b'\x10'
+  // Word 25: RX Mailbox Size = 128
+  data[50] = b'\x80'
+  // Word 26: TX Mailbox Offset = 0x1080
+  data[52] = b'\x80'
+  data[53] = b'\x10'
+  // Word 27: TX Mailbox Size = 128
+  data[54] = b'\x80'
+  // Word 28: Mailbox Protocol = 0x000C
+  data[56] = b'\x0C'
+  // Category area at word 64 (byte 128)
+  // Category 1: FMMU (type=40, size=1 word = 2 bytes)
+  data[128] = b'\x28' // type = 40
+  data[130] = b'\x01' // size = 1 word
+  data[132] = b'\x01' // FMMU0: Read (outputs)
+  data[133] = b'\x02' // FMMU1: Write (inputs)
+  // Category 2: SM (type=41, size=16 words = 32 bytes, 4 SM entries)
+  data[134] = b'\x29' // type = 41
+  data[136] = b'\x10' // size = 16 words
+  // SM0: MailboxOut at 0x1000, size 128
+  data[138] = b'\x00'
+  data[139] = b'\x10' // physical_start
+  data[140] = b'\x80' // length = 128
+  data[142] = b'\x26' // control
+  data[143] = b'\x01' // type = MailboxOut
+  data[144] = b'\x01' // enable
+  // SM1: MailboxIn at 0x1080, size 128
+  data[146] = b'\x80'
+  data[147] = b'\x10'
+  data[148] = b'\x80'
+  data[150] = b'\x22'
+  data[151] = b'\x02' // type = MailboxIn
+  data[152] = b'\x01'
+  // SM2: ProcessDataOut at 0x1100, size 32
+  data[154] = b'\x00'
+  data[155] = b'\x11' // physical_start = 0x1100
+  data[156] = b'\x20' // length = 32
+  data[158] = b'\x64' // control
+  data[159] = b'\x03' // type = ProcessDataOut
+  data[160] = b'\x01' // enable
+  // SM3: ProcessDataIn at 0x1200, size 16
+  data[162] = b'\x00'
+  data[163] = b'\x12' // physical_start = 0x1200
+  data[164] = b'\x10' // length = 16
+  data[166] = b'\x20' // control
+  data[167] = b'\x04' // type = ProcessDataIn
+  data[168] = b'\x01' // enable
+  // End marker
+  data[170] = b'\xFF'
+  data[171] = b'\x7F'
+  Bytes::makei(data.length(), fn(i) { data[i] })
+}

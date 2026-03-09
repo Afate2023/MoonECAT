@@ -6,6 +6,12 @@ import {
 }
 
 // Values
+pub fn calculate_fmmu_configs(Array[FmmuDirection], Array[SmConfig], UInt) -> (Array[FmmuConfig], Int, Int)
+
+pub fn calculate_slave_mapping(Bytes, UInt) -> SlaveMapping raise @hal.EcError
+
+pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
+
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
 pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
@@ -43,6 +49,7 @@ pub(all) struct FmmuConfig {
   direction : FmmuDirection
   activate : Bool
 }
+pub fn FmmuConfig::to_bytes(Self) -> Bytes
 pub impl Eq for FmmuConfig
 pub impl Show for FmmuConfig
 
@@ -154,6 +161,15 @@ pub(all) struct SiiSmEntry {
 pub impl Eq for SiiSmEntry
 pub impl Show for SiiSmEntry
 
+pub(all) struct SlaveMapping {
+  sm_configs : Array[SmConfig]
+  fmmu_configs : Array[FmmuConfig]
+  output_bytes : Int
+  input_bytes : Int
+}
+pub impl Eq for SlaveMapping
+pub impl Show for SlaveMapping
+
 pub(all) struct SmConfig {
   physical_start : UInt
   length : UInt
@@ -162,6 +178,7 @@ pub(all) struct SmConfig {
   enable : Bool
   sm_type : SmType
 }
+pub fn SmConfig::to_bytes(Self) -> Bytes
 pub impl Eq for SmConfig
 pub impl Show for SmConfig
 

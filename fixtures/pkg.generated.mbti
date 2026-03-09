@@ -12,6 +12,8 @@ pub fn sample_ek1100_identity() -> @hal.SlaveIdentity
 
 pub fn sample_sii_eeprom() -> Bytes
 
+pub fn sample_sii_eeprom_with_pdo() -> Bytes
+
 // Errors
 
 // Types and methods
