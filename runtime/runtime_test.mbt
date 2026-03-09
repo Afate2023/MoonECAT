@@ -448,3 +448,209 @@ test "SlaveReport equality" {
   }
   assert_eq(r1, r2)
 }
+
+///|
+test "validate: all slaves match" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 2,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+    {
+      position: 1U,
+      expected_identity: Some({
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      }),
+      configured_address: 0x1002U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, true)
+  assert_eq(report.total_expected, 2)
+  assert_eq(report.total_found, 2)
+  assert_eq(report.results.length(), 2)
+}
+
+///|
+test "validate: identity mismatch detected" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0009U,
+        product_code: 0x0099U,
+        revision: 0x0001U,
+        serial: 0x0000U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_true(report.results[0] is @runtime.IdentityMismatch(..))
+}
+
+///|
+test "validate: missing slave" {
+  let scan : @runtime.ScanReport = { slave_count: 0, slaves: [] }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_eq(report.results.length(), 1)
+  assert_true(report.results[0] is @runtime.Missing(..))
+}
+
+///|
+test "validate: extra slave detected" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 2,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        vendor_id: 0x0005U,
+        product_code: 0x0010U,
+        revision: 0x0001U,
+        serial: 0x0000U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_eq(report.results.length(), 2)
+  assert_true(report.results[0] is @runtime.Ok)
+  assert_true(report.results[1] is @runtime.Extra(..))
+}
+
+///|
+test "validate: no identity constraint accepts any slave" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0xFFFFU,
+        product_code: 0xFFFFU,
+        revision: 0xFFFFU,
+        serial: 0xFFFFU,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    { position: 0U, expected_identity: None, configured_address: 0x1001U },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, true)
+  assert_eq(report.results.length(), 1)
+}
+
+///|
+test "validate: empty config and empty scan" {
+  let scan : @runtime.ScanReport = { slave_count: 0, slaves: [] }
+  let expected : Array[@hal.SlaveConfig] = []
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, true)
+  assert_eq(report.total_expected, 0)
+  assert_eq(report.total_found, 0)
+}
+
+///|
+test "ValidateReport format shows PASS" {
+  let report : @runtime.ValidateReport = {
+    total_expected: 1,
+    total_found: 1,
+    results: [@runtime.Ok],
+    all_ok: true,
+  }
+  let text = report.format()
+  assert_true(text.contains("PASS"))
+  assert_true(text.contains("[OK]"))
+}
+
+///|
+test "ValidateReport format shows FAIL with details" {
+  let report : @runtime.ValidateReport = {
+    total_expected: 2,
+    total_found: 1,
+    results: [@runtime.Ok, @runtime.Missing(position=1)],
+    all_ok: false,
+  }
+  let text = report.format()
+  assert_true(text.contains("FAIL"))
+  assert_true(text.contains("[MISSING]"))
+}

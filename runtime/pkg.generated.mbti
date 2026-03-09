@@ -9,6 +9,8 @@ import {
 // Values
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
+pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
+
 // Errors
 
 // Types and methods
@@ -98,6 +100,23 @@ pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
 pub impl Eq for Telemetry
 pub impl Show for Telemetry
+
+pub(all) struct ValidateReport {
+  total_expected : Int
+  total_found : Int
+  results : Array[ValidationResult]
+  all_ok : Bool
+}
+pub fn ValidateReport::format(Self) -> String
+pub impl Show for ValidateReport
+
+pub(all) enum ValidationResult {
+  Ok
+  IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
+  Missing(position~ : Int)
+  Extra(position~ : Int)
+}
+pub impl Show for ValidationResult
 
 // Type aliases
 
