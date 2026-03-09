@@ -1,0 +1,135 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/mailbox"
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum CoeService {
+  SdoRequest
+  SdoResponse
+  SdoInfo
+  PdoRemoteRequest
+  TxPdo
+  RxPdo
+  Emergency
+}
+pub impl Eq for CoeService
+pub impl Show for CoeService
+
+pub(all) struct FmmuConfig {
+  logical_start : UInt
+  length : UInt
+  logical_start_bit : Byte
+  logical_end_bit : Byte
+  physical_start : UInt
+  physical_start_bit : Byte
+  direction : FmmuDirection
+  activate : Bool
+}
+pub impl Eq for FmmuConfig
+pub impl Show for FmmuConfig
+
+pub(all) enum FmmuDirection {
+  Read
+  Write
+}
+pub impl Eq for FmmuDirection
+pub impl Show for FmmuDirection
+
+pub(all) struct MailboxHeader {
+  length : UInt
+  address : UInt
+  channel : Byte
+  priority : Byte
+  mb_type : MailboxType
+  counter : Byte
+}
+pub impl Eq for MailboxHeader
+pub impl Show for MailboxHeader
+
+pub(all) enum MailboxType {
+  Err
+  AoE
+  EoE
+  CoE
+  FoE
+  SoE
+  VoE
+}
+pub fn MailboxType::to_byte(Self) -> Byte
+pub impl Eq for MailboxType
+pub impl Show for MailboxType
+
+pub(all) enum SdoCommand {
+  DownloadRequest
+  DownloadResponse
+  UploadRequest
+  UploadResponse
+  AbortTransfer
+}
+pub impl Eq for SdoCommand
+pub impl Show for SdoCommand
+
+pub(all) struct SdoRequest {
+  index : UInt
+  subindex : Byte
+  command : SdoCommand
+  data : Bytes
+  complete_access : Bool
+}
+pub impl Eq for SdoRequest
+pub impl Show for SdoRequest
+
+pub(all) enum SiiCategory {
+  Strings
+  General
+  Fmmu
+  SyncManager
+  TxPdo
+  RxPdo
+  Dc
+}
+pub impl Eq for SiiCategory
+pub impl Show for SiiCategory
+
+pub(all) struct SiiData {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+  mailbox_rx_offset : UInt
+  mailbox_rx_size : UInt
+  mailbox_tx_offset : UInt
+  mailbox_tx_size : UInt
+  mailbox_protocols : UInt
+}
+pub impl Eq for SiiData
+pub impl Show for SiiData
+
+pub(all) struct SmConfig {
+  physical_start : UInt
+  length : UInt
+  control : Byte
+  status : Byte
+  enable : Bool
+  sm_type : SmType
+}
+pub impl Eq for SmConfig
+pub impl Show for SmConfig
+
+pub(all) enum SmType {
+  MailboxOut
+  MailboxIn
+  ProcessDataOut
+  ProcessDataIn
+  Unused
+}
+pub impl Eq for SmType
+pub impl Show for SmType
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,97 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/protocol"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+pub let broadcast_mac : FixedArray[Byte]
+
+pub let default_master_mac : FixedArray[Byte]
+
+pub let ecat_frame_type : Int
+
+pub let ecat_header_len : Int
+
+pub let ethernet_header_len : Int
+
+pub let pdu_header_len : Int
+
+pub let wkc_len : Int
+
+// Errors
+
+// Types and methods
+pub(all) enum AddressMode {
+  AutoIncrement
+  ConfiguredStation(UInt)
+  Logical(UInt)
+}
+pub impl Eq for AddressMode
+pub impl Show for AddressMode
+
+pub(all) enum EcCommand {
+  NOP
+  APRD
+  APWR
+  APRW
+  FPRD
+  FPWR
+  FPRW
+  BRD
+  BWR
+  BRW
+  LRD
+  LWR
+  LRW
+  ARMW
+  FRMW
+}
+pub fn EcCommand::from_byte(Byte) -> Self raise @hal.EcError
+pub fn EcCommand::to_byte(Self) -> Byte
+pub impl Eq for EcCommand
+pub impl Show for EcCommand
+
+pub(all) struct EcFrame {
+  dst_mac : FixedArray[Byte]
+  src_mac : FixedArray[Byte]
+  pdus : Array[Pdu]
+}
+pub impl Eq for EcFrame
+pub impl Show for EcFrame
+
+pub(all) enum EsmState {
+  Init
+  PreOp
+  SafeOp
+  Op
+  Boot
+}
+pub fn EsmState::can_transition(Self, Self) -> Bool
+pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
+pub fn EsmState::to_byte(Self) -> Byte
+pub impl Eq for EsmState
+pub impl Show for EsmState
+
+pub(all) struct Pdu {
+  header : PduHeader
+  data : Bytes
+  wkc : UInt
+}
+pub impl Eq for Pdu
+pub impl Show for Pdu
+
+pub(all) struct PduHeader {
+  command : EcCommand
+  index : Byte
+  address : UInt
+  len_flags : UInt
+}
+pub impl Eq for PduHeader
+pub impl Show for PduHeader
+
+// Type aliases
+
+// Traits
+

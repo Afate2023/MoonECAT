@@ -1,0 +1,71 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/hal"
+
+// Values
+pub let ethercat_ethertype : Int
+
+pub let max_frame_size : Int
+
+// Errors
+pub(all) suberror EcError {
+  LinkDown
+  SendFailed(String)
+  RecvTimeout
+  RecvFailed(String)
+  InvalidFrame(String)
+  InvalidPdu(String)
+  UnexpectedWkc(expected~ : Int, actual~ : Int)
+  EsmTransitionFailed(from~ : String, to~ : String)
+  EsmStateError(String)
+  MailboxTimeout
+  MailboxProtocol(String)
+  SdoAbort(UInt)
+  SiiReadFailed(String)
+  EsiParseFailed(String)
+  ConfigMismatch(String)
+  NotSupported(String)
+  Internal(String)
+}
+pub impl Show for EcError
+
+// Types and methods
+pub(all) struct Duration(Int64)
+#deprecated
+pub fn Duration::inner(Self) -> Int64
+pub impl Compare for Duration
+pub impl Eq for Duration
+pub impl Show for Duration
+
+pub(all) struct NicHandle {
+  id : Int
+}
+pub impl Eq for NicHandle
+pub impl Show for NicHandle
+
+pub(all) struct Timestamp(Int64)
+#deprecated
+pub fn Timestamp::inner(Self) -> Int64
+pub impl Compare for Timestamp
+pub impl Eq for Timestamp
+pub impl Show for Timestamp
+
+// Type aliases
+
+// Traits
+pub(open) trait Clock {
+  now(Self) -> Timestamp
+  sleep(Self, Duration) -> Unit
+}
+
+pub(open) trait FileAccess {
+  read_file(Self, String) -> Bytes raise EcError
+  write_file(Self, String, Bytes) -> Unit raise EcError
+}
+
+pub(open) trait Nic {
+  open_(String) -> Self raise EcError
+  send(Self, Bytes) -> Int raise EcError
+  recv(Self, timeout~ : Duration) -> Bytes raise EcError
+  close(Self) -> Unit
+}
+

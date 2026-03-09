@@ -1,6 +1,6 @@
-// import {
-//   "username/MoonECAT" @lib,
-// }
+import {
+  "afate/MoonECAT" @lib,
+}
 
 options(
   "is-main": true,

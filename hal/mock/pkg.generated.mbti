@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/hal/mock"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct MockClock {
+  mut current_ns : Int64
+}
+pub fn MockClock::advance(Self, Int64) -> Unit
+pub fn MockClock::new() -> Self
+pub impl @hal.Clock for MockClock
+
+pub struct MockNic {
+  buffer : Array[Bytes]
+  mut is_open : Bool
+}
+pub fn MockNic::new() -> Self
+pub impl @hal.Nic for MockNic
+
+// Type aliases
+
+// Traits
+

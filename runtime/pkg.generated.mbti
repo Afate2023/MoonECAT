@@ -1,0 +1,46 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/runtime"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) enum RunMode {
+  FreeRun
+  DcSync
+}
+pub impl Eq for RunMode
+pub impl Show for RunMode
+
+pub(all) enum RuntimeState {
+  Idle
+  Scanning
+  Configuring
+  Running(RunMode)
+  Stopping
+  Error(@hal.EcError)
+}
+pub impl Show for RuntimeState
+
+pub(all) struct Telemetry {
+  mut cycles : Int64
+  mut tx_frames : Int64
+  mut rx_frames : Int64
+  mut timeouts : Int64
+  mut retries : Int64
+  mut wkc_errors : Int64
+}
+pub fn Telemetry::new() -> Self
+pub fn Telemetry::reset(Self) -> Unit
+pub impl Eq for Telemetry
+pub impl Show for Telemetry
+
+// Type aliases
+
+// Traits
+

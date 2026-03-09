@@ -1,9 +1,9 @@
 {
-  "name": "username/MoonECAT",
+  "name": "afate/MoonECAT",
   "version": "0.1.0",
   "readme": "README.mbt.md",
   "repository": "",
   "license": "Apache-2.0",
-  "keywords": [],
-  "description": ""
+  "keywords": ["ethercat", "industrial", "fieldbus"],
+  "description": "A modular EtherCAT master library written in MoonBit"
 }
