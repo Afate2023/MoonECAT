@@ -29,6 +29,15 @@ pub(all) suberror EcError {
 pub impl Show for EcError
 
 // Types and methods
+pub(all) struct DiagnosticEvent {
+  timestamp : Timestamp
+  severity : Severity
+  source : String
+  message : String
+}
+pub fn DiagnosticEvent::new(Timestamp, Severity, String, String) -> Self
+pub impl Show for DiagnosticEvent
+
 pub(all) struct Duration(Int64)
 #deprecated
 pub fn Duration::inner(Self) -> Int64
@@ -36,11 +45,48 @@ pub impl Compare for Duration
 pub impl Eq for Duration
 pub impl Show for Duration
 
+pub(all) struct MasterConfig {
+  interface_name : String
+  cycle_period_ns : Int64
+  recv_timeout_ns : Int64
+  max_retries : Int
+  dc_enabled : Bool
+}
+pub fn MasterConfig::default() -> Self
+pub impl Eq for MasterConfig
+pub impl Show for MasterConfig
+
 pub(all) struct NicHandle {
   id : Int
 }
 pub impl Eq for NicHandle
 pub impl Show for NicHandle
+
+pub(all) enum Severity {
+  Debug
+  Info
+  Warn
+  Error
+}
+pub impl Eq for Severity
+pub impl Show for Severity
+
+pub(all) struct SlaveConfig {
+  position : UInt
+  expected_identity : SlaveIdentity?
+  configured_address : UInt
+}
+pub impl Eq for SlaveConfig
+pub impl Show for SlaveConfig
+
+pub(all) struct SlaveIdentity {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+}
+pub impl Eq for SlaveIdentity
+pub impl Show for SlaveIdentity
 
 pub(all) struct Timestamp(Int64)
 #deprecated
@@ -55,6 +101,10 @@ pub impl Show for Timestamp
 pub(open) trait Clock {
   now(Self) -> Timestamp
   sleep(Self, Duration) -> Unit
+}
+
+pub(open) trait DiagnosticSink {
+  emit(Self, DiagnosticEvent) -> Unit
 }
 
 pub(open) trait FileAccess {
