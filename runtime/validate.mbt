@@ -27,46 +27,79 @@ pub(all) struct ValidateReport {
 ///|
 /// Validate that a scan report matches an expected slave configuration.
 /// Each expected slave is checked by position.
+fn find_slave_at_position(
+  slaves : Array[SlaveReport],
+  position : Int,
+) -> SlaveReport? {
+  for slave in slaves {
+    if slave.position == position {
+      return Some(slave)
+    }
+  }
+  None
+}
+
+///|
+fn has_expected_position(
+  expected : Array[@hal.SlaveConfig],
+  position : Int,
+) -> Bool {
+  for exp in expected {
+    if exp.position.reinterpret_as_int() == position {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Validate that scan results match expected slaves by `position`.
 pub fn validate(
   scan_report : ScanReport,
   expected : Array[@hal.SlaveConfig],
 ) -> ValidateReport {
   let results : Array[ValidationResult] = []
   let mut all_ok = true
-  // Check each expected slave
-  for i = 0; i < expected.length(); i = i + 1 {
-    if i < scan_report.slaves.length() {
-      let found = scan_report.slaves[i]
-      let exp = expected[i]
-      let actual_identity : @hal.SlaveIdentity = {
-        vendor_id: found.vendor_id,
-        product_code: found.product_code,
-        revision: found.revision,
-        serial: found.serial,
+  // Check each expected slave by configured position.
+  for exp in expected {
+    let pos = exp.position.reinterpret_as_int()
+    match find_slave_at_position(scan_report.slaves, pos) {
+      Some(found) => {
+        let actual_identity : @hal.SlaveIdentity = {
+          vendor_id: found.vendor_id,
+          product_code: found.product_code,
+          revision: found.revision,
+          serial: found.serial,
+        }
+        match exp.expected_identity {
+          Some(expected_id) =>
+            if actual_identity.vendor_id == expected_id.vendor_id &&
+              actual_identity.product_code == expected_id.product_code {
+              results.push(Ok)
+            } else {
+              results.push(
+                IdentityMismatch(expected=expected_id, actual=actual_identity),
+              )
+              all_ok = false
+            }
+          None => results.push(Ok) // No identity constraint — accept any
+        }
       }
-      match exp.expected_identity {
-        Some(expected_id) =>
-          if actual_identity.vendor_id == expected_id.vendor_id &&
-            actual_identity.product_code == expected_id.product_code {
-            results.push(Ok)
-          } else {
-            results.push(
-              IdentityMismatch(expected=expected_id, actual=actual_identity),
-            )
-            all_ok = false
-          }
-        None => results.push(Ok) // No identity constraint — accept any
+      None => {
+        results.push(Missing(position=pos))
+        all_ok = false
       }
-    } else {
-      results.push(Missing(position=i))
+    }
+  }
+
+  // Check for extra slaves whose positions are not configured.
+  for found in scan_report.slaves {
+    if not(has_expected_position(expected, found.position)) {
+      results.push(Extra(position=found.position))
       all_ok = false
     }
   }
-  // Check for extra slaves
-  for i = expected.length(); i < scan_report.slaves.length(); i = i + 1 {
-    results.push(Extra(position=i))
-    all_ok = false
-  }
+
   {
     total_expected: expected.length(),
     total_found: scan_report.slave_count,

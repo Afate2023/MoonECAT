@@ -630,6 +630,90 @@ test "validate: empty config and empty scan" {
 }
 
 ///|
+test "validate: matches by position even when expected order differs" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 2,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 1U,
+      expected_identity: Some({
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      }),
+      configured_address: 0x1002U,
+    },
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, true)
+  assert_eq(report.results.length(), 2)
+}
+
+///|
+test "validate: reports missing and extra by position" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 1U,
+      expected_identity: Some({
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      }),
+      configured_address: 0x1002U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_eq(report.results.length(), 2)
+  assert_true(report.results[0] is @runtime.Missing(position=1))
+  assert_true(report.results[1] is @runtime.Extra(position=0))
+}
+
+///|
 test "ValidateReport format shows PASS" {
   let report : @runtime.ValidateReport = {
     total_expected: 1,
