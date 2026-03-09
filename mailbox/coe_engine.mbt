@@ -1,0 +1,319 @@
+///|
+/// CoE/SDO transaction engine: encode/decode mailbox + CoE frames,
+/// and drive expedited SDO Upload/Download transactions.
+///
+/// Mailbox frame layout (ETG.1000.6):
+///   Bytes 0-1: Length (data area only, little-endian)
+///   Bytes 2-3: Address (station address, little-endian)
+///   Byte 4: bits [7:6]=Priority, [5:2]=reserved, [1:0]=Channel
+///   Byte 5: bits [7:4]=Counter, [3:0]=Type
+///   Bytes 6+: Protocol-specific data
+///
+/// CoE header (2 bytes):
+///   Bits [15:12] = CoE service type
+///   Bits [11:0]  = reserved/number
+///
+/// SDO header (expedited, 8 bytes):
+///   Byte 0: Command specifier + size indicator
+///   Byte 1-2: Index (little-endian)
+///   Byte 3: Subindex
+///   Bytes 4-7: Data (expedited) or size (normal)
+
+///|
+/// Mailbox header size in bytes.
+let mailbox_header_len : Int = 6
+
+///|
+/// CoE header size in bytes.
+let coe_header_len : Int = 2
+
+///|
+/// SDO expedited header size in bytes (command + index + subindex + 4 data).
+let sdo_header_len : Int = 8
+
+///|
+/// Encode a mailbox header into 6 bytes.
+pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
+  let buf = @buffer.new(size_hint=mailbox_header_len)
+  // Bytes 0-1: Length (LE)
+  buf.write_byte((self.length & 0xFFU).to_byte())
+  buf.write_byte(((self.length >> 8) & 0xFFU).to_byte())
+  // Bytes 2-3: Address (LE)
+  buf.write_byte((self.address & 0xFFU).to_byte())
+  buf.write_byte(((self.address >> 8) & 0xFFU).to_byte())
+  // Byte 4: Channel[1:0] | Priority[7:6]
+  let b4 = (self.channel & b'\x03') | ((self.priority & b'\x03') << 6)
+  buf.write_byte(b4)
+  // Byte 5: Type[3:0] | Counter[7:4]
+  let b5 = self.mb_type.to_byte() | ((self.counter & b'\x0F') << 4)
+  buf.write_byte(b5)
+  buf.to_bytes()
+}
+
+///|
+/// Decode a mailbox header from bytes (needs at least 6 bytes).
+pub fn MailboxHeader::from_bytes(
+  data : Bytes,
+) -> MailboxHeader raise @hal.EcError {
+  if data.length() < mailbox_header_len {
+    raise @hal.EcError::MailboxProtocol("mailbox header too short")
+  }
+  let length = data[0].to_uint() | (data[1].to_uint() << 8)
+  let address = data[2].to_uint() | (data[3].to_uint() << 8)
+  let channel = data[4] & b'\x03'
+  let priority = (data[4] >> 6) & b'\x03'
+  let type_byte = data[5] & b'\x0F'
+  let counter = (data[5] >> 4) & b'\x0F'
+  let mb_type : MailboxType = match type_byte {
+    b'\x00' => Err
+    b'\x01' => AoE
+    b'\x02' => EoE
+    b'\x03' => CoE
+    b'\x04' => FoE
+    b'\x05' => SoE
+    b'\x0F' => VoE
+    _ =>
+      raise @hal.EcError::MailboxProtocol(
+        "unknown mailbox type: " + type_byte.to_int().to_string(),
+      )
+  }
+  { length, address, channel, priority, mb_type, counter }
+}
+
+///|
+/// CoE service type encoding for the CoE header.
+fn CoeService::to_uint(self : CoeService) -> UInt {
+  match self {
+    SdoRequest => 2U
+    SdoResponse => 3U
+    SdoInfo => 8U
+    TxPdo => 5U
+    RxPdo => 6U
+    PdoRemoteRequest => 7U
+    Emergency => 1U
+  }
+}
+
+///|
+/// Decode CoE service type from the 4-bit field.
+fn coe_service_from_uint(v : UInt) -> CoeService raise @hal.EcError {
+  match v {
+    1U => Emergency
+    2U => SdoRequest
+    3U => SdoResponse
+    5U => TxPdo
+    6U => RxPdo
+    7U => PdoRemoteRequest
+    8U => SdoInfo
+    _ =>
+      raise @hal.EcError::MailboxProtocol(
+        "unknown CoE service: " + v.reinterpret_as_int().to_string(),
+      )
+  }
+}
+
+///|
+/// SDO command specifier byte encoding.
+fn SdoCommand::to_byte(self : SdoCommand) -> Byte {
+  match self {
+    DownloadRequest => b'\x21' // initiate download, expedited, size=4
+    DownloadResponse => b'\x60'
+    UploadRequest => b'\x40'
+    UploadResponse => b'\x43' // initiate upload response, expedited, size=4
+    AbortTransfer => b'\x80'
+  }
+}
+
+///|
+/// Decode SDO command specifier from byte.
+fn sdo_command_from_byte(b : Byte) -> SdoCommand raise @hal.EcError {
+  // Check command specifier bits [7:5]
+  let cs = (b >> 5) & b'\x07'
+  match cs {
+    b'\x01' => DownloadRequest // 001 = initiate download
+    b'\x02' => UploadResponse // 010 = initiate upload response
+    b'\x03' => DownloadResponse // 011 = initiate download response
+    b'\x04' => AbortTransfer // 100 = abort
+    _ =>
+      if b == b'\x40' {
+        UploadRequest // 010 with no data bits = upload request
+      } else {
+        raise @hal.EcError::MailboxProtocol(
+          "unknown SDO command: 0x" + b.to_int().to_string(),
+        )
+      }
+  }
+}
+
+///|
+/// SdoTransaction tracks one SDO request-response exchange.
+pub(all) struct SdoTransaction {
+  /// Mailbox counter for correlation.
+  counter : Byte
+  /// Target slave station address.
+  station : UInt
+  /// SDO request to send.
+  request : SdoRequest
+} derive(Eq, Show)
+
+///|
+/// SdoResponse holds a decoded SDO response.
+pub(all) struct SdoResponse {
+  index : UInt
+  subindex : Byte
+  command : SdoCommand
+  data : Bytes
+} derive(Eq, Show)
+
+///|
+/// Build a complete mailbox frame for an SDO request (expedited).
+pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
+  let buf = @buffer.new(
+    size_hint=mailbox_header_len + coe_header_len + sdo_header_len,
+  )
+  let data_len = coe_header_len + sdo_header_len
+  // Mailbox header
+  let mbh : MailboxHeader = {
+    length: data_len.reinterpret_as_uint(),
+    address: self.station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter: self.counter,
+  }
+  let hdr_bytes = mbh.to_bytes()
+  for i = 0; i < hdr_bytes.length(); i = i + 1 {
+    buf.write_byte(hdr_bytes[i])
+  }
+  // CoE header: service type in bits [15:12]
+  let svc = self.request.command.to_coe_service()
+  let coe_word = svc.to_uint() << 12
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  // SDO header
+  buf.write_byte(self.request.command.to_byte())
+  // Index (LE)
+  buf.write_byte((self.request.index & 0xFFU).to_byte())
+  buf.write_byte(((self.request.index >> 8) & 0xFFU).to_byte())
+  // Subindex
+  buf.write_byte(self.request.subindex)
+  // Data (pad to 4 bytes)
+  for i = 0; i < 4; i = i + 1 {
+    if i < self.request.data.length() {
+      buf.write_byte(self.request.data[i])
+    } else {
+      buf.write_byte(b'\x00')
+    }
+  }
+  buf.to_bytes()
+}
+
+///|
+/// Map SDO command to its CoE service type.
+fn SdoCommand::to_coe_service(self : SdoCommand) -> CoeService {
+  match self {
+    DownloadRequest | UploadRequest | AbortTransfer => SdoRequest
+    DownloadResponse | UploadResponse => SdoResponse
+  }
+}
+
+///|
+/// Decode an SDO response from a raw mailbox frame.
+pub fn decode_sdo_response(
+  data : Bytes,
+) -> (MailboxHeader, SdoResponse) raise @hal.EcError {
+  if data.length() < mailbox_header_len + coe_header_len + sdo_header_len {
+    raise @hal.EcError::MailboxProtocol("SDO response frame too short")
+  }
+  let mbh = MailboxHeader::from_bytes(data)
+  // Verify it's a CoE mailbox
+  if mbh.mb_type != CoE {
+    raise @hal.EcError::MailboxProtocol(
+      "expected CoE mailbox, got " + mbh.mb_type.to_string(),
+    )
+  }
+  let off = mailbox_header_len
+  // CoE header
+  let coe_word = data[off].to_uint() | (data[off + 1].to_uint() << 8)
+  let svc_field = (coe_word >> 12) & 0xFU
+  let _svc = coe_service_from_uint(svc_field)
+  // SDO header
+  let sdo_off = off + coe_header_len
+  let cmd = sdo_command_from_byte(data[sdo_off])
+  let index = data[sdo_off + 1].to_uint() | (data[sdo_off + 2].to_uint() << 8)
+  let subindex = data[sdo_off + 3]
+  let sdo_data = Bytes::makei(4, fn(i) { data[sdo_off + 4 + i] })
+  // Check for abort
+  if cmd == AbortTransfer {
+    let abort_code = sdo_data[0].to_uint() |
+      (sdo_data[1].to_uint() << 8) |
+      (sdo_data[2].to_uint() << 16) |
+      (sdo_data[3].to_uint() << 24)
+    raise @hal.EcError::SdoAbort(abort_code)
+  }
+  let resp : SdoResponse = { index, subindex, command: cmd, data: sdo_data }
+  (mbh, resp)
+}
+
+///|
+/// MailboxCounter manages the 4-bit counter cycling (1-15, wrapping).
+pub(all) struct MailboxCounter {
+  mut value : Byte
+} derive(Show)
+
+///|
+pub fn MailboxCounter::new() -> MailboxCounter {
+  { value: b'\x01' }
+}
+
+///|
+/// Get the current counter value and advance.
+pub fn MailboxCounter::next(self : MailboxCounter) -> Byte {
+  let current = self.value
+  let next_val = self.value.to_int() % 15 + 1
+  self.value = next_val.to_byte()
+  current
+}
+
+///|
+/// Build an SDO Download (write) transaction.
+pub fn build_sdo_download(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+  data : Bytes,
+) -> SdoTransaction {
+  {
+    counter,
+    station,
+    request: {
+      index,
+      subindex,
+      command: DownloadRequest,
+      data,
+      complete_access: false,
+    },
+  }
+}
+
+///|
+/// Build an SDO Upload (read) transaction.
+pub fn build_sdo_upload(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+) -> SdoTransaction {
+  {
+    counter,
+    station,
+    request: {
+      index,
+      subindex,
+      command: UploadRequest,
+      data: Bytes::new(0),
+      complete_access: false,
+    },
+  }
+}

@@ -6,11 +6,17 @@ import {
 }
 
 // Values
+pub fn build_sdo_download(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
+
+pub fn build_sdo_upload(Byte, UInt, UInt, Byte) -> SdoTransaction
+
 pub fn calculate_fmmu_configs(Array[FmmuDirection], Array[SmConfig], UInt) -> (Array[FmmuConfig], Int, Int)
 
 pub fn calculate_slave_mapping(Bytes, UInt) -> SlaveMapping raise @hal.EcError
 
 pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
+
+pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
@@ -60,6 +66,13 @@ pub(all) enum FmmuDirection {
 pub impl Eq for FmmuDirection
 pub impl Show for FmmuDirection
 
+pub(all) struct MailboxCounter {
+  mut value : Byte
+}
+pub fn MailboxCounter::new() -> Self
+pub fn MailboxCounter::next(Self) -> Byte
+pub impl Show for MailboxCounter
+
 pub(all) struct MailboxHeader {
   length : UInt
   address : UInt
@@ -68,6 +81,8 @@ pub(all) struct MailboxHeader {
   mb_type : MailboxType
   counter : Byte
 }
+pub fn MailboxHeader::from_bytes(Bytes) -> Self raise @hal.EcError
+pub fn MailboxHeader::to_bytes(Self) -> Bytes
 pub impl Eq for MailboxHeader
 pub impl Show for MailboxHeader
 
@@ -103,6 +118,24 @@ pub(all) struct SdoRequest {
 }
 pub impl Eq for SdoRequest
 pub impl Show for SdoRequest
+
+pub(all) struct SdoResponse {
+  index : UInt
+  subindex : Byte
+  command : SdoCommand
+  data : Bytes
+}
+pub impl Eq for SdoResponse
+pub impl Show for SdoResponse
+
+pub(all) struct SdoTransaction {
+  counter : Byte
+  station : UInt
+  request : SdoRequest
+}
+pub fn SdoTransaction::encode(Self) -> Bytes
+pub impl Eq for SdoTransaction
+pub impl Show for SdoTransaction
 
 pub(all) enum SiiCategory {
   Strings

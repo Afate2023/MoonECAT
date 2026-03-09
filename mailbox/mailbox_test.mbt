@@ -407,3 +407,214 @@ test "FmmuConfig to_bytes length is always 16" {
   // Direction Write should be byte 0x02
   assert_eq(fmmu.to_bytes()[11], b'\x02')
 }
+
+// ========== CoE/SDO Engine Tests ==========
+
+///|
+test "MailboxHeader encode/decode roundtrip" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x01',
+    priority: b'\x02',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x05',
+  }
+  let encoded = mbh.to_bytes()
+  assert_eq(encoded.length(), 6)
+  let decoded = @mailbox.MailboxHeader::from_bytes(encoded)
+  assert_eq(decoded.length, 10U)
+  assert_eq(decoded.address, 0x1001U)
+  assert_eq(decoded.channel, b'\x01')
+  assert_eq(decoded.priority, b'\x02')
+  assert_eq(decoded.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(decoded.counter, b'\x05')
+}
+
+///|
+test "MailboxHeader::from_bytes rejects short data" {
+  let short = Bytes::new(3)
+  let result = try? @mailbox.MailboxHeader::from_bytes(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "MailboxCounter cycles 1 through 15" {
+  let ctr = @mailbox.MailboxCounter::new()
+  let mut last = b'\x00'
+  for _i = 0; _i < 30; _i = _i + 1 {
+    let v = ctr.next()
+    assert_true(v >= b'\x01' && v <= b'\x0F')
+    last = v
+  }
+  // After 30 calls it should have wrapped at least once
+  ignore(last)
+}
+
+///|
+test "MailboxCounter never returns 0" {
+  let ctr = @mailbox.MailboxCounter::new()
+  for _i = 0; _i < 100; _i = _i + 1 {
+    let v = ctr.next()
+    assert_true(v != b'\x00')
+  }
+}
+
+///|
+test "SdoTransaction encode produces correct frame size" {
+  let txn = @mailbox.build_sdo_download(
+    b'\x01', 0x1001U, 0x6040U, b'\x00', b"\x06\x00\x00\x00",
+  )
+  let frame = txn.encode()
+  // 6 (mbh) + 2 (coe) + 8 (sdo) = 16 bytes
+  assert_eq(frame.length(), 16)
+}
+
+///|
+test "SdoTransaction encode mailbox header fields" {
+  let txn = @mailbox.build_sdo_download(
+    b'\x03', 0x2002U, 0x6040U, b'\x01', b"\xFF\x00\x00\x00",
+  )
+  let frame = txn.encode()
+  // Decode back the mailbox header
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(mbh.counter, b'\x03')
+  assert_eq(mbh.address, 0x2002U)
+  assert_eq(mbh.length, 10U) // 2 + 8
+}
+
+///|
+test "SdoTransaction upload request encode" {
+  let txn = @mailbox.build_sdo_upload(b'\x01', 0x1001U, 0x1018U, b'\x01')
+  let frame = txn.encode()
+  assert_eq(frame.length(), 16)
+  // SDO command byte should be 0x40 (upload request)
+  assert_eq(frame[8], b'\x40')
+  // Index should be 0x1018 LE
+  assert_eq(frame[9], b'\x18')
+  assert_eq(frame[10], b'\x10')
+  // Subindex
+  assert_eq(frame[11], b'\x01')
+}
+
+///|
+test "decode_sdo_response roundtrip with download response" {
+  // Manually build a download response frame
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x01',
+  }
+  let hdr = mbh.to_bytes()
+  // CoE header: SDO Response service (3) in bits [15:12]
+  let coe_lo : Byte = b'\x00'
+  let coe_hi : Byte = b'\x30' // 3 << 4 = 0x30
+  // SDO: download response command = 0x60, index 0x6040, subindex 0x00
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      coe_lo
+    } else if i == 7 {
+      coe_hi
+    } else if i == 8 {
+      b'\x60' // download response
+    } else if i == 9 {
+      b'\x40' // index lo
+    } else if i == 10 {
+      b'\x60' // index hi
+    } else if i == 11 {
+      b'\x00' // subindex
+    } else {
+      b'\x00'
+    }
+  })
+  let (decoded_mbh, resp) = @mailbox.decode_sdo_response(frame)
+  assert_eq(decoded_mbh.counter, b'\x01')
+  assert_eq(resp.index, 0x6040U)
+  assert_eq(resp.subindex, b'\x00')
+  assert_eq(resp.command, @mailbox.SdoCommand::DownloadResponse)
+}
+
+///|
+test "decode_sdo_response detects abort" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x01',
+  }
+  let hdr = mbh.to_bytes()
+  // SDO abort frame
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x20' // SDO Request service (2) << 4
+    } else if i == 8 {
+      b'\x80' // abort command
+    } else if i == 12 {
+      b'\x01' // abort code low byte
+    } else if i == 13 {
+      b'\x00'
+    } else if i == 14 {
+      b'\x00'
+    } else if i == 15 {
+      b'\x06' // 0x06000001 abort code
+    } else {
+      b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_sdo_response(frame)
+  assert_true(result is Err(@hal.EcError::SdoAbort(_)))
+}
+
+///|
+test "decode_sdo_response rejects non-CoE mailbox" {
+  // Build a frame with AoE mailbox type
+  let frame = Bytes::makei(16, fn(i) {
+    if i == 5 {
+      b'\x11' // type=AoE(1), counter=1
+    } else {
+      b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_sdo_response(frame)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_sdo_response rejects short frame" {
+  let short = Bytes::new(10)
+  let result = try? @mailbox.decode_sdo_response(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "build_sdo_download creates correct request" {
+  let txn = @mailbox.build_sdo_download(
+    b'\x02', 0x1001U, 0x6040U, b'\x00', b"\x06\x00\x00\x00",
+  )
+  assert_eq(txn.counter, b'\x02')
+  assert_eq(txn.station, 0x1001U)
+  assert_eq(txn.request.index, 0x6040U)
+  assert_eq(txn.request.subindex, b'\x00')
+  assert_eq(txn.request.command, @mailbox.SdoCommand::DownloadRequest)
+  assert_eq(txn.request.data.length(), 4)
+}
+
+///|
+test "build_sdo_upload creates correct request" {
+  let txn = @mailbox.build_sdo_upload(b'\x01', 0x1001U, 0x1018U, b'\x01')
+  assert_eq(txn.request.command, @mailbox.SdoCommand::UploadRequest)
+  assert_eq(txn.request.data.length(), 0)
+  assert_eq(txn.request.complete_access, false)
+}
