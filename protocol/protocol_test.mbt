@@ -165,3 +165,100 @@ test "EcFrame decode rejects wrong ethertype" {
   let result = try? @protocol.EcFrame::decode(bad)
   assert_true(result is Err(_))
 }
+
+///|
+test "address helpers - configured address packing" {
+  let addr = @protocol.configured_address(0x1001U, 0x0130U)
+  assert_eq(@protocol.address_station(addr), 0x1001U)
+  assert_eq(@protocol.address_offset(addr), 0x0130U)
+}
+
+///|
+test "address helpers - broadcast address" {
+  let addr = @protocol.broadcast_address(0x0130U)
+  assert_eq(@protocol.address_station(addr), 0U)
+  assert_eq(@protocol.address_offset(addr), 0x0130U)
+}
+
+///|
+test "address helpers - auto increment address" {
+  let addr = @protocol.auto_increment_address(0U)
+  assert_eq(addr, 0U)
+  let addr2 = @protocol.auto_increment_address(3U)
+  assert_eq(addr2, 3U)
+}
+
+///|
+test "address helpers - logical address passthrough" {
+  let addr = @protocol.logical_address(0xDEADBEEFU)
+  assert_eq(addr, 0xDEADBEEFU)
+}
+
+///|
+test "command selection by address type" {
+  assert_eq(@protocol.read_command(AutoIncrement), @protocol.EcCommand::APRD)
+  assert_eq(@protocol.write_command(Configured), @protocol.EcCommand::FPWR)
+  assert_eq(@protocol.readwrite_command(Broadcast), @protocol.EcCommand::BRW)
+  assert_eq(@protocol.read_command(Logical), @protocol.EcCommand::LRD)
+  assert_eq(@protocol.write_command(Logical), @protocol.EcCommand::LWR)
+  assert_eq(@protocol.readwrite_command(Logical), @protocol.EcCommand::LRW)
+}
+
+///|
+test "FrameBuilder - add and build single PDU" {
+  let builder = @protocol.FrameBuilder::new()
+  let idx = builder.add(
+    BRD,
+    @protocol.broadcast_address(0x0130U),
+    Bytes::new(2),
+  )
+  assert_eq(idx, b'\x00')
+  assert_eq(builder.length(), 1)
+  let frame = builder.build()
+  assert_eq(frame.pdus.length(), 1)
+  assert_eq(frame.pdus[0].header.command, @protocol.EcCommand::BRD)
+  // After build, builder is reset
+  assert_true(builder.is_empty())
+}
+
+///|
+test "FrameBuilder - sequential index assignment" {
+  let builder = @protocol.FrameBuilder::new()
+  let idx0 = builder.add(BRD, 0U, Bytes::new(0))
+  let idx1 = builder.add(FPRD, 0x10010130U, Bytes::new(4))
+  let idx2 = builder.add(LRW, 0x1000U, Bytes::new(8))
+  assert_eq(idx0, b'\x00')
+  assert_eq(idx1, b'\x01')
+  assert_eq(idx2, b'\x02')
+  let frame = builder.build()
+  assert_eq(frame.pdus.length(), 3)
+}
+
+///|
+test "FrameBuilder - build and encode/decode roundtrip" {
+  let builder = @protocol.FrameBuilder::new()
+  let data = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04'])
+  let idx = builder.add(
+    FPRD,
+    @protocol.configured_address(0x1001U, 0x0130U),
+    data,
+  )
+  let frame = builder.build()
+  let encoded = frame.encode()
+  let decoded = @protocol.EcFrame::decode(encoded)
+  let found = @protocol.find_pdu_by_index(decoded, idx)
+  assert_true(found is Some(_))
+  guard found is Some(pdu)
+  assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
+  assert_eq(pdu.data, data)
+}
+
+///|
+test "find_pdu_by_index returns None for missing index" {
+  let frame : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [],
+  }
+  assert_true(@protocol.find_pdu_by_index(frame, b'\xFF') is None)
+}

@@ -6,7 +6,17 @@ import {
 }
 
 // Values
+pub fn address_offset(UInt) -> UInt
+
+pub fn address_station(UInt) -> UInt
+
+pub fn auto_increment_address(UInt) -> UInt
+
+pub fn broadcast_address(UInt) -> UInt
+
 pub let broadcast_mac : FixedArray[Byte]
+
+pub fn configured_address(UInt, UInt) -> UInt
 
 pub let default_master_mac : FixedArray[Byte]
 
@@ -16,9 +26,21 @@ pub let ecat_header_len : Int
 
 pub let ethernet_header_len : Int
 
+pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
+
+pub fn logical_address(UInt) -> UInt
+
+pub let max_pdus_per_frame : Int
+
 pub let pdu_header_len : Int
 
+pub fn read_command(AddressType) -> EcCommand
+
+pub fn readwrite_command(AddressType) -> EcCommand
+
 pub let wkc_len : Int
+
+pub fn write_command(AddressType) -> EcCommand
 
 // Errors
 
@@ -30,6 +52,15 @@ pub(all) enum AddressMode {
 }
 pub impl Eq for AddressMode
 pub impl Show for AddressMode
+
+pub(all) enum AddressType {
+  AutoIncrement
+  Configured
+  Broadcast
+  Logical
+}
+pub impl Eq for AddressType
+pub impl Show for AddressType
 
 pub(all) enum EcCommand {
   NOP
@@ -75,6 +106,19 @@ pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
 pub impl Eq for EsmState
 pub impl Show for EsmState
+
+pub(all) struct FrameBuilder {
+  mut next_index : Int
+  pending : Array[Pdu]
+  mut pending_size : Int
+}
+pub fn FrameBuilder::add(Self, EcCommand, UInt, Bytes) -> Byte raise @hal.EcError
+pub fn FrameBuilder::build(Self) -> EcFrame
+pub fn FrameBuilder::is_empty(Self) -> Bool
+pub fn FrameBuilder::length(Self) -> Int
+pub fn FrameBuilder::new() -> Self
+pub fn FrameBuilder::reset(Self) -> Unit
+pub impl Show for FrameBuilder
 
 pub(all) struct Pdu {
   header : PduHeader
