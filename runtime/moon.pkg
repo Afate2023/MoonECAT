@@ -1,6 +1,7 @@
 import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/protocol",
+  "moonbitlang/core/buffer",
 }
 
 import {

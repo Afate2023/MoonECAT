@@ -387,3 +387,64 @@ test "Free-run: set_slave_outputs and get_slave_inputs" {
   assert_eq(inputs[0], b'\xAA')
   assert_eq(inputs[3], b'\xDD')
 }
+
+// ========== Scan Command Tests ==========
+
+///|
+test "scan with mock loopback returns empty report" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let report = @runtime.scan(nic, timeout)
+  // MockNic echoes back WKC=0, so count_slaves returns 0
+  assert_eq(report.slave_count, 0)
+  assert_eq(report.slaves.length(), 0)
+}
+
+///|
+test "ScanReport format with no slaves" {
+  let report : @runtime.ScanReport = { slave_count: 0, slaves: [] }
+  let output = report.format()
+  assert_true(output.contains("Slaves found: 0"))
+  assert_true(output.contains("EtherCAT Bus Scan Report"))
+}
+
+///|
+test "ScanReport format with slaves" {
+  let report : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      },
+    ],
+  }
+  let output = report.format()
+  assert_true(output.contains("Slaves found: 1"))
+  assert_true(output.contains("Slave #0"))
+}
+
+///|
+test "SlaveReport equality" {
+  let r1 : @runtime.SlaveReport = {
+    position: 0,
+    station_address: 0x1001U,
+    vendor_id: 0x0002U,
+    product_code: 0x04D2U,
+    revision: 0x0001U,
+    serial: 0x1234U,
+  }
+  let r2 : @runtime.SlaveReport = {
+    position: 0,
+    station_address: 0x1001U,
+    vendor_id: 0x0002U,
+    product_code: 0x04D2U,
+    revision: 0x0001U,
+    serial: 0x1234U,
+  }
+  assert_eq(r1, r2)
+}
