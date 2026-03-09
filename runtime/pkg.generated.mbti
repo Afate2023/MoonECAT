@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
@@ -36,6 +38,28 @@ pub(all) enum RunMode {
 }
 pub impl Eq for RunMode
 pub impl Show for RunMode
+
+pub(all) enum RunPhase {
+  Scanning
+  Validating
+  Configuring
+  Operational
+  Stopping
+  Done
+}
+pub impl Eq for RunPhase
+pub impl Show for RunPhase
+
+pub(all) struct RunReport {
+  scan : ScanReport
+  validation : ValidateReport
+  cycles_requested : Int
+  cycles_ok : Int
+  telemetry : Telemetry
+  final_phase : RunPhase
+}
+pub fn RunReport::format(Self) -> String
+pub impl Show for RunReport
 
 pub(all) struct Runtime {
   mut state : RuntimeState

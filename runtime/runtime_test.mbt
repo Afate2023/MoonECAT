@@ -654,3 +654,115 @@ test "ValidateReport format shows FAIL with details" {
   assert_true(text.contains("FAIL"))
   assert_true(text.contains("[MISSING]"))
 }
+
+///|
+test "RunPhase equality" {
+  assert_eq(@runtime.RunPhase::Scanning, @runtime.RunPhase::Scanning)
+  assert_eq(@runtime.RunPhase::Done, @runtime.RunPhase::Done)
+  assert_true(@runtime.RunPhase::Scanning != @runtime.RunPhase::Done)
+}
+
+///|
+test "RunReport format with zero cycles" {
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 0, slaves: [] },
+    validation: { total_expected: 0, total_found: 0, results: [], all_ok: true },
+    cycles_requested: 0,
+    cycles_ok: 0,
+    telemetry: @runtime.Telemetry::new(),
+    final_phase: @runtime.Done,
+  }
+  let text = report.format()
+  assert_true(text.contains("MoonECAT Run Report"))
+  assert_true(text.contains("Slaves found: 0"))
+  assert_true(text.contains("Validation: PASS"))
+  assert_true(text.contains("0/0 OK"))
+  assert_true(text.contains("Phase: Done"))
+}
+
+///|
+test "RunReport format with cycles and telemetry" {
+  let tel : @runtime.Telemetry = {
+    cycles: 100L,
+    tx_frames: 100L,
+    rx_frames: 98L,
+    timeouts: 2L,
+    retries: 1L,
+    wkc_errors: 3L,
+  }
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 2, slaves: [] },
+    validation: { total_expected: 2, total_found: 2, results: [], all_ok: true },
+    cycles_requested: 100,
+    cycles_ok: 97,
+    telemetry: tel,
+    final_phase: @runtime.Done,
+  }
+  let text = report.format()
+  assert_true(text.contains("Slaves found: 2"))
+  assert_true(text.contains("97/100 OK"))
+  assert_true(text.contains("tx=100"))
+  assert_true(text.contains("timeouts=2"))
+  assert_true(text.contains("wkc_errors=3"))
+}
+
+///|
+test "run with mock loopback: empty bus, no expected slaves succeeds" {
+  let nic = @mock.MockNic::new()
+  let config = @hal.MasterConfig::default()
+  let expected : Array[@hal.SlaveConfig] = []
+  let ctx : @protocol.PdoContext = {
+    image: @protocol.ProcessImage::new(0, 0),
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 0,
+  }
+  let report = @runtime.run(
+    nic,
+    config,
+    expected,
+    ctx,
+    0U,
+    0,
+    @hal.Duration(1000L),
+  )
+  assert_eq(report.scan.slave_count, 0)
+  assert_eq(report.validation.all_ok, true)
+  assert_true(report.final_phase is @runtime.Done)
+}
+
+///|
+test "run with mock loopback: validation fails when slaves expected but not found" {
+  let nic = @mock.MockNic::new()
+  let config = @hal.MasterConfig::default()
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let ctx : @protocol.PdoContext = {
+    image: @protocol.ProcessImage::new(64, 64),
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 128,
+  }
+  let report = @runtime.run(
+    nic,
+    config,
+    expected,
+    ctx,
+    1U,
+    10,
+    @hal.Duration(1000L),
+  )
+  assert_eq(report.validation.all_ok, false)
+  assert_eq(report.cycles_ok, 0)
+  assert_true(report.final_phase is @runtime.Validating)
+}
