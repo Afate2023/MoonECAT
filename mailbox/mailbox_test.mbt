@@ -277,3 +277,133 @@ test "calculate_slave_mapping mailbox-only slave" {
   assert_eq(mapping.output_bytes, 0) // mailbox doesn't count as PDO
   assert_eq(mapping.input_bytes, 0)
 }
+
+///|
+test "parse_sii_header identity consistency with fixture" {
+  let eeprom = @fixtures.sample_sii_eeprom()
+  let sii = @mailbox.parse_sii_header(eeprom)
+  let expected = @fixtures.sample_ek1100_identity()
+  // SII header identity should match the fixture identity
+  assert_eq(sii.vendor_id, expected.vendor_id)
+  assert_eq(sii.product_code, expected.product_code)
+  assert_eq(sii.revision, expected.revision)
+}
+
+///|
+test "parse_sii_categories empty EEPROM returns empty" {
+  // 128 bytes of zeros - word 64 starts at byte 128 which doesn't exist
+  let data = Bytes::new(128)
+  let categories = @mailbox.parse_sii_categories(data)
+  assert_eq(categories.length(), 0)
+}
+
+///|
+test "parse_sii_general rejects short data" {
+  let short = Bytes::new(4)
+  let result = try? @mailbox.parse_sii_general(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "parse_sii_fmmu empty data" {
+  let data = Bytes::new(0)
+  let dirs = @mailbox.parse_sii_fmmu(data)
+  assert_eq(dirs.length(), 0)
+}
+
+///|
+test "parse_sii_sm empty data" {
+  let data = Bytes::new(0)
+  let entries = @mailbox.parse_sii_sm(data)
+  assert_eq(entries.length(), 0)
+}
+
+///|
+test "calculate_fmmu_configs with no FMMU directions" {
+  let sm_configs : Array[@mailbox.SmConfig] = [
+    {
+      physical_start: 0x1100U,
+      length: 32U,
+      control: b'\x64',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataOut,
+    },
+  ]
+  let (fmmus, out, inp) = @mailbox.calculate_fmmu_configs([], sm_configs, 0U)
+  assert_eq(fmmus.length(), 0)
+  assert_eq(out, 0)
+  assert_eq(inp, 0)
+}
+
+///|
+test "calculate_fmmu_configs with no matching SM" {
+  // FMMU directions exist but no matching SM types
+  let fmmu_dirs = [@mailbox.FmmuDirection::Read, @mailbox.FmmuDirection::Write]
+  let (fmmus, out, inp) = @mailbox.calculate_fmmu_configs(fmmu_dirs, [], 0U)
+  assert_eq(fmmus.length(), 0)
+  assert_eq(out, 0)
+  assert_eq(inp, 0)
+}
+
+///|
+test "calculate_slave_mapping with PDO fixture - logical address chaining" {
+  // Test that two slaves can have sequential logical addresses
+  let eeprom = @fixtures.sample_sii_eeprom_with_pdo()
+  let mapping1 = @mailbox.calculate_slave_mapping(eeprom, 0U)
+  let next_base = (mapping1.output_bytes + mapping1.input_bytes).reinterpret_as_uint()
+  let mapping2 = @mailbox.calculate_slave_mapping(eeprom, next_base)
+  // Second slave's logical addresses should start after first slave's
+  assert_eq(mapping2.fmmu_configs[0].logical_start, next_base)
+  assert_true(mapping2.fmmu_configs[0].logical_start > 0U)
+}
+
+///|
+test "SlaveMapping equality" {
+  let eeprom = @fixtures.sample_sii_eeprom_with_pdo()
+  let m1 = @mailbox.calculate_slave_mapping(eeprom, 0U)
+  let m2 = @mailbox.calculate_slave_mapping(eeprom, 0U)
+  assert_eq(m1, m2)
+}
+
+///|
+test "SmConfig to_bytes length is always 8" {
+  let configs : Array[@mailbox.SmConfig] = [
+    {
+      physical_start: 0U,
+      length: 0U,
+      control: b'\x00',
+      status: b'\x00',
+      enable: false,
+      sm_type: @mailbox.SmType::Unused,
+    },
+    {
+      physical_start: 0xFFFFU,
+      length: 0xFFFFU,
+      control: b'\xFF',
+      status: b'\xFF',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataIn,
+    },
+  ]
+  for cfg in configs {
+    assert_eq(cfg.to_bytes().length(), 8)
+  }
+}
+
+///|
+test "FmmuConfig to_bytes length is always 16" {
+  let fmmu : @mailbox.FmmuConfig = {
+    logical_start: 0xFFFFFFFFU,
+    length: 0xFFFFU,
+    logical_start_bit: b'\x07',
+    logical_end_bit: b'\x07',
+    physical_start: 0xFFFFU,
+    physical_start_bit: b'\x07',
+    direction: @mailbox.FmmuDirection::Write,
+    activate: true,
+  }
+  assert_eq(fmmu.to_bytes().length(), 16)
+  // Direction Write should be byte 0x02
+  assert_eq(fmmu.to_bytes()[11], b'\x02')
+}

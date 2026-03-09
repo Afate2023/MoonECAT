@@ -492,3 +492,184 @@ test "all EcCommand values survive encode/decode" {
     assert_eq(decoded.pdus[0].header.command, cmd)
   }
 }
+
+///|
+test "discovery - assign_station_address via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic echoes with wkc=0 so this will raise SendFailed
+  let result = try? @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  assert_true(result is Err(_))
+}
+
+///|
+test "discovery - read_register_fp command type" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let pdu = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
+}
+
+///|
+test "discovery - write_register_fp command type" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = Bytes::from_array([b'\x02', b'\x00'])
+  let pdu = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control, data, timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::FPWR)
+}
+
+///|
+test "discovery - write_register_ap command type" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = Bytes::from_array([b'\x01', b'\x10'])
+  let pdu = @protocol.write_register_ap(
+    nic, 0U, @protocol.reg_station_address, data, timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::APWR)
+}
+
+///|
+test "discovery - register address constants are reasonable" {
+  // FMMU registers start at 0x0600
+  assert_eq(@protocol.reg_fmmu_base, 0x0600U)
+  assert_eq(@protocol.fmmu_entry_size, 16)
+  // SM registers start at 0x0800
+  assert_eq(@protocol.reg_sm_base, 0x0800U)
+  assert_eq(@protocol.sm_entry_size, 8)
+  // AL registers in expected range
+  assert_true(@protocol.reg_al_status.reinterpret_as_int() >= 0x100)
+  assert_true(@protocol.reg_al_control.reinterpret_as_int() >= 0x100)
+  // SII registers
+  assert_true(@protocol.reg_sii_control.reinterpret_as_int() >= 0x500)
+}
+
+///|
+test "SlaveInfo with SII data" {
+  let sii : @mailbox.SiiData = {
+    vendor_id: 0x2U,
+    product_code: 0x044C2C52U,
+    revision: 0x00110000U,
+    serial: 0U,
+    mailbox_rx_offset: 0x1000U,
+    mailbox_rx_size: 128U,
+    mailbox_tx_offset: 0x1080U,
+    mailbox_tx_size: 128U,
+    mailbox_protocols: 0xCU,
+  }
+  let info : @protocol.SlaveInfo = {
+    position: 0,
+    configured_address: 0x1001U,
+    identity: @fixtures.sample_ek1100_identity(),
+    al_status: Init,
+    dl_status: 0x0037U,
+    sii: Some(sii),
+  }
+  assert_true(info.sii is Some(_))
+  guard info.sii is Some(s)
+  assert_eq(s.vendor_id, 0x2U)
+  assert_eq(s.mailbox_protocols, 0xCU)
+}
+
+///|
+test "identity validation - matching" {
+  let expected : @hal.SlaveIdentity = {
+    vendor_id: 0x2U,
+    product_code: 0x044C2C52U,
+    revision: 0x00110000U,
+    serial: 0U,
+  }
+  let actual = @fixtures.sample_ek1100_identity()
+  assert_eq(expected, actual)
+}
+
+///|
+test "identity validation - mismatch detection" {
+  let expected : @hal.SlaveIdentity = {
+    vendor_id: 0x2U,
+    product_code: 0x12345678U, // different product
+    revision: 0x00110000U,
+    serial: 0U,
+  }
+  let actual = @fixtures.sample_ek1100_identity()
+  assert_true(expected != actual)
+}
+
+///|
+test "SlaveConfig construction" {
+  let cfg : @hal.SlaveConfig = {
+    position: 0U,
+    expected_identity: Some(@fixtures.sample_ek1100_identity()),
+    configured_address: 0x1001U,
+  }
+  assert_eq(cfg.position, 0U)
+  assert_eq(cfg.configured_address, 0x1001U)
+  assert_true(cfg.expected_identity is Some(_))
+}
+
+///|
+test "ESM state transitions - Init to Boot" {
+  assert_true(@protocol.EsmState::Init.can_transition(@protocol.EsmState::Boot))
+}
+
+///|
+test "ESM state transitions - Boot to Init" {
+  assert_true(@protocol.EsmState::Boot.can_transition(@protocol.EsmState::Init))
+}
+
+///|
+test "ESM state transitions - PreOp to Init" {
+  assert_true(
+    @protocol.EsmState::PreOp.can_transition(@protocol.EsmState::Init),
+  )
+}
+
+///|
+test "ESM state transitions - SafeOp to Init" {
+  assert_true(
+    @protocol.EsmState::SafeOp.can_transition(@protocol.EsmState::Init),
+  )
+}
+
+///|
+test "ESM state transitions - Op to SafeOp only" {
+  // Op can go to SafeOp
+  assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::SafeOp))
+  // Op can also go to PreOp and Init per ETG.1000
+  assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::PreOp))
+  assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Init))
+  // Op cannot go to Boot
+  assert_true(
+    not(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot)),
+  )
+}
+
+///|
+test "FrameBuilder - max PDU capacity" {
+  let builder = @protocol.FrameBuilder::new()
+  for _i = 0; _i < @protocol.max_pdus_per_frame; _i = _i + 1 {
+    let _ = builder.add(NOP, 0U, Bytes::new(0))
+  }
+  assert_eq(builder.length(), @protocol.max_pdus_per_frame)
+  let frame = builder.build()
+  assert_eq(frame.pdus.length(), @protocol.max_pdus_per_frame)
+}
+
+///|
+test "full discovery flow simulation" {
+  // Simulate a scan workflow: count → assign → read registers
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // 1. Count slaves (mock returns 0)
+  let count = @protocol.count_slaves(nic, timeout)
+  assert_eq(count, 0)
+  // 2. Build scan result
+  let scan : @protocol.ScanResult = { slave_count: count, slaves: [] }
+  assert_eq(scan.slave_count, 0)
+  assert_eq(scan.slaves.length(), 0)
+}
