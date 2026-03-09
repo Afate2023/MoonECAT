@@ -74,7 +74,9 @@ pub fn validate(
         match exp.expected_identity {
           Some(expected_id) =>
             if actual_identity.vendor_id == expected_id.vendor_id &&
-              actual_identity.product_code == expected_id.product_code {
+              actual_identity.product_code == expected_id.product_code &&
+              actual_identity.revision == expected_id.revision &&
+              actual_identity.serial == expected_id.serial {
               results.push(Ok)
             } else {
               results.push(

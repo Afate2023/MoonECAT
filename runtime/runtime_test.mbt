@@ -534,6 +534,70 @@ test "validate: identity mismatch detected" {
 }
 
 ///|
+test "validate: revision mismatch detected" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x9999U,
+        serial: 0x1234U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_true(report.results[0] is @runtime.IdentityMismatch(..))
+}
+
+///|
+test "validate: serial mismatch detected" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x9999U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_true(report.results[0] is @runtime.IdentityMismatch(..))
+}
+
+///|
 test "validate: missing slave" {
   let scan : @runtime.ScanReport = { slave_count: 0, slaves: [] }
   let expected : Array[@hal.SlaveConfig] = [
