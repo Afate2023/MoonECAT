@@ -118,3 +118,272 @@ test "CycleResult equality" {
   let r3 : @runtime.CycleResult = { wkc: 1U, expected_wkc: 3U, ok: false }
   assert_true(r1 != r3)
 }
+
+// ========== M4-4: Free-run and recovery path tests ==========
+
+///|
+test "Free-run: Runtime lifecycle Idle → Scanning → Configuring → Running" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  assert_true(rt.state is Idle)
+  rt.set_state(@runtime.RuntimeState::Scanning)
+  assert_true(rt.state is Scanning)
+  rt.set_state(@runtime.RuntimeState::Configuring)
+  assert_true(rt.state is Configuring)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  assert_true(rt.state is Running(FreeRun))
+  rt.set_state(@runtime.RuntimeState::Stopping)
+  assert_true(rt.state is Stopping)
+  rt.set_state(@runtime.RuntimeState::Idle)
+  assert_true(rt.state is Idle)
+}
+
+///|
+test "Free-run: run_cycle succeeds when expected_wkc is 0" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0x1000U)
+  // MockNic echoes back frames with WKC=0
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let result = rt.run_cycle(nic, @hal.Duration(1000L))
+  assert_eq(result.ok, true)
+  assert_eq(result.wkc, 0U)
+  assert_eq(result.expected_wkc, 0U)
+  assert_eq(rt.consecutive_wkc_errors, 0)
+  let t = rt.get_telemetry()
+  assert_eq(t.cycles, 1L)
+  assert_eq(t.tx_frames, 1L)
+  assert_eq(t.rx_frames, 1L)
+}
+
+///|
+test "Free-run: run_cycles executes multiple cycles" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
+  assert_eq(success, 10)
+  let t = rt.get_telemetry()
+  assert_eq(t.cycles, 10L)
+  assert_eq(t.tx_frames, 10L)
+  assert_eq(t.rx_frames, 10L)
+  assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Recovery: WKC mismatch increments error counter" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  // Expect WKC=3, but MockNic echoes WKC=0 → mismatch
+  rt.configure_pdo(ctx, 3U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let result = rt.run_cycle(nic, @hal.Duration(1000L))
+  assert_eq(result.ok, false)
+  assert_eq(result.wkc, 0U)
+  assert_eq(result.expected_wkc, 3U)
+  assert_eq(rt.consecutive_wkc_errors, 1)
+  let t = rt.get_telemetry()
+  assert_eq(t.wkc_errors, 1L)
+}
+
+///|
+test "Recovery: consecutive WKC errors trigger recovery state" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 3U) // expect 3, get 0 → always fail
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  // Run 10 cycles; after 5 consecutive errors, should enter Error state
+  let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
+  assert_eq(success, 0)
+  assert_true(rt.state is Error(_))
+  let t = rt.get_telemetry()
+  // Should have tried 5 cycles (then broke on the 5th error)
+  assert_eq(t.wkc_errors, 5L)
+  assert_eq(t.cycles, 5L)
+}
+
+///|
+test "Recovery: reset_error_counter allows resumption" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 3U)
+  let nic = @mock.MockNic::new()
+  // Accumulate some errors
+  for _i = 0; _i < 3; _i = _i + 1 {
+    let _r = rt.run_cycle(nic, @hal.Duration(1000L))
+  }
+  assert_eq(rt.consecutive_wkc_errors, 3)
+  assert_eq(rt.needs_recovery(), false) // not yet at threshold (5)
+  // Reset and verify counters cleared
+  rt.reset_error_counter()
+  assert_eq(rt.consecutive_wkc_errors, 0)
+  assert_eq(rt.needs_recovery(), false)
+}
+
+///|
+test "Recovery: Telemetry reset clears all counters" {
+  let t = @runtime.Telemetry::new()
+  t.cycles = 100L
+  t.tx_frames = 200L
+  t.rx_frames = 150L
+  t.timeouts = 5L
+  t.retries = 3L
+  t.wkc_errors = 10L
+  t.reset()
+  assert_eq(t.cycles, 0L)
+  assert_eq(t.tx_frames, 0L)
+  assert_eq(t.rx_frames, 0L)
+  assert_eq(t.timeouts, 0L)
+  assert_eq(t.retries, 0L)
+  assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Free-run: ESM transition path building" {
+  // Verify transition paths from Init to higher states
+  let path = @protocol.build_transition_path(@protocol.EsmState::Op)
+  assert_eq(path.length(), 4)
+  assert_eq(path[0], @protocol.EsmState::Init)
+  assert_eq(path[1], @protocol.EsmState::PreOp)
+  assert_eq(path[2], @protocol.EsmState::SafeOp)
+  assert_eq(path[3], @protocol.EsmState::Op)
+}
+
+///|
+test "Free-run: ESM shutdown path building" {
+  // Verify shutdown paths back to Init
+  let path = @protocol.build_shutdown_path(@protocol.EsmState::Op)
+  assert_eq(path.length(), 4)
+  assert_eq(path[0], @protocol.EsmState::Op)
+  assert_eq(path[1], @protocol.EsmState::SafeOp)
+  assert_eq(path[2], @protocol.EsmState::PreOp)
+  assert_eq(path[3], @protocol.EsmState::Init)
+}
+
+///|
+test "Free-run: ESM can_transition validates allowed transitions" {
+  // Forward transitions
+  assert_true(
+    @protocol.EsmState::Init.can_transition(@protocol.EsmState::PreOp),
+  )
+  assert_true(
+    @protocol.EsmState::PreOp.can_transition(@protocol.EsmState::SafeOp),
+  )
+  assert_true(@protocol.EsmState::SafeOp.can_transition(@protocol.EsmState::Op))
+  // Backward transitions
+  assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::SafeOp))
+  assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Init))
+  // Invalid skip
+  assert_true(
+    not(@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op)),
+  )
+}
+
+///|
+test "Free-run: PDO context build with multiple slaves" {
+  let sm1 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 8,
+    input_bytes: 4,
+  }
+  let sm2 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 16,
+    input_bytes: 8,
+  }
+  let ctx = @protocol.PdoContext::build([(sm1, 1U), (sm2, 2U)], 0x1000U)
+  assert_eq(ctx.mappings.length(), 2)
+  assert_eq(ctx.image.output_size, 24) // 8 + 16
+  assert_eq(ctx.image.input_size, 12) // 4 + 8
+  assert_eq(ctx.logical_base, 0x1000U)
+  assert_eq(ctx.logical_size, 36) // 24 + 12
+  // Check slave 1 mapping
+  assert_eq(ctx.mappings[0].output_offset, 0)
+  assert_eq(ctx.mappings[0].output_length, 8)
+  assert_eq(ctx.mappings[0].input_offset, 0)
+  assert_eq(ctx.mappings[0].input_length, 4)
+  // Check slave 2 mapping
+  assert_eq(ctx.mappings[1].output_offset, 8)
+  assert_eq(ctx.mappings[1].output_length, 16)
+  assert_eq(ctx.mappings[1].input_offset, 4)
+  assert_eq(ctx.mappings[1].input_length, 8)
+}
+
+///|
+test "Recovery: Runtime error state display" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  rt.set_state(
+    @runtime.RuntimeState::Error(
+      @hal.EcError::UnexpectedWkc(expected=3, actual=0),
+    ),
+  )
+  assert_true(rt.state is Error(_))
+  // Can recover from error back to Idle
+  rt.set_state(@runtime.RuntimeState::Idle)
+  assert_true(rt.state is Idle)
+}
+
+///|
+test "Free-run: set_slave_outputs and get_slave_inputs" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 4,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  // Set output data for slave 1
+  let out_data = b"\x01\x02\x03\x04"
+  ctx.set_slave_outputs(1U, out_data)
+  // Check that outputs are set in the process image
+  assert_eq(ctx.image.outputs[0], b'\x01')
+  assert_eq(ctx.image.outputs[3], b'\x04')
+  // Set some input data manually and read it
+  ctx.image.inputs = b"\xAA\xBB\xCC\xDD"
+  let inputs = ctx.get_slave_inputs(1U)
+  assert_eq(inputs[0], b'\xAA')
+  assert_eq(inputs[3], b'\xDD')
+}
