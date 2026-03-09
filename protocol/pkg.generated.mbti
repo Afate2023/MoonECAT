@@ -19,6 +19,12 @@ pub fn broadcast_address(UInt) -> UInt
 
 pub let broadcast_mac : FixedArray[Byte]
 
+pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn build_shutdown_path(EsmState) -> Array[EsmState]
+
+pub fn build_transition_path(EsmState) -> Array[EsmState]
+
 pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
@@ -40,6 +46,10 @@ pub fn logical_address(UInt) -> UInt
 pub let max_pdus_per_frame : Int
 
 pub let pdu_header_len : Int
+
+pub fn[N : @hal.Nic] read_al_status(N, UInt, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_al_status_code(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
 pub fn read_command(AddressType) -> EcCommand
 
@@ -77,6 +87,8 @@ pub let reg_station_alias : UInt
 
 pub let reg_type : UInt
 
+pub fn[N : @hal.Nic] request_state(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
+
 pub let sm_entry_size : Int
 
 pub fn[N : @hal.Nic] transact(N, EcFrame, @hal.Duration) -> EcFrame raise @hal.EcError
@@ -84,6 +96,8 @@ pub fn[N : @hal.Nic] transact(N, EcFrame, @hal.Duration) -> EcFrame raise @hal.E
 pub fn[N : @hal.Nic] transact_pdu(N, EcCommand, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
 
 pub fn[N : @hal.Nic] transact_pdu_retry(N, EcCommand, UInt, Bytes, @hal.Duration, Int) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_through(N, UInt, Array[EsmState], @hal.Duration) -> EsmState raise @hal.EcError
 
 pub let wkc_len : Int
 

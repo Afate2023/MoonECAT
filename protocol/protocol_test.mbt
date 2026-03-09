@@ -673,3 +673,85 @@ test "full discovery flow simulation" {
   assert_eq(scan.slave_count, 0)
   assert_eq(scan.slaves.length(), 0)
 }
+
+///|
+test "build_transition_path to Op" {
+  let path = @protocol.build_transition_path(@protocol.EsmState::Op)
+  assert_eq(path.length(), 4)
+  assert_eq(path[0], @protocol.EsmState::Init)
+  assert_eq(path[1], @protocol.EsmState::PreOp)
+  assert_eq(path[2], @protocol.EsmState::SafeOp)
+  assert_eq(path[3], @protocol.EsmState::Op)
+}
+
+///|
+test "build_transition_path to PreOp" {
+  let path = @protocol.build_transition_path(@protocol.EsmState::PreOp)
+  assert_eq(path.length(), 2)
+  assert_eq(path[0], @protocol.EsmState::Init)
+  assert_eq(path[1], @protocol.EsmState::PreOp)
+}
+
+///|
+test "build_transition_path to Boot" {
+  let path = @protocol.build_transition_path(@protocol.EsmState::Boot)
+  assert_eq(path.length(), 2)
+  assert_eq(path[0], @protocol.EsmState::Init)
+  assert_eq(path[1], @protocol.EsmState::Boot)
+}
+
+///|
+test "build_shutdown_path from Op" {
+  let path = @protocol.build_shutdown_path(@protocol.EsmState::Op)
+  assert_eq(path.length(), 4)
+  assert_eq(path[0], @protocol.EsmState::Op)
+  assert_eq(path[1], @protocol.EsmState::SafeOp)
+  assert_eq(path[2], @protocol.EsmState::PreOp)
+  assert_eq(path[3], @protocol.EsmState::Init)
+}
+
+///|
+test "build_shutdown_path from Init is idempotent" {
+  let path = @protocol.build_shutdown_path(@protocol.EsmState::Init)
+  assert_eq(path.length(), 1)
+  assert_eq(path[0], @protocol.EsmState::Init)
+}
+
+///|
+test "transition_through with empty path raises error" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.transition_through(nic, 0x1001U, [], timeout)
+  assert_true(result is Err(_))
+}
+
+///|
+test "broadcast_state via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout)
+  assert_eq(wkc, 0U) // MockNic echoes, WKC=0
+}
+
+///|
+test "read_al_status via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic echoes the sent frame (which has zero-initialized data)
+  // EsmState::from_byte(0) will fail because 0 isn't a valid ESM state
+  let result = try? @protocol.read_al_status(nic, 0x1001U, timeout)
+  // We expect either a valid state or an error from the mock
+  match result {
+    Ok(state) => assert_true(state is Init)
+    Err(_) => () // acceptable with mock
+  }
+}
+
+///|
+test "read_al_status_code via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let code = @protocol.read_al_status_code(nic, 0x1001U, timeout)
+  // MockNic returns zeroed data, so status code = 0
+  assert_eq(code, 0U)
+}
