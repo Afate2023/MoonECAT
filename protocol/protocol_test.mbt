@@ -330,3 +330,123 @@ test "transact_pdu_retry - succeeds on first try" {
   )
   assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
 }
+
+///|
+test "EcFrame roundtrip preserves large PDU data" {
+  // Create a PDU with 256 bytes of payload
+  let data = Bytes::makei(256, fn(i) { (i % 256).to_byte() })
+  let frame : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [
+      {
+        header: {
+          command: LRW,
+          index: b'\x07',
+          address: 0x10000U,
+          len_flags: 256U,
+        },
+        data,
+        wkc: 42U,
+      },
+    ],
+  }
+  let decoded = @protocol.EcFrame::decode(frame.encode())
+  assert_eq(decoded.pdus[0].data.length(), 256)
+  assert_eq(decoded.pdus[0].data, data)
+  assert_eq(decoded.pdus[0].wkc, 42U)
+}
+
+///|
+test "EcFrame roundtrip preserves MAC addresses" {
+  let custom_dst : FixedArray[Byte] = [
+    b'\x01', b'\x02', b'\x03', b'\x04', b'\x05', b'\x06',
+  ]
+  let custom_src : FixedArray[Byte] = [
+    b'\x0A', b'\x0B', b'\x0C', b'\x0D', b'\x0E', b'\x0F',
+  ]
+  let frame : @protocol.EcFrame = {
+    dst_mac: custom_dst,
+    src_mac: custom_src,
+    pdus: [
+      {
+        header: { command: NOP, index: b'\x00', address: 0U, len_flags: 0U },
+        data: Bytes::new(0),
+        wkc: 0U,
+      },
+    ],
+  }
+  let decoded = @protocol.EcFrame::decode(frame.encode())
+  assert_eq(decoded.dst_mac, custom_dst)
+  assert_eq(decoded.src_mac, custom_src)
+}
+
+///|
+test "EcFrame roundtrip preserves address through encode/decode" {
+  let addr = @protocol.configured_address(0x1001U, 0x0130U)
+  let frame : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [
+      {
+        header: { command: FPRD, index: b'\x00', address: addr, len_flags: 0U },
+        data: Bytes::new(0),
+        wkc: 0U,
+      },
+    ],
+  }
+  let decoded = @protocol.EcFrame::decode(frame.encode())
+  assert_eq(@protocol.address_station(decoded.pdus[0].header.address), 0x1001U)
+  assert_eq(@protocol.address_offset(decoded.pdus[0].header.address), 0x0130U)
+}
+
+///|
+test "FrameBuilder index wraps at 256" {
+  let builder = @protocol.FrameBuilder::new()
+  // Manually set next_index near wrap point
+  builder.next_index = 254
+  let idx254 = builder.add(NOP, 0U, Bytes::new(0))
+  assert_eq(idx254, b'\xFE')
+  let _ = builder.build()
+  let idx255 = builder.add(NOP, 0U, Bytes::new(0))
+  assert_eq(idx255, b'\xFF')
+  let _ = builder.build()
+  let idx0 = builder.add(NOP, 0U, Bytes::new(0))
+  assert_eq(idx0, b'\x00')
+}
+
+///|
+test "all EcCommand values survive encode/decode" {
+  let cmds : Array[@protocol.EcCommand] = [
+    NOP,
+    APRD,
+    APWR,
+    APRW,
+    FPRD,
+    FPWR,
+    FPRW,
+    BRD,
+    BWR,
+    BRW,
+    LRD,
+    LWR,
+    LRW,
+    ARMW,
+    FRMW,
+  ]
+  for cmd in cmds {
+    let frame : @protocol.EcFrame = {
+      dst_mac: @protocol.broadcast_mac,
+      src_mac: @protocol.default_master_mac,
+      pdus: [
+        {
+          header: { command: cmd, index: b'\x00', address: 0U, len_flags: 0U },
+          data: Bytes::new(0),
+          wkc: 0U,
+        },
+      ],
+    }
+    let decoded = @protocol.EcFrame::decode(frame.encode())
+    assert_eq(decoded.pdus[0].header.command, cmd)
+  }
+}
