@@ -846,6 +846,203 @@ test "PdoContext set_slave_outputs rejects unknown station" {
   assert_true(result is Err(_))
 }
 
+// ========== Mailbox Transport Tests ==========
+
+///|
+test "mailbox_poll via mock loopback" {
+  // MockNic echoes frames; the response data will be zeroed (from the request)
+  // so SM status bit 3 = 0 → mailbox not ready
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  let ready = @protocol.mailbox_poll(nic, 0x1001U, cfg, timeout)
+  assert_eq(ready, false) // Echo returns zero data → not ready
+}
+
+///|
+test "mailbox_send via mock loopback" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  // Should succeed without error
+  @protocol.mailbox_send(nic, 0x1001U, cfg, Bytes::new(16), timeout)
+}
+
+///|
+test "mailbox_send rejects oversized data" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 16U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 16U,
+    in_sm_index: 1,
+  }
+  let result = try? @protocol.mailbox_send(
+    nic,
+    0x1001U,
+    cfg,
+    Bytes::new(32), // larger than out_size
+    timeout,
+  )
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
+
+///|
+test "mailbox_recv times out when poll never succeeds" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  // MockNic echoes zero data → poll always returns false → should timeout
+  let result = try? @protocol.mailbox_recv(
+    nic,
+    0x1001U,
+    cfg,
+    timeout,
+    max_polls=3,
+  )
+  assert_true(result is Err(@hal.EcError::MailboxTimeout))
+}
+
+// ========== EEPROM Read Tests ==========
+
+///|
+test "eeprom_read_word via mock loopback" {
+  // MockNic echoes frames. The SII control register read returns zeros,
+  // which means busy=0 → ready. Data register read also returns zeros.
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = @protocol.eeprom_read_word(nic, 0x1001U, 0U, timeout)
+  assert_eq(data.length(), 4)
+}
+
+///|
+test "eeprom_read multi-word via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let data = @protocol.eeprom_read(nic, 0x1001U, 0U, 3, timeout)
+  assert_eq(data.length(), 12) // 3 words * 4 bytes
+}
+
+// ========== ESM Extensions Tests ==========
+
+///|
+test "read_device_emulation via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic echoes zero data → bit 7 = 0 → no device emulation
+  let is_emu = @protocol.read_device_emulation(nic, 0x1001U, timeout)
+  assert_eq(is_emu, false)
+}
+
+///|
+test "request_state_aware without device_emulation same as request_state" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic echoes zeros → read_al_status gets 0x00 → EsmStateError
+  let result = try? @protocol.request_state_aware(
+    nic,
+    0x1001U,
+    @protocol.EsmState::Init,
+    timeout,
+  )
+  assert_true(result is Err(@hal.EcError::EsmStateError(_)))
+}
+
+///|
+test "request_state_aware with device_emulation" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // With device_emulation flag, should check error indication first,
+  // then proceed to request_state (which also gets EsmStateError from mock)
+  let result = try? @protocol.request_state_aware(
+    nic,
+    0x1001U,
+    @protocol.EsmState::Init,
+    device_emulation=true,
+    timeout,
+  )
+  assert_true(result is Err(@hal.EcError::EsmStateError(_)))
+}
+
+///|
+test "set_sm_enable via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // Enable SM2
+  @protocol.set_sm_enable(nic, 0x1001U, 2, true, timeout)
+  // Disable SM2
+  @protocol.set_sm_enable(nic, 0x1001U, 2, false, timeout)
+}
+
+///|
+test "apply_op_only_policy no-op when not op_only" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // When op_only = false, should do nothing
+  @protocol.apply_op_only_policy(
+    nic,
+    0x1001U,
+    @protocol.EsmState::SafeOp,
+    false,
+    [2],
+    timeout,
+  )
+}
+
+///|
+test "apply_op_only_policy disables SM when not Op" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // When op_only = true and state is SafeOp, should disable SM
+  @protocol.apply_op_only_policy(
+    nic,
+    0x1001U,
+    @protocol.EsmState::SafeOp,
+    true,
+    [2],
+    timeout,
+  )
+}
+
+///|
+test "apply_op_only_policy enables SM when Op" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // When op_only = true and state is Op, should enable SM
+  @protocol.apply_op_only_policy(
+    nic,
+    0x1001U,
+    @protocol.EsmState::Op,
+    true,
+    [2, 3],
+    timeout,
+  )
+}
+
 ///|
 test "PdoContext get_slave_inputs rejects unknown station" {
   let sm : @mailbox.SlaveMapping = {

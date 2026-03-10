@@ -16,6 +16,10 @@ pub fn calculate_slave_mapping(Bytes, UInt) -> SlaveMapping raise @hal.EcError
 
 pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
 
+pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
+
+pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
+
 pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
@@ -49,6 +53,14 @@ pub(all) enum CoeService {
 pub impl Eq for CoeService
 pub impl Show for CoeService
 
+pub(all) struct EmergencyMessage {
+  error_code : UInt
+  error_register : Byte
+  data : Bytes
+}
+pub impl Eq for EmergencyMessage
+pub impl Show for EmergencyMessage
+
 pub(all) struct FmmuConfig {
   logical_start : UInt
   length : UInt
@@ -69,6 +81,19 @@ pub(all) enum FmmuDirection {
 }
 pub impl Eq for FmmuDirection
 pub impl Show for FmmuDirection
+
+pub(all) struct MailboxConfig {
+  out_address : UInt
+  out_size : UInt
+  out_sm_index : Int
+  in_address : UInt
+  in_size : UInt
+  in_sm_index : Int
+}
+pub fn MailboxConfig::from_sii(SiiData) -> Self
+pub fn MailboxConfig::is_valid(Self) -> Bool
+pub impl Eq for MailboxConfig
+pub impl Show for MailboxConfig
 
 pub(all) struct MailboxCounter {
   mut value : Byte
@@ -102,6 +127,30 @@ pub(all) enum MailboxType {
 pub fn MailboxType::to_byte(Self) -> Byte
 pub impl Eq for MailboxType
 pub impl Show for MailboxType
+
+pub(all) struct Rmsm {
+  counter : MailboxCounter
+  mut state : RmsmState
+  max_retries : Int
+  mut retries : Int
+  mut last_recv_counter : Byte
+}
+pub fn Rmsm::begin_transaction(Self) -> Byte raise @hal.EcError
+pub fn Rmsm::current_counter(Self) -> Byte
+pub fn Rmsm::is_idle(Self) -> Bool
+pub fn Rmsm::new(max_retries? : Int) -> Self
+pub fn Rmsm::record_timeout(Self) -> Bool
+pub fn Rmsm::reset(Self) -> Unit
+pub fn Rmsm::validate_response(Self, Byte) -> Bool raise @hal.EcError
+pub impl Show for Rmsm
+
+pub(all) enum RmsmState {
+  Idle
+  WaitingForResponse(Byte)
+  Error(String)
+}
+pub impl Eq for RmsmState
+pub impl Show for RmsmState
 
 pub(all) enum SdoCommand {
   DownloadRequest
@@ -189,6 +238,9 @@ pub(all) struct SiiGeneral {
   flags : Byte
   current_on_ebus : UInt
 }
+pub fn SiiGeneral::is_op_only(Self) -> Bool
+pub fn SiiGeneral::prefers_not_lrw(Self) -> Bool
+pub fn SiiGeneral::supports_identification_ado(Self) -> Bool
 pub impl Eq for SiiGeneral
 pub impl Show for SiiGeneral
 

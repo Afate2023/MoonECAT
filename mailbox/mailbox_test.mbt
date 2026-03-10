@@ -625,3 +625,311 @@ test "build_sdo_upload creates correct request" {
   assert_eq(txn.request.data.length(), 0)
   assert_eq(txn.request.complete_access, false)
 }
+
+// ========== MailboxConfig Tests ==========
+
+///|
+test "MailboxConfig::from_sii extracts SM addresses" {
+  let sii : @mailbox.SiiData = {
+    vendor_id: 0x02U,
+    product_code: 0x044C2C52U,
+    revision: 0x120000U,
+    serial: 0U,
+    bootstrap_rx_offset: 0U,
+    bootstrap_rx_size: 0U,
+    bootstrap_tx_offset: 0U,
+    bootstrap_tx_size: 0U,
+    mailbox_rx_offset: 0x1000U,
+    mailbox_rx_size: 128U,
+    mailbox_tx_offset: 0x1080U,
+    mailbox_tx_size: 128U,
+    mailbox_protocols: 0x0CU,
+  }
+  let cfg = @mailbox.MailboxConfig::from_sii(sii)
+  assert_eq(cfg.out_address, 0x1000U)
+  assert_eq(cfg.out_size, 128U)
+  assert_eq(cfg.out_sm_index, 0)
+  assert_eq(cfg.in_address, 0x1080U)
+  assert_eq(cfg.in_size, 128U)
+  assert_eq(cfg.in_sm_index, 1)
+}
+
+///|
+test "MailboxConfig::is_valid returns true for non-zero sizes" {
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  assert_true(cfg.is_valid())
+}
+
+///|
+test "MailboxConfig::is_valid returns false for zero sizes" {
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0U,
+    out_size: 0U,
+    out_sm_index: 0,
+    in_address: 0U,
+    in_size: 0U,
+    in_sm_index: 1,
+  }
+  assert_true(not(cfg.is_valid()))
+}
+
+// ========== RMSM Tests ==========
+
+///|
+test "Rmsm new starts in Idle" {
+  let rmsm = @mailbox.Rmsm::new()
+  assert_true(rmsm.is_idle())
+  assert_eq(rmsm.current_counter(), b'\x00')
+}
+
+///|
+test "Rmsm begin_transaction transitions to WaitingForResponse" {
+  let rmsm = @mailbox.Rmsm::new()
+  let cnt = rmsm.begin_transaction()
+  assert_true(cnt >= b'\x01' && cnt <= b'\x0F')
+  assert_true(not(rmsm.is_idle()))
+}
+
+///|
+test "Rmsm begin_transaction fails when not Idle" {
+  let rmsm = @mailbox.Rmsm::new()
+  let _ = rmsm.begin_transaction()
+  let result = try? rmsm.begin_transaction()
+  assert_true(result is Err(_))
+}
+
+///|
+test "Rmsm validate_response succeeds with matching counter" {
+  let rmsm = @mailbox.Rmsm::new()
+  let cnt = rmsm.begin_transaction()
+  let valid = rmsm.validate_response(cnt)
+  assert_true(valid)
+  assert_true(rmsm.is_idle())
+}
+
+///|
+test "Rmsm validate_response accepts counter 0 (slave doesn't support)" {
+  let rmsm = @mailbox.Rmsm::new()
+  let _ = rmsm.begin_transaction()
+  let valid = rmsm.validate_response(b'\x00')
+  assert_true(valid)
+  assert_true(rmsm.is_idle())
+}
+
+///|
+test "Rmsm validate_response detects counter mismatch" {
+  let rmsm = @mailbox.Rmsm::new()
+  let cnt = rmsm.begin_transaction()
+  let wrong_cnt = if cnt == b'\x0F' { b'\x01' } else { cnt + b'\x01' }
+  let result = try? rmsm.validate_response(wrong_cnt)
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
+
+///|
+test "Rmsm validate_response detects repeat frame" {
+  let rmsm = @mailbox.Rmsm::new()
+  // First transaction: succeed
+  let cnt1 = rmsm.begin_transaction()
+  let _ = rmsm.validate_response(cnt1)
+  // Second transaction: same counter should be a repeat
+  let cnt2 = rmsm.begin_transaction()
+  ignore(cnt2)
+  let is_new = rmsm.validate_response(cnt1)
+  assert_true(not(is_new)) // Repeat detected
+}
+
+///|
+test "Rmsm record_timeout allows retries up to max" {
+  let rmsm = @mailbox.Rmsm::new(max_retries=2)
+  let _ = rmsm.begin_transaction()
+  assert_true(rmsm.record_timeout())
+  assert_true(rmsm.record_timeout())
+  assert_true(not(rmsm.record_timeout())) // Third retry exceeds max
+}
+
+///|
+test "Rmsm reset returns to Idle" {
+  let rmsm = @mailbox.Rmsm::new()
+  let _ = rmsm.begin_transaction()
+  rmsm.reset()
+  assert_true(rmsm.is_idle())
+}
+
+// ========== Emergency Message Tests ==========
+
+///|
+test "decode_emergency parses valid payload" {
+  // error_code = 0x1234, error_register = 0xAB, data = [01,02,03,04,05]
+  let payload = Bytes::from_array([
+    b'\x34', b'\x12', b'\xAB', b'\x01', b'\x02', b'\x03', b'\x04', b'\x05',
+  ])
+  let emg = @mailbox.decode_emergency(payload)
+  assert_eq(emg.error_code, 0x1234U)
+  assert_eq(emg.error_register, b'\xAB')
+  assert_eq(emg.data[0], b'\x01')
+  assert_eq(emg.data[4], b'\x05')
+}
+
+///|
+test "decode_emergency rejects short payload" {
+  let short = Bytes::new(5)
+  let result = try? @mailbox.decode_emergency(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_emergency_frame parses valid frame" {
+  // Build: mbh (6) + CoE hdr emergency (2) + emergency payload (8) = 16 bytes
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x03',
+  }
+  let hdr = mbh.to_bytes()
+  // CoE header: service type = 1 (Emergency) in bits [15:12] → high byte = 0x10
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00' // CoE lo
+    } else if i == 7 {
+      b'\x10' // CoE hi: service type 1 << 4
+    } else if i == 8 {
+      b'\x78' // error code lo
+    } else if i == 9 {
+      b'\x56' // error code hi
+    } else if i == 10 {
+      b'\xAA' // error register
+    } else {
+      b'\x00' // data
+    }
+  })
+  let (decoded_mbh, emg) = @mailbox.decode_emergency_frame(frame)
+  assert_eq(decoded_mbh.counter, b'\x03')
+  assert_eq(emg.error_code, 0x5678U)
+  assert_eq(emg.error_register, b'\xAA')
+}
+
+///|
+test "decode_emergency_frame rejects non-CoE" {
+  // Build a frame with AoE mailbox type
+  let frame = Bytes::makei(16, fn(i) {
+    if i == 5 {
+      b'\x11' // type = AoE(1), counter=1
+    } else {
+      b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_emergency_frame(frame)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_emergency_frame rejects wrong CoE service type" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x01',
+  }
+  let hdr = mbh.to_bytes()
+  // CoE header: service type = 3 (SDO Response, not Emergency)
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 7 {
+      b'\x30' // service type 3 << 4
+    } else {
+      b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_emergency_frame(frame)
+  assert_true(result is Err(_))
+}
+
+// ========== SiiGeneral Flags Tests ==========
+
+///|
+test "SiiGeneral::is_op_only detects flag bit 0" {
+  let gen : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    flags: b'\x01', // bit 0 set = OpOnly
+    current_on_ebus: 0U,
+  }
+  assert_true(gen.is_op_only())
+  assert_true(not(gen.prefers_not_lrw()))
+  assert_true(not(gen.supports_identification_ado()))
+}
+
+///|
+test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
+  let gen : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    flags: b'\x02', // bit 1 set = NotLRW
+    current_on_ebus: 0U,
+  }
+  assert_true(not(gen.is_op_only()))
+  assert_true(gen.prefers_not_lrw())
+}
+
+///|
+test "SiiGeneral::supports_identification_ado detects flag bit 3" {
+  let gen : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    flags: b'\x08', // bit 3 set = IdentificationAdo
+    current_on_ebus: 0U,
+  }
+  assert_true(gen.supports_identification_ado())
+}
+
+///|
+test "SiiGeneral all flags clear" {
+  let gen : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    flags: b'\x00',
+    current_on_ebus: 0U,
+  }
+  assert_true(not(gen.is_op_only()))
+  assert_true(not(gen.prefers_not_lrw()))
+  assert_true(not(gen.supports_identification_ado()))
+}

@@ -11,6 +11,8 @@ pub fn address_offset(UInt) -> UInt
 
 pub fn address_station(UInt) -> UInt
 
+pub fn[N : @hal.Nic] apply_op_only_policy(N, UInt, EsmState, Bool, Array[Int], @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] assign_station_address(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn auto_increment_address(UInt) -> UInt
@@ -35,6 +37,10 @@ pub let ecat_frame_type : Int
 
 pub let ecat_header_len : Int
 
+pub fn[N : @hal.Nic] eeprom_read(N, UInt, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
+
 pub let ethernet_header_len : Int
 
 pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
@@ -42,6 +48,14 @@ pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
 pub let fmmu_entry_size : Int
 
 pub fn logical_address(UInt) -> UInt
+
+pub fn[N : @hal.Nic] mailbox_exchange(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] mailbox_poll(N, UInt, @mailbox.MailboxConfig, @hal.Duration) -> Bool raise @hal.EcError
+
+pub fn[N : @hal.Nic] mailbox_recv(N, UInt, @mailbox.MailboxConfig, @hal.Duration, max_polls? : Int) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] mailbox_send(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let max_pdus_per_frame : Int
 
@@ -58,6 +72,8 @@ pub fn[N : @hal.Nic] read_al_status(N, UInt, @hal.Duration) -> EsmState raise @h
 pub fn[N : @hal.Nic] read_al_status_code(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
 pub fn read_command(AddressType) -> EcCommand
+
+pub fn[N : @hal.Nic] read_device_emulation(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
 
@@ -94,6 +110,18 @@ pub let reg_station_alias : UInt
 pub let reg_type : UInt
 
 pub fn[N : @hal.Nic] request_state(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] request_state_aware(N, UInt, EsmState, device_emulation? : Bool, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_download(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_download_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_upload(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_upload_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] set_sm_enable(N, UInt, Int, Bool, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let sm_entry_size : Int
 
