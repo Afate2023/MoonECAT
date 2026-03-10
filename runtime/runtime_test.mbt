@@ -1084,6 +1084,32 @@ test "run with mock loopback: validation fails when slaves expected but not foun
 }
 
 ///|
+test "replay integration minimal flow: scan->validate->run->stop" {
+  let nic = @mock.MockNic::new()
+  let config = @hal.MasterConfig::default()
+  let expected : Array[@hal.SlaveConfig] = []
+  let ctx : @protocol.PdoContext = {
+    image: @protocol.ProcessImage::new(0, 0),
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 0,
+  }
+  let report = @runtime.run(
+    nic,
+    config,
+    expected,
+    ctx,
+    0U,
+    3,
+    @hal.Duration(1000L),
+  )
+  assert_eq(report.validation.all_ok, true)
+  assert_eq(report.cycles_requested, 3)
+  assert_eq(report.cycles_ok, 3)
+  assert_true(report.final_phase is @runtime.Done)
+}
+
+///|
 test "diagnosis parser: error register" {
   let b = @runtime.parse_error_register_payload(b"\xAA")
   assert_eq(b, b'\xAA')
