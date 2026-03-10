@@ -357,6 +357,7 @@
   - ✅ commit: `420a99a` `test(runtime): add minimal replay integration flow`
 - [x] 持续把参考分析文档转成实现约束和验收标准。
   - ✅ [docs/REFERENCE_CONSTRAINTS.md](docs/REFERENCE_CONSTRAINTS.md): 建立“参考调用流 -> 实现约束 -> 测试验收”映射矩阵
+  - ✅ commit: `44dfea1` `docs: map reference callflows to constraints and tests`
 
 ## 5. 依赖顺序
 
