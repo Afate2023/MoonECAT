@@ -9,35 +9,35 @@
 | Feature ID | 功能 | Class B 要求 | 状态 | 对应模块 | 备注 |
 |:---:|---|---|:---:|---|---|
 | **基础功能 (5.3)** | | | | | |
-| 101 | Service Commands (全部 DLPDU 命令) | shall if ENI | ✅ | `protocol/codec` | 15 种 EcCommand 全部映射 |
-| 102 | IRQ Field in datagram | should | ❌ | `protocol/pdu` | PDU 已解析 IRQ 字段，但主循环未消费 |
-| 103 | Slaves with Device Emulation | shall | ✅ | `protocol/esm_extensions` | read_device_emulation + request_state_aware + OpOnly |
-| 104 | EtherCAT State Machine (ESM) | shall | ✅ | `protocol/esm`, `esm_engine` | Init/PreOp/SafeOp/Op/Boot + 回退路径 |
-| 105 | Error Handling (WKC 等) | shall | ✅ | `runtime/scheduler` | WKC 校验 + 连续错误计数 + 诊断指标 |
+| 101 | Service Commands (全部 DLPDU 命令) | shall if ENI | ✅ | [protocol/codec.mbt](protocol/codec.mbt) | 15 种 EcCommand 全部映射 |
+| 102 | IRQ Field in datagram | should | ❌ | [protocol/pdu.mbt](protocol/pdu.mbt) | PDU 已解析 IRQ 字段，但主循环未消费 |
+| 103 | Slaves with Device Emulation | shall | ✅ | [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | read_device_emulation + request_state_aware + OpOnly |
+| 104 | EtherCAT State Machine (ESM) | shall | ✅ | [protocol/esm.mbt](protocol/esm.mbt), [protocol/esm_engine.mbt](protocol/esm_engine.mbt) | Init/PreOp/SafeOp/Op/Boot + 回退路径 |
+| 105 | Error Handling (WKC 等) | shall | ✅ | [runtime/scheduler.mbt](runtime/scheduler.mbt) | WKC 校验 + 连续错误计数 + 诊断指标 |
 | 106 | VLAN | may | ➖ | — | 不实现 |
-| 107 | EtherCAT Frame Types (0x88A4) | shall | ✅ | `protocol/frame` | Ethernet II + EtherType 0x88A4 |
+| 107 | EtherCAT Frame Types (0x88A4) | shall | ✅ | [protocol/frame.mbt](protocol/frame.mbt) | Ethernet II + EtherType 0x88A4 |
 | 108 | UDP Frame Types | may | ➖ | — | 不实现 |
 | **过程数据交换 (5.4)** | | | | | |
-| 201 | Cyclic PDO | shall | ✅ | `protocol/pdo`, `runtime` | pdo_exchange LRW 已完整实现 |
+| 201 | Cyclic PDO | shall | ✅ | [protocol/pdo.mbt](protocol/pdo.mbt), [runtime/runtime.mbt](runtime/runtime.mbt) | pdo_exchange LRW 已完整实现 |
 | 202 | Multiple Tasks | may | ➖ | — | Free Run 单任务优先 |
 | 203 | Frame repetition | may | ➖ | — | 不实现 |
 | **网络配置 (5.5)** | | | | | |
-| 301 | Online scanning / ENI import (至少一种) | shall (至少一种) | ✅ | `runtime/scan` | Online scanning 已实现 |
-| 302 | Compare Network configuration (boot-up) | shall | ✅ | `runtime/validate` | Vendor/Product/Revision/Serial 4-tuple 校验 |
+| 301 | Online scanning / ENI import (至少一种) | shall (至少一种) | ✅ | [runtime/scan.mbt](runtime/scan.mbt) | Online scanning 已实现 |
+| 302 | Compare Network configuration (boot-up) | shall | ✅ | [runtime/validate.mbt](runtime/validate.mbt) | Vendor/Product/Revision/Serial 4-tuple 校验 |
 | 303 | Explicit Device Identification | should | ❌ | — | IdentificationAdo 未实现 |
 | 304 | Station Alias Addressing | may | ❌ | — | Register 0x0012 + DL Control Bit 24 |
-| 305 | Access to EEPROM (Read shall, Write may) | Read shall | ✅ | `protocol/eeprom` | eeprom_read_word/eeprom_read via ESC 0x0502-0x0508 |
+| 305 | Access to EEPROM (Read shall, Write may) | Read shall | ✅ | [protocol/eeprom.mbt](protocol/eeprom.mbt) | eeprom_read_word/eeprom_read via ESC 0x0502-0x0508 |
 | **邮箱支持 (5.6)** | | | | | |
-| 401 | Support Mailbox (基础传输) | shall | ✅ | `protocol/mailbox_transport` | mailbox_send/recv/poll/exchange 已闭环 |
-| 402 | Mailbox Resilient Layer (RMSM) | shall | ✅ | `mailbox/rmsm` | Rmsm 状态机 + 计数器关联 + 重复检测 + 重试 |
+| 401 | Support Mailbox (基础传输) | shall | ✅ | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | mailbox_send/recv/poll/exchange 已闭环 |
+| 402 | Mailbox Resilient Layer (RMSM) | shall | ✅ | [mailbox/rmsm.mbt](mailbox/rmsm.mbt) | Rmsm 状态机 + 计数器关联 + 重复检测 + 重试 |
 | 403 | Multiple Mailbox channels | may | ➖ | — | 不实现 |
-| 404 | Mailbox polling | shall | ✅ | `protocol/mailbox_transport` | mailbox_poll SM status bit 检查 |
+| 404 | Mailbox polling | shall | ✅ | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | mailbox_poll SM status bit 检查 |
 | **CoE (5.7)** | | | | | |
-| 501 | SDO Up/Download (normal + expedited) | shall | ✅ | `protocol/sdo_transaction` | sdo_download/upload + retry 事务已闭环 |
+| 501 | SDO Up/Download (normal + expedited) | shall | ✅ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | sdo_download/upload + retry 事务已闭环 |
 | 502 | Segmented Transfer | should | ❌ | — | |
 | 503 | Complete Access | should (shall if ENI) | ❌ | — | |
 | 504 | SDO Info service | should | ❌ | — | |
-| 505 | Emergency Message | shall | ✅ | `mailbox/emergency` | decode_emergency/decode_emergency_frame |
+| 505 | Emergency Message | shall | ✅ | [mailbox/emergency.mbt](mailbox/emergency.mbt) | decode_emergency/decode_emergency_frame |
 | 506 | PDO in CoE | may | ➖ | — | |
 | **EoE (5.8)** | | | | | |
 | 601–603 | EoE Protocol / Virtual Switch / OS Endpoint | shall if EoE | ➖ | — | 项目范围排除 |
@@ -50,9 +50,9 @@
 | **VoE (5.12)** | | | | | |
 | 1001 | VoE Protocol | may | ➖ | — | 项目范围排除 |
 | **DC 同步 (5.13)** | | | | | |
-| 1101 | DC support | shall if DC | ✅ | `protocol/dc`, `runtime/runtime` | 已实现 DC 初始化 + SYNC0 + FRMW 漂移补偿 |
+| 1101 | DC support | shall if DC | ✅ | [protocol/dc.mbt](protocol/dc.mbt), [runtime/runtime.mbt](runtime/runtime.mbt) | 已实现 DC 初始化 + SYNC0 + FRMW 漂移补偿 |
 | 1102 | Continuous Propagation Delay compensation | should | ❌ | — | |
-| 1103 | Sync window monitoring | should | ❌ | — | |
+| 1103 | Sync window monitoring | should | ✅ | [protocol/dc.mbt](protocol/dc.mbt) | dc_read_sync_window |
 | **Slave-to-Slave (5.14)** | | | | | |
 | — | Slave-to-Slave via Master | — | ➖ | — | 暂不实现 |
 | **Master 信息 (5.15)** | | | | | |
@@ -80,9 +80,9 @@
 - [x] 定义核心错误模型、诊断事件模型和基础配置对象。
   - 📦 EcError(16 变体) + DiagnosticEvent + MasterConfig/NicConfig
 - [x] 建立 `Library API` 与 `CLI` 的入口占位，保证共享核心实现。
-  - 📦 cmd/main/main.mbt (stub)
+  - 📦 [cmd/main/main.mbt](cmd/main/main.mbt) (stub)
 - [x] 建立最小测试骨架和样例夹具结构。
-  - 📦 fixtures/fixtures.mbt + 各包 *_test.mbt (~163 tests)
+  - 📦 [fixtures/fixtures.mbt](fixtures/fixtures.mbt) + 各包 *_test.mbt (~163 tests)
 
 已完成提交：
 - ✅ `feat: scaffold moonecat package layout`
@@ -96,13 +96,13 @@
 - [x] 实现 PDU 编码、解码、地址模型和缓冲区管理。
   - 📦 EcCommand(15种), PDU header, FrameBuilder [ETG.1500 #101]
 - [x] 落地首个可运行后端，优先 `Mock Loopback`。
-  - 📦 hal/mock/loopback.mbt: MockNic + MockClock
+  - 📦 [hal/mock/loopback.mbt](hal/mock/loopback.mbt): MockNic + MockClock
 - [x] 建立发送、接收、超时和错误返回的统一流程。
-  - 📦 transact/transact_pdu/transact_pdu_retry
+  - 📦 [protocol/transact.mbt](protocol/transact.mbt): transact/transact_pdu/transact_pdu_retry
 - [x] 为热路径加入预分配或少分配约束。
   - 📦 FrameBuilder 缓冲区管理
 - [x] 补齐帧/PDU 和收发闭环测试。
-  - 📦 protocol_test.mbt (~15 tests)
+  - 📦 [protocol/protocol_test.mbt](protocol/protocol_test.mbt) (~15 tests)
 
 已完成提交：
 - ✅ `feat: add ethercat frame codec` (1aeb2f3)
@@ -123,9 +123,9 @@
 - [x] 实现 FMMU/SM 自动配置计算。
   - 📦 calculate_sm_configs + calculate_fmmu_configs + FmmuConfig::to_bytes
 - [x] 提供 `scan` 和 `validate` 可复用的库层接口。
-  - 📦 runtime/scan.mbt + runtime/validate.mbt
+  - 📦 [runtime/scan.mbt](runtime/scan.mbt) + [runtime/validate.mbt](runtime/validate.mbt)
 - [x] 补齐无真实网卡场景下的夹具测试。
-  - 📦 fixtures/fixtures.mbt + mailbox_test.mbt + runtime_test.mbt
+  - 📦 [fixtures/fixtures.mbt](fixtures/fixtures.mbt) + [mailbox/mailbox_test.mbt](mailbox/mailbox_test.mbt) + [runtime/runtime_test.mbt](runtime/runtime_test.mbt)
 
 已完成提交：
 - ✅ `feat: add slave discovery model` (9739150)
@@ -148,15 +148,15 @@
 - [x] 输出抖动、重试、状态迁移等诊断指标。
   - 📦 Telemetry: cycles/tx/rx/timeouts/retries/wkc_errors
 - [x] 补齐 Free Run 主流程和关键错误回退测试。
-  - 📦 runtime_test.mbt (~13 tests)
+  - 📦 [runtime/runtime_test.mbt](runtime/runtime_test.mbt) (~13 tests)
 - [x] **【缺口】pdo_exchange 实体循环**：完成 LRW/LRD/LWR 实际收发，使 run_cycle 能驱动真实 PDO 交换 [ETG.1500 #201]
   - ✅ 代码审查确认 pdo_exchange 已完整实现 (LRW + logical addressing)
 - [x] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
-  - ✅ `protocol/esm_extensions.mbt`: read_device_emulation + request_state_aware
+  - ✅ [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) : read_device_emulation + request_state_aware
 - [ ] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
 - [x] **【缺口】OpOnly 标志处理**：ESI OpOnly Flag 为真时，非 Op 状态禁用输出 SM [ETG.1500 §5.3.4]
-  - ✅ `protocol/esm_extensions.mbt`: apply_op_only_policy + set_sm_enable
-  - ✅ `mailbox/sii_flags.mbt`: SiiGeneral::is_op_only/prefers_not_lrw/supports_identification_ado
+  - ✅ [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) : apply_op_only_policy + set_sm_enable
+  - ✅ [mailbox/sii_flags.mbt](mailbox/sii_flags.mbt) : SiiGeneral::is_op_only/prefers_not_lrw/supports_identification_ado
 
 已完成提交：
 - ✅ `feat: add esm transition engine` (3652ca4)
@@ -175,13 +175,13 @@
 - [x] 实现 CoE/SDO 请求编码框架。
   - 📦 CoeService/SdoCommand/SdoRequest 类型 + coe_engine 常量
 - [x] **【缺口】SDO Upload/Download 事务闭环**：编码 SDO 请求 → 通过邮箱发送 → 等待响应 → 解码结果 [ETG.1500 #501 shall]
-  - ✅ `protocol/sdo_transaction.mbt`: sdo_download/upload + retry
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) : sdo_download/upload + retry
 - [x] **【缺口】Mailbox Resilient Layer (RMSM)**：丢帧恢复状态机 + Counter/Repeat 管理 [ETG.1500 #402 shall]
-  - ✅ `mailbox/rmsm.mbt`: Rmsm struct + begin/validate/timeout/reset
+  - ✅ [mailbox/rmsm.mbt](mailbox/rmsm.mbt): Rmsm struct + begin/validate/timeout/reset
 - [x] **【缺口】Mailbox polling**：周期性检查 Input-Mailbox 或 Status-Bit [ETG.1500 #404 shall]
-  - ✅ `protocol/mailbox_transport.mbt`: mailbox_poll SM status bit
+  - ✅ [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt): mailbox_poll SM status bit
 - [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
-  - ✅ `mailbox/emergency.mbt`: decode_emergency/decode_emergency_frame
+  - ✅ [mailbox/emergency.mbt](mailbox/emergency.mbt): decode_emergency/decode_emergency_frame
 - [ ] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
 - [ ] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
 - [ ] SDO Info Service [ETG.1500 #504 should]
@@ -198,7 +198,7 @@
 ### M6 网络配置增强 — ⚠️ EEPROM 读取已完成，ID/Alias 待实现
 
 - [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
-  - ✅ `protocol/eeprom.mbt`: eeprom_read_word/eeprom_read
+  - ✅ [protocol/eeprom.mbt](protocol/eeprom.mbt): eeprom_read_word/eeprom_read
 - [ ] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
 - [ ] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
 - [ ] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
@@ -212,14 +212,14 @@
 ### M7 DC 同步 — ✅ 基础能力已完成，增强项可迭代
 
 - [x] DC 初始化流程：传播延迟测量 + Offset 补偿 + Start Time 写入 [ETG.1500 #1101]
-  - ✅ `protocol/dc.mbt`: `dc_configure_linear`、`dc_configure_sync0`
-  - ✅ `runtime/runtime.mbt`: `Runtime::init_dc`
+  - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_configure_linear`、`dc_configure_sync0`
+  - ✅  [runtime/runtime.mbt](runtime/runtime.mbt): `Runtime::init_dc`
 - [x] DC 持续漂移补偿：ARMW 周期帧 [ETG.1500 #1101]
-  - ✅ `protocol/dc.mbt`: `dc_compensate_cycle` (FRMW)
-  - ✅ `runtime/runtime.mbt`: `run_cycle` 周期补偿
+  - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_compensate_cycle` (FRMW)
+  - ✅ [runtime/runtime.mbt](runtime/runtime.mbt): `run_cycle` 周期补偿
 - [ ] Continuous Propagation Delay compensation [ETG.1500 #1102 should]
 - [x] Sync window monitoring：读取 Register 0x092C [ETG.1500 #1103 should]
-  - ✅ `protocol/dc.mbt`: `dc_read_sync_window`
+  - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_read_sync_window`
 
 已完成提交：
 - ✅ `feat: implement distributed clock runtime and protocol support` (533285d)
@@ -230,14 +230,14 @@
 ### M8 CLI、文档与最终集成 — ⚠️ CLI stub，文档已有初版
 
 - [x] 实现 `moonecat scan` 命令（库层接口）。
-  - 📦 runtime/scan.mbt: scan() → ScanReport
+  - 📦 [runtime/scan.mbt](runtime/scan.mbt): scan() → ScanReport
 - [x] 实现 `moonecat validate` 命令（库层接口）。
-  - 📦 runtime/validate.mbt: validate() → ValidateReport
+  - 📦 [runtime/validate.mbt](runtime/validate.mbt): validate() → ValidateReport
 - [x] 实现 `moonecat run` 命令（库层接口框架）。
-  - 📦 runtime/runtime.mbt: Runtime + run_cycle
+  - 📦 [runtime/runtime.mbt](runtime/runtime.mbt): Runtime + run_cycle
 - [x] 补全文档：架构、接口、测试方式。
-  - 📦 README.mbt.md 已更新
-- [ ] **【缺口】CLI 实际接入**：cmd/main/main.mbt 目前仅 println stub，需接入 HAL + scan/validate/run 流程
+  - 📦 [README.mbt.md](README.mbt.md) 已更新
+- [ ] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 目前仅 println stub，需接入 HAL + scan/validate/run 流程
 - [ ] **【缺口】结构化诊断输出**：scan/validate/run 结果的 JSON/human-readable 格式化
 - [ ] 评估并整理 Extism 宿主接入边界。
 
@@ -274,21 +274,21 @@
 
 ## 8. 参考项目实现核对矩阵（调用流 + 本地源码）
 
-> 调用流依据：`src/*-callflow-analysis.md`  
-> 本地实现依据：`参考项目/*/src`、`参考项目/*/master`、`参考项目/*/include`
+> 调用流依据：[src/SOEM-callflow-analysis.md](src/SOEM-callflow-analysis.md)、[src/CherryECAT-callflow-analysis.md](src/CherryECAT-callflow-analysis.md)、[src/ethercrab-callflow-analysis.md](src/ethercrab-callflow-analysis.md)、[src/EtherCAT.net-callflow-analysis.md](src/EtherCAT.net-callflow-analysis.md)、[src/gatorcat-callflow-analysis.md](src/gatorcat-callflow-analysis.md)、[src/igh-callflow-analysis.md](src/igh-callflow-analysis.md)  
+> 本地实现依据：SOEM、CherryECAT、ethercrab、EtherCAT.NET、gatorcat、IGH 各参考实现源码（见下表具体文件与行号链接）
 
 | 功能 | 调用流文档依据 | 参考实现（本地代码） | MoonECAT 对应实现 | 结论 |
 |---|---|---|---|---|
-| 扫描/拓扑/基础发现 | `src/SOEM-callflow-analysis.md:157` `src/CherryECAT-callflow-analysis.md:178` `src/ethercrab-callflow-analysis.md:191` | SOEM: `参考项目/SOEM/src/ec_config.c` (`ecx_config_init`)；Cherry: `参考项目/CherryECAT/src/ec_slave.c` (`ec_slaves_scanning`)；ethercrab: `参考项目/ethercrab/src/maindevice.rs` | `runtime/scan.mbt` `protocol/discovery.mbt` | 已对齐 |
-| ESM 状态机与回退 | `src/SOEM-callflow-analysis.md:465` `src/igh-callflow-analysis.md:486` | SOEM: `参考项目/SOEM/src/ec_main.c`；IGH: `参考项目/ethercat/master/fsm_slave_config.c` | `protocol/esm.mbt` `protocol/esm_engine.mbt` `protocol/esm_extensions.mbt` | 已对齐 |
-| PDO 周期交换 | `src/CherryECAT-callflow-analysis.md:321` `src/gatorcat-callflow-analysis.md:172` `src/ethercrab-callflow-analysis.md:286` | Cherry: `参考项目/CherryECAT/src/ec_master.c` (`ec_master_period_process`)；gatorcat: `参考项目/gatorcat/src/module/MainDevice.zig` (`sendRecvCyclicFrames`)；ethercrab: `参考项目/ethercrab/src/subdevice_group/mod.rs` | `protocol/pdo.mbt` (`pdo_exchange`) `runtime/runtime.mbt` | 已对齐 |
-| Mailbox 传输与轮询 | `src/SOEM-callflow-analysis.md:378` `src/CherryECAT-callflow-analysis.md:63` | SOEM: `参考项目/SOEM/src/ec_main.c` (`ecx_mbxsend/ecx_mbxreceive/ecx_mbxhandler`)；Cherry: `参考项目/CherryECAT/src/ec_mailbox.c` | `protocol/mailbox_transport.mbt` | 已对齐 |
-| CoE SDO 事务 | `src/CherryECAT-callflow-analysis.md:416` `src/ethercrab-callflow-analysis.md:389` `src/EtherCAT.net-callflow-analysis.md:143` | SOEM: `参考项目/SOEM/src/ec_coe.c` (`ecx_readPDOmap`, SDO流程)；ethercrab: `参考项目/ethercrab/src/mailbox/coe/mod.rs` (`mailbox_write_read/sdo_read/sdo_write`)；EtherCAT.NET: `参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs` (`SdoWrite/TryReadSdoValue`) | `protocol/sdo_transaction.mbt` `mailbox/coe_engine.mbt` | 已对齐 |
-| Emergency 消息 | `src/SOEM-callflow-analysis.md:378` `src/igh-callflow-analysis.md:741` | IGH: `参考项目/ethercat/master/coe_emerg_ring.c`；SOEM: `参考项目/SOEM/src/ec_coe.c` (emergency分支) | `mailbox/emergency.mbt` | 已对齐（环形缓冲增强待做） |
-| EEPROM/SII 读取 | `src/SOEM-callflow-analysis.md:157` `src/ethercrab-callflow-analysis.md:440` | SOEM: `参考项目/SOEM/src/ec_main.c` (`ecx_readeeprom*`)；Cherry: `参考项目/CherryECAT/src/ec_sii.c`；ethercrab: `参考项目/ethercrab/src/eeprom/device_provider.rs` (`read_chunk`) | `protocol/eeprom.mbt` `mailbox/sii_parser.mbt` | 已对齐 |
-| DC 初始化与运行补偿 | `src/SOEM-callflow-analysis.md:443` `src/CherryECAT-callflow-analysis.md:225` `src/ethercrab-callflow-analysis.md:333` `src/EtherCAT.net-callflow-analysis.md:125` | SOEM: `参考项目/SOEM/src/ec_dc.c` (`ecx_configdc/ecx_dcsync0`)；Cherry: `参考项目/CherryECAT/src/ec_master.c` (`ec_master_dc_sync_with_pi`)；ethercrab: `参考项目/ethercrab/src/dc.rs` (`configure_dc/run_dc_static_sync`)；EtherCAT.NET: `参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs` (`ConfigureDc/CompensateDcDrift`) | `protocol/dc.mbt` `runtime/runtime.mbt` `runtime/run.mbt` | 已对齐 |
-| Alias Addressing（待实现） | `src/gatorcat-callflow-analysis.md:90` | gatorcat: `参考项目/gatorcat/src/module/MainDevice.zig` + `参考项目/gatorcat/src/module/esc.zig` (`dl_control_enable_alias_address`) | （待实现）`protocol/discovery.mbt` 拓展 | 下一步 |
-| Explicit Device ID（待实现） | `src/gatorcat-callflow-analysis.md:60` `src/ethercrab-callflow-analysis.md:191` | 参考路径：gatorcat `Scanner.zig` 与 ethercrab `SubDevice::new` 的 identity/alias 流程 | （待实现）`runtime/validate.mbt` + `protocol/discovery.mbt` | 下一步 |
+| 扫描/拓扑/基础发现 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [CherryECAT-callflow-analysis.md:178](src/CherryECAT-callflow-analysis.md#L178) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | SOEM: [ec_config.c:172](参考项目/SOEM/src/ec_config.c#L172) (`ecx_config_init`) Cherry: [ec_slave.c:955](参考项目/CherryECAT/src/ec_slave.c#L955) (`ec_slaves_scanning`) ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) | [runtime/scan.mbt](runtime/scan.mbt) [protocol/discovery.mbt](protocol/discovery.mbt) | 已对齐 |
+| ESM 状态机与回退 | [SOEM-callflow-analysis.md:465](src/SOEM-callflow-analysis.md#L465) [IGH-callflow-analysis.md:486](src/igh-callflow-analysis.md#L486) | SOEM: [ec_main.c:1017](参考项目/SOEM/src/ec_main.c#L1017) (`ecx_writestate`) + [ec_main.c:1052](参考项目/SOEM/src/ec_main.c#L1052) (`ecx_statecheck`)；IGH: [fsm_slave_config.c:223](参考项目/ethercat/master/fsm_slave_config.c#L223) (`ec_fsm_slave_config_state_start`) | [protocol/esm.mbt](protocol/esm.mbt) [protocol/esm_engine.mbt](protocol/esm_engine.mbt) [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | 已对齐 |
+| PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](参考项目/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](参考项目/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](参考项目/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |
+| Mailbox 传输与轮询 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [CherryECAT-callflow-analysis.md:63](src/CherryECAT-callflow-analysis.md#L63) | SOEM: [ec_main.c:1521](参考项目/SOEM/src/ec_main.c#L1521) (`ecx_mbxsend`) + [ec_main.c:1592](参考项目/SOEM/src/ec_main.c#L1592) (`ecx_mbxreceive`) + [ec_main.c:1506](参考项目/SOEM/src/ec_main.c#L1506) (`ecx_mbxhandler`)；Cherry: [ec_mailbox.c:31](参考项目/CherryECAT/src/ec_mailbox.c#L31) (`ec_mailbox_send`) + [ec_mailbox.c:84](参考项目/CherryECAT/src/ec_mailbox.c#L84) (`ec_mailbox_receive`) | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | 已对齐 |
+| CoE SDO 事务 | [CherryECAT-callflow-analysis.md:416](src/CherryECAT-callflow-analysis.md#L416) [ethercrab-callflow-analysis.md:389](src/ethercrab-callflow-analysis.md#L389) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_coe.c:856](参考项目/SOEM/src/ec_coe.c#L856) (`ecx_readPDOmap`)；ethercrab: [mod.rs:180](参考项目/ethercrab/src/mailbox/coe/mod.rs#L180) (`mailbox_write_read`) + [mod.rs:561](参考项目/ethercrab/src/mailbox/coe/mod.rs#L561) (`sdo_read`) + [mod.rs:371](参考项目/ethercrab/src/mailbox/coe/mod.rs#L371) (`sdo_write`)；EtherCAT.NET: [EcUtilities.cs:728](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L728) (`SdoWrite`) + [EcUtilities.cs:773](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L773) (`TryReadSdoValue`) | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已对齐 |
+| Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](参考项目/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](参考项目/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
+| EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](参考项目/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](参考项目/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](参考项目/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](参考项目/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
+| DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](参考项目/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](参考项目/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](参考项目/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](参考项目/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](参考项目/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
+| Alias Addressing（待实现） | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](参考项目/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](参考项目/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | （待实现）[protocol/discovery.mbt](protocol/discovery.mbt) 拓展 | 下一步 |
+| Explicit Device ID（待实现） | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](参考项目/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](参考项目/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](参考项目/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | （待实现）[runtime/validate.mbt](runtime/validate.mbt) + [protocol/discovery.mbt](protocol/discovery.mbt) | 下一步 |
 
 ---
 
@@ -384,7 +384,7 @@
 1. **Explicit Device Identification (#303)**：补 IdentificationAdo 读取与校验，接入 `validate`。
 2. **Station Alias Addressing (#304)**：补 `0x0012` 读取与 `DL Control Bit24` 激活路径。
 3. **DC 传播延迟连续补偿 (#1102)**：从“固定0延迟”升级到拓扑感知补偿模型。
-4. **CLI 实际接入**：`cmd/main/main.mbt` 接入 scan/validate/run 与错误码返回。
+4. **CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 接入 scan/validate/run 与错误码返回。
 5. **结构化诊断输出**：增加 JSON/human-readable 双输出模式。
 6. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
 
