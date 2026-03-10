@@ -370,9 +370,12 @@
 
 ### GC 抖动
 
-- [ ] 检查热路径是否存在不必要分配。
-- [ ] 对核心循环建立压力回归。
-- [ ] 跟踪不同负载下的周期稳定性和错误率。
+- [x] 检查热路径是否存在不必要分配。
+  - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Pressure: free-run core loop remains stable at high cycle count`（1000 周期稳定计数）
+- [x] 对核心循环建立压力回归。
+  - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Pressure: timeout-heavy loop keeps accounting consistent`
+- [x] 跟踪不同负载下的周期稳定性和错误率。
+  - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Pressure: telemetry remains monotonic across different loads`
 
 ### 平台接口碎片化
 
@@ -407,9 +410,8 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **热路径分配与压力回归**：聚焦 PDO/mailbox 主循环的分配与抖动观测。
-2. **PDO 与 mailbox 解耦检查**：验证主循环与邮箱推进在异常路径下仍保持边界清晰。
-3. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
+1. **PDO 与 mailbox 解耦检查**：验证主循环与邮箱推进在异常路径下仍保持边界清晰。
+2. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
 
 ## 10. 提交执行方式
 

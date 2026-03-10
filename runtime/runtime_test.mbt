@@ -270,6 +270,83 @@ test "Free-run: run_cycles executes multiple cycles" {
 }
 
 ///|
+test "Pressure: free-run core loop remains stable at high cycle count" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let cycles = 1000
+  let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
+  assert_eq(success, cycles)
+  let t = rt.get_telemetry()
+  assert_eq(t.cycles, cycles.to_int64())
+  assert_eq(t.tx_frames, cycles.to_int64())
+  assert_eq(t.rx_frames, cycles.to_int64())
+  assert_eq(t.timeouts, 0L)
+  assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Pressure: timeout-heavy loop keeps accounting consistent" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = TimeoutNic::new()
+  let cycles = 1000
+  let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
+  assert_eq(success, 0)
+  let t = rt.get_telemetry()
+  assert_eq(t.cycles, cycles.to_int64())
+  assert_eq(t.tx_frames, cycles.to_int64())
+  assert_eq(t.rx_frames, 0L)
+  assert_eq(t.timeouts, cycles.to_int64())
+  assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Pressure: telemetry remains monotonic across different loads" {
+  let loads : Array[Int] = [50, 200, 500]
+  for load in loads {
+    let config = @hal.MasterConfig::default()
+    let rt = @runtime.Runtime::new(config)
+    let sm : @mailbox.SlaveMapping = {
+      sm_configs: [],
+      fmmu_configs: [],
+      output_bytes: 2,
+      input_bytes: 2,
+    }
+    let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+    rt.configure_pdo(ctx, 0U)
+    rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+    let nic = @mock.MockNic::new()
+    let success = rt.run_cycles(nic, load, @hal.Duration(1000L))
+    assert_eq(success, load)
+    let t = rt.get_telemetry()
+    assert_eq(t.cycles, load.to_int64())
+    assert_eq(t.tx_frames, load.to_int64())
+    assert_eq(t.rx_frames, load.to_int64())
+    assert_eq(t.timeouts, 0L)
+    assert_eq(t.wkc_errors, 0L)
+  }
+}
+
+///|
 test "Recovery: run_cycles records RecvTimeout and continues" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
