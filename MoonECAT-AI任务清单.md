@@ -387,6 +387,7 @@
   - ✅ 超时/链路异常: [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Recovery: run_cycles records RecvTimeout and continues` + `Runtime run_cycle propagates LinkDown on broken NIC`
   - ✅ 配置不一致: [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `run with mock loopback: validation fails when slaves expected but not found`
   - ✅ 重试边界: [mailbox/mailbox_test.mbt](mailbox/mailbox_test.mbt) `Rmsm record_timeout allows retries up to max`
+  - ✅ commit: `bc33a9f` `test(runtime): cover timeout and link-down recovery paths`
 - [ ] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
 
 ## 7. 30 天启动清单 — ✅ 已完成
