@@ -45,6 +45,8 @@ pub(all) struct Runtime {
   mut consecutive_wkc_errors : Int
   /// DC synchronization state.
   mut dc_state : DcState
+  /// Reference station for FRMW drift compensation.
+  mut dc_reference_station : UInt?
 } derive(Show)
 
 ///|
@@ -58,6 +60,48 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     max_wkc_errors: 5,
     consecutive_wkc_errors: 0,
     dc_state: Disabled,
+    dc_reference_station: None,
+  }
+}
+
+///|
+/// Initialize distributed clocks for the configured station list.
+/// Returns true when DC was initialized and locked.
+pub fn[N : @hal.Nic] Runtime::init_dc(
+  self : Runtime,
+  nic : N,
+  stations : Array[UInt],
+  timeout : @hal.Duration,
+) -> Bool raise @hal.EcError {
+  if not(self.config.dc_enabled) {
+    self.dc_state = Disabled
+    self.dc_reference_station = None
+    return false
+  }
+  if stations.length() == 0 {
+    self.dc_state = Disabled
+    self.dc_reference_station = None
+    return false
+  }
+  self.dc_state = Measuring
+  let init = @protocol.dc_configure_linear(
+    nic,
+    stations,
+    self.config.cycle_period_ns.to_int().reinterpret_as_uint(),
+    timeout,
+    static_sync_iterations=200,
+  )
+  match init {
+    Some(info) => {
+      self.dc_reference_station = Some(info.reference_station)
+      self.dc_state = Locked
+      true
+    }
+    None => {
+      self.dc_reference_station = None
+      self.dc_state = Disabled
+      false
+    }
   }
 }
 
@@ -91,6 +135,16 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
   }
   self.telemetry.cycles = self.telemetry.cycles + 1L
   self.telemetry.tx_frames = self.telemetry.tx_frames + 1L
+  // FRMW drift compensation frame before PDO cycle when DC is active.
+  if self.config.dc_enabled {
+    match self.dc_reference_station {
+      Some(station) =>
+        @protocol.dc_compensate_cycle(nic, station, timeout) catch {
+          _ => self.dc_state = Drifting(1L)
+        }
+      None => ()
+    }
+  }
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
   self.telemetry.rx_frames = self.telemetry.rx_frames + 1L
   let ok = wkc >= self.expected_wkc

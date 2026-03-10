@@ -31,6 +31,20 @@ pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_compensate_cycle(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_configure_linear(N, Array[UInt], UInt, @hal.Duration, static_sync_iterations? : Int) -> DcInitResult? raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_latch_times(N, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_read_receive_time(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_read_sync_window(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_static_sync(N, UInt, Int, @hal.Duration) -> Unit raise @hal.EcError
+
 pub let default_master_mac : FixedArray[Byte]
 
 pub let ecat_frame_type : Int
@@ -88,6 +102,34 @@ pub let reg_al_status : UInt
 pub let reg_al_status_code : UInt
 
 pub let reg_build : UInt
+
+pub let reg_dc_cuc : UInt
+
+pub let reg_dc_cycle0 : UInt
+
+pub let reg_dc_cycle1 : UInt
+
+pub let reg_dc_sof : UInt
+
+pub let reg_dc_start0 : UInt
+
+pub let reg_dc_sync_act : UInt
+
+pub let reg_dc_system_delay : UInt
+
+pub let reg_dc_system_diff : UInt
+
+pub let reg_dc_system_offset : UInt
+
+pub let reg_dc_system_time : UInt
+
+pub let reg_dc_time0 : UInt
+
+pub let reg_dc_time1 : UInt
+
+pub let reg_dc_time2 : UInt
+
+pub let reg_dc_time3 : UInt
 
 pub let reg_dl_status : UInt
 
@@ -160,6 +202,13 @@ pub(all) enum AddressType {
 }
 pub impl Eq for AddressType
 pub impl Show for AddressType
+
+pub(all) struct DcInitResult {
+  reference_station : UInt
+  configured_count : Int
+}
+pub impl Eq for DcInitResult
+pub impl Show for DcInitResult
 
 pub(all) enum EcCommand {
   NOP

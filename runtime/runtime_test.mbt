@@ -89,6 +89,28 @@ test "Runtime configure_pdo sets context" {
 }
 
 ///|
+test "Runtime init_dc disabled keeps state Disabled" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let nic = @mock.MockNic::new()
+  let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
+  assert_eq(ok, false)
+  assert_true(rt.dc_state is Disabled)
+  assert_true(rt.dc_reference_station is None)
+}
+
+///|
+test "Runtime init_dc enabled sets Locked" {
+  let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
+  let rt = @runtime.Runtime::new(config)
+  let nic = @mock.MockNic::new()
+  let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
+  assert_eq(ok, true)
+  assert_true(rt.dc_state is Locked)
+  assert_true(rt.dc_reference_station is Some(_))
+}
+
+///|
 test "Runtime run_cycle without pdo_ctx raises Internal error" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
@@ -162,6 +184,26 @@ test "Free-run: run_cycle succeeds when expected_wkc is 0" {
   assert_eq(t.cycles, 1L)
   assert_eq(t.tx_frames, 1L)
   assert_eq(t.rx_frames, 1L)
+}
+
+///|
+test "DcSync: run_cycle performs compensation and PDO" {
+  let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x1000U)
+  rt.configure_pdo(ctx, 0U)
+  let nic = @mock.MockNic::new()
+  ignore(rt.init_dc(nic, [0x1001U], @hal.Duration(1000L)))
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
+  let result = rt.run_cycle(nic, @hal.Duration(1000L))
+  assert_true(result.ok)
+  assert_true(rt.dc_state is Locked || rt.dc_state is Drifting(_))
 }
 
 ///|

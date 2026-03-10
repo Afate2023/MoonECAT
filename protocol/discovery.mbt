@@ -61,6 +61,62 @@ pub let reg_sm_base : UInt = 0x0800U
 pub let sm_entry_size : Int = 8
 
 ///|
+/// DC receive time register (port 0). Broadcast write latches all port times.
+pub let reg_dc_time0 : UInt = 0x0900U
+
+///|
+/// DC receive time register (port 1).
+pub let reg_dc_time1 : UInt = 0x0904U
+
+///|
+/// DC receive time register (port 2).
+pub let reg_dc_time2 : UInt = 0x0908U
+
+///|
+/// DC receive time register (port 3).
+pub let reg_dc_time3 : UInt = 0x090CU
+
+///|
+/// DC system time register.
+pub let reg_dc_system_time : UInt = 0x0910U
+
+///|
+/// DC receive timestamp register used for offset compensation.
+pub let reg_dc_sof : UInt = 0x0918U
+
+///|
+/// DC system time offset register.
+pub let reg_dc_system_offset : UInt = 0x0920U
+
+///|
+/// DC propagation delay register.
+pub let reg_dc_system_delay : UInt = 0x0928U
+
+///|
+/// DC sync window/system difference register.
+pub let reg_dc_system_diff : UInt = 0x092CU
+
+///|
+/// DC control unit register.
+pub let reg_dc_cuc : UInt = 0x0980U
+
+///|
+/// DC sync activate register.
+pub let reg_dc_sync_act : UInt = 0x0981U
+
+///|
+/// DC SYNC0 start time register.
+pub let reg_dc_start0 : UInt = 0x0990U
+
+///|
+/// DC SYNC0 cycle time register.
+pub let reg_dc_cycle0 : UInt = 0x09A0U
+
+///|
+/// DC SYNC1 cycle time register.
+pub let reg_dc_cycle1 : UInt = 0x09A4U
+
+///|
 /// SlaveInfo represents a discovered slave on the network.
 pub(all) struct SlaveInfo {
   /// Position on the bus (0 = first slave)

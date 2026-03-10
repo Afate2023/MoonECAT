@@ -63,7 +63,9 @@ pub fn[N : @hal.Nic] run(
   // Phase 4: Run PDO cycles
   let rt = Runtime::new(config)
   rt.configure_pdo(pdo_ctx, expected_wkc)
-  rt.set_state(Running(FreeRun))
+  let stations = expected.map(fn(s) { s.configured_address })
+  let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
+  rt.set_state(Running(if dc_ok { DcSync } else { FreeRun }))
   let ok_count = rt.run_cycles(nic, cycles, timeout)
 
   // Phase 5: Shutdown — transition slaves back to Init

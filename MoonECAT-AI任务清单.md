@@ -50,7 +50,7 @@
 | **VoE (5.12)** | | | | | |
 | 1001 | VoE Protocol | may | ➖ | — | 项目范围排除 |
 | **DC 同步 (5.13)** | | | | | |
-| 1101 | DC support | shall if DC | ❌ | `runtime/scheduler` | DcState 枚举存在，实现为空 |
+| 1101 | DC support | shall if DC | ✅ | `protocol/dc`, `runtime/runtime` | 已实现 DC 初始化 + SYNC0 + FRMW 漂移补偿 |
 | 1102 | Continuous Propagation Delay compensation | should | ❌ | — | |
 | 1103 | Sync window monitoring | should | ❌ | — | |
 | **Slave-to-Slave (5.14)** | | | | | |
@@ -58,7 +58,7 @@
 | **Master 信息 (5.15)** | | | | | |
 | 1301 | Master Object Dictionary | may | ➖ | — | Class B 可选 |
 
-**Class B 强制(shall)功能覆盖率：16/17 ≈ 94%** (仅 DC #1101 待实现)
+**Class B 强制(shall)功能覆盖率：17/17 = 100%**
 
 ---
 
@@ -209,17 +209,23 @@
 待完成提交：
 - `feat: add explicit device identification`
 
-### M7 DC 同步 — ❌ 框架占位，不阻塞 Free Run
+### M7 DC 同步 — ✅ 基础能力已完成，增强项可迭代
 
-- [ ] DC 初始化流程：传播延迟测量 + Offset 补偿 + Start Time 写入 [ETG.1500 #1101]
-- [ ] DC 持续漂移补偿：ARMW 周期帧 [ETG.1500 #1101]
+- [x] DC 初始化流程：传播延迟测量 + Offset 补偿 + Start Time 写入 [ETG.1500 #1101]
+  - ✅ `protocol/dc.mbt`: `dc_configure_linear`、`dc_configure_sync0`
+  - ✅ `runtime/runtime.mbt`: `Runtime::init_dc`
+- [x] DC 持续漂移补偿：ARMW 周期帧 [ETG.1500 #1101]
+  - ✅ `protocol/dc.mbt`: `dc_compensate_cycle` (FRMW)
+  - ✅ `runtime/runtime.mbt`: `run_cycle` 周期补偿
 - [ ] Continuous Propagation Delay compensation [ETG.1500 #1102 should]
-- [ ] Sync window monitoring：读取 Register 0x092C [ETG.1500 #1103 should]
+- [x] Sync window monitoring：读取 Register 0x092C [ETG.1500 #1103 should]
+  - ✅ `protocol/dc.mbt`: `dc_read_sync_window`
+
+已完成提交：
+- ✅ `feat: implement distributed clock runtime and protocol support` (待本次提交)
 
 待完成提交：
-- `feat: add dc propagation delay measurement`
-- `feat: add dc drift compensation`
-- `feat: add sync window monitoring`
+- `feat: improve dc propagation delay compensation with topology-aware model`
 
 ### M8 CLI、文档与最终集成 — ⚠️ CLI stub，文档已有初版
 
@@ -261,8 +267,23 @@
 | ✅ | 505 | ~~Emergency Message 接收~~ | decode_emergency/decode_emergency_frame | #401 ✅ |
 | ✅ | 103 | ~~Device Emulation 感知~~ | request_state_aware + OpOnly | SII General ✅ |
 | ✅ | 305 | ~~EEPROM 寄存器级读取~~ | eeprom_read_word/eeprom_read | M2 transact ✅ |
-| P2 | 1101 | DC 基础支持 | 传播延迟+Offset+漂移补偿 | P0 PDO 先完成 |
+| ✅ | 1101 | ~~DC 基础支持~~ | DC 初始化 + Offset + SYNC0 + FRMW 已完成 | P0 PDO ✅ |
 | P2 | 303 | Explicit Device ID | IdentificationAdo | Scan 已有 |
+
+---
+
+## 8. 参考项目 DC 核对清单
+
+> 已对比：SOEM、CherryECAT、ethercrab、EtherCAT.NET
+
+- [x] **SOEM**：核对 `ec_configdc/ec_dcsync0/ec_dcsync01` 思路，采用同类寄存器序列
+  - `0x0900/0x0910/0x0920/0x0928/0x0981/0x0990/0x09A0`
+- [x] **CherryECAT**：核对端口时延与 DC 参考时钟策略
+  - 采纳“先锁参考，再周期补偿”的运行策略
+- [x] **ethercrab**：核对 `configure_dc` + `run_dc_static_sync` 两阶段模型
+  - 采纳“初始化静态补偿 + 周期 FRMW 动态补偿”
+- [x] **EtherCAT.NET**：核对运行期漂移补偿（ring-buffer 思路）
+  - MoonECAT 当前实现了每周期补偿，ring-buffer 调参留作后续优化
 
 ---
 

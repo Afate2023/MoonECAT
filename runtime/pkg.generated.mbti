@@ -70,9 +70,11 @@ pub(all) struct Runtime {
   max_wkc_errors : Int
   mut consecutive_wkc_errors : Int
   mut dc_state : DcState
+  mut dc_reference_station : UInt?
 }
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
 pub fn Runtime::get_telemetry(Self) -> Telemetry
+pub fn[N : @hal.Nic] Runtime::init_dc(Self, N, Array[UInt], @hal.Duration) -> Bool raise @hal.EcError
 pub fn Runtime::needs_recovery(Self) -> Bool
 pub fn Runtime::new(@hal.MasterConfig) -> Self
 pub fn Runtime::record_retry(Self) -> Unit

@@ -1043,6 +1043,66 @@ test "apply_op_only_policy enables SM when Op" {
   )
 }
 
+// ========== Distributed Clock Tests ==========
+
+///|
+test "dc_latch_times via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  @protocol.dc_latch_times(nic, timeout)
+}
+
+///|
+test "dc_read_receive_time via mock returns zero" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let t = @protocol.dc_read_receive_time(nic, 0x1001U, timeout)
+  assert_eq(t, 0U)
+}
+
+///|
+test "dc_read_sync_window via mock returns zero" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let w = @protocol.dc_read_sync_window(nic, 0x1001U, timeout)
+  assert_eq(w, 0U)
+}
+
+///|
+test "dc_configure_sync0 via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  @protocol.dc_configure_sync0(nic, 0x1001U, 1_000_000U, timeout)
+}
+
+///|
+test "dc_compensate_cycle via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  @protocol.dc_compensate_cycle(nic, 0x1001U, timeout)
+}
+
+///|
+test "dc_configure_linear returns reference station" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let result = @protocol.dc_configure_linear(
+    nic,
+    [0x1001U, 0x1002U],
+    1_000_000U,
+    timeout,
+    static_sync_iterations=2,
+  )
+  assert_true(result is Some(_))
+  match result {
+    Some(info) => {
+      assert_eq(info.reference_station, 0x1001U)
+      assert_eq(info.configured_count, 2)
+    }
+    None => assert_true(false)
+  }
+}
+
 ///|
 test "PdoContext get_slave_inputs rejects unknown station" {
   let sm : @mailbox.SlaveMapping = {
