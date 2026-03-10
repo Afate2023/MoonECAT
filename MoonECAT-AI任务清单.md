@@ -269,7 +269,7 @@
 - `补全文档（架构/接口/测试方式）` → `e5d8a81` `docs: document architecture and user workflows`
 - `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
-- `Extism 宿主接入边界整理` → `<pending>`
+- `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
 
 ---
 
