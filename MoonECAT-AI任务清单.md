@@ -355,7 +355,8 @@
 - [x] 建立流程回放和最小集成测试。
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt): `replay integration minimal flow: scan->validate->run->stop`
   - ✅ commit: `420a99a` `test(runtime): add minimal replay integration flow`
-- [ ] 持续把参考分析文档转成实现约束和验收标准。
+- [x] 持续把参考分析文档转成实现约束和验收标准。
+  - ✅ [docs/REFERENCE_CONSTRAINTS.md](docs/REFERENCE_CONSTRAINTS.md): 建立“参考调用流 -> 实现约束 -> 测试验收”映射矩阵
 
 ## 5. 依赖顺序
 
@@ -413,7 +414,7 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
+1. **（本轮高优先已清空）**：后续新增参考约束时按 `docs/REFERENCE_CONSTRAINTS.md` 继续增量落标。
 
 ## 10. 提交执行方式
 
