@@ -222,7 +222,7 @@
   - ✅ `protocol/dc.mbt`: `dc_read_sync_window`
 
 已完成提交：
-- ✅ `feat: implement distributed clock runtime and protocol support` (待本次提交)
+- ✅ `feat: implement distributed clock runtime and protocol support` (533285d)
 
 待完成提交：
 - `feat: improve dc propagation delay compensation with topology-aware model`
@@ -272,18 +272,23 @@
 
 ---
 
-## 8. 参考项目 DC 核对清单
+## 8. 参考项目实现核对矩阵（调用流 + 本地源码）
 
-> 已对比：SOEM、CherryECAT、ethercrab、EtherCAT.NET
+> 调用流依据：`src/*-callflow-analysis.md`  
+> 本地实现依据：`参考项目/*/src`、`参考项目/*/master`、`参考项目/*/include`
 
-- [x] **SOEM**：核对 `ec_configdc/ec_dcsync0/ec_dcsync01` 思路，采用同类寄存器序列
-  - `0x0900/0x0910/0x0920/0x0928/0x0981/0x0990/0x09A0`
-- [x] **CherryECAT**：核对端口时延与 DC 参考时钟策略
-  - 采纳“先锁参考，再周期补偿”的运行策略
-- [x] **ethercrab**：核对 `configure_dc` + `run_dc_static_sync` 两阶段模型
-  - 采纳“初始化静态补偿 + 周期 FRMW 动态补偿”
-- [x] **EtherCAT.NET**：核对运行期漂移补偿（ring-buffer 思路）
-  - MoonECAT 当前实现了每周期补偿，ring-buffer 调参留作后续优化
+| 功能 | 调用流文档依据 | 参考实现（本地代码） | MoonECAT 对应实现 | 结论 |
+|---|---|---|---|---|
+| 扫描/拓扑/基础发现 | `src/SOEM-callflow-analysis.md:157` `src/CherryECAT-callflow-analysis.md:178` `src/ethercrab-callflow-analysis.md:191` | SOEM: `参考项目/SOEM/src/ec_config.c` (`ecx_config_init`)；Cherry: `参考项目/CherryECAT/src/ec_slave.c` (`ec_slaves_scanning`)；ethercrab: `参考项目/ethercrab/src/maindevice.rs` | `runtime/scan.mbt` `protocol/discovery.mbt` | 已对齐 |
+| ESM 状态机与回退 | `src/SOEM-callflow-analysis.md:465` `src/igh-callflow-analysis.md:486` | SOEM: `参考项目/SOEM/src/ec_main.c`；IGH: `参考项目/ethercat/master/fsm_slave_config.c` | `protocol/esm.mbt` `protocol/esm_engine.mbt` `protocol/esm_extensions.mbt` | 已对齐 |
+| PDO 周期交换 | `src/CherryECAT-callflow-analysis.md:321` `src/gatorcat-callflow-analysis.md:172` `src/ethercrab-callflow-analysis.md:286` | Cherry: `参考项目/CherryECAT/src/ec_master.c` (`ec_master_period_process`)；gatorcat: `参考项目/gatorcat/src/module/MainDevice.zig` (`sendRecvCyclicFrames`)；ethercrab: `参考项目/ethercrab/src/subdevice_group/mod.rs` | `protocol/pdo.mbt` (`pdo_exchange`) `runtime/runtime.mbt` | 已对齐 |
+| Mailbox 传输与轮询 | `src/SOEM-callflow-analysis.md:378` `src/CherryECAT-callflow-analysis.md:63` | SOEM: `参考项目/SOEM/src/ec_main.c` (`ecx_mbxsend/ecx_mbxreceive/ecx_mbxhandler`)；Cherry: `参考项目/CherryECAT/src/ec_mailbox.c` | `protocol/mailbox_transport.mbt` | 已对齐 |
+| CoE SDO 事务 | `src/CherryECAT-callflow-analysis.md:416` `src/ethercrab-callflow-analysis.md:389` `src/EtherCAT.net-callflow-analysis.md:143` | SOEM: `参考项目/SOEM/src/ec_coe.c` (`ecx_readPDOmap`, SDO流程)；ethercrab: `参考项目/ethercrab/src/mailbox/coe/mod.rs` (`mailbox_write_read/sdo_read/sdo_write`)；EtherCAT.NET: `参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs` (`SdoWrite/TryReadSdoValue`) | `protocol/sdo_transaction.mbt` `mailbox/coe_engine.mbt` | 已对齐 |
+| Emergency 消息 | `src/SOEM-callflow-analysis.md:378` `src/igh-callflow-analysis.md:741` | IGH: `参考项目/ethercat/master/coe_emerg_ring.c`；SOEM: `参考项目/SOEM/src/ec_coe.c` (emergency分支) | `mailbox/emergency.mbt` | 已对齐（环形缓冲增强待做） |
+| EEPROM/SII 读取 | `src/SOEM-callflow-analysis.md:157` `src/ethercrab-callflow-analysis.md:440` | SOEM: `参考项目/SOEM/src/ec_main.c` (`ecx_readeeprom*`)；Cherry: `参考项目/CherryECAT/src/ec_sii.c`；ethercrab: `参考项目/ethercrab/src/eeprom/device_provider.rs` (`read_chunk`) | `protocol/eeprom.mbt` `mailbox/sii_parser.mbt` | 已对齐 |
+| DC 初始化与运行补偿 | `src/SOEM-callflow-analysis.md:443` `src/CherryECAT-callflow-analysis.md:225` `src/ethercrab-callflow-analysis.md:333` `src/EtherCAT.net-callflow-analysis.md:125` | SOEM: `参考项目/SOEM/src/ec_dc.c` (`ecx_configdc/ecx_dcsync0`)；Cherry: `参考项目/CherryECAT/src/ec_master.c` (`ec_master_dc_sync_with_pi`)；ethercrab: `参考项目/ethercrab/src/dc.rs` (`configure_dc/run_dc_static_sync`)；EtherCAT.NET: `参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs` (`ConfigureDc/CompensateDcDrift`) | `protocol/dc.mbt` `runtime/runtime.mbt` `runtime/run.mbt` | 已对齐 |
+| Alias Addressing（待实现） | `src/gatorcat-callflow-analysis.md:90` | gatorcat: `参考项目/gatorcat/src/module/MainDevice.zig` + `参考项目/gatorcat/src/module/esc.zig` (`dl_control_enable_alias_address`) | （待实现）`protocol/discovery.mbt` 拓展 | 下一步 |
+| Explicit Device ID（待实现） | `src/gatorcat-callflow-analysis.md:60` `src/ethercrab-callflow-analysis.md:191` | 参考路径：gatorcat `Scanner.zig` 与 ethercrab `SubDevice::new` 的 identity/alias 流程 | （待实现）`runtime/validate.mbt` + `protocol/discovery.mbt` | 下一步 |
 
 ---
 
@@ -372,22 +377,18 @@
 - [x] 已形成可输出结构化结果的扫描与配置原型。
 - [x] 已形成可继续拆解 issue 和 commit 的统一任务基线。
 
-## 8. 下一阶段优先级建议
+## 9. 下一阶段优先级建议（剩余项）
 
-达成 Class B 的最短路径（按依赖顺序）：
+剩余高优先任务（按依赖顺序）：
 
-1. **完成 pdo_exchange 实体** — P0，使 Free Run 端到端可跑
-2. **完成邮箱 SM 级收发** — P0，为 SDO/Emergency 打通通道
-3. **实现 RMSM** — P0，邮箱弹性恢复
-4. **实现 Mailbox polling** — P0，周期检查从站邮箱
-5. **实现 SDO Upload/Download 事务** — P0，CoE 核心功能
-6. **实现 Emergency Message 接收** — P0，CoE 必需
-7. **处理 Device Emulation / OpOnly 标志** — P1，ESM 合规
-8. **实现 EEPROM 寄存器级读取** — P1，真实硬件必需
-9. **DC 初始化+漂移补偿** — P2，Class B conditional
-10. **CLI 实际接入** — 最后一步
+1. **Explicit Device Identification (#303)**：补 IdentificationAdo 读取与校验，接入 `validate`。
+2. **Station Alias Addressing (#304)**：补 `0x0012` 读取与 `DL Control Bit24` 激活路径。
+3. **DC 传播延迟连续补偿 (#1102)**：从“固定0延迟”升级到拓扑感知补偿模型。
+4. **CLI 实际接入**：`cmd/main/main.mbt` 接入 scan/validate/run 与错误码返回。
+5. **结构化诊断输出**：增加 JSON/human-readable 双输出模式。
+6. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
 
-## 9. 提交执行方式
+## 10. 提交执行方式
 
 - 每完成一个"建议提交拆分"条目，就单独 `git add` 对应文件并提交。
 - 提交前先运行本次改动对应的最小验证；文档改动至少检查链接、标题和任务编号是否一致。
