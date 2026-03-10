@@ -309,6 +309,23 @@ pub fn decode_sdo_response(
     return (mbh, resp)
   }
 
+  // Segmented download response: command specifier in bits[7:5] = 001,
+  // and payload contains only command byte (no index/subindex fields).
+  if (cmd_byte & b'\xE0') == b'\x20' && sdo_payload_len == 1 {
+    let toggle = (cmd_byte & b'\x10') != b'\x00'
+    let resp : SdoResponse = {
+      index: 0U,
+      subindex: b'\x00',
+      command: DownloadResponse,
+      data: Bytes::new(0),
+      segmented: true,
+      toggle,
+      last_segment: true,
+      complete_size: None,
+    }
+    return (mbh, resp)
+  }
+
   let cmd = sdo_command_from_byte(cmd_byte)
 
   if sdo_payload_len < sdo_header_len {
@@ -523,6 +540,56 @@ pub fn build_sdo_upload_segment_request(
 }
 
 ///|
+/// Build an SDO Download Segment request frame.
+/// `segment` may contain at most 7 bytes.
+pub fn build_sdo_download_segment_request(
+  counter : Byte,
+  station : UInt,
+  toggle : Bool,
+  last_segment : Bool,
+  segment : Bytes,
+) -> Bytes raise @hal.EcError {
+  if segment.length() > 7 {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO download segment too large (>7 bytes)",
+    )
+  }
+  let buf = @buffer.new(
+    size_hint=mailbox_header_len + coe_header_len + 1 + segment.length(),
+  )
+  let data_len = coe_header_len + 1 + segment.length()
+  let mbh : MailboxHeader = {
+    length: data_len.reinterpret_as_uint(),
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter,
+  }
+  let hdr_bytes = mbh.to_bytes()
+  for i in 0..<hdr_bytes.length() {
+    buf.write_byte(hdr_bytes[i])
+  }
+  let coe_word = 2U << 12
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  let n_unused = 7 - segment.length()
+  let mut cmd = b'\x00'
+  if toggle {
+    cmd = cmd | b'\x10'
+  }
+  cmd = cmd | (n_unused.to_byte() << 1)
+  if last_segment {
+    cmd = cmd | b'\x01'
+  }
+  buf.write_byte(cmd)
+  for i in 0..<segment.length() {
+    buf.write_byte(segment[i])
+  }
+  buf.to_bytes()
+}
+
+///|
 /// Build an SDO Info "Get OD List" request frame.
 /// list_type: 0 = number of objects for all list classes.
 pub fn build_sdo_info_get_od_list_request(
@@ -608,4 +675,14 @@ pub fn decode_sdo_info_response(
     Bytes::new(0)
   }
   (mbh, { opcode, incomplete, fragments_left, payload })
+}
+
+///|
+/// Decode OD list payload (sequence of little-endian WORD indices).
+pub fn decode_sdo_info_od_list_payload(payload : Bytes) -> Array[UInt] {
+  let count = payload.length() / 2
+  Array::makei(count, fn(i) {
+    let off = i * 2
+    payload[off].to_uint() | (payload[off + 1].to_uint() << 8)
+  })
 }

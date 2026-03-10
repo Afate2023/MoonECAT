@@ -735,6 +735,61 @@ test "build_sdo_upload_segment_request encodes toggle bit" {
 }
 
 ///|
+test "build_sdo_download_segment_request encodes segment header" {
+  let frame = @mailbox.build_sdo_download_segment_request(
+    b'\x06', 0x1001U, true, true, b"\xDE\xAD\xBE",
+  )
+  assert_eq(frame.length(), 12) // 6 + 2 + 1 + 3
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(mbh.length, 6U)
+  // cmd: toggle=1, n_unused=4, last=1 -> 0x19
+  assert_eq(frame[8], b'\x19')
+  assert_eq(frame[9], b'\xDE')
+  assert_eq(frame[10], b'\xAD')
+  assert_eq(frame[11], b'\xBE')
+}
+
+///|
+test "build_sdo_download_segment_request rejects payload over 7 bytes" {
+  let result = try? @mailbox.build_sdo_download_segment_request(
+    b'\x01', 0x1001U, false, false, b"\x00\x01\x02\x03\x04\x05\x06\x07",
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_sdo_response supports download segment response" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 3U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x07',
+  }
+  let hdr = mbh.to_bytes()
+  let frame = Bytes::makei(9, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30' // CoE SdoResponse
+    } else if i == 8 {
+      b'\x30' // segmented download response, toggle=1
+    } else {
+      b'\x00'
+    }
+  })
+  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
+  assert_eq(resp.command, @mailbox.SdoCommand::DownloadResponse)
+  assert_true(resp.segmented)
+  assert_true(resp.toggle)
+  assert_eq(resp.data.length(), 0)
+}
+
+///|
 test "build_sdo_info_get_od_list_request encodes mailbox and opcode" {
   let frame = @mailbox.build_sdo_info_get_od_list_request(b'\x04', 0x1001U, 0U)
   assert_eq(frame.length(), 14) // 6 + 2 + 4 + 2
@@ -789,6 +844,17 @@ test "decode_sdo_info_response parses header and payload" {
   assert_true(info.incomplete)
   assert_eq(info.fragments_left, 3U)
   assert_eq(info.payload, b"\x11\x22\x33\x44")
+}
+
+///|
+test "decode_sdo_info_od_list_payload parses little-endian indices" {
+  let indices = @mailbox.decode_sdo_info_od_list_payload(
+    b"\x00\x10\x13\x1C\x00\x1A",
+  )
+  assert_eq(indices.length(), 3)
+  assert_eq(indices[0], 0x1000U)
+  assert_eq(indices[1], 0x1C13U)
+  assert_eq(indices[2], 0x1A00U)
 }
 
 // ========== MailboxConfig Tests ==========

@@ -182,25 +182,27 @@
   - ✅ [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt): mailbox_poll SM status bit
 - [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
   - ✅ [mailbox/emergency.mbt](mailbox/emergency.mbt): decode_emergency/decode_emergency_frame
-- [ ] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
+- [x] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
   - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): 分段上传循环拼接（toggle / last segment）
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): 分段上传起始/分段响应解码
-  - ⏳ 仍缺：分段下载请求/响应循环
-- [ ] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): 分段下载请求构帧 + 分段下载响应解码
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): 分段下载请求/响应循环（含 toggle 校验）
+- [x] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_download_ca` / `build_sdo_upload_ca` + CA bit 编码
   - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_download_complete_access` / `sdo_upload_complete_access`
-  - ⏳ 仍缺：CA 分段续传循环
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): CA 上传/下载分段续传循环
 - [ ] SDO Info Service [ETG.1500 #504 should]
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_info_get_od_list_request` + `decode_sdo_info_response`
-  - ⏳ 仍缺：对象字典遍历与分段拉取流程
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_info_get_od_list`（分片拼接 + list type 头处理）
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `decode_sdo_info_od_list_payload`
+  - ⏳ 仍缺：OD/OE 描述遍历接口（Get OD / Get OE）
 
 已完成提交：
 - ✅ `feat: add coe sdo transaction engine` (f161c3c)
 - ✅ `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions` (ff166d4)
 
 待完成提交：
-- `feat: add sdo segmented transfer`
-- `feat: add sdo complete access`
+- `feat: complete segmented sdo download and CA continuation`
 - `feat: add sdo info service`
 
 ### M6 网络配置增强 — ⚠️ EEPROM 读取已完成，ID/Alias 待实现

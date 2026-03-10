@@ -17,6 +17,12 @@ pub fn[N : @hal.Nic] sdo_download(
   data : Bytes,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
+  if data.length() > 4 {
+    return sdo_download_segmented(
+      nic, station, mb_config, rmsm, index, subindex, data, timeout, false,
+    )
+  }
+
   let counter = rmsm.begin_transaction()
   let txn = @mailbox.build_sdo_download(counter, station, index, subindex, data)
   let frame = txn.encode()
@@ -82,54 +88,9 @@ pub fn[N : @hal.Nic] sdo_upload(
     return resp.data
   }
 
-  // Segmented upload: collect all upload segment responses.
-  let acc = @buffer.new(
-    size_hint=match resp.complete_size {
-      Some(sz) => sz.reinterpret_as_int()
-      None => 64
-    },
+  sdo_upload_collect_segmented(
+    nic, station, mb_config, rmsm, timeout, resp, "SDO upload",
   )
-  for b in resp.data {
-    acc.write_byte(b)
-  }
-
-  let mut current = resp
-  let mut toggle = false
-  while not(current.last_segment) {
-    let seg_counter = rmsm.begin_transaction()
-    let seg_req = @mailbox.build_sdo_upload_segment_request(
-      seg_counter, station, toggle,
-    )
-    mailbox_send(nic, station, mb_config, seg_req, timeout)
-    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
-    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
-    let _ = rmsm.validate_response(seg_mbh.counter)
-    if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
-      not(seg_resp.segmented) {
-      raise @hal.EcError::MailboxProtocol(
-        "SDO upload: expected segmented UploadResponse",
-      )
-    }
-    if seg_resp.toggle != toggle {
-      raise @hal.EcError::MailboxProtocol("SDO upload: segment toggle mismatch")
-    }
-    for b in seg_resp.data {
-      acc.write_byte(b)
-    }
-    current = seg_resp
-    toggle = not(toggle)
-  }
-
-  let out = acc.to_bytes()
-  match current.complete_size {
-    Some(sz) =>
-      if out.length() >= sz.reinterpret_as_int() {
-        Bytes::makei(sz.reinterpret_as_int(), fn(i) { out[i] })
-      } else {
-        out
-      }
-    None => out
-  }
 }
 
 ///|
@@ -221,6 +182,12 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
   data : Bytes,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
+  if data.length() > 4 {
+    return sdo_download_segmented(
+      nic, station, mb_config, rmsm, index, subindex, data, timeout, true,
+    )
+  }
+
   let counter = rmsm.begin_transaction()
   let txn = @mailbox.build_sdo_download_ca(
     counter, station, index, subindex, data,
@@ -261,11 +228,188 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
       "SDO CA upload: expected UploadResponse, got " + resp.command.to_string(),
     )
   }
-  if resp.segmented {
-    raise @hal.EcError::MailboxProtocol(
-      "SDO CA upload segmented continuation is not implemented yet",
+  if not(resp.segmented) {
+    return resp.data
+  }
+
+  sdo_upload_collect_segmented(
+    nic, station, mb_config, rmsm, timeout, resp, "SDO CA upload",
+  )
+}
+
+///|
+/// Read CoE SDO Info OD list and return object indices.
+pub fn[N : @hal.Nic] sdo_info_get_od_list(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  list_type : UInt,
+  timeout : @hal.Duration,
+) -> Array[UInt] raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let req = @mailbox.build_sdo_info_get_od_list_request(
+    counter, station, list_type,
+  )
+  mailbox_send(nic, station, mb_config, req, timeout)
+
+  let acc = @buffer.new(size_hint=64)
+  let mut first = true
+  let mut done = false
+  while not(done) {
+    let raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
+    let _ = rmsm.validate_response(mbh.counter)
+    if info.opcode != b'\x02' {
+      raise @hal.EcError::MailboxProtocol(
+        "SDO Info: expected Get OD List response opcode",
+      )
+    }
+    let payload = if first {
+      first = false
+      if info.payload.length() < 2 {
+        raise @hal.EcError::MailboxProtocol(
+          "SDO Info: OD list response missing list type",
+        )
+      }
+      Bytes::makei(info.payload.length() - 2, fn(i) { info.payload[i + 2] })
+    } else {
+      info.payload
+    }
+    for b in payload {
+      acc.write_byte(b)
+    }
+    done = not(info.incomplete)
+  }
+
+  @mailbox.decode_sdo_info_od_list_payload(acc.to_bytes())
+}
+
+///|
+fn[N : @hal.Nic] sdo_upload_collect_segmented(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  initial : @mailbox.SdoResponse,
+  context : String,
+) -> Bytes raise @hal.EcError {
+  let acc = @buffer.new(
+    size_hint=match initial.complete_size {
+      Some(sz) => sz.reinterpret_as_int()
+      None => 64
+    },
+  )
+  for b in initial.data {
+    acc.write_byte(b)
+  }
+
+  let mut current = initial
+  let mut toggle = false
+  while not(current.last_segment) {
+    let seg_counter = rmsm.begin_transaction()
+    let seg_req = @mailbox.build_sdo_upload_segment_request(
+      seg_counter, station, toggle,
+    )
+    mailbox_send(nic, station, mb_config, seg_req, timeout)
+    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
+    let _ = rmsm.validate_response(seg_mbh.counter)
+    if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
+      not(seg_resp.segmented) {
+      raise @hal.EcError::MailboxProtocol(
+        context + ": expected segmented UploadResponse",
+      )
+    }
+    if seg_resp.toggle != toggle {
+      raise @hal.EcError::MailboxProtocol(context + ": segment toggle mismatch")
+    }
+    for b in seg_resp.data {
+      acc.write_byte(b)
+    }
+    current = seg_resp
+    toggle = not(toggle)
+  }
+
+  let out = acc.to_bytes()
+  match current.complete_size {
+    Some(sz) =>
+      if out.length() >= sz.reinterpret_as_int() {
+        Bytes::makei(sz.reinterpret_as_int(), fn(i) { out[i] })
+      } else {
+        out
+      }
+    None => out
+  }
+}
+
+///|
+fn[N : @hal.Nic] sdo_download_segmented(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  data : Bytes,
+  timeout : @hal.Duration,
+  complete_access : Bool,
+) -> Unit raise @hal.EcError {
+  let total_len = data.length().reinterpret_as_uint()
+  let size_payload = Bytes::from_array([
+    (total_len & 0xFFU).to_byte(),
+    ((total_len >> 8) & 0xFFU).to_byte(),
+    ((total_len >> 16) & 0xFFU).to_byte(),
+    ((total_len >> 24) & 0xFFU).to_byte(),
+  ])
+  let init_counter = rmsm.begin_transaction()
+  let init_txn = if complete_access {
+    @mailbox.build_sdo_download_ca(
+      init_counter, station, index, subindex, size_payload,
     )
   } else {
-    resp.data
+    @mailbox.build_sdo_download(
+      init_counter, station, index, subindex, size_payload,
+    )
+  }
+  mailbox_send(nic, station, mb_config, init_txn.encode(), timeout)
+  let init_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let (init_mbh, init_resp) = @mailbox.decode_sdo_response(init_raw)
+  let _ = rmsm.validate_response(init_mbh.counter)
+  if init_resp.command != @mailbox.SdoCommand::DownloadResponse {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO download segmented: expected DownloadResponse for initiate",
+    )
+  }
+
+  let mut offset = 0
+  let mut toggle = false
+  while offset < data.length() {
+    let remain = data.length() - offset
+    let chunk_len = if remain > 7 { 7 } else { remain }
+    let chunk = Bytes::makei(chunk_len, fn(i) { data[offset + i] })
+    let last = offset + chunk_len >= data.length()
+    let seg_counter = rmsm.begin_transaction()
+    let seg_frame = @mailbox.build_sdo_download_segment_request(
+      seg_counter, station, toggle, last, chunk,
+    )
+    mailbox_send(nic, station, mb_config, seg_frame, timeout)
+    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
+    let _ = rmsm.validate_response(seg_mbh.counter)
+    if seg_resp.command != @mailbox.SdoCommand::DownloadResponse ||
+      not(seg_resp.segmented) {
+      raise @hal.EcError::MailboxProtocol(
+        "SDO download segmented: expected segmented DownloadResponse",
+      )
+    }
+    if seg_resp.toggle != toggle {
+      raise @hal.EcError::MailboxProtocol(
+        "SDO download segmented: segment toggle mismatch",
+      )
+    }
+    offset += chunk_len
+    toggle = not(toggle)
   }
 }

@@ -10,6 +10,8 @@ pub fn build_sdo_download(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
 pub fn build_sdo_download_ca(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
+pub fn build_sdo_download_segment_request(Byte, UInt, Bool, Bool, Bytes) -> Bytes raise @hal.EcError
+
 pub fn build_sdo_info_get_od_list_request(Byte, UInt, UInt) -> Bytes
 
 pub fn build_sdo_upload(Byte, UInt, UInt, Byte) -> SdoTransaction
@@ -27,6 +29,8 @@ pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
 pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
+
+pub fn decode_sdo_info_od_list_payload(Bytes) -> Array[UInt]
 
 pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError
 
