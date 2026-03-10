@@ -35,8 +35,8 @@
 | **CoE (5.7)** | | | | | |
 | 501 | SDO Up/Download (normal + expedited) | shall | ✅ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | sdo_download/upload + retry 事务已闭环 |
 | 502 | Segmented Transfer | should | ⚠️ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt), [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已支持分段上传拼接；分段下载待补 |
-| 503 | Complete Access | should (shall if ENI) | ❌ | — | |
-| 504 | SDO Info service | should | ❌ | — | |
+| 503 | Complete Access | should (shall if ENI) | ⚠️ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt), [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | 已支持 CA 位编码与 CA Upload/Download 事务入口；CA 分段续传待补 |
+| 504 | SDO Info service | should | ⚠️ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已支持 Get OD List 请求构造与 SDO Info 响应头解码；OD读取流程待补 |
 | 505 | Emergency Message | shall | ✅ | [mailbox/emergency.mbt](mailbox/emergency.mbt) | decode_emergency/decode_emergency_frame |
 | 506 | PDO in CoE | may | ➖ | — | |
 | **EoE (5.8)** | | | | | |
@@ -187,7 +187,12 @@
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): 分段上传起始/分段响应解码
   - ⏳ 仍缺：分段下载请求/响应循环
 - [ ] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_download_ca` / `build_sdo_upload_ca` + CA bit 编码
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_download_complete_access` / `sdo_upload_complete_access`
+  - ⏳ 仍缺：CA 分段续传循环
 - [ ] SDO Info Service [ETG.1500 #504 should]
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_info_get_od_list_request` + `decode_sdo_info_response`
+  - ⏳ 仍缺：对象字典遍历与分段拉取流程
 
 已完成提交：
 - ✅ `feat: add coe sdo transaction engine` (f161c3c)

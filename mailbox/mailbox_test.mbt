@@ -705,6 +705,24 @@ test "build_sdo_upload creates correct request" {
 }
 
 ///|
+test "SdoTransaction encode sets complete access bit for download" {
+  let txn = @mailbox.build_sdo_download_ca(
+    b'\x02', 0x1001U, 0x1A00U, b'\x00', b"\x01\x02\x03\x04",
+  )
+  let frame = txn.encode()
+  assert_eq(frame[8], b'\x31') // 0x21 | bit4
+  assert_true(txn.request.complete_access)
+}
+
+///|
+test "SdoTransaction encode sets complete access bit for upload" {
+  let txn = @mailbox.build_sdo_upload_ca(b'\x03', 0x1001U, 0x1A00U, b'\x01')
+  let frame = txn.encode()
+  assert_eq(frame[8], b'\x50') // 0x40 | bit4
+  assert_true(txn.request.complete_access)
+}
+
+///|
 test "build_sdo_upload_segment_request encodes toggle bit" {
   let frame0 = @mailbox.build_sdo_upload_segment_request(
     b'\x02', 0x1001U, false,
@@ -714,6 +732,63 @@ test "build_sdo_upload_segment_request encodes toggle bit" {
   assert_eq(frame1.length(), 16)
   assert_eq(frame0[8], b'\x60')
   assert_eq(frame1[8], b'\x70')
+}
+
+///|
+test "build_sdo_info_get_od_list_request encodes mailbox and opcode" {
+  let frame = @mailbox.build_sdo_info_get_od_list_request(b'\x04', 0x1001U, 0U)
+  assert_eq(frame.length(), 14) // 6 + 2 + 4 + 2
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(mbh.counter, b'\x04')
+  assert_eq(mbh.length, 8U)
+  assert_eq(frame[7], b'\x80') // CoE service=0x08 in high nibble
+  assert_eq(frame[8], b'\x01') // opcode=Get OD List req
+}
+
+///|
+test "decode_sdo_info_response parses header and payload" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U, // 2 + 4 + 4 payload
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x05',
+  }
+  let hdr = mbh.to_bytes()
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x80' // SDO Info service
+    } else if i == 8 {
+      b'\x82' // opcode=0x02, incomplete=1
+    } else if i == 9 {
+      b'\x00'
+    } else if i == 10 {
+      b'\x03' // fragments_left = 3
+    } else if i == 11 {
+      b'\x00'
+    } else if i == 12 {
+      b'\x11'
+    } else if i == 13 {
+      b'\x22'
+    } else if i == 14 {
+      b'\x33'
+    } else if i == 15 {
+      b'\x44'
+    } else {
+      b'\x00'
+    }
+  })
+  let (_mbh, info) = @mailbox.decode_sdo_info_response(frame)
+  assert_eq(info.opcode, b'\x02')
+  assert_true(info.incomplete)
+  assert_eq(info.fragments_left, 3U)
+  assert_eq(info.payload, b"\x11\x22\x33\x44")
 }
 
 // ========== MailboxConfig Tests ==========

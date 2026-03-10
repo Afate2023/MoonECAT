@@ -208,3 +208,64 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
     }
   }
 }
+
+///|
+/// Execute an SDO Download with Complete Access enabled.
+pub fn[N : @hal.Nic] sdo_download_complete_access(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let txn = @mailbox.build_sdo_download_ca(
+    counter, station, index, subindex, data,
+  )
+  let frame = txn.encode()
+  mailbox_send(nic, station, mb_config, frame, timeout)
+  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+  let _ = rmsm.validate_response(mbh.counter)
+  if resp.command != @mailbox.SdoCommand::DownloadResponse {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO CA download: expected DownloadResponse, got " +
+      resp.command.to_string(),
+    )
+  }
+}
+
+///|
+/// Execute an SDO Upload with Complete Access enabled.
+pub fn[N : @hal.Nic] sdo_upload_complete_access(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let txn = @mailbox.build_sdo_upload_ca(counter, station, index, subindex)
+  let frame = txn.encode()
+  mailbox_send(nic, station, mb_config, frame, timeout)
+  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+  let _ = rmsm.validate_response(mbh.counter)
+  if resp.command != @mailbox.SdoCommand::UploadResponse {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO CA upload: expected UploadResponse, got " + resp.command.to_string(),
+    )
+  }
+  if resp.segmented {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO CA upload segmented continuation is not implemented yet",
+    )
+  } else {
+    resp.data
+  }
+}

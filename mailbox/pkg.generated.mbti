@@ -8,7 +8,13 @@ import {
 // Values
 pub fn build_sdo_download(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
+pub fn build_sdo_download_ca(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
+
+pub fn build_sdo_info_get_od_list_request(Byte, UInt, UInt) -> Bytes
+
 pub fn build_sdo_upload(Byte, UInt, UInt, Byte) -> SdoTransaction
+
+pub fn build_sdo_upload_ca(Byte, UInt, UInt, Byte) -> SdoTransaction
 
 pub fn build_sdo_upload_segment_request(Byte, UInt, Bool) -> Bytes
 
@@ -21,6 +27,8 @@ pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
 pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
+
+pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError
 
 pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
 
@@ -163,6 +171,15 @@ pub(all) enum SdoCommand {
 }
 pub impl Eq for SdoCommand
 pub impl Show for SdoCommand
+
+pub(all) struct SdoInfoResponse {
+  opcode : Byte
+  incomplete : Bool
+  fragments_left : UInt
+  payload : Bytes
+}
+pub impl Eq for SdoInfoResponse
+pub impl Show for SdoInfoResponse
 
 pub(all) struct SdoRequest {
   index : UInt

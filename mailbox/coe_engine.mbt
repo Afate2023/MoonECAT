@@ -32,6 +32,10 @@ let coe_header_len : Int = 2
 let sdo_header_len : Int = 8
 
 ///|
+/// SDO Info header size in bytes.
+let sdo_info_header_len : Int = 4
+
+///|
 /// Encode a mailbox header into 6 bytes.
 pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
   let buf = @buffer.new(size_hint=mailbox_header_len)
@@ -199,7 +203,12 @@ pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
   buf.write_byte((coe_word & 0xFFU).to_byte())
   buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
   // SDO header
-  buf.write_byte(self.request.command.to_byte())
+  let mut cmd = self.request.command.to_byte()
+  // Complete Access is bit4 in initiate upload/download command.
+  if self.request.complete_access {
+    cmd = cmd | b'\x10'
+  }
+  buf.write_byte(cmd)
   // Index (LE)
   buf.write_byte((self.request.index & 0xFFU).to_byte())
   buf.write_byte(((self.request.index >> 8) & 0xFFU).to_byte())
@@ -436,6 +445,49 @@ pub fn build_sdo_upload(
 }
 
 ///|
+/// Build an SDO Download transaction with Complete Access flag set.
+pub fn build_sdo_download_ca(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+  data : Bytes,
+) -> SdoTransaction {
+  {
+    counter,
+    station,
+    request: {
+      index,
+      subindex,
+      command: DownloadRequest,
+      data,
+      complete_access: true,
+    },
+  }
+}
+
+///|
+/// Build an SDO Upload transaction with Complete Access flag set.
+pub fn build_sdo_upload_ca(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+) -> SdoTransaction {
+  {
+    counter,
+    station,
+    request: {
+      index,
+      subindex,
+      command: UploadRequest,
+      data: Bytes::new(0),
+      complete_access: true,
+    },
+  }
+}
+
+///|
 /// Build an SDO Upload Segment request frame.
 /// Toggle bit alternates on each segment round-trip.
 pub fn build_sdo_upload_segment_request(
@@ -468,4 +520,92 @@ pub fn build_sdo_upload_segment_request(
     buf.write_byte(b'\x00')
   }
   buf.to_bytes()
+}
+
+///|
+/// Build an SDO Info "Get OD List" request frame.
+/// list_type: 0 = number of objects for all list classes.
+pub fn build_sdo_info_get_od_list_request(
+  counter : Byte,
+  station : UInt,
+  list_type : UInt,
+) -> Bytes {
+  let payload_len = coe_header_len + sdo_info_header_len + 2
+  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let mbh : MailboxHeader = {
+    length: payload_len.reinterpret_as_uint(),
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  for i in 0..<hdr.length() {
+    buf.write_byte(hdr[i])
+  }
+  let coe_word = 8U << 12 // CoE Service = SDO Info
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  // SDO Info header: opcode=0x01 (Get OD List req), incomplete=0, reserved=0, fragments_left=0
+  buf.write_byte(b'\x01')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  // List type (WORD, LE)
+  buf.write_byte((list_type & 0xFFU).to_byte())
+  buf.write_byte(((list_type >> 8) & 0xFFU).to_byte())
+  buf.to_bytes()
+}
+
+///|
+/// Decoded SDO Info response header and payload body.
+pub(all) struct SdoInfoResponse {
+  opcode : Byte
+  incomplete : Bool
+  fragments_left : UInt
+  payload : Bytes
+} derive(Eq, Show)
+
+///|
+/// Decode SDO Info response frame (service=0x08).
+pub fn decode_sdo_info_response(
+  data : Bytes,
+) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError {
+  if data.length() < mailbox_header_len + coe_header_len + sdo_info_header_len {
+    raise @hal.EcError::MailboxProtocol("SDO Info response frame too short")
+  }
+  let mbh = MailboxHeader::from_bytes(data)
+  let payload_len = mbh.length.reinterpret_as_int()
+  if payload_len < coe_header_len + sdo_info_header_len {
+    raise @hal.EcError::MailboxProtocol("SDO Info response payload too short")
+  }
+  let frame_len = mailbox_header_len + payload_len
+  if data.length() < frame_len {
+    raise @hal.EcError::MailboxProtocol("SDO Info response truncated")
+  }
+  if mbh.mb_type != CoE {
+    raise @hal.EcError::MailboxProtocol(
+      "expected CoE mailbox, got " + mbh.mb_type.to_string(),
+    )
+  }
+  let off = mailbox_header_len
+  let coe_word = data[off].to_uint() | (data[off + 1].to_uint() << 8)
+  let svc_field = (coe_word >> 12) & 0xFU
+  if svc_field != 8U {
+    raise @hal.EcError::MailboxProtocol("expected SDO Info service (0x08)")
+  }
+  let info_off = off + coe_header_len
+  let hdr0 = data[info_off]
+  let opcode = hdr0 & b'\x7F'
+  let incomplete = (hdr0 & b'\x80') != b'\x00'
+  let fragments_left = data[info_off + 2].to_uint() |
+    (data[info_off + 3].to_uint() << 8)
+  let body_len = payload_len - coe_header_len - sdo_info_header_len
+  let payload = if body_len > 0 {
+    Bytes::makei(body_len, fn(i) { data[info_off + sdo_info_header_len + i] })
+  } else {
+    Bytes::new(0)
+  }
+  (mbh, { opcode, incomplete, fragments_left, payload })
 }

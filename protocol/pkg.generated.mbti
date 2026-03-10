@@ -167,9 +167,13 @@ pub fn[N : @hal.Nic] request_state_aware(N, UInt, EsmState, device_emulation? : 
 
 pub fn[N : @hal.Nic] sdo_download(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] sdo_download_complete_access(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] sdo_download_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] sdo_upload(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_upload_complete_access(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] sdo_upload_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
 
