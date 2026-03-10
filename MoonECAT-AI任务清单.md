@@ -354,6 +354,7 @@
 - [x] 建立单元测试和夹具测试 (~163 tests)。
 - [x] 建立流程回放和最小集成测试。
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt): `replay integration minimal flow: scan->validate->run->stop`
+  - ✅ commit: `420a99a` `test(runtime): add minimal replay integration flow`
 - [ ] 持续把参考分析文档转成实现约束和验收标准。
 
 ## 5. 依赖顺序
