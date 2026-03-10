@@ -169,7 +169,8 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
             ) catch {
               _ => self.dc_state = Drifting(2L)
             }
-            self.telemetry.dc_delay_updates = self.telemetry.dc_delay_updates + 1L
+            self.telemetry.dc_delay_updates = self.telemetry.dc_delay_updates +
+              1L
           }
         None => ()
       }

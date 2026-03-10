@@ -794,8 +794,11 @@ pub fn decode_sdo_info_od_description_payload(
   let object_code = payload[5]
   let name = if payload.length() > 6 {
     let name_bytes = Bytes::makei(payload.length() - 6, fn(i) { payload[6 + i] })
-    try @utf8.decode(name_bytes) catch {
-      _ => raise @hal.EcError::MailboxProtocol("SDO Info Get OD name is not valid UTF-8")
+    @utf8.decode(name_bytes) catch {
+      _ =>
+        raise @hal.EcError::MailboxProtocol(
+          "SDO Info Get OD name is not valid UTF-8",
+        )
     }
   } else {
     ""
@@ -821,8 +824,11 @@ pub fn decode_sdo_info_oe_description_payload(
     let name_bytes = Bytes::makei(payload.length() - 10, fn(i) {
       payload[10 + i]
     })
-    try @utf8.decode(name_bytes) catch {
-      _ => raise @hal.EcError::MailboxProtocol("SDO Info Get OE name is not valid UTF-8")
+    @utf8.decode(name_bytes) catch {
+      _ =>
+        raise @hal.EcError::MailboxProtocol(
+          "SDO Info Get OE name is not valid UTF-8",
+        )
     }
   } else {
     ""

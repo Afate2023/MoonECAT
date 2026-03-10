@@ -14,6 +14,10 @@ pub fn build_sdo_download_segment_request(Byte, UInt, Bool, Bool, Bytes) -> Byte
 
 pub fn build_sdo_info_get_od_list_request(Byte, UInt, UInt) -> Bytes
 
+pub fn build_sdo_info_get_od_request(Byte, UInt, UInt) -> Bytes
+
+pub fn build_sdo_info_get_oe_request(Byte, UInt, UInt, Byte, Byte) -> Bytes
+
 pub fn build_sdo_upload(Byte, UInt, UInt, Byte) -> SdoTransaction
 
 pub fn build_sdo_upload_ca(Byte, UInt, UInt, Byte) -> SdoTransaction
@@ -30,7 +34,11 @@ pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
 
+pub fn decode_sdo_info_od_description_payload(Bytes) -> SdoInfoObjectDescription raise @hal.EcError
+
 pub fn decode_sdo_info_od_list_payload(Bytes) -> Array[UInt]
+
+pub fn decode_sdo_info_oe_description_payload(Bytes) -> SdoInfoEntryDescription raise @hal.EcError
 
 pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError
 
@@ -175,6 +183,28 @@ pub(all) enum SdoCommand {
 }
 pub impl Eq for SdoCommand
 pub impl Show for SdoCommand
+
+pub(all) struct SdoInfoEntryDescription {
+  index : UInt
+  subindex : Byte
+  value_info : Byte
+  data_type : UInt
+  bit_length : UInt
+  access : UInt
+  name : String
+}
+pub impl Eq for SdoInfoEntryDescription
+pub impl Show for SdoInfoEntryDescription
+
+pub(all) struct SdoInfoObjectDescription {
+  index : UInt
+  data_type : UInt
+  object_code : Byte
+  max_subindex : Byte
+  name : String
+}
+pub impl Eq for SdoInfoObjectDescription
+pub impl Show for SdoInfoObjectDescription
 
 pub(all) struct SdoInfoResponse {
   opcode : Byte

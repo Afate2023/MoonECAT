@@ -71,6 +71,8 @@ pub(all) struct Runtime {
   mut consecutive_wkc_errors : Int
   mut dc_state : DcState
   mut dc_reference_station : UInt?
+  mut dc_stations : Array[UInt]
+  mut dc_cycle_counter : Int
 }
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
 pub fn Runtime::get_telemetry(Self) -> Telemetry
@@ -122,6 +124,7 @@ pub(all) struct Telemetry {
   mut retries : Int64
   mut wkc_errors : Int64
   mut irq_events : Int64
+  mut dc_delay_updates : Int64
 }
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
@@ -139,6 +142,7 @@ pub impl Show for ValidateReport
 
 pub(all) enum ValidationResult {
   Ok
+  StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   Missing(position~ : Int)
   Extra(position~ : Int)

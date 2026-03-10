@@ -285,13 +285,15 @@ pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(
   for station in stations {
     let recv_time = dc_read_receive_time(nic, station, timeout)
     let measured = abs_diff_u32(recv_time, reference_time)
-    let old_pdu = read_register_fp(nic, station, reg_dc_system_delay, 4, timeout)
+    let old_pdu = read_register_fp(
+      nic, station, reg_dc_system_delay, 4, timeout,
+    )
     let old_delay = le_u32(old_pdu.data)
     let blended = if smoothing_den == 0U {
       measured
     } else {
       let keep = smoothing_den - smoothing_num
-      ((old_delay * keep) + (measured * smoothing_num)) / smoothing_den
+      (old_delay * keep + measured * smoothing_num) / smoothing_den
     }
     let _ = write_register_fp(
       nic,

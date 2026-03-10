@@ -43,6 +43,8 @@ pub fn[N : @hal.Nic] dc_read_receive_time(N, UInt, @hal.Duration) -> UInt raise 
 
 pub fn[N : @hal.Nic] dc_read_sync_window(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(N, UInt, Array[UInt], @hal.Duration, smoothing_num? : UInt, smoothing_den? : UInt) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_static_sync(N, UInt, Int, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let default_master_mac : FixedArray[Byte]
@@ -171,7 +173,11 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(N, UInt, @mailbox.MailboxConfi
 
 pub fn[N : @hal.Nic] sdo_download_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] sdo_info_get_od_description(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, @hal.Duration) -> @mailbox.SdoInfoObjectDescription raise @hal.EcError
+
 pub fn[N : @hal.Nic] sdo_info_get_od_list(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, @hal.Duration) -> Array[UInt] raise @hal.EcError
+
+pub fn[N : @hal.Nic] sdo_info_get_oe_description(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Byte, @hal.Duration) -> @mailbox.SdoInfoEntryDescription raise @hal.EcError
 
 pub fn[N : @hal.Nic] sdo_upload(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
 
