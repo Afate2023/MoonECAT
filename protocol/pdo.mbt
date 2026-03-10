@@ -58,6 +58,13 @@ pub(all) struct PdoContext {
 } derive(Show)
 
 ///|
+/// Result of one PDO exchange, including WKC and datagram IRQ.
+pub(all) struct PdoExchangeResult {
+  wkc : UInt
+  irq : UInt
+} derive(Eq, Show)
+
+///|
 /// Build a PdoContext from a list of slave mappings.
 /// Each SlaveMapping provides output/input byte counts from FMMU calculation.
 pub fn PdoContext::build(
@@ -105,8 +112,18 @@ pub fn[N : @hal.Nic] pdo_exchange(
   ctx : PdoContext,
   timeout : @hal.Duration,
 ) -> UInt raise @hal.EcError {
+  pdo_exchange_result(nic, ctx, timeout).wkc
+}
+
+///|
+/// Execute one PDO cycle and return both WKC and IRQ from the response datagram.
+pub fn[N : @hal.Nic] pdo_exchange_result(
+  nic : N,
+  ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> PdoExchangeResult raise @hal.EcError {
   if ctx.logical_size <= 0 {
-    return 0U
+    return { wkc: 0U, irq: 0U }
   }
   // Build the outgoing data: combine outputs + zero-filled input area
   let total = ctx.image.output_size + ctx.image.input_size
@@ -130,7 +147,7 @@ pub fn[N : @hal.Nic] pdo_exchange(
       pdu.data[ctx.image.output_size + i]
     })
   }
-  pdu.wkc
+  { wkc: pdu.wkc, irq: pdu.header.irq }
 }
 
 ///|

@@ -879,6 +879,7 @@ test "RunReport format with cycles and telemetry" {
     timeouts: 2L,
     retries: 1L,
     wkc_errors: 3L,
+    irq_events: 4L,
   }
   let report : @runtime.RunReport = {
     scan: { slave_count: 2, slaves: [] },
@@ -893,6 +894,7 @@ test "RunReport format with cycles and telemetry" {
   assert_true(text.contains("97/100 OK"))
   assert_true(text.contains("tx=100"))
   assert_true(text.contains("timeouts=2"))
+  assert_true(text.contains("irq_events=4"))
   assert_true(text.contains("wkc_errors=3"))
 }
 

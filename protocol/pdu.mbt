@@ -73,6 +73,8 @@ pub(all) struct PduHeader {
   address : UInt
   /// Data length and next/last flags packed into 11+1+4 bits
   len_flags : UInt
+  /// Datagram IRQ field (ETG.1000.4), parsed and propagated for runtime use.
+  irq : UInt
 } derive(Eq, Show)
 
 ///|

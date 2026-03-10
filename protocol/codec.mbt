@@ -44,8 +44,8 @@ fn encode_pdu(buf : @buffer.Buffer, pdu : Pdu, is_last : Bool) -> Unit {
   let more : UInt = if is_last { 0U } else { 1U }
   let len_flags = (data_len & 0x7FFU) | (more << 15)
   write_u16_le(buf, len_flags)
-  // IRQ (2 bytes, typically 0)
-  write_u16_le(buf, 0U)
+  // IRQ (2 bytes)
+  write_u16_le(buf, pdu.header.irq)
   // Data payload
   buf.write_bytes(pdu.data)
   // Working counter (2 bytes LE)
@@ -131,7 +131,7 @@ pub fn EcFrame::decode(data : Bytes) -> EcFrame raise @hal.EcError {
     let len_flags = read_u16_le(data, offset + 6)
     let data_len = (len_flags & 0x7FFU).reinterpret_as_int()
     let more = ((len_flags >> 15) & 1U).reinterpret_as_int()
-    // Skip IRQ at offset+8..offset+10
+    let irq = read_u16_le(data, offset + 8)
     offset = offset + pdu_header_len
     if offset + data_len + wkc_len > data.length() {
       raise @hal.EcError::InvalidPdu("PDU data truncated")
@@ -147,7 +147,7 @@ pub fn EcFrame::decode(data : Bytes) -> EcFrame raise @hal.EcError {
     let wkc = read_u16_le(data, offset)
     offset = offset + wkc_len
     pdus.push({
-      header: { command, index, address, len_flags },
+      header: { command, index, address, len_flags, irq },
       data: pdu_data,
       wkc,
     })

@@ -53,7 +53,7 @@ pub fn FrameBuilder::add(
   self.next_index = self.next_index + 1
   let len_flags = data.length().reinterpret_as_uint() & 0x7FFU
   self.pending.push({
-    header: { command, index, address, len_flags },
+    header: { command, index, address, len_flags, irq: 0U },
     data,
     wkc: 0U,
   })

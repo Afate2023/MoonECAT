@@ -62,7 +62,13 @@ test "EcFrame encode/decode roundtrip - single NOP PDU" {
     src_mac: @protocol.default_master_mac,
     pdus: [
       {
-        header: { command: NOP, index: b'\x00', address: 0U, len_flags: 0U },
+        header: {
+          command: NOP,
+          index: b'\x00',
+          address: 0U,
+          len_flags: 0U,
+          irq: 0U,
+        },
         data: Bytes::new(0),
         wkc: 0U,
       },
@@ -88,6 +94,7 @@ test "EcFrame encode/decode roundtrip - BRD with data" {
           index: b'\x42',
           address: 0x1234U,
           len_flags: 4U,
+          irq: 0x1234U,
         },
         data,
         wkc: 1U,
@@ -100,6 +107,7 @@ test "EcFrame encode/decode roundtrip - BRD with data" {
   assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::BRD)
   assert_eq(decoded.pdus[0].header.index, b'\x42')
   assert_eq(decoded.pdus[0].header.address, 0x1234U)
+  assert_eq(decoded.pdus[0].header.irq, 0x1234U)
   assert_eq(decoded.pdus[0].data, data)
   assert_eq(decoded.pdus[0].wkc, 1U)
 }
@@ -111,7 +119,13 @@ test "EcFrame encode/decode roundtrip - multiple PDUs" {
     src_mac: @protocol.default_master_mac,
     pdus: [
       {
-        header: { command: APRD, index: b'\x01', address: 0U, len_flags: 0U },
+        header: {
+          command: APRD,
+          index: b'\x01',
+          address: 0U,
+          len_flags: 0U,
+          irq: 0U,
+        },
         data: Bytes::new(0),
         wkc: 0U,
       },
@@ -121,6 +135,7 @@ test "EcFrame encode/decode roundtrip - multiple PDUs" {
           index: b'\x02',
           address: 0x1000U,
           len_flags: 2U,
+          irq: 0U,
         },
         data: Bytes::from_array([b'\xAA', b'\xBB']),
         wkc: 1U,
@@ -387,6 +402,7 @@ test "EcFrame roundtrip preserves large PDU data" {
           index: b'\x07',
           address: 0x10000U,
           len_flags: 256U,
+          irq: 0U,
         },
         data,
         wkc: 42U,
@@ -412,7 +428,13 @@ test "EcFrame roundtrip preserves MAC addresses" {
     src_mac: custom_src,
     pdus: [
       {
-        header: { command: NOP, index: b'\x00', address: 0U, len_flags: 0U },
+        header: {
+          command: NOP,
+          index: b'\x00',
+          address: 0U,
+          len_flags: 0U,
+          irq: 0U,
+        },
         data: Bytes::new(0),
         wkc: 0U,
       },
@@ -431,7 +453,13 @@ test "EcFrame roundtrip preserves address through encode/decode" {
     src_mac: @protocol.default_master_mac,
     pdus: [
       {
-        header: { command: FPRD, index: b'\x00', address: addr, len_flags: 0U },
+        header: {
+          command: FPRD,
+          index: b'\x00',
+          address: addr,
+          len_flags: 0U,
+          irq: 0U,
+        },
         data: Bytes::new(0),
         wkc: 0U,
       },
@@ -482,7 +510,13 @@ test "all EcCommand values survive encode/decode" {
       src_mac: @protocol.default_master_mac,
       pdus: [
         {
-          header: { command: cmd, index: b'\x00', address: 0U, len_flags: 0U },
+          header: {
+            command: cmd,
+            index: b'\x00',
+            address: 0U,
+            len_flags: 0U,
+            irq: 0U,
+          },
           data: Bytes::new(0),
           wkc: 0U,
         },
@@ -545,8 +579,27 @@ test "discovery - register address constants are reasonable" {
   // AL registers in expected range
   assert_true(@protocol.reg_al_status.reinterpret_as_int() >= 0x100)
   assert_true(@protocol.reg_al_control.reinterpret_as_int() >= 0x100)
+  assert_eq(@protocol.reg_dl_control, 0x0100U)
+  assert_eq(@protocol.reg_station_alias, 0x0012U)
+  assert_eq(@protocol.dl_control_alias_enable_bit, 24)
   // SII registers
   assert_true(@protocol.reg_sii_control.reinterpret_as_int() >= 0x500)
+}
+
+///|
+test "discovery - read_station_alias via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let station_alias = @protocol.read_station_alias(nic, 0x1001U, timeout)
+  assert_eq(station_alias, 0U)
+}
+
+///|
+test "discovery - enable_alias_addressing via mock returns error" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.enable_alias_addressing(nic, 0x1001U, timeout)
+  assert_true(result is Err(_))
 }
 
 ///|

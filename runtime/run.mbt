@@ -114,6 +114,8 @@ pub fn RunReport::format(self : RunReport) -> String {
     tel.rx_frames.to_string() +
     " timeouts=" +
     tel.timeouts.to_string() +
+    " irq_events=" +
+    tel.irq_events.to_string() +
     " wkc_errors=" +
     tel.wkc_errors.to_string() +
     "\n",

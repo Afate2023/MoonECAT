@@ -47,6 +47,8 @@ pub fn[N : @hal.Nic] dc_static_sync(N, UInt, Int, @hal.Duration) -> Unit raise @
 
 pub let default_master_mac : FixedArray[Byte]
 
+pub let dl_control_alias_enable_bit : Int
+
 pub let ecat_frame_type : Int
 
 pub let ecat_header_len : Int
@@ -54,6 +56,8 @@ pub let ecat_header_len : Int
 pub fn[N : @hal.Nic] eeprom_read(N, UInt, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let ethernet_header_len : Int
 
@@ -75,6 +79,8 @@ pub let max_pdus_per_frame : Int
 
 pub fn[N : @hal.Nic] pdo_exchange(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.Nic] pdo_exchange_result(N, PdoContext, @hal.Duration) -> PdoExchangeResult raise @hal.EcError
+
 pub fn[N : @hal.Nic] pdo_read(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
 
 pub fn[N : @hal.Nic] pdo_write(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
@@ -92,6 +98,8 @@ pub fn[N : @hal.Nic] read_device_emulation(N, UInt, @hal.Duration) -> Bool raise
 pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_station_alias(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
 pub fn readwrite_command(AddressType) -> EcCommand
 
@@ -130,6 +138,8 @@ pub let reg_dc_time1 : UInt
 pub let reg_dc_time2 : UInt
 
 pub let reg_dc_time3 : UInt
+
+pub let reg_dl_control : UInt
 
 pub let reg_dl_status : UInt
 
@@ -279,6 +289,13 @@ pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError
 pub fn PdoContext::set_slave_outputs(Self, UInt, Bytes) -> Unit raise @hal.EcError
 pub impl Show for PdoContext
 
+pub(all) struct PdoExchangeResult {
+  wkc : UInt
+  irq : UInt
+}
+pub impl Eq for PdoExchangeResult
+pub impl Show for PdoExchangeResult
+
 pub(all) struct PdoMapping {
   station : UInt
   output_logical : UInt
@@ -304,6 +321,7 @@ pub(all) struct PduHeader {
   index : Byte
   address : UInt
   len_flags : UInt
+  irq : UInt
 }
 pub impl Eq for PduHeader
 pub impl Show for PduHeader

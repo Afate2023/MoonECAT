@@ -10,7 +10,7 @@
 |:---:|---|---|:---:|---|---|
 | **基础功能 (5.3)** | | | | | |
 | 101 | Service Commands (全部 DLPDU 命令) | shall if ENI | ✅ | [protocol/codec.mbt](protocol/codec.mbt) | 15 种 EcCommand 全部映射 |
-| 102 | IRQ Field in datagram | should | ❌ | [protocol/pdu.mbt](protocol/pdu.mbt) | PDU 已解析 IRQ 字段，但主循环未消费 |
+| 102 | IRQ Field in datagram | should | ✅ | [protocol/pdu.mbt](protocol/pdu.mbt), [runtime/runtime.mbt](runtime/runtime.mbt), [runtime/scheduler.mbt](runtime/scheduler.mbt) | IRQ 已编解码透传并在主循环计数 (`irq_events`) |
 | 103 | Slaves with Device Emulation | shall | ✅ | [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | read_device_emulation + request_state_aware + OpOnly |
 | 104 | EtherCAT State Machine (ESM) | shall | ✅ | [protocol/esm.mbt](protocol/esm.mbt), [protocol/esm_engine.mbt](protocol/esm_engine.mbt) | Init/PreOp/SafeOp/Op/Boot + 回退路径 |
 | 105 | Error Handling (WKC 等) | shall | ✅ | [runtime/scheduler.mbt](runtime/scheduler.mbt) | WKC 校验 + 连续错误计数 + 诊断指标 |
@@ -25,7 +25,7 @@
 | 301 | Online scanning / ENI import (至少一种) | shall (至少一种) | ✅ | [runtime/scan.mbt](runtime/scan.mbt) | Online scanning 已实现 |
 | 302 | Compare Network configuration (boot-up) | shall | ✅ | [runtime/validate.mbt](runtime/validate.mbt) | Vendor/Product/Revision/Serial 4-tuple 校验 |
 | 303 | Explicit Device Identification | should | ❌ | — | IdentificationAdo 未实现 |
-| 304 | Station Alias Addressing | may | ❌ | — | Register 0x0012 + DL Control Bit 24 |
+| 304 | Station Alias Addressing | may | ✅ | [protocol/discovery.mbt](protocol/discovery.mbt) | `read_station_alias` + `enable_alias_addressing` (0x0012 + Bit24) |
 | 305 | Access to EEPROM (Read shall, Write may) | Read shall | ✅ | [protocol/eeprom.mbt](protocol/eeprom.mbt) | eeprom_read_word/eeprom_read via ESC 0x0502-0x0508 |
 | **邮箱支持 (5.6)** | | | | | |
 | 401 | Support Mailbox (基础传输) | shall | ✅ | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | mailbox_send/recv/poll/exchange 已闭环 |
@@ -200,7 +200,8 @@
 - [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
   - ✅ [protocol/eeprom.mbt](protocol/eeprom.mbt): eeprom_read_word/eeprom_read
 - [ ] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
-- [ ] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
+- [x] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
+  - ✅ [protocol/discovery.mbt](protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
 - [ ] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
 
 已完成提交：
@@ -287,7 +288,7 @@
 | Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](参考项目/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](参考项目/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
 | EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](参考项目/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](参考项目/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](参考项目/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](参考项目/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
 | DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](参考项目/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](参考项目/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](参考项目/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](参考项目/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](参考项目/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
-| Alias Addressing（待实现） | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](参考项目/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](参考项目/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | （待实现）[protocol/discovery.mbt](protocol/discovery.mbt) 拓展 | 下一步 |
+| Alias Addressing | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](参考项目/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](参考项目/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | [protocol/discovery.mbt](protocol/discovery.mbt) (`read_station_alias` / `enable_alias_addressing`) | 已对齐 |
 | Explicit Device ID（待实现） | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](参考项目/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](参考项目/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](参考项目/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | （待实现）[runtime/validate.mbt](runtime/validate.mbt) + [protocol/discovery.mbt](protocol/discovery.mbt) | 下一步 |
 
 ---
@@ -382,11 +383,10 @@
 剩余高优先任务（按依赖顺序）：
 
 1. **Explicit Device Identification (#303)**：补 IdentificationAdo 读取与校验，接入 `validate`。
-2. **Station Alias Addressing (#304)**：补 `0x0012` 读取与 `DL Control Bit24` 激活路径。
-3. **DC 传播延迟连续补偿 (#1102)**：从“固定0延迟”升级到拓扑感知补偿模型。
-4. **CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 接入 scan/validate/run 与错误码返回。
-5. **结构化诊断输出**：增加 JSON/human-readable 双输出模式。
-6. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
+2. **DC 传播延迟连续补偿 (#1102)**：从“固定0延迟”升级到拓扑感知补偿模型。
+3. **CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 接入 scan/validate/run 与错误码返回。
+4. **结构化诊断输出**：增加 JSON/human-readable 双输出模式。
+5. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
 
 ## 10. 提交执行方式
 

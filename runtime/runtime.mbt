@@ -145,8 +145,12 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
       None => ()
     }
   }
-  let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
+  let pdo_result = @protocol.pdo_exchange_result(nic, ctx, timeout)
+  let wkc = pdo_result.wkc
   self.telemetry.rx_frames = self.telemetry.rx_frames + 1L
+  if pdo_result.irq != 0U {
+    self.telemetry.irq_events = self.telemetry.irq_events + 1L
+  }
   let ok = wkc >= self.expected_wkc
   if ok {
     self.consecutive_wkc_errors = 0
@@ -191,6 +195,7 @@ pub fn Runtime::get_telemetry(self : Runtime) -> Telemetry {
     timeouts: self.telemetry.timeouts,
     retries: self.telemetry.retries,
     wkc_errors: self.telemetry.wkc_errors,
+    irq_events: self.telemetry.irq_events,
   }
 }
 

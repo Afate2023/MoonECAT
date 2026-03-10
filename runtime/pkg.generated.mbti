@@ -121,6 +121,7 @@ pub(all) struct Telemetry {
   mut timeouts : Int64
   mut retries : Int64
   mut wkc_errors : Int64
+  mut irq_events : Int64
 }
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit

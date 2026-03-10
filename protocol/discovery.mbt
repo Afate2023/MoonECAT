@@ -13,6 +13,14 @@ pub let reg_build : UInt = 0x0002U
 pub let reg_dl_status : UInt = 0x0110U
 
 ///|
+/// DL Control register.
+pub let reg_dl_control : UInt = 0x0100U
+
+///|
+/// DL Control bit used to enable station alias addressing.
+pub let dl_control_alias_enable_bit : Int = 24
+
+///|
 /// AL Status register: current ESM state and error indication.
 pub let reg_al_status : UInt = 0x0130U
 
@@ -235,6 +243,56 @@ pub fn[N : @hal.Nic] assign_station_address(
     raise @hal.EcError::SendFailed(
       "station address assignment failed for position " +
       position.reinterpret_as_int().to_string(),
+    )
+  }
+}
+
+///|
+/// Read station alias register (0x0012) using configured station addressing.
+pub fn[N : @hal.Nic] read_station_alias(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let pdu = read_register_fp(nic, station, reg_station_alias, 2, timeout)
+  if pdu.data.length() < 2 {
+    raise @hal.EcError::InvalidPdu("station alias response too short")
+  }
+  pdu.data[0].to_uint() | (pdu.data[1].to_uint() << 8)
+}
+
+///|
+/// Set DL Control Bit24 to enable alias addressing for one slave.
+pub fn[N : @hal.Nic] enable_alias_addressing(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let dl = read_register_fp(nic, station, reg_dl_control, 4, timeout)
+  if dl.data.length() < 4 {
+    raise @hal.EcError::InvalidPdu("DL control response too short")
+  }
+  let current = dl.data[0].to_uint() |
+    (dl.data[1].to_uint() << 8) |
+    (dl.data[2].to_uint() << 16) |
+    (dl.data[3].to_uint() << 24)
+  let updated = current | (1U << dl_control_alias_enable_bit)
+  let buf = @buffer.new(size_hint=4)
+  buf.write_byte((updated & 0xFFU).reinterpret_as_int().to_byte())
+  buf.write_byte(((updated >> 8) & 0xFFU).reinterpret_as_int().to_byte())
+  buf.write_byte(((updated >> 16) & 0xFFU).reinterpret_as_int().to_byte())
+  buf.write_byte(((updated >> 24) & 0xFFU).reinterpret_as_int().to_byte())
+  let pdu = write_register_fp(
+    nic,
+    station,
+    reg_dl_control,
+    buf.to_bytes(),
+    timeout,
+  )
+  if pdu.wkc == 0U {
+    raise @hal.EcError::SendFailed(
+      "enable alias addressing failed for station " +
+      station.reinterpret_as_int().to_string(),
     )
   }
 }
