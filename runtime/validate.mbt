@@ -7,6 +7,8 @@
 pub(all) enum ValidationResult {
   /// Slave matches expected configuration.
   Ok
+  /// Slave station address mismatch.
+  StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   /// Slave identity mismatch.
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   /// Slave not found at expected position.
@@ -65,6 +67,17 @@ pub fn validate(
     let pos = exp.position.reinterpret_as_int()
     match find_slave_at_position(scan_report.slaves, pos) {
       Some(found) => {
+        if found.station_address != exp.configured_address {
+          results.push(
+            StationAddressMismatch(
+              position=pos,
+              expected=exp.configured_address,
+              actual=found.station_address,
+            ),
+          )
+          all_ok = false
+          continue
+        }
         let actual_identity : @hal.SlaveIdentity = {
           vendor_id: found.vendor_id,
           product_code: found.product_code,
@@ -124,6 +137,16 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
   for i = 0; i < self.results.length(); i = i + 1 {
     match self.results[i] {
       Ok => buf.write_string("  [OK] Slave #" + i.to_string() + "\n")
+      StationAddressMismatch(position~, expected~, actual~) =>
+        buf.write_string(
+          "  [ADDR-MISMATCH] Slave #" +
+          position.to_string() +
+          ": expected 0x" +
+          expected.reinterpret_as_int().to_string() +
+          " actual 0x" +
+          actual.reinterpret_as_int().to_string() +
+          "\n",
+        )
       IdentityMismatch(..) =>
         buf.write_string(
           "  [MISMATCH] Slave #" + i.to_string() + ": identity mismatch\n",

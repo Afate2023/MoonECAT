@@ -24,7 +24,7 @@
 | **网络配置 (5.5)** | | | | | |
 | 301 | Online scanning / ENI import (至少一种) | shall (至少一种) | ✅ | [runtime/scan.mbt](runtime/scan.mbt) | Online scanning 已实现 |
 | 302 | Compare Network configuration (boot-up) | shall | ✅ | [runtime/validate.mbt](runtime/validate.mbt) | Vendor/Product/Revision/Serial 4-tuple 校验 |
-| 303 | Explicit Device Identification | should | ❌ | — | IdentificationAdo 未实现 |
+| 303 | Explicit Device Identification | should | ⚠️ | [runtime/validate.mbt](runtime/validate.mbt) | 已增加站地址+身份联合校验；IdentificationAdo 读取仍待补 |
 | 304 | Station Alias Addressing | may | ✅ | [protocol/discovery.mbt](protocol/discovery.mbt) | `read_station_alias` + `enable_alias_addressing` (0x0012 + Bit24) |
 | 305 | Access to EEPROM (Read shall, Write may) | Read shall | ✅ | [protocol/eeprom.mbt](protocol/eeprom.mbt) | eeprom_read_word/eeprom_read via ESC 0x0502-0x0508 |
 | **邮箱支持 (5.6)** | | | | | |
@@ -200,6 +200,8 @@
 - [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
   - ✅ [protocol/eeprom.mbt](protocol/eeprom.mbt): eeprom_read_word/eeprom_read
 - [ ] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
+  - ✅ [runtime/validate.mbt](runtime/validate.mbt): 站地址(`configured_address`) + 身份4元组联合校验
+  - ⏳ 仍缺：IdentificationAdo 读取路径与校验接入
 - [x] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
   - ✅ [protocol/discovery.mbt](protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
 - [ ] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
@@ -289,7 +291,7 @@
 | EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](参考项目/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](参考项目/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](参考项目/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](参考项目/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
 | DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](参考项目/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](参考项目/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](参考项目/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](参考项目/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](参考项目/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
 | Alias Addressing | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](参考项目/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](参考项目/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | [protocol/discovery.mbt](protocol/discovery.mbt) (`read_station_alias` / `enable_alias_addressing`) | 已对齐 |
-| Explicit Device ID（待实现） | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](参考项目/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](参考项目/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](参考项目/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | （待实现）[runtime/validate.mbt](runtime/validate.mbt) + [protocol/discovery.mbt](protocol/discovery.mbt) | 下一步 |
+| Explicit Device ID（部分） | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](参考项目/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](参考项目/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](参考项目/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | [runtime/validate.mbt](runtime/validate.mbt) + [protocol/discovery.mbt](protocol/discovery.mbt) | 部分对齐（IdentificationAdo 待补） |
 
 ---
 
@@ -382,7 +384,7 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **Explicit Device Identification (#303)**：补 IdentificationAdo 读取与校验，接入 `validate`。
+1. **Explicit Device Identification (#303)**：补 IdentificationAdo 读取与校验（`validate` 已完成站地址+身份联合校验）。
 2. **DC 传播延迟连续补偿 (#1102)**：从“固定0延迟”升级到拓扑感知补偿模型。
 3. **CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 接入 scan/validate/run 与错误码返回。
 4. **结构化诊断输出**：增加 JSON/human-readable 双输出模式。
