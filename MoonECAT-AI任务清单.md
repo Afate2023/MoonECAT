@@ -135,7 +135,7 @@
 - `网络一致性 4-tuple 校验` → `773692c` `fix(validate): compare full identity 4-tuple`
 - `SII/ESI 规范修正` → `b95a431` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
 
-### M4 ESM、PDO 周期通信、运行时编排 — ✅ 核心完成，ESM 超时值待补
+### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成
 
 - [x] 实现 ESM 状态流转和错误回退路径。
   - 📦 EsmState 5 状态 + can_transition + request_state + transition_through [ETG.1500 #104]
@@ -258,7 +258,9 @@
   - 📦 [README.mbt.md](README.mbt.md) 已更新
 - [x] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 已接入 Mock HAL + scan/validate/run 流程
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
-- [ ] 评估并整理 Extism 宿主接入边界。
+- [x] 评估并整理 Extism 宿主接入边界。
+  - ✅ [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
+  - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 
 提交映射（选项 → commit）：
 - `moonecat scan` 库层接口 → `04b1e6d` `feat: add moonecat scan command`
@@ -267,6 +269,7 @@
 - `补全文档（架构/接口/测试方式）` → `e5d8a81` `docs: document architecture and user workflows`
 - `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
+- `Extism 宿主接入边界整理` → `<pending>`
 
 ---
 
@@ -398,11 +401,9 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **ESM 超时值（M4 缺口）**：从 SII/ESI 或 ETG.1020 默认值接入状态切换超时。
-2. **Extism 宿主接入边界（M8 未完成）**：梳理 CLI/Library 与宿主接口分层与约束。
-3. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
-4. **热路径分配与压力回归**：聚焦 PDO/mailbox 主循环的分配与抖动观测。
-5. **异常场景覆盖**：补超时、重试、链路异常、配置不一致场景。
+1. **流程回放集成测试**：引入最小回放/实网回归（scan→preop→op→pdo→stop）。
+2. **热路径分配与压力回归**：聚焦 PDO/mailbox 主循环的分配与抖动观测。
+3. **异常场景覆盖**：补超时、重试、链路异常、配置不一致场景。
 
 ## 10. 提交执行方式
 
