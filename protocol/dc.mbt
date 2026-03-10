@@ -66,6 +66,15 @@ fn write_i64_from_i32(v : Int) -> Bytes {
 }
 
 ///|
+fn abs_diff_u32(a : UInt, b : UInt) -> UInt {
+  if a >= b {
+    a - b
+  } else {
+    b - a
+  }
+}
+
+///|
 /// Latch DC receive times on all slaves by broadcast-writing to 0x0900.
 pub fn[N : @hal.Nic] dc_latch_times(
   nic : N,
@@ -230,12 +239,14 @@ pub fn[N : @hal.Nic] dc_configure_linear(
       write_i64_from_i32(offset_i),
       timeout,
     )
-    // Without full topology metadata, keep pdelay at 0 for now.
+    // Topology-aware approximation: use per-station receive-time delta
+    // against the selected reference station as propagation delay estimate.
+    let pdelay = abs_diff_u32(recv_time, reference_time)
     let _ = write_register_fp(
       nic,
       station,
       reg_dc_system_delay,
-      write_u32(0U),
+      write_u32(pdelay),
       timeout,
     )
     // Configure SYNC0 for cyclic operation.

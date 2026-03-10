@@ -51,7 +51,7 @@
 | 1001 | VoE Protocol | may | ➖ | — | 项目范围排除 |
 | **DC 同步 (5.13)** | | | | | |
 | 1101 | DC support | shall if DC | ✅ | [protocol/dc.mbt](protocol/dc.mbt), [runtime/runtime.mbt](runtime/runtime.mbt) | 已实现 DC 初始化 + SYNC0 + FRMW 漂移补偿 |
-| 1102 | Continuous Propagation Delay compensation | should | ❌ | — | |
+| 1102 | Continuous Propagation Delay compensation | should | ⚠️ | [protocol/dc.mbt](protocol/dc.mbt) | 已从固定0延迟升级为参考站接收时间差估计；在线连续校正待补 |
 | 1103 | Sync window monitoring | should | ✅ | [protocol/dc.mbt](protocol/dc.mbt) | dc_read_sync_window |
 | **Slave-to-Slave (5.14)** | | | | | |
 | — | Slave-to-Slave via Master | — | ➖ | — | 暂不实现 |
@@ -229,6 +229,8 @@
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_compensate_cycle` (FRMW)
   - ✅ [runtime/runtime.mbt](runtime/runtime.mbt): `run_cycle` 周期补偿
 - [ ] Continuous Propagation Delay compensation [ETG.1500 #1102 should]
+  - ✅ [protocol/dc.mbt](protocol/dc.mbt): `reg_dc_system_delay` 改为基于参考站接收时间差估计
+  - ⏳ 仍缺：运行态连续重估与闭环校正
 - [x] Sync window monitoring：读取 Register 0x092C [ETG.1500 #1103 should]
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_read_sync_window`
 
