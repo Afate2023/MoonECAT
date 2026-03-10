@@ -47,6 +47,10 @@ pub(all) struct Runtime {
   mut dc_state : DcState
   /// Reference station for FRMW drift compensation.
   mut dc_reference_station : UInt?
+  /// DC station set used for runtime delay re-estimation.
+  mut dc_stations : Array[UInt]
+  /// Per-cycle counter for periodic delay re-estimation.
+  mut dc_cycle_counter : Int
 } derive(Show)
 
 ///|
@@ -61,6 +65,8 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     consecutive_wkc_errors: 0,
     dc_state: Disabled,
     dc_reference_station: None,
+    dc_stations: [],
+    dc_cycle_counter: 0,
   }
 }
 
@@ -76,11 +82,13 @@ pub fn[N : @hal.Nic] Runtime::init_dc(
   if not(self.config.dc_enabled) {
     self.dc_state = Disabled
     self.dc_reference_station = None
+    self.dc_stations = []
     return false
   }
   if stations.length() == 0 {
     self.dc_state = Disabled
     self.dc_reference_station = None
+    self.dc_stations = []
     return false
   }
   self.dc_state = Measuring
@@ -94,11 +102,14 @@ pub fn[N : @hal.Nic] Runtime::init_dc(
   match init {
     Some(info) => {
       self.dc_reference_station = Some(info.reference_station)
+      self.dc_stations = stations
+      self.dc_cycle_counter = 0
       self.dc_state = Locked
       true
     }
     None => {
       self.dc_reference_station = None
+      self.dc_stations = []
       self.dc_state = Disabled
       false
     }
@@ -143,6 +154,25 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
           _ => self.dc_state = Drifting(1L)
         }
       None => ()
+    }
+    self.dc_cycle_counter = self.dc_cycle_counter + 1
+    if self.dc_cycle_counter >= 100 {
+      self.dc_cycle_counter = 0
+      match self.dc_reference_station {
+        Some(station) =>
+          if self.dc_stations.length() > 0 {
+            @protocol.dc_reestimate_propagation_delays(
+              nic,
+              station,
+              self.dc_stations,
+              timeout,
+            ) catch {
+              _ => self.dc_state = Drifting(2L)
+            }
+            self.telemetry.dc_delay_updates = self.telemetry.dc_delay_updates + 1L
+          }
+        None => ()
+      }
     }
   }
   let pdo_result = @protocol.pdo_exchange_result(nic, ctx, timeout)
@@ -196,6 +226,7 @@ pub fn Runtime::get_telemetry(self : Runtime) -> Telemetry {
     retries: self.telemetry.retries,
     wkc_errors: self.telemetry.wkc_errors,
     irq_events: self.telemetry.irq_events,
+    dc_delay_updates: self.telemetry.dc_delay_updates,
   }
 }
 

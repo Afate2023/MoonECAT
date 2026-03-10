@@ -116,6 +116,8 @@ pub fn RunReport::format(self : RunReport) -> String {
     tel.timeouts.to_string() +
     " irq_events=" +
     tel.irq_events.to_string() +
+    " dc_delay_updates=" +
+    tel.dc_delay_updates.to_string() +
     " wkc_errors=" +
     tel.wkc_errors.to_string() +
     "\n",

@@ -28,6 +28,7 @@ pub(all) struct Telemetry {
   mut retries : Int64
   mut wkc_errors : Int64
   mut irq_events : Int64
+  mut dc_delay_updates : Int64
 } derive(Eq, Show)
 
 ///|
@@ -40,6 +41,7 @@ pub fn Telemetry::new() -> Telemetry {
     retries: 0L,
     wkc_errors: 0L,
     irq_events: 0L,
+    dc_delay_updates: 0L,
   }
 }
 
@@ -52,4 +54,5 @@ pub fn Telemetry::reset(self : Telemetry) -> Unit {
   self.retries = 0L
   self.wkc_errors = 0L
   self.irq_events = 0L
+  self.dc_delay_updates = 0L
 }

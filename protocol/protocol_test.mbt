@@ -1157,6 +1157,18 @@ test "dc_configure_linear returns reference station" {
 }
 
 ///|
+test "dc_reestimate_propagation_delays via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  @protocol.dc_reestimate_propagation_delays(
+    nic,
+    0x1001U,
+    [0x1001U, 0x1002U],
+    timeout,
+  )
+}
+
+///|
 test "PdoContext get_slave_inputs rejects unknown station" {
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],

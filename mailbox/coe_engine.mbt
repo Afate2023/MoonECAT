@@ -626,12 +626,105 @@ pub fn build_sdo_info_get_od_list_request(
 }
 
 ///|
+/// Build an SDO Info "Get OD" (object description) request frame.
+pub fn build_sdo_info_get_od_request(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+) -> Bytes {
+  let payload_len = coe_header_len + sdo_info_header_len + 2
+  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let mbh : MailboxHeader = {
+    length: payload_len.reinterpret_as_uint(),
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  for i in 0..<hdr.length() {
+    buf.write_byte(hdr[i])
+  }
+  let coe_word = 8U << 12
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  buf.write_byte(b'\x03')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  buf.write_byte((index & 0xFFU).to_byte())
+  buf.write_byte(((index >> 8) & 0xFFU).to_byte())
+  buf.to_bytes()
+}
+
+///|
+/// Build an SDO Info "Get OE" (entry description) request frame.
+/// `value_info` is a bitmask selecting additional fields in the response.
+pub fn build_sdo_info_get_oe_request(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+  value_info : Byte,
+) -> Bytes {
+  let payload_len = coe_header_len + sdo_info_header_len + 4
+  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let mbh : MailboxHeader = {
+    length: payload_len.reinterpret_as_uint(),
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  for i in 0..<hdr.length() {
+    buf.write_byte(hdr[i])
+  }
+  let coe_word = 8U << 12
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  buf.write_byte(b'\x05')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  buf.write_byte(b'\x00')
+  buf.write_byte((index & 0xFFU).to_byte())
+  buf.write_byte(((index >> 8) & 0xFFU).to_byte())
+  buf.write_byte(subindex)
+  buf.write_byte(value_info)
+  buf.to_bytes()
+}
+
+///|
 /// Decoded SDO Info response header and payload body.
 pub(all) struct SdoInfoResponse {
   opcode : Byte
   incomplete : Bool
   fragments_left : UInt
   payload : Bytes
+} derive(Eq, Show)
+
+///|
+/// SDO Info object description (Get OD response body).
+pub(all) struct SdoInfoObjectDescription {
+  index : UInt
+  data_type : UInt
+  object_code : Byte
+  max_subindex : Byte
+  name : String
+} derive(Eq, Show)
+
+///|
+/// SDO Info entry description (Get OE response body).
+pub(all) struct SdoInfoEntryDescription {
+  index : UInt
+  subindex : Byte
+  value_info : Byte
+  data_type : UInt
+  bit_length : UInt
+  access : UInt
+  name : String
 } derive(Eq, Show)
 
 ///|
@@ -685,4 +778,54 @@ pub fn decode_sdo_info_od_list_payload(payload : Bytes) -> Array[UInt] {
     let off = i * 2
     payload[off].to_uint() | (payload[off + 1].to_uint() << 8)
   })
+}
+
+///|
+/// Decode Get OD response payload.
+pub fn decode_sdo_info_od_description_payload(
+  payload : Bytes,
+) -> SdoInfoObjectDescription raise @hal.EcError {
+  if payload.length() < 6 {
+    raise @hal.EcError::MailboxProtocol("SDO Info Get OD payload too short")
+  }
+  let index = payload[0].to_uint() | (payload[1].to_uint() << 8)
+  let data_type = payload[2].to_uint() | (payload[3].to_uint() << 8)
+  let max_subindex = payload[4]
+  let object_code = payload[5]
+  let name = if payload.length() > 6 {
+    let name_bytes = Bytes::makei(payload.length() - 6, fn(i) { payload[6 + i] })
+    try @utf8.decode(name_bytes) catch {
+      _ => raise @hal.EcError::MailboxProtocol("SDO Info Get OD name is not valid UTF-8")
+    }
+  } else {
+    ""
+  }
+  { index, data_type, object_code, max_subindex, name }
+}
+
+///|
+/// Decode Get OE response payload.
+pub fn decode_sdo_info_oe_description_payload(
+  payload : Bytes,
+) -> SdoInfoEntryDescription raise @hal.EcError {
+  if payload.length() < 10 {
+    raise @hal.EcError::MailboxProtocol("SDO Info Get OE payload too short")
+  }
+  let index = payload[0].to_uint() | (payload[1].to_uint() << 8)
+  let subindex = payload[2]
+  let value_info = payload[3]
+  let data_type = payload[4].to_uint() | (payload[5].to_uint() << 8)
+  let bit_length = payload[6].to_uint() | (payload[7].to_uint() << 8)
+  let access = payload[8].to_uint() | (payload[9].to_uint() << 8)
+  let name = if payload.length() > 10 {
+    let name_bytes = Bytes::makei(payload.length() - 10, fn(i) {
+      payload[10 + i]
+    })
+    try @utf8.decode(name_bytes) catch {
+      _ => raise @hal.EcError::MailboxProtocol("SDO Info Get OE name is not valid UTF-8")
+    }
+  } else {
+    ""
+  }
+  { index, subindex, value_info, data_type, bit_length, access, name }
 }

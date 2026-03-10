@@ -168,7 +168,7 @@
 - `feat: implement pdo_exchange with LRW transaction` — 已确认完成，无需额外代码
 - ✅ `feat: handle device emulation and OpOnly flags in ESM` (ff166d4)
 
-### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，分段/CA/Info 待实现
+### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，含分段/CA/Info
 
 - [x] 实现 MailboxHeader 编解码。
   - 📦 MailboxHeader::to_bytes/from_bytes + MailboxType 枚举
@@ -191,11 +191,12 @@
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_download_ca` / `build_sdo_upload_ca` + CA bit 编码
   - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_download_complete_access` / `sdo_upload_complete_access`
   - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): CA 上传/下载分段续传循环
-- [ ] SDO Info Service [ETG.1500 #504 should]
+- [x] SDO Info Service [ETG.1500 #504 should]
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_info_get_od_list_request` + `decode_sdo_info_response`
   - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_info_get_od_list`（分片拼接 + list type 头处理）
   - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `decode_sdo_info_od_list_payload`
-  - ⏳ 仍缺：OD/OE 描述遍历接口（Get OD / Get OE）
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): `build_sdo_info_get_od_request` / `build_sdo_info_get_oe_request`
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): `sdo_info_get_od_description` / `sdo_info_get_oe_description`
 
 已完成提交：
 - ✅ `feat: add coe sdo transaction engine` (f161c3c)
@@ -203,7 +204,7 @@
 
 待完成提交：
 - `feat: complete segmented sdo download and CA continuation`
-- `feat: add sdo info service`
+- `feat: complete sdo info od oe services`
 
 ### M6 网络配置增强 — ⚠️ EEPROM 读取已完成，ID/Alias 待实现
 
@@ -222,7 +223,7 @@
 待完成提交：
 - `feat: add explicit device identification`
 
-### M7 DC 同步 — ✅ 基础能力已完成，增强项可迭代
+### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
 
 - [x] DC 初始化流程：传播延迟测量 + Offset 补偿 + Start Time 写入 [ETG.1500 #1101]
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_configure_linear`、`dc_configure_sync0`
@@ -230,9 +231,10 @@
 - [x] DC 持续漂移补偿：ARMW 周期帧 [ETG.1500 #1101]
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_compensate_cycle` (FRMW)
   - ✅ [runtime/runtime.mbt](runtime/runtime.mbt): `run_cycle` 周期补偿
-- [ ] Continuous Propagation Delay compensation [ETG.1500 #1102 should]
+- [x] Continuous Propagation Delay compensation [ETG.1500 #1102 should]
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `reg_dc_system_delay` 改为基于参考站接收时间差估计
-  - ⏳ 仍缺：运行态连续重估与闭环校正
+  - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_reestimate_propagation_delays` 运行态重估 + 平滑更新
+  - ✅ [runtime/runtime.mbt](runtime/runtime.mbt): 每 100 周期触发一次连续重估并计数
 - [x] Sync window monitoring：读取 Register 0x092C [ETG.1500 #1103 should]
   - ✅ [protocol/dc.mbt](protocol/dc.mbt): `dc_read_sync_window`
 
@@ -240,7 +242,7 @@
 - ✅ `feat: implement distributed clock runtime and protocol support` (533285d)
 
 待完成提交：
-- `feat: improve dc propagation delay compensation with topology-aware model`
+- `feat: add continuous runtime propagation delay compensation`
 
 ### M8 CLI、文档与最终集成 — ⚠️ CLI stub，文档已有初版
 

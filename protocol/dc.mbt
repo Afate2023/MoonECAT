@@ -20,6 +20,14 @@ let dc_sync_start_delay_ns : UInt = 100_000_000U
 let dc_default_static_sync_frames : Int = 2000
 
 ///|
+/// Default smoothing factor numerator for delay update: new =
+/// (old * (dc_delay_smoothing_den - dc_delay_smoothing_num) + measured * dc_delay_smoothing_num) / den.
+let dc_delay_smoothing_num : UInt = 1U
+
+///|
+let dc_delay_smoothing_den : UInt = 4U
+
+///|
 /// Result of DC initialization.
 pub(all) struct DcInitResult {
   reference_station : UInt
@@ -255,4 +263,42 @@ pub fn[N : @hal.Nic] dc_configure_linear(
 
   dc_static_sync(nic, reference_station, static_sync_iterations, timeout)
   Some({ reference_station, configured_count: stations.length() })
+}
+
+///|
+/// Re-estimate and update propagation delay during runtime.
+/// This closes the loop for ETG.1500 #1102 by periodically updating 0x0928.
+pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(
+  nic : N,
+  reference_station : UInt,
+  stations : Array[UInt],
+  timeout : @hal.Duration,
+  smoothing_num? : UInt = dc_delay_smoothing_num,
+  smoothing_den? : UInt = dc_delay_smoothing_den,
+) -> Unit raise @hal.EcError {
+  if stations.length() == 0 {
+    return
+  }
+  dc_latch_times(nic, timeout)
+  let reference_time = dc_read_receive_time(nic, reference_station, timeout)
+
+  for station in stations {
+    let recv_time = dc_read_receive_time(nic, station, timeout)
+    let measured = abs_diff_u32(recv_time, reference_time)
+    let old_pdu = read_register_fp(nic, station, reg_dc_system_delay, 4, timeout)
+    let old_delay = le_u32(old_pdu.data)
+    let blended = if smoothing_den == 0U {
+      measured
+    } else {
+      let keep = smoothing_den - smoothing_num
+      ((old_delay * keep) + (measured * smoothing_num)) / smoothing_den
+    }
+    let _ = write_register_fp(
+      nic,
+      station,
+      reg_dc_system_delay,
+      write_u32(blended),
+      timeout,
+    )
+  }
 }

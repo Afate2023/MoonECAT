@@ -7,6 +7,7 @@ test "Telemetry initializes to zero" {
   assert_eq(t.timeouts, 0L)
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
+  assert_eq(t.dc_delay_updates, 0L)
 }
 
 ///|
@@ -311,6 +312,7 @@ test "Recovery: Telemetry reset clears all counters" {
   t.timeouts = 5L
   t.retries = 3L
   t.wkc_errors = 10L
+  t.dc_delay_updates = 8L
   t.reset()
   assert_eq(t.cycles, 0L)
   assert_eq(t.tx_frames, 0L)
@@ -318,6 +320,7 @@ test "Recovery: Telemetry reset clears all counters" {
   assert_eq(t.timeouts, 0L)
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
+  assert_eq(t.dc_delay_updates, 0L)
 }
 
 ///|
@@ -912,6 +915,7 @@ test "RunReport format with cycles and telemetry" {
     retries: 1L,
     wkc_errors: 3L,
     irq_events: 4L,
+    dc_delay_updates: 2L,
   }
   let report : @runtime.RunReport = {
     scan: { slave_count: 2, slaves: [] },
@@ -927,7 +931,28 @@ test "RunReport format with cycles and telemetry" {
   assert_true(text.contains("tx=100"))
   assert_true(text.contains("timeouts=2"))
   assert_true(text.contains("irq_events=4"))
+  assert_true(text.contains("dc_delay_updates=2"))
   assert_true(text.contains("wkc_errors=3"))
+}
+
+///|
+test "DcSync: periodic delay re-estimation updates telemetry" {
+  let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x1000U)
+  rt.configure_pdo(ctx, 0U)
+  let nic = @mock.MockNic::new()
+  ignore(rt.init_dc(nic, [0x1001U], @hal.Duration(1000L)))
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
+  let _ = rt.run_cycles(nic, 105, @hal.Duration(1000L))
+  let t = rt.get_telemetry()
+  assert_true(t.dc_delay_updates >= 1L)
 }
 
 ///|

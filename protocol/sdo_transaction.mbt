@@ -251,38 +251,50 @@ pub fn[N : @hal.Nic] sdo_info_get_od_list(
   let req = @mailbox.build_sdo_info_get_od_list_request(
     counter, station, list_type,
   )
-  mailbox_send(nic, station, mb_config, req, timeout)
+  let payload = sdo_info_collect_payload(
+    nic, station, mb_config, rmsm, req, b'\x02', 2, timeout, "Get OD List",
+  )
+  @mailbox.decode_sdo_info_od_list_payload(payload)
+}
 
-  let acc = @buffer.new(size_hint=64)
-  let mut first = true
-  let mut done = false
-  while not(done) {
-    let raw = mailbox_recv(nic, station, mb_config, timeout)
-    let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
-    let _ = rmsm.validate_response(mbh.counter)
-    if info.opcode != b'\x02' {
-      raise @hal.EcError::MailboxProtocol(
-        "SDO Info: expected Get OD List response opcode",
-      )
-    }
-    let payload = if first {
-      first = false
-      if info.payload.length() < 2 {
-        raise @hal.EcError::MailboxProtocol(
-          "SDO Info: OD list response missing list type",
-        )
-      }
-      Bytes::makei(info.payload.length() - 2, fn(i) { info.payload[i + 2] })
-    } else {
-      info.payload
-    }
-    for b in payload {
-      acc.write_byte(b)
-    }
-    done = not(info.incomplete)
-  }
+///|
+/// Read SDO Info Get OD (object description) for one object index.
+pub fn[N : @hal.Nic] sdo_info_get_od_description(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  timeout : @hal.Duration,
+) -> @mailbox.SdoInfoObjectDescription raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let req = @mailbox.build_sdo_info_get_od_request(counter, station, index)
+  let payload = sdo_info_collect_payload(
+    nic, station, mb_config, rmsm, req, b'\x04', 0, timeout, "Get OD",
+  )
+  @mailbox.decode_sdo_info_od_description_payload(payload)
+}
 
-  @mailbox.decode_sdo_info_od_list_payload(acc.to_bytes())
+///|
+/// Read SDO Info Get OE (entry description) for one object entry.
+pub fn[N : @hal.Nic] sdo_info_get_oe_description(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  value_info : Byte,
+  timeout : @hal.Duration,
+) -> @mailbox.SdoInfoEntryDescription raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let req = @mailbox.build_sdo_info_get_oe_request(
+    counter, station, index, subindex, value_info,
+  )
+  let payload = sdo_info_collect_payload(
+    nic, station, mb_config, rmsm, req, b'\x06', 0, timeout, "Get OE",
+  )
+  @mailbox.decode_sdo_info_oe_description_payload(payload)
 }
 
 ///|
@@ -412,4 +424,54 @@ fn[N : @hal.Nic] sdo_download_segmented(
     offset += chunk_len
     toggle = not(toggle)
   }
+}
+
+///|
+fn[N : @hal.Nic] sdo_info_collect_payload(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  request_frame : Bytes,
+  expected_opcode : Byte,
+  first_fragment_skip : Int,
+  timeout : @hal.Duration,
+  context : String,
+) -> Bytes raise @hal.EcError {
+  mailbox_send(nic, station, mb_config, request_frame, timeout)
+  let acc = @buffer.new(size_hint=64)
+  let mut first = true
+  let mut done = false
+  while not(done) {
+    let raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
+    let _ = rmsm.validate_response(mbh.counter)
+    if info.opcode != expected_opcode {
+      raise @hal.EcError::MailboxProtocol(
+        "SDO Info " +
+        context +
+        ": unexpected opcode " +
+        info.opcode.to_int().to_string(),
+      )
+    }
+    let payload = if first && first_fragment_skip > 0 {
+      first = false
+      if info.payload.length() < first_fragment_skip {
+        raise @hal.EcError::MailboxProtocol(
+          "SDO Info " + context + ": payload too short",
+        )
+      }
+      Bytes::makei(info.payload.length() - first_fragment_skip, fn(i) {
+        info.payload[first_fragment_skip + i]
+      })
+    } else {
+      first = false
+      info.payload
+    }
+    for b in payload {
+      acc.write_byte(b)
+    }
+    done = not(info.incomplete)
+  }
+  acc.to_bytes()
 }

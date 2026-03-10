@@ -802,6 +802,32 @@ test "build_sdo_info_get_od_list_request encodes mailbox and opcode" {
 }
 
 ///|
+test "build_sdo_info_get_od_request encodes index and opcode" {
+  let frame = @mailbox.build_sdo_info_get_od_request(b'\x04', 0x1001U, 0x1C13U)
+  assert_eq(frame.length(), 14)
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_eq(mbh.length, 8U)
+  assert_eq(frame[8], b'\x03')
+  assert_eq(frame[12], b'\x13')
+  assert_eq(frame[13], b'\x1C')
+}
+
+///|
+test "build_sdo_info_get_oe_request encodes subindex and value_info" {
+  let frame = @mailbox.build_sdo_info_get_oe_request(
+    b'\x05', 0x1001U, 0x1A00U, b'\x02', b'\x07',
+  )
+  assert_eq(frame.length(), 16)
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_eq(mbh.length, 10U)
+  assert_eq(frame[8], b'\x05')
+  assert_eq(frame[12], b'\x00')
+  assert_eq(frame[13], b'\x1A')
+  assert_eq(frame[14], b'\x02')
+  assert_eq(frame[15], b'\x07')
+}
+
+///|
 test "decode_sdo_info_response parses header and payload" {
   let mbh : @mailbox.MailboxHeader = {
     length: 10U, // 2 + 4 + 4 payload
@@ -855,6 +881,32 @@ test "decode_sdo_info_od_list_payload parses little-endian indices" {
   assert_eq(indices[0], 0x1000U)
   assert_eq(indices[1], 0x1C13U)
   assert_eq(indices[2], 0x1A00U)
+}
+
+///|
+test "decode_sdo_info_od_description_payload parses fixed fields and name" {
+  let desc = @mailbox.decode_sdo_info_od_description_payload(
+    b"\x13\x1C\x07\x00\x03\x09MapPDO",
+  )
+  assert_eq(desc.index, 0x1C13U)
+  assert_eq(desc.data_type, 0x0007U)
+  assert_eq(desc.max_subindex, b'\x03')
+  assert_eq(desc.object_code, b'\x09')
+  assert_eq(desc.name, "MapPDO")
+}
+
+///|
+test "decode_sdo_info_oe_description_payload parses fields and name" {
+  let entry = @mailbox.decode_sdo_info_oe_description_payload(
+    b"\x00\x1A\x02\x07\x05\x00\x10\x00\x3F\x00Entry2",
+  )
+  assert_eq(entry.index, 0x1A00U)
+  assert_eq(entry.subindex, b'\x02')
+  assert_eq(entry.value_info, b'\x07')
+  assert_eq(entry.data_type, 0x0005U)
+  assert_eq(entry.bit_length, 0x0010U)
+  assert_eq(entry.access, 0x003FU)
+  assert_eq(entry.name, "Entry2")
 }
 
 // ========== MailboxConfig Tests ==========
