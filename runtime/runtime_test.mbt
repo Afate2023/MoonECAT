@@ -90,6 +90,45 @@ test "Runtime configure_pdo sets context" {
 }
 
 ///|
+/// TimeoutNic is a deterministic test double that always times out on recv.
+pub struct TimeoutNic {
+  mut is_open : Bool
+}
+
+///|
+fn TimeoutNic::new() -> TimeoutNic {
+  { is_open: true }
+}
+
+///|
+pub impl @hal.Nic for TimeoutNic with open_(name) {
+  ignore(name)
+  TimeoutNic::new()
+}
+
+///|
+pub impl @hal.Nic for TimeoutNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for TimeoutNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  raise @hal.EcError::RecvTimeout
+}
+
+///|
+pub impl @hal.Nic for TimeoutNic with close(self) {
+  self.is_open = false
+}
+
+///|
 test "Runtime init_dc disabled keeps state Disabled" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
@@ -228,6 +267,48 @@ test "Free-run: run_cycles executes multiple cycles" {
   assert_eq(t.tx_frames, 10L)
   assert_eq(t.rx_frames, 10L)
   assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Recovery: run_cycles records RecvTimeout and continues" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = TimeoutNic::new()
+  let success = rt.run_cycles(nic, 4, @hal.Duration(1000L))
+  assert_eq(success, 0)
+  let t = rt.get_telemetry()
+  assert_eq(t.timeouts, 4L)
+  assert_eq(t.cycles, 4L)
+  assert_eq(t.rx_frames, 0L)
+  assert_true(not(rt.needs_recovery()))
+}
+
+///|
+test "Runtime run_cycle propagates LinkDown on broken NIC" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = TimeoutNic::new()
+  nic.close()
+  let result = try? rt.run_cycle(nic, @hal.Duration(1000L))
+  assert_true(result is Err(@hal.EcError::LinkDown))
 }
 
 ///|

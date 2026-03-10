@@ -383,7 +383,10 @@
 ### 状态机死锁
 
 - [x] 覆盖 Init、PreOp、SafeOp、Op 以及错误回退路径。
-- [ ] 覆盖超时、重试、链路异常和配置不一致场景。
+- [x] 覆盖超时、重试、链路异常和配置不一致场景。
+  - ✅ 超时/链路异常: [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Recovery: run_cycles records RecvTimeout and continues` + `Runtime run_cycle propagates LinkDown on broken NIC`
+  - ✅ 配置不一致: [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `run with mock loopback: validation fails when slaves expected but not found`
+  - ✅ 重试边界: [mailbox/mailbox_test.mbt](mailbox/mailbox_test.mbt) `Rmsm record_timeout allows retries up to max`
 - [ ] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
 
 ## 7. 30 天启动清单 — ✅ 已完成
@@ -404,7 +407,8 @@
 剩余高优先任务（按依赖顺序）：
 
 1. **热路径分配与压力回归**：聚焦 PDO/mailbox 主循环的分配与抖动观测。
-2. **异常场景覆盖**：补超时、重试、链路异常、配置不一致场景。
+2. **PDO 与 mailbox 解耦检查**：验证主循环与邮箱推进在异常路径下仍保持边界清晰。
+3. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
 
 ## 10. 提交执行方式
 
