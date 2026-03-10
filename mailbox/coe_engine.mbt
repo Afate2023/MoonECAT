@@ -163,6 +163,14 @@ pub(all) struct SdoResponse {
   subindex : Byte
   command : SdoCommand
   data : Bytes
+  /// True when this response is part of segmented transfer.
+  segmented : Bool
+  /// Toggle bit used by segmented transfer.
+  toggle : Bool
+  /// True when this is the last segmented frame.
+  last_segment : Bool
+  /// Total transfer size if provided by initiate upload response.
+  complete_size : UInt?
 } derive(Eq, Show)
 
 ///|
@@ -222,10 +230,18 @@ fn SdoCommand::to_coe_service(self : SdoCommand) -> CoeService {
 pub fn decode_sdo_response(
   data : Bytes,
 ) -> (MailboxHeader, SdoResponse) raise @hal.EcError {
-  if data.length() < mailbox_header_len + coe_header_len + sdo_header_len {
+  if data.length() < mailbox_header_len + coe_header_len + 1 {
     raise @hal.EcError::MailboxProtocol("SDO response frame too short")
   }
   let mbh = MailboxHeader::from_bytes(data)
+  let payload_len = mbh.length.reinterpret_as_int()
+  if payload_len < coe_header_len + 1 {
+    raise @hal.EcError::MailboxProtocol("SDO response payload too short")
+  }
+  let frame_len = mailbox_header_len + payload_len
+  if data.length() < frame_len {
+    raise @hal.EcError::MailboxProtocol("SDO response truncated")
+  }
   // Verify it's a CoE mailbox
   if mbh.mb_type != CoE {
     raise @hal.EcError::MailboxProtocol(
@@ -233,25 +249,126 @@ pub fn decode_sdo_response(
     )
   }
   let off = mailbox_header_len
+  let sdo_payload_len = payload_len - coe_header_len
   // CoE header
   let coe_word = data[off].to_uint() | (data[off + 1].to_uint() << 8)
   let svc_field = (coe_word >> 12) & 0xFU
   let _svc = coe_service_from_uint(svc_field)
   // SDO header
   let sdo_off = off + coe_header_len
-  let cmd = sdo_command_from_byte(data[sdo_off])
-  let index = data[sdo_off + 1].to_uint() | (data[sdo_off + 2].to_uint() << 8)
-  let subindex = data[sdo_off + 3]
-  let sdo_data = Bytes::makei(4, fn(i) { data[sdo_off + 4 + i] })
-  // Check for abort
-  if cmd == AbortTransfer {
-    let abort_code = sdo_data[0].to_uint() |
-      (sdo_data[1].to_uint() << 8) |
-      (sdo_data[2].to_uint() << 16) |
-      (sdo_data[3].to_uint() << 24)
+  let cmd_byte = data[sdo_off]
+
+  // Abort transfer response
+  if cmd_byte == b'\x80' {
+    if sdo_payload_len < 8 {
+      raise @hal.EcError::MailboxProtocol("SDO abort payload too short")
+    }
+    let abort_off = sdo_off + 4
+    let abort_code = data[abort_off].to_uint() |
+      (data[abort_off + 1].to_uint() << 8) |
+      (data[abort_off + 2].to_uint() << 16) |
+      (data[abort_off + 3].to_uint() << 24)
     raise @hal.EcError::SdoAbort(abort_code)
   }
-  let resp : SdoResponse = { index, subindex, command: cmd, data: sdo_data }
+
+  // Segmented upload response: command specifier in bits[7:5] = 000
+  if (cmd_byte & b'\xE0') == b'\x00' {
+    let toggle = (cmd_byte & b'\x10') != b'\x00'
+    let n_unused = ((cmd_byte >> 1) & b'\x07').to_int()
+    let last = (cmd_byte & b'\x01') != b'\x00'
+    let payload_after_cmd = sdo_payload_len - 1
+    let seg_len = if payload_after_cmd > 7 - n_unused {
+      7 - n_unused
+    } else {
+      payload_after_cmd
+    }
+    let seg_data = if seg_len > 0 {
+      Bytes::makei(seg_len, fn(i) { data[sdo_off + 1 + i] })
+    } else {
+      Bytes::new(0)
+    }
+    let resp : SdoResponse = {
+      index: 0U,
+      subindex: b'\x00',
+      command: UploadResponse,
+      data: seg_data,
+      segmented: true,
+      toggle,
+      last_segment: last,
+      complete_size: None,
+    }
+    return (mbh, resp)
+  }
+
+  let cmd = sdo_command_from_byte(cmd_byte)
+
+  if sdo_payload_len < sdo_header_len {
+    raise @hal.EcError::MailboxProtocol("SDO response header too short")
+  }
+  let index = data[sdo_off + 1].to_uint() | (data[sdo_off + 2].to_uint() << 8)
+  let subindex = data[sdo_off + 3]
+
+  // Initiate upload response: command specifier bits[7:5] = 010
+  if cmd == UploadResponse {
+    let expedited = (cmd_byte & b'\x02') != b'\x00'
+    let size_indicated = (cmd_byte & b'\x01') != b'\x00'
+    if expedited {
+      let n_unused = ((cmd_byte >> 2) & b'\x03').to_int()
+      let data_len = 4 - n_unused
+      let resp_data = Bytes::makei(data_len, fn(i) { data[sdo_off + 4 + i] })
+      let resp : SdoResponse = {
+        index,
+        subindex,
+        command: UploadResponse,
+        data: resp_data,
+        segmented: false,
+        toggle: false,
+        last_segment: true,
+        complete_size: None,
+      }
+      return (mbh, resp)
+    }
+
+    let complete_size = if size_indicated {
+      Some(
+        data[sdo_off + 4].to_uint() |
+        (data[sdo_off + 5].to_uint() << 8) |
+        (data[sdo_off + 6].to_uint() << 16) |
+        (data[sdo_off + 7].to_uint() << 24),
+      )
+    } else {
+      None
+    }
+    let extra_len = sdo_payload_len - sdo_header_len
+    let extra_data = if extra_len > 0 {
+      Bytes::makei(extra_len, fn(i) { data[sdo_off + sdo_header_len + i] })
+    } else {
+      Bytes::new(0)
+    }
+    let resp : SdoResponse = {
+      index,
+      subindex,
+      command: UploadResponse,
+      data: extra_data,
+      segmented: true,
+      toggle: false,
+      last_segment: false,
+      complete_size,
+    }
+    return (mbh, resp)
+  }
+
+  let sdo_data = Bytes::makei(4, fn(i) { data[sdo_off + 4 + i] })
+  let resp : SdoResponse = {
+    index,
+    subindex,
+    command: cmd,
+    data: sdo_data,
+    segmented: false,
+    toggle: false,
+    last_segment: true,
+    complete_size: None,
+  }
   (mbh, resp)
 }
 
@@ -316,4 +433,39 @@ pub fn build_sdo_upload(
       complete_access: false,
     },
   }
+}
+
+///|
+/// Build an SDO Upload Segment request frame.
+/// Toggle bit alternates on each segment round-trip.
+pub fn build_sdo_upload_segment_request(
+  counter : Byte,
+  station : UInt,
+  toggle : Bool,
+) -> Bytes {
+  let buf = @buffer.new(
+    size_hint=mailbox_header_len + coe_header_len + sdo_header_len,
+  )
+  let data_len = coe_header_len + sdo_header_len
+  let mbh : MailboxHeader = {
+    length: data_len.reinterpret_as_uint(),
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: CoE,
+    counter,
+  }
+  let hdr_bytes = mbh.to_bytes()
+  for i in 0..<hdr_bytes.length() {
+    buf.write_byte(hdr_bytes[i])
+  }
+  let coe_word = 2U << 12
+  buf.write_byte((coe_word & 0xFFU).to_byte())
+  buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
+  let cmd = if toggle { b'\x70' } else { b'\x60' }
+  buf.write_byte(cmd)
+  for _i in 0..<7 {
+    buf.write_byte(b'\x00')
+  }
+  buf.to_bytes()
 }

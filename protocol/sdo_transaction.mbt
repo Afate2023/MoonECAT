@@ -78,7 +78,58 @@ pub fn[N : @hal.Nic] sdo_upload(
       "SDO upload: index/subindex mismatch in response",
     )
   }
-  resp.data
+  if not(resp.segmented) {
+    return resp.data
+  }
+
+  // Segmented upload: collect all upload segment responses.
+  let acc = @buffer.new(
+    size_hint=match resp.complete_size {
+      Some(sz) => sz.reinterpret_as_int()
+      None => 64
+    },
+  )
+  for b in resp.data {
+    acc.write_byte(b)
+  }
+
+  let mut current = resp
+  let mut toggle = false
+  while not(current.last_segment) {
+    let seg_counter = rmsm.begin_transaction()
+    let seg_req = @mailbox.build_sdo_upload_segment_request(
+      seg_counter, station, toggle,
+    )
+    mailbox_send(nic, station, mb_config, seg_req, timeout)
+    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
+    let _ = rmsm.validate_response(seg_mbh.counter)
+    if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
+      not(seg_resp.segmented) {
+      raise @hal.EcError::MailboxProtocol(
+        "SDO upload: expected segmented UploadResponse",
+      )
+    }
+    if seg_resp.toggle != toggle {
+      raise @hal.EcError::MailboxProtocol("SDO upload: segment toggle mismatch")
+    }
+    for b in seg_resp.data {
+      acc.write_byte(b)
+    }
+    current = seg_resp
+    toggle = not(toggle)
+  }
+
+  let out = acc.to_bytes()
+  match current.complete_size {
+    Some(sz) =>
+      if out.length() >= sz.reinterpret_as_int() {
+        Bytes::makei(sz.reinterpret_as_int(), fn(i) { out[i] })
+      } else {
+        out
+      }
+    None => out
+  }
 }
 
 ///|

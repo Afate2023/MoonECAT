@@ -34,7 +34,7 @@
 | 404 | Mailbox polling | shall | ✅ | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | mailbox_poll SM status bit 检查 |
 | **CoE (5.7)** | | | | | |
 | 501 | SDO Up/Download (normal + expedited) | shall | ✅ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | sdo_download/upload + retry 事务已闭环 |
-| 502 | Segmented Transfer | should | ❌ | — | |
+| 502 | Segmented Transfer | should | ⚠️ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt), [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已支持分段上传拼接；分段下载待补 |
 | 503 | Complete Access | should (shall if ENI) | ❌ | — | |
 | 504 | SDO Info service | should | ❌ | — | |
 | 505 | Emergency Message | shall | ✅ | [mailbox/emergency.mbt](mailbox/emergency.mbt) | decode_emergency/decode_emergency_frame |
@@ -183,6 +183,9 @@
 - [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
   - ✅ [mailbox/emergency.mbt](mailbox/emergency.mbt): decode_emergency/decode_emergency_frame
 - [ ] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
+  - ✅ [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt): 分段上传循环拼接（toggle / last segment）
+  - ✅ [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt): 分段上传起始/分段响应解码
+  - ⏳ 仍缺：分段下载请求/响应循环
 - [ ] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
 - [ ] SDO Info Service [ETG.1500 #504 should]
 

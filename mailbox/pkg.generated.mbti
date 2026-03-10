@@ -10,6 +10,8 @@ pub fn build_sdo_download(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
 pub fn build_sdo_upload(Byte, UInt, UInt, Byte) -> SdoTransaction
 
+pub fn build_sdo_upload_segment_request(Byte, UInt, Bool) -> Bytes
+
 pub fn calculate_fmmu_configs(Array[FmmuDirection], Array[SmConfig], UInt) -> (Array[FmmuConfig], Int, Int)
 
 pub fn calculate_slave_mapping(Bytes, UInt) -> SlaveMapping raise @hal.EcError
@@ -177,6 +179,10 @@ pub(all) struct SdoResponse {
   subindex : Byte
   command : SdoCommand
   data : Bytes
+  segmented : Bool
+  toggle : Bool
+  last_segment : Bool
+  complete_size : UInt?
 }
 pub impl Eq for SdoResponse
 pub impl Show for SdoResponse

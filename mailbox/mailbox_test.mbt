@@ -545,6 +545,84 @@ test "decode_sdo_response roundtrip with download response" {
   assert_eq(resp.index, 0x6040U)
   assert_eq(resp.subindex, b'\x00')
   assert_eq(resp.command, @mailbox.SdoCommand::DownloadResponse)
+  assert_true(not(resp.segmented))
+}
+
+///|
+test "decode_sdo_response supports initiate segmented upload response" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x01',
+  }
+  let hdr = mbh.to_bytes()
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30' // CoE SdoResponse
+    } else if i == 8 {
+      b'\x41' // upload response, non-expedited, size indicated
+    } else if i == 9 {
+      b'\x18' // index lo
+    } else if i == 10 {
+      b'\x10' // index hi
+    } else if i == 11 {
+      b'\x01' // subindex
+    } else if i == 12 {
+      b'\x08' // complete size = 8
+    } else {
+      b'\x00'
+    }
+  })
+  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
+  assert_eq(resp.command, @mailbox.SdoCommand::UploadResponse)
+  assert_true(resp.segmented)
+  assert_true(not(resp.last_segment))
+  assert_true(resp.complete_size is Some(8U))
+}
+
+///|
+test "decode_sdo_response supports upload segment response" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 6U,
+    address: 0x1001U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x02',
+  }
+  let hdr = mbh.to_bytes()
+  let frame = Bytes::makei(12, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30' // CoE SdoResponse
+    } else if i == 8 {
+      b'\x19' // toggle=1, n=4, last=1 => 3 bytes payload
+    } else if i == 9 {
+      b'\xAA'
+    } else if i == 10 {
+      b'\xBB'
+    } else if i == 11 {
+      b'\xCC'
+    } else {
+      b'\x00'
+    }
+  })
+  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
+  assert_eq(resp.command, @mailbox.SdoCommand::UploadResponse)
+  assert_true(resp.segmented)
+  assert_true(resp.toggle)
+  assert_true(resp.last_segment)
+  assert_eq(resp.data, b"\xAA\xBB\xCC")
 }
 
 ///|
@@ -624,6 +702,18 @@ test "build_sdo_upload creates correct request" {
   assert_eq(txn.request.command, @mailbox.SdoCommand::UploadRequest)
   assert_eq(txn.request.data.length(), 0)
   assert_eq(txn.request.complete_access, false)
+}
+
+///|
+test "build_sdo_upload_segment_request encodes toggle bit" {
+  let frame0 = @mailbox.build_sdo_upload_segment_request(
+    b'\x02', 0x1001U, false,
+  )
+  let frame1 = @mailbox.build_sdo_upload_segment_request(b'\x03', 0x1001U, true)
+  assert_eq(frame0.length(), 16)
+  assert_eq(frame1.length(), 16)
+  assert_eq(frame0[8], b'\x60')
+  assert_eq(frame1[8], b'\x70')
 }
 
 // ========== MailboxConfig Tests ==========
