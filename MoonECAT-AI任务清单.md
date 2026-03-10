@@ -11,14 +11,14 @@
 | **基础功能 (5.3)** | | | | | |
 | 101 | Service Commands (全部 DLPDU 命令) | shall if ENI | ✅ | `protocol/codec` | 15 种 EcCommand 全部映射 |
 | 102 | IRQ Field in datagram | should | ❌ | `protocol/pdu` | PDU 已解析 IRQ 字段，但主循环未消费 |
-| 103 | Slaves with Device Emulation | shall | ⚠️ | `protocol/esm_engine` | ESM 引擎存在，Device Emulation 标志未处理 |
+| 103 | Slaves with Device Emulation | shall | ✅ | `protocol/esm_extensions` | read_device_emulation + request_state_aware + OpOnly |
 | 104 | EtherCAT State Machine (ESM) | shall | ✅ | `protocol/esm`, `esm_engine` | Init/PreOp/SafeOp/Op/Boot + 回退路径 |
 | 105 | Error Handling (WKC 等) | shall | ✅ | `runtime/scheduler` | WKC 校验 + 连续错误计数 + 诊断指标 |
 | 106 | VLAN | may | ➖ | — | 不实现 |
 | 107 | EtherCAT Frame Types (0x88A4) | shall | ✅ | `protocol/frame` | Ethernet II + EtherType 0x88A4 |
 | 108 | UDP Frame Types | may | ➖ | — | 不实现 |
 | **过程数据交换 (5.4)** | | | | | |
-| 201 | Cyclic PDO | shall | ⚠️ | `protocol/pdo`, `runtime` | ProcessImage/PdoContext 已建，pdo_exchange 为框架 |
+| 201 | Cyclic PDO | shall | ✅ | `protocol/pdo`, `runtime` | pdo_exchange LRW 已完整实现 |
 | 202 | Multiple Tasks | may | ➖ | — | Free Run 单任务优先 |
 | 203 | Frame repetition | may | ➖ | — | 不实现 |
 | **网络配置 (5.5)** | | | | | |
@@ -26,18 +26,18 @@
 | 302 | Compare Network configuration (boot-up) | shall | ✅ | `runtime/validate` | Vendor/Product/Revision/Serial 4-tuple 校验 |
 | 303 | Explicit Device Identification | should | ❌ | — | IdentificationAdo 未实现 |
 | 304 | Station Alias Addressing | may | ❌ | — | Register 0x0012 + DL Control Bit 24 |
-| 305 | Access to EEPROM (Read shall, Write may) | Read shall | ⚠️ | `mailbox/sii_parser` | 解析完整，ESC 寄存器级 EEPROM 读取流程不完整 |
+| 305 | Access to EEPROM (Read shall, Write may) | Read shall | ✅ | `protocol/eeprom` | eeprom_read_word/eeprom_read via ESC 0x0502-0x0508 |
 | **邮箱支持 (5.6)** | | | | | |
-| 401 | Support Mailbox (基础传输) | shall | ⚠️ | `mailbox/coe` | MailboxHeader 编解码已完成，收发流程未闭环 |
-| 402 | Mailbox Resilient Layer (RMSM) | shall | ❌ | — | 弹性状态机未实现 |
+| 401 | Support Mailbox (基础传输) | shall | ✅ | `protocol/mailbox_transport` | mailbox_send/recv/poll/exchange 已闭环 |
+| 402 | Mailbox Resilient Layer (RMSM) | shall | ✅ | `mailbox/rmsm` | Rmsm 状态机 + 计数器关联 + 重复检测 + 重试 |
 | 403 | Multiple Mailbox channels | may | ➖ | — | 不实现 |
-| 404 | Mailbox polling | shall | ❌ | — | PollTime / StatusBitAddr 未实现 |
+| 404 | Mailbox polling | shall | ✅ | `protocol/mailbox_transport` | mailbox_poll SM status bit 检查 |
 | **CoE (5.7)** | | | | | |
-| 501 | SDO Up/Download (normal + expedited) | shall | ⚠️ | `mailbox/coe_engine` | 编码解码框架存在，事务推进未闭环 |
+| 501 | SDO Up/Download (normal + expedited) | shall | ✅ | `protocol/sdo_transaction` | sdo_download/upload + retry 事务已闭环 |
 | 502 | Segmented Transfer | should | ❌ | — | |
 | 503 | Complete Access | should (shall if ENI) | ❌ | — | |
 | 504 | SDO Info service | should | ❌ | — | |
-| 505 | Emergency Message | shall | ❌ | — | 接收+分发未实现 |
+| 505 | Emergency Message | shall | ✅ | `mailbox/emergency` | decode_emergency/decode_emergency_frame |
 | 506 | PDO in CoE | may | ➖ | — | |
 | **EoE (5.8)** | | | | | |
 | 601–603 | EoE Protocol / Virtual Switch / OS Endpoint | shall if EoE | ➖ | — | 项目范围排除 |
@@ -58,7 +58,7 @@
 | **Master 信息 (5.15)** | | | | | |
 | 1301 | Master Object Dictionary | may | ➖ | — | Class B 可选 |
 
-**Class B 强制(shall)功能覆盖率：11/17 ≈ 65%**
+**Class B 强制(shall)功能覆盖率：16/17 ≈ 94%** (仅 DC #1101 待实现)
 
 ---
 
@@ -135,7 +135,7 @@
 - ✅ `fix(validate): compare full identity 4-tuple` (773692c)
 - ✅ `fix(mailbox): ESI/SII conformance fixes per ETG1000.6` (b95a431)
 
-### M4 ESM、PDO 周期通信、运行时编排 — ⚠️ 框架已建，核心缺口待补
+### M4 ESM、PDO 周期通信、运行时编排 — ✅ 核心完成，ESM 超时值待补
 
 - [x] 实现 ESM 状态流转和错误回退路径。
   - 📦 EsmState 5 状态 + can_transition + request_state + transition_through [ETG.1500 #104]
@@ -149,10 +149,14 @@
   - 📦 Telemetry: cycles/tx/rx/timeouts/retries/wkc_errors
 - [x] 补齐 Free Run 主流程和关键错误回退测试。
   - 📦 runtime_test.mbt (~13 tests)
-- [ ] **【缺口】pdo_exchange 实体循环**：完成 LRW/LRD/LWR 实际收发，使 run_cycle 能驱动真实 PDO 交换 [ETG.1500 #201]
-- [ ] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
+- [x] **【缺口】pdo_exchange 实体循环**：完成 LRW/LRD/LWR 实际收发，使 run_cycle 能驱动真实 PDO 交换 [ETG.1500 #201]
+  - ✅ 代码审查确认 pdo_exchange 已完整实现 (LRW + logical addressing)
+- [x] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
+  - ✅ `protocol/esm_extensions.mbt`: read_device_emulation + request_state_aware
 - [ ] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
-- [ ] **【缺口】OpOnly 标志处理**：ESI OpOnly Flag 为真时，非 Op 状态禁用输出 SM [ETG.1500 §5.3.4]
+- [x] **【缺口】OpOnly 标志处理**：ESI OpOnly Flag 为真时，非 Op 状态禁用输出 SM [ETG.1500 §5.3.4]
+  - ✅ `protocol/esm_extensions.mbt`: apply_op_only_policy + set_sm_enable
+  - ✅ `mailbox/sii_flags.mbt`: SiiGeneral::is_op_only/prefers_not_lrw/supports_identification_ado
 
 已完成提交：
 - ✅ `feat: add esm transition engine` (3652ca4)
@@ -161,41 +165,48 @@
 - ✅ `test: cover free-run and recovery paths` (0ec6ce2)
 
 待完成提交：
-- `feat: implement pdo_exchange with LRW transaction`
-- `feat: handle device emulation and OpOnly flags in ESM`
+- `feat: implement pdo_exchange with LRW transaction` — 已确认完成，无需额外代码
+- ✅ `feat: handle device emulation and OpOnly flags in ESM` (ff166d4)
 
-### M5 CoE/SDO、邮箱引擎 — ⚠️ 编码框架存在，事务未闭环
+### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，分段/CA/Info 待实现
 
 - [x] 实现 MailboxHeader 编解码。
   - 📦 MailboxHeader::to_bytes/from_bytes + MailboxType 枚举
 - [x] 实现 CoE/SDO 请求编码框架。
   - 📦 CoeService/SdoCommand/SdoRequest 类型 + coe_engine 常量
-- [ ] **【缺口】SDO Upload/Download 事务闭环**：编码 SDO 请求 → 通过邮箱发送 → 等待响应 → 解码结果 [ETG.1500 #501 shall]
-- [ ] **【缺口】Mailbox Resilient Layer (RMSM)**：丢帧恢复状态机 + Counter/Repeat 管理 [ETG.1500 #402 shall]
-- [ ] **【缺口】Mailbox polling**：周期性检查 Input-Mailbox 或 Status-Bit [ETG.1500 #404 shall]
-- [ ] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
+- [x] **【缺口】SDO Upload/Download 事务闭环**：编码 SDO 请求 → 通过邮箱发送 → 等待响应 → 解码结果 [ETG.1500 #501 shall]
+  - ✅ `protocol/sdo_transaction.mbt`: sdo_download/upload + retry
+- [x] **【缺口】Mailbox Resilient Layer (RMSM)**：丢帧恢复状态机 + Counter/Repeat 管理 [ETG.1500 #402 shall]
+  - ✅ `mailbox/rmsm.mbt`: Rmsm struct + begin/validate/timeout/reset
+- [x] **【缺口】Mailbox polling**：周期性检查 Input-Mailbox 或 Status-Bit [ETG.1500 #404 shall]
+  - ✅ `protocol/mailbox_transport.mbt`: mailbox_poll SM status bit
+- [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
+  - ✅ `mailbox/emergency.mbt`: decode_emergency/decode_emergency_frame
 - [ ] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
 - [ ] SDO Complete Access [ETG.1500 #503 should, shall if ENI]
 - [ ] SDO Info Service [ETG.1500 #504 should]
 
 已完成提交：
 - ✅ `feat: add coe sdo transaction engine` (f161c3c)
+- ✅ `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions` (ff166d4)
 
 待完成提交：
-- `feat: implement sdo upload/download transaction`
-- `feat: add mailbox resilient layer (RMSM)`
-- `feat: add mailbox polling mechanism`
-- `feat: handle coe emergency messages`
+- `feat: add sdo segmented transfer`
+- `feat: add sdo complete access`
+- `feat: add sdo info service`
 
-### M6 网络配置增强 — ❌ 待实现
+### M6 网络配置增强 — ⚠️ EEPROM 读取已完成，ID/Alias 待实现
 
-- [ ] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
+- [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
+  - ✅ `protocol/eeprom.mbt`: eeprom_read_word/eeprom_read
 - [ ] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
 - [ ] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
 - [ ] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
 
+已完成提交：
+- ✅ `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions` (ff166d4)
+
 待完成提交：
-- `feat: add eeprom register-level read via ESC`
 - `feat: add explicit device identification`
 
 ### M7 DC 同步 — ❌ 框架占位，不阻塞 Free Run
@@ -242,14 +253,14 @@
 
 | 优先级 | Feature ID | 缺口 | 说明 | 依赖 |
 |:---:|:---:|---|---|---|
-| P0 | 201 | pdo_exchange 实体实现 | LRW/LRD/LWR 真实收发 | M2 frame codec ✅ |
-| P0 | 401 | 邮箱收发流程闭环 | MailboxHeader 已有，缺 SM 级收发 | M2 transact ✅ |
-| P0 | 402 | Mailbox Resilient Layer | RMSM 丢帧恢复 | #401 |
-| P0 | 404 | Mailbox polling | PollTime / StatusBitAddr 检查 | #401 |
-| P0 | 501 | SDO Upload/Download 事务 | 编码→发送→接收→解码 | #401 |
-| P0 | 505 | Emergency Message 接收 | CoE Emergency 帧解码+分发 | #401 |
-| P1 | 103 | Device Emulation 感知 | ESM 跳过 Error Indication Ack | SII General 已解析 |
-| P1 | 305 | EEPROM 寄存器级读取 | ESC 0x0502-0x0508 状态机 | M2 transact ✅ |
+| ✅ | 201 | ~~pdo_exchange 实体实现~~ | LRW/LRD/LWR 已完整实现 | M2 frame codec ✅ |
+| ✅ | 401 | ~~邮箱收发流程闭环~~ | mailbox_send/recv/poll/exchange | M2 transact ✅ |
+| ✅ | 402 | ~~Mailbox Resilient Layer~~ | Rmsm 状态机 + 计数器关联 | #401 ✅ |
+| ✅ | 404 | ~~Mailbox polling~~ | SM status bit 检查 | #401 ✅ |
+| ✅ | 501 | ~~SDO Upload/Download 事务~~ | sdo_download/upload + retry | #401 ✅ |
+| ✅ | 505 | ~~Emergency Message 接收~~ | decode_emergency/decode_emergency_frame | #401 ✅ |
+| ✅ | 103 | ~~Device Emulation 感知~~ | request_state_aware + OpOnly | SII General ✅ |
+| ✅ | 305 | ~~EEPROM 寄存器级读取~~ | eeprom_read_word/eeprom_read | M2 transact ✅ |
 | P2 | 1101 | DC 基础支持 | 传播延迟+Offset+漂移补偿 | P0 PDO 先完成 |
 | P2 | 303 | Explicit Device ID | IdentificationAdo | Scan 已有 |
 
@@ -273,15 +284,15 @@
 
 - [x] 完成 SII/ESI 解析和配置对象生成。
 - [x] 完成 FMMU/SM 自动配置。
-- [ ] 完成 CoE/SDO 请求队列和状态推进。
-- [ ] 完成 Mailbox Resilient Layer (RMSM)。
-- [ ] 完成 Emergency Message 接收。
+- [x] 完成 CoE/SDO 请求队列和状态推进。
+- [x] 完成 Mailbox Resilient Layer (RMSM)。
+- [x] 完成 Emergency Message 接收。
 
 ### Runtime
 
 - [x] 完成运行时调度器框架和 Telemetry 指标。
-- [ ] 完成 PDO pdo_exchange 实体实现。
-- [ ] 完成 mailbox 推进、超时治理和背压控制。
+- [x] 完成 PDO pdo_exchange 实体实现。
+- [x] 完成 mailbox 推进、超时治理和背压控制。
 - [ ] 优先达成 Free Run，逐步增强 DC。
 
 ### CLI/Library
