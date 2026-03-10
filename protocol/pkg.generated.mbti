@@ -47,6 +47,8 @@ pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(N, UInt, Array[UInt], @hal
 
 pub fn[N : @hal.Nic] dc_static_sync(N, UInt, Int, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn default_esm_timeout_policy() -> EsmTimeoutPolicy
+
 pub let default_master_mac : FixedArray[Byte]
 
 pub let dl_control_alias_enable_bit : Int
@@ -60,6 +62,10 @@ pub fn[N : @hal.Nic] eeprom_read(N, UInt, UInt, Int, @hal.Duration) -> Bytes rai
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn esm_default_timeout(EsmState) -> @hal.Duration
+
+pub fn esm_timeout_for(EsmState, EsmTimeoutPolicy) -> @hal.Duration
 
 pub let ethernet_header_len : Int
 
@@ -197,6 +203,8 @@ pub fn[N : @hal.Nic] transact_pdu_retry(N, EcCommand, UInt, Bytes, @hal.Duration
 
 pub fn[N : @hal.Nic] transition_through(N, UInt, Array[EsmState], @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] transition_through_with_timeout_policy(N, UInt, Array[EsmState], EsmTimeoutPolicy) -> EsmState raise @hal.EcError
+
 pub let wkc_len : Int
 
 pub fn write_command(AddressType) -> EcCommand
@@ -276,6 +284,16 @@ pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
 pub impl Eq for EsmState
 pub impl Show for EsmState
+
+pub(all) struct EsmTimeoutPolicy {
+  init : @hal.Duration?
+  preop : @hal.Duration?
+  safeop : @hal.Duration?
+  op : @hal.Duration?
+  boot : @hal.Duration?
+}
+pub impl Eq for EsmTimeoutPolicy
+pub impl Show for EsmTimeoutPolicy
 
 pub(all) struct FrameBuilder {
   mut next_index : Int

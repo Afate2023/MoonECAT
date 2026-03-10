@@ -815,6 +815,54 @@ test "read_al_status_code via mock" {
 }
 
 ///|
+test "ESM default timeout values by target state" {
+  assert_eq(
+    @protocol.esm_default_timeout(@protocol.EsmState::Init),
+    @hal.Duration(5_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_default_timeout(@protocol.EsmState::PreOp),
+    @hal.Duration(3_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_default_timeout(@protocol.EsmState::SafeOp),
+    @hal.Duration(10_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_default_timeout(@protocol.EsmState::Op),
+    @hal.Duration(10_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_default_timeout(@protocol.EsmState::Boot),
+    @hal.Duration(5_000_000_000L),
+  )
+}
+
+///|
+test "ESM timeout policy uses override then default" {
+  let policy : @protocol.EsmTimeoutPolicy = {
+    init: Some(@hal.Duration(9L)),
+    preop: None,
+    safeop: Some(@hal.Duration(11L)),
+    op: None,
+    boot: None,
+  }
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.EsmState::Init, policy),
+    @hal.Duration(9L),
+  )
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.EsmState::SafeOp, policy),
+    @hal.Duration(11L),
+  )
+  // No override for PreOp -> falls back to default policy.
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.EsmState::PreOp, policy),
+    @protocol.esm_default_timeout(@protocol.EsmState::PreOp),
+  )
+}
+
+///|
 test "ProcessImage construction" {
   let img = @protocol.ProcessImage::new(32, 16)
   assert_eq(img.output_size, 32)
