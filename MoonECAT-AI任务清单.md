@@ -394,6 +394,7 @@
   - ✅ commit: `bc33a9f` `test(runtime): cover timeout and link-down recovery paths`
 - [x] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Decoupling: mailbox diagnosis failure does not block PDO run loop`
+  - ✅ commit: `5f1e012` `test(runtime): verify mailbox and PDO path decoupling`
 
 ## 7. 30 天启动清单 — ✅ 已完成
 
