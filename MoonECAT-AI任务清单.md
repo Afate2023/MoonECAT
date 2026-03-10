@@ -153,7 +153,9 @@
   - ✅ 代码审查确认 pdo_exchange 已完整实现 (LRW + logical addressing)
 - [x] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
   - ✅ [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) : read_device_emulation + request_state_aware
-- [ ] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
+- [x] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
+  - ✅ [protocol/esm_engine.mbt](protocol/esm_engine.mbt): `EsmTimeoutPolicy` + `esm_default_timeout` + `esm_timeout_for` + `transition_through_with_timeout_policy`
+  - ✅ 参考实现映射：SOEM `ecx_statecheck(..., EC_TIMEOUTSTATE)`（全局状态超时）、ethercrab `Timeouts::state_transition`（统一状态迁移超时）、gatorcat `init/preop/safeop/op` 分态超时参数
 - [x] **【缺口】OpOnly 标志处理**：ESI OpOnly Flag 为真时，非 Op 状态禁用输出 SM [ETG.1500 §5.3.4]
   - ✅ [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) : apply_op_only_policy + set_sm_enable
   - ✅ [mailbox/sii_flags.mbt](mailbox/sii_flags.mbt) : SiiGeneral::is_op_only/prefers_not_lrw/supports_identification_ado
@@ -164,6 +166,7 @@
 - `运行时调度与 telemetry` → `e5886a4` `feat: add runtime scheduler and telemetry`
 - `Free Run 与恢复路径测试` → `0ec6ce2` `test: cover free-run and recovery paths`
 - `Device Emulation + OpOnly 扩展` → `ff166d4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
+- `ESM 超时策略（默认值 + 可覆盖策略）` → `394a457` `feat(protocol): add ESM timeout policy and defaults`
 
 ### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，含分段/CA/Info
 
