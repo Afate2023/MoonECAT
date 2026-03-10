@@ -1290,3 +1290,49 @@ test "diagnosis parser: u32 rejects short payload" {
   let result = try? @runtime.parse_u32_payload(b"\x01\x02\x03")
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
+
+///|
+test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+
+  // PDO path works before mailbox diagnosis call.
+  let before = rt.run_cycles(nic, 2, @hal.Duration(1000L))
+  assert_eq(before, 2)
+
+  let bad_cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 8U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  let mailbox_result = try? @protocol.mailbox_send(
+    nic,
+    0x1001U,
+    bad_cfg,
+    Bytes::new(16),
+    @hal.Duration(1000L),
+  )
+  // Mailbox path is expected to fail immediately; critical check is that PDO
+  // loop remains usable afterwards.
+  assert_true(mailbox_result is Err(@hal.EcError::MailboxProtocol(_)))
+
+  let after = rt.run_cycles(nic, 3, @hal.Duration(1000L))
+  assert_eq(after, 3)
+  let t = rt.get_telemetry()
+  assert_eq(t.cycles, 5L)
+  assert_eq(t.timeouts, 0L)
+  assert_eq(t.wkc_errors, 0L)
+}

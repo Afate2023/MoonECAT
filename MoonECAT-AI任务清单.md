@@ -392,7 +392,8 @@
   - ✅ 配置不一致: [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `run with mock loopback: validation fails when slaves expected but not found`
   - ✅ 重试边界: [mailbox/mailbox_test.mbt](mailbox/mailbox_test.mbt) `Rmsm record_timeout allows retries up to max`
   - ✅ commit: `bc33a9f` `test(runtime): cover timeout and link-down recovery paths`
-- [ ] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
+- [x] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
+  - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Decoupling: mailbox diagnosis failure does not block PDO run loop`
 
 ## 7. 30 天启动清单 — ✅ 已完成
 
@@ -411,8 +412,7 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **PDO 与 mailbox 解耦检查**：验证主循环与邮箱推进在异常路径下仍保持边界清晰。
-2. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
+1. **参考分析文档持续落标**：持续把参考调用流约束转为可执行测试与验收项。
 
 ## 10. 提交执行方式
 
