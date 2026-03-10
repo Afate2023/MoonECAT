@@ -376,6 +376,7 @@
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Pressure: timeout-heavy loop keeps accounting consistent`
 - [x] 跟踪不同负载下的周期稳定性和错误率。
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Pressure: telemetry remains monotonic across different loads`
+  - ✅ commit: `7c91dcf` `test(runtime): add pressure regression coverage for core loop`
 
 ### 平台接口碎片化
 
