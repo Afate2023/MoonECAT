@@ -215,7 +215,8 @@
   - ⏳ 仍缺：IdentificationAdo 读取路径与校验接入
 - [x] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
   - ✅ [protocol/discovery.mbt](protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
-- [ ] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
+- [x] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
+  - ✅ [runtime/diagnosis.mbt](runtime/diagnosis.mbt): `read_error_register`/`read_diagnosis_counter`/`read_slave_diagnosis`
 
 已完成提交：
 - ✅ `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions` (ff166d4)
@@ -254,8 +255,8 @@
   - 📦 [runtime/runtime.mbt](runtime/runtime.mbt): Runtime + run_cycle
 - [x] 补全文档：架构、接口、测试方式。
   - 📦 [README.mbt.md](README.mbt.md) 已更新
-- [ ] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 目前仅 println stub，需接入 HAL + scan/validate/run 流程
-- [ ] **【缺口】结构化诊断输出**：scan/validate/run 结果的 JSON/human-readable 格式化
+- [x] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 已接入 Mock HAL + scan/validate/run 流程
+- [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [ ] 评估并整理 Extism 宿主接入边界。
 
 已完成提交：
@@ -265,8 +266,7 @@
 - ✅ `docs: document architecture and user workflows` (e5d8a81)
 
 待完成提交：
-- `feat: wire cli commands to library runtime`
-- `feat: add structured diagnostic output`
+- `feat: wire cli commands and add diagnosis interface`
 
 ---
 

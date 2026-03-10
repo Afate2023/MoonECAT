@@ -1,10 +1,10 @@
 import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/protocol",
+  "afate/MoonECAT/mailbox",
   "moonbitlang/core/buffer",
 }
 
 import {
   "afate/MoonECAT/hal/mock",
-  "afate/MoonECAT/mailbox",
 } for "test"

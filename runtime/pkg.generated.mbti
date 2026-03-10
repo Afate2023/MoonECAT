@@ -3,10 +3,21 @@ package "afate/MoonECAT/runtime"
 
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
 }
 
 // Values
+pub fn parse_error_register_payload(Bytes) -> Byte raise @hal.EcError
+
+pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_error_register(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+
 pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
@@ -104,6 +115,14 @@ pub(all) struct ScanReport {
 pub fn ScanReport::format(Self) -> String
 pub impl Eq for ScanReport
 pub impl Show for ScanReport
+
+pub(all) struct SlaveDiagnosis {
+  station_address : UInt
+  error_register : Byte
+  diagnosis_counter : UInt?
+}
+pub impl Eq for SlaveDiagnosis
+pub impl Show for SlaveDiagnosis
 
 pub(all) struct SlaveReport {
   position : Int

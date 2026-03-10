@@ -1015,3 +1015,27 @@ test "run with mock loopback: validation fails when slaves expected but not foun
   assert_eq(report.cycles_ok, 0)
   assert_true(report.final_phase is @runtime.Validating)
 }
+
+///|
+test "diagnosis parser: error register" {
+  let b = @runtime.parse_error_register_payload(b"\xAA")
+  assert_eq(b, b'\xAA')
+}
+
+///|
+test "diagnosis parser: error register rejects empty payload" {
+  let result = try? @runtime.parse_error_register_payload(Bytes::new(0))
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
+
+///|
+test "diagnosis parser: u32 little-endian" {
+  let v = @runtime.parse_u32_payload(b"\x78\x56\x34\x12")
+  assert_eq(v, 0x12345678U)
+}
+
+///|
+test "diagnosis parser: u32 rejects short payload" {
+  let result = try? @runtime.parse_u32_payload(b"\x01\x02\x03")
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
