@@ -21,7 +21,12 @@ pub(all) struct SlaveReport {
   product_code : UInt
   revision : UInt
   serial : UInt
+  identification : UInt
 } derive(Eq, Show)
+
+///|
+/// Default IdentificationAdo register used for explicit device identification.
+let default_identification_ado : UInt = 0x0014U
 
 ///|
 /// Run the scan procedure: count slaves, assign addresses, read identity
@@ -30,6 +35,16 @@ pub(all) struct SlaveReport {
 pub fn[N : @hal.Nic] scan(
   nic : N,
   timeout : @hal.Duration,
+) -> ScanReport raise @hal.EcError {
+  scan_with_identification_ado(nic, timeout, default_identification_ado)
+}
+
+///|
+/// Run the scan procedure with a configurable IdentificationAdo register.
+pub fn[N : @hal.Nic] scan_with_identification_ado(
+  nic : N,
+  timeout : @hal.Duration,
+  identification_ado : UInt,
 ) -> ScanReport raise @hal.EcError {
   let count = @protocol.count_slaves(nic, timeout)
   let slaves : Array[SlaveReport] = []
@@ -55,6 +70,10 @@ pub fn[N : @hal.Nic] scan(
       nic, station, 0x0014U, 4, timeout,
     )
     let serial = read_u32_le(serial_pdu.data, 0)
+    let identification_pdu = @protocol.read_register_fp(
+      nic, station, identification_ado, 4, timeout,
+    )
+    let identification = read_u32_le(identification_pdu.data, 0)
     slaves.push({
       position: i,
       station_address: station,
@@ -62,6 +81,7 @@ pub fn[N : @hal.Nic] scan(
       product_code,
       revision,
       serial,
+      identification,
     })
   }
   { slave_count: count, slaves }
@@ -105,6 +125,11 @@ pub fn ScanReport::format(self : ScanReport) -> String {
     )
     buf.write_string(
       "  Serial: 0x" + s.serial.reinterpret_as_int().to_string() + "\n",
+    )
+    buf.write_string(
+      "  Identification: 0x" +
+      s.identification.reinterpret_as_int().to_string() +
+      "\n",
     )
     if i < self.slaves.length() - 1 {
       buf.write_string("\n")

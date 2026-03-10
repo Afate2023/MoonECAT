@@ -40,6 +40,8 @@ pub(all) struct SlaveConfig {
   position : UInt
   /// Expected identity (from ESI/config file).
   expected_identity : SlaveIdentity?
+  /// Expected explicit device identification value (IdentificationAdo).
+  expected_identification : UInt?
   /// Configured station address.
   configured_address : UInt
 } derive(Eq, Show)

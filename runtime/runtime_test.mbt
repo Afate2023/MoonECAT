@@ -465,6 +465,7 @@ test "ScanReport format with slaves" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
     ],
   }
@@ -482,6 +483,7 @@ test "SlaveReport equality" {
     product_code: 0x04D2U,
     revision: 0x0001U,
     serial: 0x1234U,
+    identification: 0U,
   }
   let r2 : @runtime.SlaveReport = {
     position: 0,
@@ -490,6 +492,7 @@ test "SlaveReport equality" {
     product_code: 0x04D2U,
     revision: 0x0001U,
     serial: 0x1234U,
+    identification: 0U,
   }
   assert_eq(r1, r2)
 }
@@ -506,6 +509,7 @@ test "validate: all slaves match" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
       {
         position: 1,
@@ -514,6 +518,7 @@ test "validate: all slaves match" {
         product_code: 0x0064U,
         revision: 0x0002U,
         serial: 0x5678U,
+        identification: 0U,
       },
     ],
   }
@@ -526,6 +531,7 @@ test "validate: all slaves match" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
     {
@@ -536,6 +542,7 @@ test "validate: all slaves match" {
         revision: 0x0002U,
         serial: 0x5678U,
       }),
+      expected_identification: None,
       configured_address: 0x1002U,
     },
   ]
@@ -558,6 +565,7 @@ test "validate: identity mismatch detected" {
         product_code: 0x0099U,
         revision: 0x0001U,
         serial: 0x0000U,
+        identification: 0U,
       },
     ],
   }
@@ -570,6 +578,7 @@ test "validate: identity mismatch detected" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -590,6 +599,7 @@ test "validate: station address mismatch detected" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
     ],
   }
@@ -602,12 +612,48 @@ test "validate: station address mismatch detected" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
   let report = @runtime.validate(scan, expected)
   assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.StationAddressMismatch(..))
+}
+
+///|
+test "validate: explicit identification mismatch detected" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+        identification: 0x11111111U,
+      },
+    ],
+  }
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      expected_identification: Some(0x22222222U),
+      configured_address: 0x1001U,
+    },
+  ]
+  let report = @runtime.validate(scan, expected)
+  assert_eq(report.all_ok, false)
+  assert_true(report.results[0] is @runtime.Ok)
+  assert_true(report.results[1] is @runtime.IdentificationMismatch(..))
 }
 
 ///|
@@ -622,6 +668,7 @@ test "validate: revision mismatch detected" {
         product_code: 0x04D2U,
         revision: 0x9999U,
         serial: 0x1234U,
+        identification: 0U,
       },
     ],
   }
@@ -634,6 +681,7 @@ test "validate: revision mismatch detected" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -654,6 +702,7 @@ test "validate: serial mismatch detected" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x9999U,
+        identification: 0U,
       },
     ],
   }
@@ -666,6 +715,7 @@ test "validate: serial mismatch detected" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -686,6 +736,7 @@ test "validate: missing slave" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -707,6 +758,7 @@ test "validate: extra slave detected" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
       {
         position: 1,
@@ -715,6 +767,7 @@ test "validate: extra slave detected" {
         product_code: 0x0010U,
         revision: 0x0001U,
         serial: 0x0000U,
+        identification: 0U,
       },
     ],
   }
@@ -727,6 +780,7 @@ test "validate: extra slave detected" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -749,11 +803,17 @@ test "validate: no identity constraint accepts any slave" {
         product_code: 0xFFFFU,
         revision: 0xFFFFU,
         serial: 0xFFFFU,
+        identification: 0U,
       },
     ],
   }
   let expected : Array[@hal.SlaveConfig] = [
-    { position: 0U, expected_identity: None, configured_address: 0x1001U },
+    {
+      position: 0U,
+      expected_identity: None,
+      expected_identification: None,
+      configured_address: 0x1001U,
+    },
   ]
   let report = @runtime.validate(scan, expected)
   assert_eq(report.all_ok, true)
@@ -782,6 +842,7 @@ test "validate: matches by position even when expected order differs" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
       {
         position: 1,
@@ -790,6 +851,7 @@ test "validate: matches by position even when expected order differs" {
         product_code: 0x0064U,
         revision: 0x0002U,
         serial: 0x5678U,
+        identification: 0U,
       },
     ],
   }
@@ -802,6 +864,7 @@ test "validate: matches by position even when expected order differs" {
         revision: 0x0002U,
         serial: 0x5678U,
       }),
+      expected_identification: None,
       configured_address: 0x1002U,
     },
     {
@@ -812,6 +875,7 @@ test "validate: matches by position even when expected order differs" {
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]
@@ -832,6 +896,7 @@ test "validate: reports missing and extra by position" {
         product_code: 0x04D2U,
         revision: 0x0001U,
         serial: 0x1234U,
+        identification: 0U,
       },
     ],
   }
@@ -844,6 +909,7 @@ test "validate: reports missing and extra by position" {
         revision: 0x0002U,
         serial: 0x5678U,
       }),
+      expected_identification: None,
       configured_address: 0x1002U,
     },
   ]
@@ -993,6 +1059,7 @@ test "run with mock loopback: validation fails when slaves expected but not foun
         revision: 0x0001U,
         serial: 0x1234U,
       }),
+      expected_identification: None,
       configured_address: 0x1001U,
     },
   ]

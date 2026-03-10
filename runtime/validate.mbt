@@ -11,6 +11,8 @@ pub(all) enum ValidationResult {
   StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   /// Slave identity mismatch.
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
+  /// Slave explicit identification mismatch.
+  IdentificationMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   /// Slave not found at expected position.
   Missing(position~ : Int)
   /// Extra slave found that was not expected.
@@ -99,6 +101,20 @@ pub fn validate(
             }
           None => results.push(Ok) // No identity constraint — accept any
         }
+        match exp.expected_identification {
+          Some(expected_id) =>
+            if found.identification != expected_id {
+              results.push(
+                IdentificationMismatch(
+                  position=pos,
+                  expected=expected_id,
+                  actual=found.identification,
+                ),
+              )
+              all_ok = false
+            }
+          None => ()
+        }
       }
       None => {
         results.push(Missing(position=pos))
@@ -150,6 +166,16 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
       IdentityMismatch(..) =>
         buf.write_string(
           "  [MISMATCH] Slave #" + i.to_string() + ": identity mismatch\n",
+        )
+      IdentificationMismatch(position~, expected~, actual~) =>
+        buf.write_string(
+          "  [ID-MISMATCH] Slave #" +
+          position.to_string() +
+          ": expected 0x" +
+          expected.reinterpret_as_int().to_string() +
+          " actual 0x" +
+          actual.reinterpret_as_int().to_string() +
+          "\n",
         )
       Missing(position~) =>
         buf.write_string(

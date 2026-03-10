@@ -74,6 +74,7 @@ pub impl Show for Severity
 pub(all) struct SlaveConfig {
   position : UInt
   expected_identity : SlaveIdentity?
+  expected_identification : UInt?
   configured_address : UInt
 }
 pub impl Eq for SlaveConfig

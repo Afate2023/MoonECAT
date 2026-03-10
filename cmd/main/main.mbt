@@ -92,6 +92,7 @@ fn expected_from_scan(scan : @runtime.ScanReport) -> Array[@hal.SlaveConfig] {
         revision: s.revision,
         serial: s.serial,
       }),
+      expected_identification: Some(s.identification),
       configured_address: s.station_address,
     }
   })
@@ -107,6 +108,7 @@ fn scan_report_json(report : @runtime.ScanReport) -> Json {
       "product_code": Json::number(s.product_code.to_double()),
       "revision": Json::number(s.revision.to_double()),
       "serial": Json::number(s.serial.to_double()),
+      "identification": Json::number(s.identification.to_double()),
     })
   })
   Json::object({

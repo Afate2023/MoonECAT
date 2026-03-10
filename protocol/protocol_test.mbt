@@ -662,6 +662,7 @@ test "SlaveConfig construction" {
   let cfg : @hal.SlaveConfig = {
     position: 0U,
     expected_identity: Some(@fixtures.sample_ek1100_identity()),
+    expected_identification: None,
     configured_address: 0x1001U,
   }
   assert_eq(cfg.position, 0U)

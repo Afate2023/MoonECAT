@@ -210,9 +210,10 @@
 
 - [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
   - ✅ [protocol/eeprom.mbt](protocol/eeprom.mbt): eeprom_read_word/eeprom_read
-- [ ] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
-  - ✅ [runtime/validate.mbt](runtime/validate.mbt): 站地址(`configured_address`) + 身份4元组联合校验
-  - ⏳ 仍缺：IdentificationAdo 读取路径与校验接入
+- [x] **Explicit Device Identification**：读取 IdentificationAdo 进行 Hot Connect 防误插 [ETG.1500 #303 should]
+  - ✅ [runtime/scan.mbt](runtime/scan.mbt): `scan_with_identification_ado(...)` + `SlaveReport.identification`
+  - ✅ [hal/config.mbt](hal/config.mbt): `SlaveConfig.expected_identification`
+  - ✅ [runtime/validate.mbt](runtime/validate.mbt): `IdentificationMismatch` + 显式标识校验
 - [x] **Station Alias Addressing**：读取 Register 0x0012 + 激活 DL Control Bit 24 [ETG.1500 #304 may]
   - ✅ [protocol/discovery.mbt](protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
 - [x] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
@@ -222,7 +223,7 @@
 - ✅ `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions` (ff166d4)
 
 待完成提交：
-- `feat: add explicit device identification`
+- （无）
 
 ### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
 

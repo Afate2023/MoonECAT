@@ -22,6 +22,8 @@ pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protoco
 
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
+pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
+
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
 // Errors
@@ -131,6 +133,7 @@ pub(all) struct SlaveReport {
   product_code : UInt
   revision : UInt
   serial : UInt
+  identification : UInt
 }
 pub impl Eq for SlaveReport
 pub impl Show for SlaveReport
@@ -163,6 +166,7 @@ pub(all) enum ValidationResult {
   Ok
   StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
+  IdentificationMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   Missing(position~ : Int)
   Extra(position~ : Int)
 }
