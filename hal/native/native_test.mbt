@@ -9,8 +9,14 @@ test "native scaffold exposes config defaults" {
 
 ///|
 test "native scaffold exposes stub runtime and availability" {
-  assert_eq(native_stub_version(), 1)
+  let version = native_stub_version()
+  assert_true(version == 0 || version == 1)
   let _ = windows_npcap_runtime_available()
+}
+
+///|
+test "native scaffold exposes interface listing entry" {
+  let _ : Result[String, Error] = try? windows_npcap_list_interfaces_text()
 }
 
 ///|

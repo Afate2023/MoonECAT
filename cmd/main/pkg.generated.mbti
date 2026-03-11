@@ -6,6 +6,7 @@ package "afate/MoonECAT/cmd/main"
 // Errors
 
 // Types and methods
+type CliBackend
 
 // Type aliases
 

@@ -8,7 +8,7 @@ enum CliBackend {
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: scan, validate, run.
+/// Commands: list-if, scan, validate, run.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -29,6 +29,11 @@ fn cli_main() -> Unit raise @hal.EcError {
   let as_json = has_flag(args, "--json")
   let timeout = @hal.Duration(1_000_000L)
   let backend = parse_backend(args)
+
+  if command == "list-if" {
+    print_interfaces(backend, as_json)
+    return
+  }
 
   match backend {
     Mock =>
@@ -113,9 +118,49 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <scan|validate|run> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>]",
+    "Usage: moonecat <list-if|scan|validate|run> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>]",
   )
   println("Default backend: mock")
+}
+
+///|
+fn print_interfaces(
+  backend : CliBackend,
+  as_json : Bool,
+) -> Unit raise @hal.EcError {
+  match backend {
+    Mock =>
+      if as_json {
+        println(
+          Json::object({
+            "backend": Json::string("mock"),
+            "interfaces_text": Json::string(""),
+            "note": Json::string("mock backend does not expose real interfaces"),
+          }).stringify(indent=2),
+        )
+      } else {
+        println("mock backend does not expose real interfaces")
+      }
+    NativeAuto | NativeWindowsNpcap => {
+      let listing = @native.windows_npcap_list_interfaces_text()
+      if as_json {
+        println(
+          Json::object({
+            "backend": Json::string("native-windows-npcap"),
+            "interfaces_text": Json::string(listing),
+          }).stringify(indent=2),
+        )
+      } else if listing == "" {
+        println("no interfaces found")
+      } else {
+        println(listing)
+      }
+    }
+    NativeLinuxRaw =>
+      raise @hal.EcError::NotSupported(
+        "native-linux-raw interface enumeration is not implemented yet",
+      )
+  }
 }
 
 ///|

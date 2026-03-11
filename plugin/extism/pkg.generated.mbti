@@ -1,0 +1,58 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/plugin/extism"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+pub fn ec_error_code(@hal.EcError) -> String
+
+pub fn encode_request(PluginRequest) -> Json
+
+pub fn encode_response(PluginResponse) -> Json
+
+pub fn placeholder_response(PluginRequest, String, String) -> PluginResponse
+
+pub fn run_entry(PluginRequest) -> PluginResponse
+
+pub fn scan_entry(PluginRequest) -> PluginResponse
+
+pub fn validate_entry(PluginRequest) -> PluginResponse
+
+// Errors
+
+// Types and methods
+pub(all) enum PluginCommand {
+  Scan
+  Validate
+  Run
+}
+pub fn PluginCommand::to_wire(Self) -> String
+pub impl Eq for PluginCommand
+pub impl Show for PluginCommand
+
+pub(all) struct PluginRequest {
+  version : String
+  command : PluginCommand
+  request_id : String
+  timeout_ns : Int64?
+  payload : Json
+}
+pub impl Show for PluginRequest
+
+pub(all) struct PluginResponse {
+  version : String
+  request_id : String
+  ok : Bool
+  error_code : String?
+  error_message : String?
+  payload : Json
+  diagnostics : Json
+}
+pub impl Show for PluginResponse
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/hal/native"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+pub fn default_linux_config(String) -> NativeNicConfig
+
+pub fn default_native_config(String) -> NativeNicConfig
+
+pub fn default_windows_npcap_config(String) -> NativeNicConfig
+
+pub fn native_backend_available(NativeBackendKind) -> Bool
+
+pub fn native_stub_version() -> Int
+
+pub let windows_npcap_backend_label : String
+
+pub fn windows_npcap_close(Int) -> Unit
+
+pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError
+
+pub fn windows_npcap_open(NativeNicConfig) -> Int raise @hal.EcError
+
+pub fn windows_npcap_recv(Int) -> Bytes raise @hal.EcError
+
+pub fn windows_npcap_runtime_available() -> Bool
+
+pub fn windows_npcap_send(Int, Bytes) -> Int raise @hal.EcError
+
+// Errors
+
+// Types and methods
+pub(all) enum NativeBackendKind {
+  Auto
+  LinuxRawSocket
+  WindowsNpcap
+}
+pub impl Eq for NativeBackendKind
+pub impl Show for NativeBackendKind
+
+pub(all) struct NativeNic {
+  config : NativeNicConfig
+  mut handle_id : Int
+  mut is_open : Bool
+}
+pub fn NativeNic::new(NativeNicConfig) -> Self
+pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError
+pub impl @hal.Nic for NativeNic
+pub impl Eq for NativeNic
+pub impl Show for NativeNic
+
+pub(all) struct NativeNicConfig {
+  interface_name : String
+  backend : NativeBackendKind
+  snaplen : Int
+  promisc : Bool
+  timeout_ms : Int
+}
+pub impl Eq for NativeNicConfig
+pub impl Show for NativeNicConfig
+
+// Type aliases
+
+// Traits
+

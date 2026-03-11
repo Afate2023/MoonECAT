@@ -28,8 +28,19 @@ extern "c" fn ffi_windows_npcap_close(handle_id : Int) -> Unit = "moonecat_windo
 extern "c" fn ffi_windows_npcap_available() -> Int = "moonecat_windows_npcap_available"
 
 ///|
+extern "c" fn ffi_windows_npcap_list_interfaces_text() -> Bytes = "moonecat_windows_npcap_list_interfaces_text"
+
+///|
 pub fn windows_npcap_runtime_available() -> Bool {
   ffi_windows_npcap_available() != 0
+}
+
+///|
+pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError {
+  if not(windows_npcap_runtime_available()) {
+    raise @hal.EcError::NotSupported("Npcap runtime is not available")
+  }
+  @utf8.decode_lossy(ffi_windows_npcap_list_interfaces_text())
 }
 
 ///|

@@ -86,9 +86,60 @@ static int moonecat_ensure_npcap_initialized(void) {
   return 1;
 }
 
+static size_t moonecat_append_text(char *buffer, size_t capacity, size_t used, const char *text) {
+  size_t remaining;
+  size_t len;
+  if (used >= capacity) {
+    return used;
+  }
+  if (text == NULL) {
+    text = "";
+  }
+  remaining = capacity - used;
+  len = strlen(text);
+  if (len >= remaining) {
+    len = remaining - 1;
+  }
+  memcpy(buffer + used, text, len);
+  used += len;
+  buffer[used] = '\0';
+  return used;
+}
+
 MOONBIT_FFI_EXPORT
 int32_t moonecat_windows_npcap_available(void) {
   return moonecat_ensure_npcap_initialized();
+}
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t moonecat_windows_npcap_list_interfaces_text(void) {
+  pcap_if_t *alldevs = NULL;
+  pcap_if_t *dev;
+  char errbuf[PCAP_ERRBUF_SIZE + 1] = {0};
+  char listing[8192] = {0};
+  size_t used = 0;
+  moonbit_bytes_t bytes;
+  if (!moonecat_ensure_npcap_initialized()) {
+    return moonbit_make_bytes(0, 0);
+  }
+  if (pcap_findalldevs(&alldevs, errbuf) != 0) {
+    moonecat_set_error(-1, errbuf[0] ? errbuf : "pcap_findalldevs failed");
+    return moonbit_make_bytes(0, 0);
+  }
+  for (dev = alldevs; dev != NULL; dev = dev->next) {
+    used = moonecat_append_text(listing, sizeof(listing), used, dev->name);
+    used = moonecat_append_text(listing, sizeof(listing), used, "\t");
+    used = moonecat_append_text(listing, sizeof(listing), used, dev->description);
+    used = moonecat_append_text(listing, sizeof(listing), used, "\n");
+    if (used + 1 >= sizeof(listing)) {
+      break;
+    }
+  }
+  pcap_freealldevs(alldevs);
+  moonecat_set_error(1, "ok");
+  bytes = moonbit_make_bytes((int32_t)used, 0);
+  memcpy(bytes, listing, used);
+  return bytes;
 }
 
 MOONBIT_FFI_EXPORT
@@ -191,6 +242,12 @@ MOONBIT_FFI_EXPORT
 int32_t moonecat_windows_npcap_available(void) {
   moonecat_set_error(-1, "Npcap backend is only available on Windows");
   return 0;
+}
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t moonecat_windows_npcap_list_interfaces_text(void) {
+  moonecat_set_error(-1, "Npcap backend is only available on Windows");
+  return moonbit_make_bytes(0, 0);
 }
 
 MOONBIT_FFI_EXPORT

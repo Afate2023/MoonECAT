@@ -7,6 +7,11 @@ pub fn windows_npcap_runtime_available() -> Bool {
 }
 
 ///|
+pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError {
+  raise @hal.EcError::NotSupported(native_last_error_message())
+}
+
+///|
 pub fn windows_npcap_open(config : NativeNicConfig) -> Int raise @hal.EcError {
   ignore(config)
   raise @hal.EcError::NotSupported(native_last_error_message())
