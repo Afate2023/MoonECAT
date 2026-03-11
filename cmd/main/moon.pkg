@@ -1,6 +1,7 @@
 import {
   "afate/MoonECAT" @lib,
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/hal/native" @native,
   "afate/MoonECAT/hal/mock" @mock,
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",

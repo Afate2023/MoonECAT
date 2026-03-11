@@ -1,4 +1,12 @@
 ///|
+enum CliBackend {
+  Mock
+  NativeAuto
+  NativeWindowsNpcap
+  NativeLinuxRaw
+}
+
+///|
 /// MoonECAT CLI entry point.
 /// Commands: scan, validate, run.
 fn main {
@@ -20,11 +28,46 @@ fn cli_main() -> Unit raise @hal.EcError {
   let command = args[1]
   let as_json = has_flag(args, "--json")
   let timeout = @hal.Duration(1_000_000L)
-  let nic = @mock.MockNic::new()
+  let backend = parse_backend(args)
 
+  match backend {
+    Mock =>
+      run_command_with_nic(command, @mock.MockNic::new(), as_json, timeout)
+    NativeAuto => {
+      let interface_name = require_interface_name(args)
+      let nic = @native.NativeNic::open_with_config(
+        @native.default_native_config(interface_name),
+      )
+      run_command_with_nic(command, nic, as_json, timeout)
+    }
+    NativeWindowsNpcap => {
+      let interface_name = require_interface_name(args)
+      let nic = @native.NativeNic::open_with_config(
+        @native.default_windows_npcap_config(interface_name),
+      )
+      run_command_with_nic(command, nic, as_json, timeout)
+    }
+    NativeLinuxRaw => {
+      let interface_name = require_interface_name(args)
+      let nic = @native.NativeNic::open_with_config(
+        @native.default_linux_config(interface_name),
+      )
+      run_command_with_nic(command, nic, as_json, timeout)
+    }
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_command_with_nic(
+  command : String,
+  nic : N,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
   match command {
     "scan" => {
       let report = @runtime.scan(nic, timeout)
+      nic.close()
       if as_json {
         println(scan_report_json(report).stringify(indent=2))
       } else {
@@ -33,6 +76,7 @@ fn cli_main() -> Unit raise @hal.EcError {
     }
     "validate" => {
       let report = @runtime.scan(nic, timeout)
+      nic.close()
       let expected = expected_from_scan(report)
       let validate_report = @runtime.validate(report, expected)
       if as_json {
@@ -54,6 +98,7 @@ fn cli_main() -> Unit raise @hal.EcError {
         10,
         timeout,
       )
+      nic.close()
       if as_json {
         println(run_report_json(run_report).stringify(indent=2))
       } else {
@@ -67,8 +112,10 @@ fn cli_main() -> Unit raise @hal.EcError {
 ///|
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
-  println("Usage: moonecat <scan|validate|run> [--json]")
-  println("Note: current CLI backend uses MockNic for workflow demonstration.")
+  println(
+    "Usage: moonecat <scan|validate|run> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>]",
+  )
+  println("Default backend: mock")
 }
 
 ///|
@@ -79,6 +126,39 @@ fn has_flag(args : Array[String], flag : String) -> Bool {
     }
   }
   false
+}
+
+///|
+fn parse_backend(args : Array[String]) -> CliBackend raise @hal.EcError {
+  match flag_value(args, "--backend") {
+    Some("mock") | None => Mock
+    Some("native") => NativeAuto
+    Some("native-windows-npcap") => NativeWindowsNpcap
+    Some("native-linux-raw") => NativeLinuxRaw
+    Some(other) =>
+      raise @hal.EcError::ConfigMismatch("unsupported backend: " + other)
+  }
+}
+
+///|
+fn require_interface_name(args : Array[String]) -> String raise @hal.EcError {
+  match flag_value(args, "--if") {
+    Some(name) => name
+    None =>
+      raise @hal.EcError::ConfigMismatch(
+        "native backend requires --if <interface>",
+      )
+  }
+}
+
+///|
+fn flag_value(args : Array[String], flag : String) -> String? {
+  for i = 0; i < args.length() - 1; i = i + 1 {
+    if args[i] == flag {
+      return Some(args[i + 1])
+    }
+  }
+  None
 }
 
 ///|
