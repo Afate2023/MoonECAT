@@ -236,21 +236,28 @@ fn[N : @hal.Nic] run_read_sii_command(
   let position = require_uint_flag(args, "--position", 0U)
   let word_count = require_int_flag(args, "--words", 128)
   let eeprom = @protocol.eeprom_read_ap(nic, position, 0U, word_count, timeout)
+  let preamble = @mailbox.parse_sii_preamble(eeprom)
+  let standard = @mailbox.parse_sii_standard_metadata(eeprom)
   let header = @mailbox.parse_sii_header(eeprom)
   let categories = @mailbox.parse_sii_categories(eeprom)
   let strings = collect_sii_strings(categories)
   let general = collect_sii_general(categories)
+  let fmmu = collect_sii_fmmu(categories)
+  let sync_managers = collect_sii_sync_managers(categories)
+  let dc_clocks = collect_sii_dc(categories)
   nic.close()
   if as_json {
     println(
-      read_sii_json(position, word_count, header, general, strings, categories).stringify(
-        indent=2,
-      ),
+      read_sii_json(
+        position, word_count, preamble, standard, header, general, strings, fmmu,
+        sync_managers, dc_clocks, categories,
+      ).stringify(indent=2),
     )
   } else {
     println(
       read_sii_text(
-        position, word_count, eeprom, header, general, strings, categories,
+        position, word_count, eeprom, preamble, standard, header, general, strings,
+        categories,
       ),
     )
   }
@@ -346,6 +353,21 @@ fn flag_value(args : Array[String], flag : String) -> String? {
 }
 
 ///|
+let mailbox_eoe_mask : UInt = 0x0002U
+
+///|
+let mailbox_coe_mask : UInt = 0x0004U
+
+///|
+let mailbox_foe_mask : UInt = 0x0008U
+
+///|
+let mailbox_soe_mask : UInt = 0x0010U
+
+///|
+let mailbox_voe_mask : UInt = 0x0020U
+
+///|
 fn require_uint_flag(
   args : Array[String],
   flag : String,
@@ -375,7 +397,7 @@ fn parse_uint_flag(flag : String, text : String) -> UInt raise @hal.EcError {
   if text == "" {
     raise @hal.EcError::ConfigMismatch("missing numeric value for " + flag)
   }
-  let bytes = text.to_bytes()
+  let bytes = @utf8.encode(text)
   for ch in bytes {
     if ch == b'\x00' {
       continue
@@ -424,40 +446,295 @@ fn collect_sii_general(
 }
 
 ///|
+fn collect_sii_fmmu(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[@mailbox.FmmuDirection] {
+  for entry in categories {
+    if entry.category == @mailbox.Fmmu {
+      return @mailbox.parse_sii_fmmu(entry.data)
+    }
+  }
+  []
+}
+
+///|
+fn collect_sii_sync_managers(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[@mailbox.SiiSmEntry] {
+  for entry in categories {
+    if entry.category == @mailbox.SyncManager {
+      return @mailbox.parse_sii_sm(entry.data)
+    }
+  }
+  []
+}
+
+///|
+fn collect_sii_dc(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[@mailbox.SiiDcClock] {
+  let result : Array[@mailbox.SiiDcClock] = []
+  for entry in categories {
+    if entry.category == @mailbox.Dc {
+      let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
+        entry.data,
+      )
+      match parsed {
+        Ok(dc) => result.push(dc)
+        Err(_) => ()
+      }
+    }
+  }
+  result
+}
+
+///|
+fn mailbox_protocol_supported(protocols : UInt, mask : UInt) -> Bool {
+  (protocols & mask) != 0U
+}
+
+///|
+fn resolved_sii_string(strings : Array[String], index : Byte) -> String {
+  let idx = index.to_int()
+  if idx <= 0 || idx > strings.length() {
+    "not set"
+  } else {
+    strings[idx - 1]
+  }
+}
+
+///|
+fn physical_port_name(port : Byte) -> String {
+  match port {
+    b'\x00' => "not used"
+    b'\x01' => "MII"
+    b'\x02' => "reserved"
+    b'\x03' => "EBUS"
+    _ => "unknown"
+  }
+}
+
+///|
+fn fmmu_usage_name(direction : @mailbox.FmmuDirection) -> String {
+  match direction {
+    Outputs => "used for Outputs"
+    Inputs => "used for Inputs"
+    MailboxState => "used for SyncM mailbox status (MBoxStat)"
+  }
+}
+
+///|
+fn sm_type_name(sm_type : @mailbox.SmType) -> String {
+  match sm_type {
+    MailboxOut => "Mailbox Out"
+    MailboxIn => "Mailbox In"
+    ProcessDataOut => "Process Data Out"
+    ProcessDataIn => "Process Data In"
+    Unused => "not used or unknown"
+  }
+}
+
+///|
+fn bool_yes_no(value : Bool) -> String {
+  if value {
+    "yes"
+  } else {
+    "no"
+  }
+}
+
+///|
+fn bool_enabled_text(value : Bool) -> String {
+  if value {
+    "enabled"
+  } else {
+    "not enabled"
+  }
+}
+
+///|
+fn bool_true_false(value : Bool) -> String {
+  if value {
+    "True"
+  } else {
+    "False"
+  }
+}
+
+///|
+fn hex_digit(value : Int) -> String {
+  match value {
+    0 => "0"
+    1 => "1"
+    2 => "2"
+    3 => "3"
+    4 => "4"
+    5 => "5"
+    6 => "6"
+    7 => "7"
+    8 => "8"
+    9 => "9"
+    10 => "A"
+    11 => "B"
+    12 => "C"
+    13 => "D"
+    14 => "E"
+    _ => "F"
+  }
+}
+
+///|
+fn format_hex(value : UInt, digits : Int) -> String {
+  let buf = @buffer.new(size_hint=digits + 2)
+  buf.write_string("0x")
+  let mut index = digits - 1
+  while index >= 0 {
+    let nibble = ((value >> (index * 4)) & 0xFU).reinterpret_as_int()
+    buf.write_string(hex_digit(nibble))
+    if index == 0 {
+      break
+    }
+    index = index - 1
+  }
+  buf.to_string()
+}
+
+///|
+fn general_json(info : @mailbox.SiiGeneral, strings : Array[String]) -> Json {
+  Json::object({
+    "group_idx": Json::number(info.group_idx.to_uint().to_double()),
+    "group_name": Json::string(resolved_sii_string(strings, info.group_idx)),
+    "image_idx": Json::number(info.image_idx.to_uint().to_double()),
+    "image_name": Json::string(resolved_sii_string(strings, info.image_idx)),
+    "order_idx": Json::number(info.order_idx.to_uint().to_double()),
+    "order_name": Json::string(resolved_sii_string(strings, info.order_idx)),
+    "name_idx": Json::number(info.name_idx.to_uint().to_double()),
+    "name": Json::string(resolved_sii_string(strings, info.name_idx)),
+    "coe_details": Json::object({
+      "raw": Json::number(info.coe_details.to_uint().to_double()),
+      "enable_sdo": Json::boolean((info.coe_details & b'\x01') != b'\x00'),
+      "enable_sdo_info": Json::boolean((info.coe_details & b'\x02') != b'\x00'),
+      "enable_pdo_assign": Json::boolean(
+        (info.coe_details & b'\x04') != b'\x00',
+      ),
+      "enable_pdo_configuration": Json::boolean(
+        (info.coe_details & b'\x08') != b'\x00',
+      ),
+      "enable_upload_at_startup": Json::boolean(
+        (info.coe_details & b'\x10') != b'\x00',
+      ),
+      "enable_sdo_complete_access": Json::boolean(
+        (info.coe_details & b'\x20') != b'\x00',
+      ),
+    }),
+    "foe_supported": Json::boolean(info.foe_supported),
+    "eoe_supported": Json::boolean(info.eoe_supported),
+    "soe_supported": Json::boolean(info.soe_supported),
+    "soe_channels": Json::number(info.soe_channels.to_uint().to_double()),
+    "ds402_channels": Json::number(info.ds402_channels.to_uint().to_double()),
+    "sysman_class": Json::number(info.sysman_class.to_uint().to_double()),
+    "flags": Json::object({
+      "raw": Json::number(info.flags.to_uint().to_double()),
+      "safe_op": Json::boolean((info.flags & b'\x01') != b'\x00'),
+      "not_lrw": Json::boolean((info.flags & b'\x02') != b'\x00'),
+      "mailbox_data_link_layer": Json::boolean(
+        (info.flags & b'\x04') != b'\x00',
+      ),
+      "ident_al_status": Json::boolean((info.flags & b'\x08') != b'\x00'),
+      "ident_physical_memory": Json::boolean((info.flags & b'\x10') != b'\x00'),
+    }),
+    "current_on_ebus": Json::number(info.current_on_ebus.to_double()),
+    "physical_ports": Json::array([
+      Json::string(physical_port_name(info.physical_port_0)),
+      Json::string(physical_port_name(info.physical_port_1)),
+      Json::string(physical_port_name(info.physical_port_2)),
+      Json::string(physical_port_name(info.physical_port_3)),
+    ]),
+    "physical_memory_address": Json::number(
+      info.physical_memory_address.to_double(),
+    ),
+  })
+}
+
+///|
 fn read_sii_json(
   position : UInt,
   word_count : Int,
+  preamble : @mailbox.SiiPreamble,
+  standard : @mailbox.SiiStandardMetadata,
   header : @mailbox.SiiData,
   general : @mailbox.SiiGeneral?,
   strings : Array[String],
+  fmmu : Array[@mailbox.FmmuDirection],
+  sync_managers : Array[@mailbox.SiiSmEntry],
+  dc_clocks : Array[@mailbox.SiiDcClock],
   categories : Array[@mailbox.SiiCategoryEntry],
 ) -> Json {
   let categories_json = categories.map(fn(entry) {
     Json::object({
       "category": Json::string(entry.category.to_string()),
+      "category_code": Json::number(
+        sii_category_code(entry.category).to_double(),
+      ),
       "byte_length": Json::number(entry.data.length().to_double()),
     })
   })
   let strings_json = strings.map(fn(text) { Json::string(text) })
   let general_json = match general {
-    Some(info) =>
-      Json::object({
-        "group_idx": Json::number(info.group_idx.to_uint().to_double()),
-        "image_idx": Json::number(info.image_idx.to_uint().to_double()),
-        "order_idx": Json::number(info.order_idx.to_uint().to_double()),
-        "name_idx": Json::number(info.name_idx.to_uint().to_double()),
-        "coe_details": Json::number(info.coe_details.to_uint().to_double()),
-        "foe_supported": Json::boolean(info.foe_supported),
-        "eoe_supported": Json::boolean(info.eoe_supported),
-        "soe_supported": Json::boolean(info.soe_supported),
-        "flags": Json::number(info.flags.to_uint().to_double()),
-        "current_on_ebus": Json::number(info.current_on_ebus.to_double()),
-      })
+    Some(info) => general_json(info, strings)
     None => Json::null()
   }
+  let fmmu_json = fmmu.map(fn(direction) {
+    Json::object({
+      "usage": Json::string(direction.to_string()),
+      "description": Json::string(fmmu_usage_name(direction)),
+    })
+  })
+  let sm_json = sync_managers.map(fn(sm) {
+    Json::object({
+      "physical_start": Json::number(sm.physical_start.to_double()),
+      "length": Json::number(sm.length.to_double()),
+      "control": Json::number(sm.control.to_uint().to_double()),
+      "status": Json::number(sm.status.to_uint().to_double()),
+      "enable": Json::boolean(sm.enable),
+      "sm_type": Json::string(sm.sm_type.to_string()),
+    })
+  })
+  let dc_json = dc_clocks.map(fn(dc) {
+    Json::object({
+      "cycle_time_0": Json::number(dc.cycle_time_0.to_double()),
+      "shift_time_0": Json::number(dc.shift_time_0.to_double()),
+      "shift_time_1": Json::number(dc.shift_time_1.to_double()),
+      "sync1_cycle_factor": Json::number(dc.sync1_cycle_factor.to_double()),
+      "assign_activate": Json::number(dc.assign_activate.to_double()),
+      "sync0_cycle_factor": Json::number(dc.sync0_cycle_factor.to_double()),
+      "name_idx": Json::number(dc.name_idx.to_uint().to_double()),
+      "name": Json::string(resolved_sii_string(strings, dc.name_idx)),
+      "description_idx": Json::number(dc.description_idx.to_uint().to_double()),
+      "description": Json::string(
+        resolved_sii_string(strings, dc.description_idx),
+      ),
+    })
+  })
   Json::object({
     "position": Json::number(position.to_double()),
     "word_count": Json::number(word_count.to_double()),
+    "preamble": Json::object({
+      "pdi_control": Json::number(preamble.pdi_control.to_double()),
+      "pdi_config": Json::number(preamble.pdi_config.to_double()),
+      "sync_impulse_length_raw": Json::number(
+        preamble.sync_impulse_length_raw.to_double(),
+      ),
+      "sync_impulse_length_ns": Json::number(
+        preamble.sync_impulse_length_ns().to_double(),
+      ),
+      "pdi_config2": Json::number(preamble.pdi_config2.to_double()),
+      "configured_station_alias": Json::number(
+        preamble.configured_station_alias.to_double(),
+      ),
+      "checksum": Json::number(preamble.checksum.to_double()),
+      "checksum_ok": Json::boolean(preamble.checksum_ok),
+    }),
     "header": Json::object({
       "vendor_id": Json::number(header.vendor_id.to_double()),
       "product_code": Json::number(header.product_code.to_double()),
@@ -477,10 +754,368 @@ fn read_sii_json(
       "mailbox_tx_size": Json::number(header.mailbox_tx_size.to_double()),
       "mailbox_protocols": Json::number(header.mailbox_protocols.to_double()),
     }),
+    "supported_mailboxes": Json::object({
+      "coe": Json::boolean(
+        mailbox_protocol_supported(header.mailbox_protocols, mailbox_coe_mask),
+      ),
+      "eoe": Json::boolean(
+        mailbox_protocol_supported(header.mailbox_protocols, mailbox_eoe_mask),
+      ),
+      "foe": Json::boolean(
+        mailbox_protocol_supported(header.mailbox_protocols, mailbox_foe_mask),
+      ),
+      "soe": Json::boolean(
+        mailbox_protocol_supported(header.mailbox_protocols, mailbox_soe_mask),
+      ),
+      "voe": Json::boolean(
+        mailbox_protocol_supported(header.mailbox_protocols, mailbox_voe_mask),
+      ),
+    }),
+    "standard_metadata": Json::object({
+      "eeprom_size_raw": Json::number(standard.eeprom_size_raw.to_double()),
+      "eeprom_size_bytes": Json::number(
+        standard.eeprom_size_bytes().to_double(),
+      ),
+      "version": Json::number(standard.version.to_double()),
+    }),
     "general": general_json,
     "strings": Json::array(strings_json),
+    "fmmu": Json::array(fmmu_json),
+    "sync_managers": Json::array(sm_json),
+    "dc_clocks": Json::array(dc_json),
     "categories": Json::array(categories_json),
   })
+}
+
+///|
+fn sii_category_title(category : @mailbox.SiiCategory) -> String {
+  match category {
+    Strings => "Strings"
+    General => "General"
+    Fmmu => "FMMU"
+    SyncManager => "SyncManager"
+    TxPdo => "TX PDO"
+    RxPdo => "RX PDO"
+    Dc => "DC CLOCK"
+  }
+}
+
+///|
+fn sii_category_code(category : @mailbox.SiiCategory) -> UInt {
+  match category {
+    Strings => 0x0AU
+    General => 0x1EU
+    Fmmu => 0x28U
+    SyncManager => 0x29U
+    TxPdo => 0x32U
+    RxPdo => 0x33U
+    Dc => 0x3CU
+  }
+}
+
+///|
+fn append_sii_strings_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  strings : Array[String],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string(
+    "  Size: " +
+    entry.data.length().to_string() +
+    " Bytes with " +
+    strings.length().to_string() +
+    " strings\n",
+  )
+  buf.write_string("  ID   Size (Bytes)    String\n")
+  for i = 0; i < strings.length(); i = i + 1 {
+    let text = strings[i]
+    buf.write_string(
+      "  " +
+      (i + 1).to_string() +
+      ": (" +
+      text.length().to_string() +
+      ") ......... '" +
+      text +
+      "'\n",
+    )
+  }
+  buf.write_string("\n")
+}
+
+///|
+fn append_sii_general_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  info : @mailbox.SiiGeneral,
+  strings : Array[String],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string("  Vendor Specific (Index of String)\n")
+  buf.write_string(
+    "    Name  Index: " +
+    info.name_idx.to_uint().to_string() +
+    ": ............. " +
+    resolved_sii_string(strings, info.name_idx) +
+    "\n",
+  )
+  buf.write_string(
+    "    Group Index: " +
+    info.group_idx.to_uint().to_string() +
+    ": ............. " +
+    resolved_sii_string(strings, info.group_idx) +
+    "\n",
+  )
+  buf.write_string(
+    "    Image Index: " +
+    info.image_idx.to_uint().to_string() +
+    ": ............. " +
+    resolved_sii_string(strings, info.image_idx) +
+    "\n",
+  )
+  buf.write_string(
+    "    Order Index: " +
+    info.order_idx.to_uint().to_string() +
+    ": ............. " +
+    resolved_sii_string(strings, info.order_idx) +
+    "\n\n",
+  )
+  buf.write_string("  CoE Details:\n")
+  buf.write_string(
+    "    Enable SDO: .................. " +
+    bool_yes_no((info.coe_details & b'\x01') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "    Enable SDO Info: ............. " +
+    bool_yes_no((info.coe_details & b'\x02') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "    Enable PDO Assign: ........... " +
+    bool_yes_no((info.coe_details & b'\x04') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "    Enable PDO Configuration: .... " +
+    bool_yes_no((info.coe_details & b'\x08') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "    Enable Upload at Startup: .... " +
+    bool_yes_no((info.coe_details & b'\x10') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "    Enable SDO complete access: .. " +
+    bool_yes_no((info.coe_details & b'\x20') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "  FoE Details: ................... " +
+    bool_enabled_text(info.foe_supported) +
+    "\n",
+  )
+  buf.write_string(
+    "  EoE Details: ................... " +
+    bool_enabled_text(info.eoe_supported) +
+    "\n\n",
+  )
+  buf.write_string(
+    "  Flag SafeOp: ................... " +
+    bool_enabled_text((info.flags & b'\x01') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "  Flag notLRW: ................... " +
+    bool_enabled_text((info.flags & b'\x02') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "  Flag MBox Data Link Layer ...... " +
+    bool_enabled_text((info.flags & b'\x04') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "  Flag Ident AL Status ........... " +
+    bool_enabled_text((info.flags & b'\x08') != b'\x00') +
+    "\n",
+  )
+  buf.write_string(
+    "  Flag Ident Physical Memory ..... " +
+    bool_enabled_text((info.flags & b'\x10') != b'\x00') +
+    "\n\n",
+  )
+  buf.write_string(
+    "  CurrentOnEBus: ................. " +
+    info.current_on_ebus.to_string() +
+    " mA\n",
+  )
+  buf.write_string("\n  Physical Ports:\n")
+  buf.write_string(
+    "     Port 0: ..................... " +
+    physical_port_name(info.physical_port_0) +
+    "\n",
+  )
+  buf.write_string(
+    "     Port 1: ..................... " +
+    physical_port_name(info.physical_port_1) +
+    "\n",
+  )
+  buf.write_string(
+    "     Port 2: ..................... " +
+    physical_port_name(info.physical_port_2) +
+    "\n",
+  )
+  buf.write_string(
+    "     Port 3: ..................... " +
+    physical_port_name(info.physical_port_3) +
+    "\n\n",
+  )
+  buf.write_string(
+    "  Physical Memory Address ........ " +
+    format_hex(info.physical_memory_address, 4) +
+    "\n\n",
+  )
+}
+
+///|
+fn append_sii_fmmu_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  fmmu : Array[@mailbox.FmmuDirection],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string("  Number of FMMUs: " + fmmu.length().to_string() + "\n")
+  for i = 0; i < fmmu.length(); i = i + 1 {
+    buf.write_string(
+      "    FMMU" + i.to_string() + ": " + fmmu_usage_name(fmmu[i]) + "\n",
+    )
+  }
+  buf.write_string("\n")
+}
+
+///|
+fn append_sii_sm_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  sms : Array[@mailbox.SiiSmEntry],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string(
+    "  Number of SyncManager: " + sms.length().to_string() + "\n",
+  )
+  for i = 0; i < sms.length(); i = i + 1 {
+    let sm = sms[i]
+    buf.write_string("  SyncManager SM" + i.to_string() + "\n")
+    buf.write_string(
+      "    Physical Startaddress: ... " +
+      format_hex(sm.physical_start, 4) +
+      "\n",
+    )
+    buf.write_string(
+      "    Length: .................. " + sm.length.to_string() + "\n",
+    )
+    buf.write_string(
+      "    Control Register: ........ " +
+      format_hex(sm.control.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "    Status Register: ......... " +
+      format_hex(sm.status.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "    Enable byte: ............. " +
+      format_hex(if sm.enable { 1U } else { 0U }, 2) +
+      "\n",
+    )
+    buf.write_string(
+      "    SM Type: ................. " + sm_type_name(sm.sm_type) + "\n",
+    )
+  }
+  buf.write_string("\n")
+}
+
+///|
+fn append_sii_dc_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  dc : @mailbox.SiiDcClock,
+  strings : Array[String],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string(
+    "  Cycle Time 0 .................. " + dc.cycle_time_0.to_string() + "\n",
+  )
+  buf.write_string(
+    "  Shift Time 0 .................. " + dc.shift_time_0.to_string() + "\n",
+  )
+  buf.write_string(
+    "  Shift Time 1 .................. " + dc.shift_time_1.to_string() + "\n",
+  )
+  buf.write_string(
+    "  Sync1 Cycle Factor ............ " +
+    dc.sync1_cycle_factor.to_string() +
+    "\n",
+  )
+  buf.write_string(
+    "  Assign Activate ............... " + dc.assign_activate.to_string() + "\n",
+  )
+  buf.write_string(
+    "  Sync0 Cylce Factor ............ " +
+    dc.sync0_cycle_factor.to_string() +
+    "\n",
+  )
+  buf.write_string(
+    "  Name Index .................... " +
+    dc.name_idx.to_uint().to_string() +
+    " (" +
+    resolved_sii_string(strings, dc.name_idx) +
+    ")\n",
+  )
+  buf.write_string(
+    "  Description Index ............. " +
+    dc.description_idx.to_uint().to_string() +
+    " (" +
+    resolved_sii_string(strings, dc.description_idx) +
+    ")\n\n",
+  )
 }
 
 ///|
@@ -488,73 +1123,178 @@ fn read_sii_text(
   position : UInt,
   word_count : Int,
   eeprom : Bytes,
+  preamble : @mailbox.SiiPreamble,
+  standard : @mailbox.SiiStandardMetadata,
   header : @mailbox.SiiData,
   general : @mailbox.SiiGeneral?,
   strings : Array[String],
   categories : Array[@mailbox.SiiCategoryEntry],
 ) -> String {
-  let buf = @buffer.new(size_hint=512)
-  buf.write_string("SII Read Report\n")
-  buf.write_string("===============\n")
-  buf.write_string("Position: " + position.to_string() + "\n")
-  buf.write_string("Bytes read: " + eeprom.length().to_string() + "\n")
-  buf.write_string("Words requested: " + word_count.to_string() + "\n\n")
-  buf.write_string("Header\n")
-  buf.write_string("  Vendor: " + header.vendor_id.to_string() + "\n")
-  buf.write_string("  Product: " + header.product_code.to_string() + "\n")
-  buf.write_string("  Revision: " + header.revision.to_string() + "\n")
-  buf.write_string("  Serial: " + header.serial.to_string() + "\n")
+  let buf = @buffer.new(size_hint=2048)
+  buf.write_string("First print preamble and config\n")
   buf.write_string(
-    "  Mailbox RX: " +
-    header.mailbox_rx_offset.to_string() +
-    " / " +
-    header.mailbox_rx_size.to_string() +
+    "Position: ................... " + position.to_string() + "\n",
+  )
+  buf.write_string(
+    "Words requested: ............ " + word_count.to_string() + "\n",
+  )
+  buf.write_string(
+    "Bytes read: ................. " + eeprom.length().to_string() + "\n",
+  )
+  buf.write_string("Preamble:\n")
+  buf.write_string(
+    "PDI Control: ................ " +
+    format_hex(preamble.pdi_control, 4) +
     "\n",
   )
   buf.write_string(
-    "  Mailbox TX: " +
-    header.mailbox_tx_offset.to_string() +
-    " / " +
+    "PDI Config: ................. " + format_hex(preamble.pdi_config, 4) + "\n",
+  )
+  buf.write_string(
+    "Sync Impulse Length: ........ " +
+    preamble.sync_impulse_length_ns().to_string() +
+    " ns (raw: " +
+    format_hex(preamble.sync_impulse_length_raw, 4) +
+    ")\n",
+  )
+  buf.write_string(
+    "PDI Config 2: ............... " +
+    format_hex(preamble.pdi_config2, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "Configured Station Alias: ... " +
+    format_hex(preamble.configured_station_alias, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "Checksum of Preamble: ....... " +
+    format_hex(preamble.checksum, 4) +
+    " (" +
+    (if preamble.checksum_ok { "ok" } else { "wrong" }) +
+    ")\n\n",
+  )
+  buf.write_string("Identity:\n")
+  buf.write_string(
+    "  Vendor ID: ................ " + format_hex(header.vendor_id, 8) + "\n",
+  )
+  buf.write_string(
+    "  Product ID: ............... " + format_hex(header.product_code, 8) + "\n",
+  )
+  buf.write_string(
+    "  Revision ID: .............. " + format_hex(header.revision, 8) + "\n",
+  )
+  buf.write_string(
+    "  Serial Number: ............ " + format_hex(header.serial, 8) + "\n\n",
+  )
+  buf.write_string("Default mailbox settings:\n")
+  buf.write_string("  Bootstrap Mailbox:\n")
+  buf.write_string(
+    "  Received Mailbox Offset: .. " +
+    format_hex(header.bootstrap_rx_offset, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "  Received Mailbox Size: .... " +
+    header.bootstrap_rx_size.to_string() +
+    "\n",
+  )
+  buf.write_string(
+    "  Send Mailbox Offset: ...... " +
+    format_hex(header.bootstrap_tx_offset, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "  Send Mailbox Size: ........ " +
+    header.bootstrap_tx_size.to_string() +
+    "\n",
+  )
+  buf.write_string("\n  Mailbox Settings:\n")
+  buf.write_string(
+    "  Received Mailbox Offset: .. " +
+    format_hex(header.mailbox_rx_offset, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "  Received Mailbox Size: .... " + header.mailbox_rx_size.to_string() + "\n",
+  )
+  buf.write_string(
+    "  Send Mailbox Offset: ...... " +
+    format_hex(header.mailbox_tx_offset, 4) +
+    "\n",
+  )
+  buf.write_string(
+    "  Send Mailbox Size: ........ " +
     header.mailbox_tx_size.to_string() +
+    "\n\n",
+  )
+  buf.write_string("Supported Mailboxes:\n")
+  buf.write_string(
+    "  CoE ....................... " +
+    bool_true_false(
+      mailbox_protocol_supported(header.mailbox_protocols, mailbox_coe_mask),
+    ) +
     "\n",
   )
-  match general {
-    Some(info) => {
-      buf.write_string("\nGeneral\n")
-      buf.write_string(
-        "  CoE details: " + info.coe_details.to_uint().to_string() + "\n",
-      )
-      buf.write_string(
-        "  FoE supported: " + info.foe_supported.to_string() + "\n",
-      )
-      buf.write_string(
-        "  EoE supported: " + info.eoe_supported.to_string() + "\n",
-      )
-      buf.write_string(
-        "  SoE supported: " + info.soe_supported.to_string() + "\n",
-      )
-      buf.write_string("  Flags: " + info.flags.to_uint().to_string() + "\n")
-      buf.write_string(
-        "  Current on EBus: " + info.current_on_ebus.to_string() + "\n",
-      )
-    }
-    None => ()
-  }
-  if not(strings.is_empty()) {
-    buf.write_string("\nStrings\n")
-    for i = 0; i < strings.length(); i = i + 1 {
-      buf.write_string("  [" + (i + 1).to_string() + "] " + strings[i] + "\n")
-    }
-  }
-  buf.write_string("\nCategories\n")
+  buf.write_string(
+    "  EoE ....................... " +
+    bool_true_false(
+      mailbox_protocol_supported(header.mailbox_protocols, mailbox_eoe_mask),
+    ) +
+    "\n",
+  )
+  buf.write_string(
+    "  FoE ....................... " +
+    bool_true_false(
+      mailbox_protocol_supported(header.mailbox_protocols, mailbox_foe_mask),
+    ) +
+    "\n",
+  )
+  buf.write_string(
+    "  SoE ....................... " +
+    bool_true_false(
+      mailbox_protocol_supported(header.mailbox_protocols, mailbox_soe_mask),
+    ) +
+    "\n",
+  )
+  buf.write_string(
+    "  VoE ....................... " +
+    bool_true_false(
+      mailbox_protocol_supported(header.mailbox_protocols, mailbox_voe_mask),
+    ) +
+    "\n\n",
+  )
+  buf.write_string(
+    "EEPROM size: ................ " +
+    standard.eeprom_size_bytes().to_string() +
+    " bytes\n",
+  )
+  buf.write_string(
+    "Version: .................... " + standard.version.to_string() + "\n\n",
+  )
   for entry in categories {
-    buf.write_string(
-      "  " +
-      entry.category.to_string() +
-      ": " +
-      entry.data.length().to_string() +
-      " bytes\n",
-    )
+    match entry.category {
+      Strings => append_sii_strings_section(buf, entry, strings)
+      General =>
+        match general {
+          Some(info) => append_sii_general_section(buf, entry, info, strings)
+          None => ()
+        }
+      Fmmu =>
+        append_sii_fmmu_section(buf, entry, @mailbox.parse_sii_fmmu(entry.data))
+      SyncManager =>
+        append_sii_sm_section(buf, entry, @mailbox.parse_sii_sm(entry.data))
+      Dc => {
+        let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
+          entry.data,
+        )
+        match parsed {
+          Ok(dc) => append_sii_dc_section(buf, entry, dc, strings)
+          Err(_) => ()
+        }
+      }
+      _ => ()
+    }
   }
   buf.to_string()
 }

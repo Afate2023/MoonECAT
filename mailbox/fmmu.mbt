@@ -15,6 +15,7 @@ pub(all) struct FmmuConfig {
 pub(all) enum FmmuDirection {
   Outputs
   Inputs
+  MailboxState
 } derive(Eq, Show)
 
 ///|

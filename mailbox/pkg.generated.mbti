@@ -46,6 +46,8 @@ pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcE
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
+pub fn parse_sii_dc(Bytes) -> SiiDcClock raise @hal.EcError
+
 pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
 
 pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
@@ -54,7 +56,11 @@ pub fn parse_sii_header(Bytes) -> SiiData raise @hal.EcError
 
 pub fn parse_sii_pdo(Bytes) -> Array[SiiPdo]
 
+pub fn parse_sii_preamble(Bytes) -> SiiPreamble raise @hal.EcError
+
 pub fn parse_sii_sm(Bytes) -> Array[SiiSmEntry]
+
+pub fn parse_sii_standard_metadata(Bytes) -> SiiStandardMetadata raise @hal.EcError
 
 pub fn parse_sii_strings(Bytes) -> Array[String]
 
@@ -100,6 +106,7 @@ pub impl Show for FmmuConfig
 pub(all) enum FmmuDirection {
   Outputs
   Inputs
+  MailboxState
 }
 pub impl Eq for FmmuDirection
 pub impl Show for FmmuDirection
@@ -283,6 +290,19 @@ pub(all) struct SiiData {
 pub impl Eq for SiiData
 pub impl Show for SiiData
 
+pub(all) struct SiiDcClock {
+  cycle_time_0 : UInt
+  shift_time_0 : UInt
+  shift_time_1 : UInt
+  sync1_cycle_factor : Int
+  assign_activate : UInt
+  sync0_cycle_factor : Int
+  name_idx : Byte
+  description_idx : Byte
+}
+pub impl Eq for SiiDcClock
+pub impl Show for SiiDcClock
+
 pub(all) struct SiiGeneral {
   group_idx : Byte
   image_idx : Byte
@@ -292,8 +312,16 @@ pub(all) struct SiiGeneral {
   foe_supported : Bool
   eoe_supported : Bool
   soe_supported : Bool
+  soe_channels : Byte
+  ds402_channels : Byte
+  sysman_class : Byte
   flags : Byte
   current_on_ebus : UInt
+  physical_port_0 : Byte
+  physical_port_1 : Byte
+  physical_port_2 : Byte
+  physical_port_3 : Byte
+  physical_memory_address : UInt
 }
 pub fn SiiGeneral::is_op_only(Self) -> Bool
 pub fn SiiGeneral::prefers_not_lrw(Self) -> Bool
@@ -324,15 +352,37 @@ pub(all) struct SiiPdoEntry {
 pub impl Eq for SiiPdoEntry
 pub impl Show for SiiPdoEntry
 
+pub(all) struct SiiPreamble {
+  pdi_control : UInt
+  pdi_config : UInt
+  sync_impulse_length_raw : UInt
+  pdi_config2 : UInt
+  configured_station_alias : UInt
+  checksum : UInt
+  checksum_ok : Bool
+}
+pub fn SiiPreamble::sync_impulse_length_ns(Self) -> UInt
+pub impl Eq for SiiPreamble
+pub impl Show for SiiPreamble
+
 pub(all) struct SiiSmEntry {
   physical_start : UInt
   length : UInt
   control : Byte
+  status : Byte
   enable : Bool
   sm_type : SmType
 }
 pub impl Eq for SiiSmEntry
 pub impl Show for SiiSmEntry
+
+pub(all) struct SiiStandardMetadata {
+  eeprom_size_raw : UInt
+  version : UInt
+}
+pub fn SiiStandardMetadata::eeprom_size_bytes(Self) -> UInt
+pub impl Eq for SiiStandardMetadata
+pub impl Show for SiiStandardMetadata
 
 pub(all) struct SlaveMapping {
   sm_configs : Array[SmConfig]

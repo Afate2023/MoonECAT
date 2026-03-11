@@ -69,6 +69,19 @@ test "cli run helper reopens nic for run path" {
 
 ///|
 test "cli read_sii_json includes header and categories" {
+  let preamble : @mailbox.SiiPreamble = {
+    pdi_control: 0x0E80U,
+    pdi_config: 0xEE44U,
+    sync_impulse_length_raw: 0x0010U,
+    pdi_config2: 0U,
+    configured_station_alias: 0U,
+    checksum: 0x00CBU,
+    checksum_ok: true,
+  }
+  let standard : @mailbox.SiiStandardMetadata = {
+    eeprom_size_raw: 15U,
+    version: 1U,
+  }
   let header : @mailbox.SiiData = {
     vendor_id: 1U,
     product_code: 2U,
@@ -93,14 +106,54 @@ test "cli read_sii_json includes header and categories" {
     foe_supported: true,
     eoe_supported: false,
     soe_supported: true,
+    soe_channels: b'\x01',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
     flags: b'\x0A',
     current_on_ebus: 14U,
+    physical_port_0: b'\x01',
+    physical_port_1: b'\x01',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
   })
-  let json = read_sii_json(0U, 128, header, general, ["SlaveName"], [
-    { category: @mailbox.General, data: Bytes::new(16) },
-  ])
+  let json = read_sii_json(
+    0U,
+    128,
+    preamble,
+    standard,
+    header,
+    general,
+    ["SlaveName"],
+    [@mailbox.FmmuDirection::Outputs],
+    [
+      {
+        physical_start: 0x1000U,
+        length: 256U,
+        control: b'\x26',
+        status: b'\x00',
+        enable: true,
+        sm_type: @mailbox.SmType::MailboxOut,
+      },
+    ],
+    [
+      {
+        cycle_time_0: 0U,
+        shift_time_0: 0U,
+        shift_time_1: 0U,
+        sync1_cycle_factor: 0,
+        assign_activate: 0x0300U,
+        sync0_cycle_factor: 0,
+        name_idx: b'\x01',
+        description_idx: b'\x01',
+      },
+    ],
+    [{ category: @mailbox.General, data: Bytes::new(32) }],
+  )
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"vendor_id\": 1"))
+  assert_true(text.contains("\"preamble\""))
+  assert_true(text.contains("\"dc_clocks\""))
   assert_true(text.contains("\"strings\""))
   assert_true(text.contains("\"categories\""))
 }

@@ -29,6 +29,51 @@ pub(all) struct SiiData {
 } derive(Eq, Show)
 
 ///|
+/// Fixed SII preamble loaded by the ESC during startup.
+pub(all) struct SiiPreamble {
+  pdi_control : UInt
+  pdi_config : UInt
+  sync_impulse_length_raw : UInt
+  pdi_config2 : UInt
+  configured_station_alias : UInt
+  checksum : UInt
+  checksum_ok : Bool
+} derive(Eq, Show)
+
+///|
+pub fn SiiPreamble::sync_impulse_length_ns(self : SiiPreamble) -> UInt {
+  self.sync_impulse_length_raw * 10U
+}
+
+///|
+/// Additional fixed metadata stored after the standard SII config block.
+pub(all) struct SiiStandardMetadata {
+  eeprom_size_raw : UInt
+  version : UInt
+} derive(Eq, Show)
+
+///|
+pub fn SiiStandardMetadata::eeprom_size_bytes(
+  self : SiiStandardMetadata,
+) -> UInt {
+  (self.eeprom_size_raw << 7) + 0x80U
+}
+
+///|
+/// Parsed DC clock category entry.
+/// This follows the field layout siitool uses for category 0x3c.
+pub(all) struct SiiDcClock {
+  cycle_time_0 : UInt
+  shift_time_0 : UInt
+  shift_time_1 : UInt
+  sync1_cycle_factor : Int
+  assign_activate : UInt
+  sync0_cycle_factor : Int
+  name_idx : Byte
+  description_idx : Byte
+} derive(Eq, Show)
+
+///|
 /// Parsed SII PDO descriptor (TxPdo/RxPdo category).
 pub(all) struct SiiPdo {
   pdo_index : UInt

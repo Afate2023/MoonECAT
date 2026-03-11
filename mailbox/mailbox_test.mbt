@@ -14,6 +14,39 @@ test "SiiCategory display" {
 test "FmmuDirection display" {
   inspect(@mailbox.FmmuDirection::Outputs, content="Outputs")
   inspect(@mailbox.FmmuDirection::Inputs, content="Inputs")
+  inspect(@mailbox.FmmuDirection::MailboxState, content="MailboxState")
+}
+
+///|
+test "parse_sii_preamble from fixed bytes" {
+  let bytes = Bytes::from_array([
+    b'\x80', b'\x0E', b'\x44', b'\xEE', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00',
+    b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\xCB', b'\x00',
+  ])
+  let preamble = @mailbox.parse_sii_preamble(bytes)
+  assert_eq(preamble.pdi_control, 0x0E80U)
+  assert_eq(preamble.pdi_config, 0xEE44U)
+  assert_eq(preamble.sync_impulse_length_raw, 0x0010U)
+  assert_eq(preamble.sync_impulse_length_ns(), 160U)
+  assert_eq(preamble.checksum, 0x00CBU)
+  assert_true(preamble.checksum_ok)
+}
+
+///|
+test "parse_sii_standard_metadata from fixed bytes" {
+  let bytes = Bytes::makei(128, fn(i) {
+    match i {
+      124 => b'\x0F'
+      125 => b'\x00'
+      126 => b'\x01'
+      127 => b'\x00'
+      _ => b'\x00'
+    }
+  })
+  let metadata = @mailbox.parse_sii_standard_metadata(bytes)
+  assert_eq(metadata.eeprom_size_raw, 15U)
+  assert_eq(metadata.eeprom_size_bytes(), 2048U)
+  assert_eq(metadata.version, 1U)
 }
 
 ///|
@@ -73,6 +106,7 @@ test "parse_sii_general from fixture" {
   assert_eq(general.name_idx, b'\x04')
   assert_true(general.foe_supported)
   assert_true(general.eoe_supported)
+  assert_eq(general.soe_channels, b'\x00')
 }
 
 ///|
@@ -87,6 +121,15 @@ test "parse_sii_fmmu from fixture" {
 }
 
 ///|
+test "parse_sii_fmmu retains mailbox state entry" {
+  let fmmu_dirs = @mailbox.parse_sii_fmmu(
+    Bytes::from_array([b'\x01', b'\x02', b'\x03']),
+  )
+  assert_eq(fmmu_dirs.length(), 3)
+  assert_eq(fmmu_dirs[2], @mailbox.FmmuDirection::MailboxState)
+}
+
+///|
 test "parse_sii_sm from fixture" {
   let eeprom = @fixtures.sample_sii_eeprom()
   let categories = @mailbox.parse_sii_categories(eeprom)
@@ -96,9 +139,24 @@ test "parse_sii_sm from fixture" {
   assert_eq(sm_entries[0].physical_start, 0x1000U)
   assert_eq(sm_entries[0].length, 128U)
   assert_eq(sm_entries[0].sm_type, @mailbox.SmType::MailboxOut)
+  assert_eq(sm_entries[0].status, b'\x00')
   assert_true(sm_entries[0].enable)
   assert_eq(sm_entries[1].physical_start, 0x1080U)
   assert_eq(sm_entries[1].sm_type, @mailbox.SmType::MailboxIn)
+}
+
+///|
+test "parse_sii_dc decodes siitool layout" {
+  let dc = @mailbox.parse_sii_dc(
+    Bytes::from_array([
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x03', b'\x00', b'\x00',
+      b'\x03', b'\x04', b'\x00', b'\x00', b'\x00', b'\x00',
+    ]),
+  )
+  assert_eq(dc.assign_activate, 0x0300U)
+  assert_eq(dc.name_idx, b'\x03')
+  assert_eq(dc.description_idx, b'\x04')
 }
 
 ///|
@@ -123,6 +181,7 @@ test "calculate_sm_configs uses sii header for mailbox" {
       physical_start: 0U,
       length: 0U,
       control: b'\x26',
+      status: b'\x00',
       enable: true,
       sm_type: @mailbox.SmType::MailboxOut,
     },
@@ -130,6 +189,7 @@ test "calculate_sm_configs uses sii header for mailbox" {
       physical_start: 0U,
       length: 0U,
       control: b'\x22',
+      status: b'\x00',
       enable: true,
       sm_type: @mailbox.SmType::MailboxIn,
     },
@@ -1155,8 +1215,16 @@ test "SiiGeneral::is_op_only detects flag bit 0" {
     foe_supported: false,
     eoe_supported: false,
     soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
     flags: b'\x01', // bit 0 set = OpOnly
     current_on_ebus: 0U,
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
   }
   assert_true(gen.is_op_only())
   assert_true(not(gen.prefers_not_lrw()))
@@ -1174,8 +1242,16 @@ test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
     foe_supported: false,
     eoe_supported: false,
     soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
     flags: b'\x02', // bit 1 set = NotLRW
     current_on_ebus: 0U,
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
   }
   assert_true(not(gen.is_op_only()))
   assert_true(gen.prefers_not_lrw())
@@ -1192,8 +1268,16 @@ test "SiiGeneral::supports_identification_ado detects flag bit 3" {
     foe_supported: false,
     eoe_supported: false,
     soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
     flags: b'\x08', // bit 3 set = IdentificationAdo
     current_on_ebus: 0U,
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
   }
   assert_true(gen.supports_identification_ado())
 }
@@ -1209,8 +1293,16 @@ test "SiiGeneral all flags clear" {
     foe_supported: false,
     eoe_supported: false,
     soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
     flags: b'\x00',
     current_on_ebus: 0U,
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
   }
   assert_true(not(gen.is_op_only()))
   assert_true(not(gen.prefers_not_lrw()))

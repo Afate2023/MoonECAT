@@ -11,6 +11,30 @@ let sii_vendor_id : Int = 8
 let sii_product_code : Int = 10
 
 ///|
+/// PDI control word (word 0).
+let sii_pdi_control : Int = 0
+
+///|
+/// PDI config word (word 1).
+let sii_pdi_config : Int = 1
+
+///|
+/// Sync impulse length (word 2), stored in units of 10 ns.
+let sii_sync_impulse_length : Int = 2
+
+///|
+/// PDI config 2 word (word 3).
+let sii_pdi_config2 : Int = 3
+
+///|
+/// Configured station alias (word 4).
+let sii_configured_station_alias : Int = 4
+
+///|
+/// Preamble checksum (word 7).
+let sii_preamble_checksum : Int = 7
+
+///|
 /// Revision Number (words 12-13, 32-bit).
 let sii_revision : Int = 12
 
@@ -53,6 +77,14 @@ let sii_std_tx_size : Int = 27
 ///|
 /// Mailbox Protocol word (word 28).
 let sii_mailbox_protocol : Int = 28
+
+///|
+/// Encoded EEPROM size word (word 62).
+let sii_eeprom_size : Int = 62
+
+///|
+/// SII version word (word 63).
+let sii_eeprom_version : Int = 63
 
 ///|
 /// First category header starts at word 64.
@@ -103,6 +135,67 @@ fn read_sii_dword(data : Bytes, word_offset : Int) -> UInt {
 }
 
 ///|
+fn read_sii_word_at_byte(data : Bytes, byte_offset : Int) -> UInt {
+  if byte_offset + 1 >= data.length() {
+    return 0U
+  }
+  data[byte_offset].to_int().reinterpret_as_uint() |
+  (data[byte_offset + 1].to_int().reinterpret_as_uint() << 8)
+}
+
+///|
+fn read_sii_dword_at_byte(data : Bytes, byte_offset : Int) -> UInt {
+  read_sii_word_at_byte(data, byte_offset) |
+  (read_sii_word_at_byte(data, byte_offset + 2) << 16)
+}
+
+///|
+fn read_sii_i16_at_byte(data : Bytes, byte_offset : Int) -> Int {
+  let value = read_sii_word_at_byte(data, byte_offset).reinterpret_as_int()
+  if value >= 0x8000 {
+    value - 0x10000
+  } else {
+    value
+  }
+}
+
+///|
+fn crc8_update(crc : Int, value : Byte) -> Int {
+  let mut current = (crc ^ value.to_int()) & 0xFF
+  for _ in 0..<8 {
+    current = if (current & 0x80) != 0 {
+      ((current << 1) & 0xFF) ^ 0x07
+    } else {
+      (current << 1) & 0xFF
+    }
+  }
+  current
+}
+
+///|
+/// Parse the fixed SII preamble.
+pub fn parse_sii_preamble(data : Bytes) -> SiiPreamble raise @hal.EcError {
+  if data.length() < 16 {
+    raise @hal.EcError::SiiReadFailed(
+      "SII preamble too short: " + data.length().to_string() + " bytes",
+    )
+  }
+  let mut crc = 0xFF
+  for i = 0; i < 16; i = i + 1 {
+    crc = crc8_update(crc, data[i])
+  }
+  {
+    pdi_control: read_sii_word(data, sii_pdi_control),
+    pdi_config: read_sii_word(data, sii_pdi_config),
+    sync_impulse_length_raw: read_sii_word(data, sii_sync_impulse_length),
+    pdi_config2: read_sii_word(data, sii_pdi_config2),
+    configured_station_alias: read_sii_word(data, sii_configured_station_alias),
+    checksum: read_sii_word(data, sii_preamble_checksum),
+    checksum_ok: crc == 0,
+  }
+}
+
+///|
 /// Parse the fixed SII header fields from raw EEPROM data.
 pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
   // Minimum: need at least 29 words (58 bytes) for the standard header
@@ -125,6 +218,22 @@ pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
     mailbox_tx_offset: read_sii_word(data, sii_std_tx_offset),
     mailbox_tx_size: read_sii_word(data, sii_std_tx_size),
     mailbox_protocols: read_sii_word(data, sii_mailbox_protocol),
+  }
+}
+
+///|
+/// Parse standard SII metadata fields after the mailbox configuration block.
+pub fn parse_sii_standard_metadata(
+  data : Bytes,
+) -> SiiStandardMetadata raise @hal.EcError {
+  if data.length() < 128 {
+    raise @hal.EcError::SiiReadFailed(
+      "SII metadata too short: " + data.length().to_string() + " bytes",
+    )
+  }
+  {
+    eeprom_size_raw: read_sii_word(data, sii_eeprom_size),
+    version: read_sii_word(data, sii_eeprom_version),
   }
 }
 
@@ -191,8 +300,16 @@ pub(all) struct SiiGeneral {
   foe_supported : Bool
   eoe_supported : Bool
   soe_supported : Bool
+  soe_channels : Byte
+  ds402_channels : Byte
+  sysman_class : Byte
   flags : Byte
   current_on_ebus : UInt
+  physical_port_0 : Byte
+  physical_port_1 : Byte
+  physical_port_2 : Byte
+  physical_port_3 : Byte
+  physical_memory_address : UInt
 } derive(Eq, Show)
 
 ///|
@@ -212,20 +329,61 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
     foe_supported: (data[6].to_int() & 0x01) != 0,
     eoe_supported: (data[7].to_int() & 0x01) != 0,
     soe_supported: data[8] != b'\x00',
+    soe_channels: if data.length() > 8 {
+      data[8]
+    } else {
+      b'\x00'
+    },
+    ds402_channels: if data.length() > 9 {
+      data[9]
+    } else {
+      b'\x00'
+    },
+    sysman_class: if data.length() > 10 {
+      data[10]
+    } else {
+      b'\x00'
+    },
     flags: data[11],
     current_on_ebus: read_sii_word(data, 6),
+    physical_port_0: if data.length() > 16 {
+      data[16] & b'\x0F'
+    } else {
+      b'\x00'
+    },
+    physical_port_1: if data.length() > 16 {
+      (data[16].to_int() >> 4).to_byte() & b'\x0F'
+    } else {
+      b'\x00'
+    },
+    physical_port_2: if data.length() > 17 {
+      data[17] & b'\x0F'
+    } else {
+      b'\x00'
+    },
+    physical_port_3: if data.length() > 17 {
+      (data[17].to_int() >> 4).to_byte() & b'\x0F'
+    } else {
+      b'\x00'
+    },
+    physical_memory_address: if data.length() > 19 {
+      read_sii_word_at_byte(data, 18)
+    } else {
+      0U
+    },
   }
 }
 
 ///|
 /// Parse the FMMU category data. Each entry is 1 byte indicating FMMU usage.
-/// Per ETG1000.6 Table 22: 0x01 = Outputs (master→slave), 0x02 = Inputs (slave→master).
+/// Per ETG1000.6 Table 22: 0x01 = Outputs, 0x02 = Inputs, 0x03 = mailbox state.
 pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
   let result : Array[FmmuDirection] = []
   for i = 0; i < data.length(); i = i + 1 {
     match data[i] {
       b'\x01' => result.push(Outputs)
       b'\x02' => result.push(Inputs)
+      b'\x03' => result.push(MailboxState)
       _ => ()
     }
   }
@@ -238,6 +396,7 @@ pub(all) struct SiiSmEntry {
   physical_start : UInt
   length : UInt
   control : Byte
+  status : Byte
   enable : Bool
   sm_type : SmType
 } derive(Eq, Show)
@@ -252,6 +411,7 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
     let phys = read_sii_word(data, offset / 2)
     let length = read_sii_word(data, offset / 2 + 1)
     let control = data[offset + 4]
+    let status = data[offset + 5]
     let enable = (data[offset + 6].to_int() & 0x01) != 0
     let type_byte = data[offset + 7]
     let sm_type : SmType = match type_byte {
@@ -261,7 +421,14 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
       b'\x04' => ProcessDataIn
       _ => Unused
     }
-    result.push({ physical_start: phys, length, control, enable, sm_type })
+    result.push({
+      physical_start: phys,
+      length,
+      control,
+      status,
+      enable,
+      sm_type,
+    })
     offset = offset + entry_size
   }
   result
@@ -340,4 +507,24 @@ pub fn parse_sii_pdo(data : Bytes) -> Array[SiiPdo] {
     })
   }
   result
+}
+
+///|
+/// Parse a DC clock category entry.
+pub fn parse_sii_dc(data : Bytes) -> SiiDcClock raise @hal.EcError {
+  if data.length() < 24 {
+    raise @hal.EcError::EsiParseFailed(
+      "DC category too short: " + data.length().to_string(),
+    )
+  }
+  {
+    cycle_time_0: read_sii_dword_at_byte(data, 0),
+    shift_time_0: read_sii_dword_at_byte(data, 4),
+    shift_time_1: read_sii_dword_at_byte(data, 8),
+    sync1_cycle_factor: read_sii_i16_at_byte(data, 12),
+    assign_activate: read_sii_word_at_byte(data, 14),
+    sync0_cycle_factor: read_sii_i16_at_byte(data, 16),
+    name_idx: data[18],
+    description_idx: data[19],
+  }
 }

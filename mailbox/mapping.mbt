@@ -69,6 +69,7 @@ pub fn calculate_fmmu_configs(
     let target_type : SmType = match dir {
       Outputs => ProcessDataOut
       Inputs => ProcessDataIn
+      MailboxState => continue
     }
     // find matching SM
     let sm_idx = find_unassigned_sm(sm_configs, sm_used, target_type)
@@ -91,6 +92,7 @@ pub fn calculate_fmmu_configs(
         match dir {
           Outputs => total_output = total_output + byte_len
           Inputs => total_input = total_input + byte_len
+          MailboxState => ()
         }
         current_offset = current_offset + length
       }
@@ -141,6 +143,7 @@ pub fn calculate_fmmu_configs(
               None => ()
             }
           }
+          MailboxState => ()
         }
     }
   }
@@ -245,6 +248,7 @@ pub fn FmmuConfig::to_bytes(self : FmmuConfig) -> Bytes {
   let dir_byte : Byte = match self.direction {
     Outputs => b'\x02'
     Inputs => b'\x01'
+    MailboxState => b'\x00'
   }
   buf.write_byte(dir_byte)
   // Byte 12: activate
