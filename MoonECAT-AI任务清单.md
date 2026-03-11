@@ -260,6 +260,8 @@
 - [x] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 已接入 Mock HAL + scan/validate/run 流程
   - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
+- [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
+  - ✅ [cmd/main/main.mbt](cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](cmd/main/main_wbtest.mbt)，代码提交：`0b374aa`
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
@@ -328,6 +330,7 @@
 - `native backend cli smoke path`：CLI 复用 native HAL 跑通 scan/validate/run
 - `native real smoke stability fix`：空总线 `run` 跳过无效 ESM 广播，CLI `run` 采用 probe/run 双实例 NIC 路径
 - `native slave identity recovery`：基于 SII/AP 优先回退链修复真实从站身份读取，并过滤 Native 自发回显帧
+- `minimal read-sii cli command`：新增 Native CLI 在线 SII 读取入口与最小 JSON/文本输出
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
 - `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封
@@ -346,6 +349,7 @@
 - `Native CLI smoke regression + release matrix docs` → `8aa93aa` `test(cli): add native smoke regression and release matrix docs`
 - `Native real smoke stability fix` → `8ac4ce6` `fix(native): stabilize real smoke run path`
 - `Native slave identity recovery` → `f691f91` `fix(native): recover slave identity from real scans`
+- `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
@@ -380,7 +384,7 @@
 | 功能 | 调用流文档依据 | 参考实现（本地代码） | MoonECAT 对应实现 | 结论 |
 |---|---|---|---|---|
 | Native NIC backend / `list-if` / 真实链路入口 | [gatorcat-callflow-analysis.md:44](src/gatorcat-callflow-analysis.md#L44) [ethercrab-callflow-analysis.md:74](src/ethercrab-callflow-analysis.md#L74) [igh-callflow-analysis.md:90](src/igh-callflow-analysis.md#L90) | Npcap SDK: [UserBridge.c:44](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L44) (`LoadNpcapDlls`) + [UserBridge.c:110](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L110) (`pcap_findalldevs_ex`) + [UserBridge.c:193](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L193) (`pcap_open`)；IGH: [generic.c:219](Reference_Project/ethercat/devices/generic.c#L219) (`sock_create_kern`) + [generic.c:234](Reference_Project/ethercat/devices/generic.c#L234) (`sockaddr_ll`)；GatorCAT: [nic.zig:182](Reference_Project/gatorcat/src/module/nic.zig#L182) (`npcap.pcap_open`) | [hal/native/platform_stub.c](hal/native/platform_stub.c) [hal/native/windows_npcap_ffi.mbt](hal/native/windows_npcap_ffi.mbt) [hal/native/linux_raw_socket_ffi.mbt](hal/native/linux_raw_socket_ffi.mbt) [hal/native/native_nic.mbt](hal/native/native_nic.mbt) [cmd/main/main.mbt](cmd/main/main.mbt) [runtime/scan.mbt](runtime/scan.mbt) [protocol/eeprom.mbt](protocol/eeprom.mbt) | 已完成真实空总线 smoke：Windows Npcap 1.8.4 / Realtek USB GbE 接口上已验证 `list-if -> scan -> validate -> run`；后续通过 SII 优先 + AP/FP 回退链与 Native 自发回显过滤恢复了真实从站非零身份字段，代码提交 `f691f91` |
-| SII 全信息读取设计 / 在线诊断入口 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_main.c:1995](Reference_Project/SOEM/src/ec_main.c#L1995) (`ecx_readeepromAP`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；EtherCAT.NET: [EsiSiiHandler.cs:1](Reference_Project/EtherCAT.net.ui_sii/EsiSiiHandler.cs#L1)；siitool: [sii.c:1](Reference_Project/siitool/sii.c#L1) | [docs/SII_FULL_READ_DESIGN.md](docs/SII_FULL_READ_DESIGN.md) | 已完成分层设计，待后续实现 `read-sii` 命令与完整 category 在线读取 |
+| SII 全信息读取设计 / 在线诊断入口 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_main.c:1995](Reference_Project/SOEM/src/ec_main.c#L1995) (`ecx_readeepromAP`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；EtherCAT.NET: [EsiSiiHandler.cs:1](Reference_Project/EtherCAT.net.ui_sii/EsiSiiHandler.cs#L1)；siitool: [sii.c:1](Reference_Project/siitool/sii.c#L1) | [docs/SII_FULL_READ_DESIGN.md](docs/SII_FULL_READ_DESIGN.md) [cmd/main/main.mbt](cmd/main/main.mbt) | 已完成分层设计与最小 `read-sii` 在线读取入口（header/general/strings/categories）；完整 category 深度解码待后续补齐 |
 | 扫描/拓扑/基础发现 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [CherryECAT-callflow-analysis.md:178](src/CherryECAT-callflow-analysis.md#L178) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | SOEM: [ec_config.c:172](Reference_Project/SOEM/src/ec_config.c#L172) (`ecx_config_init`) Cherry: [ec_slave.c:955](Reference_Project/CherryECAT/src/ec_slave.c#L955) (`ec_slaves_scanning`) ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) | [runtime/scan.mbt](runtime/scan.mbt) [protocol/discovery.mbt](protocol/discovery.mbt) | 已对齐 |
 | ESM 状态机与回退 | [SOEM-callflow-analysis.md:465](src/SOEM-callflow-analysis.md#L465) [IGH-callflow-analysis.md:486](src/igh-callflow-analysis.md#L486) | SOEM: [ec_main.c:1017](Reference_Project/SOEM/src/ec_main.c#L1017) (`ecx_writestate`) + [ec_main.c:1052](Reference_Project/SOEM/src/ec_main.c#L1052) (`ecx_statecheck`)；IGH: [fsm_slave_config.c:223](Reference_Project/ethercat/master/fsm_slave_config.c#L223) (`ec_fsm_slave_config_state_start`) | [protocol/esm.mbt](protocol/esm.mbt) [protocol/esm_engine.mbt](protocol/esm_engine.mbt) [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | 已对齐 |
 | PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](Reference_Project/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](Reference_Project/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](Reference_Project/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |

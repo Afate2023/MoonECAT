@@ -41,6 +41,12 @@ moon run cmd/main list-if -- --backend native-linux-raw --json
 
 # Run a scan with the auto-selected native backend
 moon run cmd/main scan -- --backend native --if <interface>
+
+# Read a slave SII window and print parsed header/general/categories
+moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --words 128
+
+# Read the same SII window as JSON
+moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --words 128 --json
 ```
 
 `list-if --json` returns a structured object with `backend` and `interfaces`.
@@ -50,6 +56,11 @@ as `description`, `loopback`, or `index`.
 `--backend native` resolves to Windows Npcap when available, otherwise Linux Raw
 Socket when available. Use the explicit backend names when you need predictable
 cross-machine scripts.
+
+`read-sii` currently performs a minimal online SII read for one slave position
+via the native backend and reports the parsed header, General category, string
+table, and discovered category list. Use `--position` to select the slave index
+and `--words` to control the EEPROM word window to read.
 
 MoonBit CLI flags belong to `moon run`, so MoonECAT parameters must be placed
 after `--`, otherwise flags like `--backend` and `--if` will be consumed by
