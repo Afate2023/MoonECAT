@@ -46,6 +46,52 @@ test "cli numeric flag parsers reject invalid integers" {
 }
 
 ///|
+test "cli esm state parser accepts canonical names" {
+  assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
+  assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)
+  assert_eq(parse_esm_state_flag("--state", "safeop"), @protocol.SafeOp)
+  assert_eq(parse_esm_state_flag("--state", "op"), @protocol.Op)
+  assert_eq(parse_esm_state_flag("--state", "boot"), @protocol.Boot)
+}
+
+///|
+test "cli esm state parser rejects unknown names" {
+  let result : Result[@protocol.EsmState, Error] = try? parse_esm_state_flag(
+    "--state", "running",
+  )
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli transition path falls back through init when needed" {
+  let path = build_cli_transition_path(@protocol.Op, @protocol.Boot)
+  assert_eq(path.length(), 5)
+  assert_eq(path[0], @protocol.Op)
+  assert_eq(path[1], @protocol.SafeOp)
+  assert_eq(path[2], @protocol.PreOp)
+  assert_eq(path[3], @protocol.Init)
+  assert_eq(path[4], @protocol.Boot)
+}
+
+///|
+test "cli state transition report json includes station mode fields" {
+  let json = state_transition_report_json({
+    mode: "station-path",
+    target: @protocol.SafeOp,
+    station: Some(0x1001U),
+    current: Some(@protocol.PreOp),
+    final_state: Some(@protocol.SafeOp),
+    status_code: Some(0U),
+    wkc: None,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"mode\": \"station-path\""))
+  assert_true(text.contains("\"target_state\": \"SafeOp\""))
+  assert_true(text.contains("\"station\": 4097"))
+  assert_true(text.contains("\"final_state\": \"SafeOp\""))
+}
+
+///|
 test "cli native backend mapping stays stable" {
   assert_eq(cli_backend_to_native_backend(NativeAuto), @native.Auto)
   assert_eq(

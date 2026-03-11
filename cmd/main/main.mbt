@@ -8,7 +8,7 @@ enum CliBackend {
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii.
+/// Commands: list-if, scan, validate, run, read-sii, state.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -59,6 +59,35 @@ fn cli_main() -> Unit raise @hal.EcError {
           @native.default_linux_config(interface_name),
         )
         run_read_sii_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "state" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported("state requires a native backend")
+      NativeAuto => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_native_config(interface_name),
+        )
+        run_state_command(nic, args, as_json, timeout)
+      }
+      NativeWindowsNpcap => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_windows_npcap_config(interface_name),
+        )
+        run_state_command(nic, args, as_json, timeout)
+      }
+      NativeLinuxRaw => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_linux_config(interface_name),
+        )
+        run_state_command(nic, args, as_json, timeout)
       }
     }
     return
@@ -215,7 +244,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--station <configured-address>] [--path]",
   )
   println("Default backend: mock")
   println("Examples:")
@@ -224,6 +253,86 @@ fn print_usage() -> Unit {
   println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
   )
+  println(
+    "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path",
+  )
+}
+
+///|
+fn[N : @hal.Nic] run_state_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let target = require_esm_state_flag(args, "--state")
+  let station = optional_uint_flag(args, "--station")
+  let use_path = has_flag(args, "--path")
+    let report_result : Result[StateTransitionReport, @hal.EcError] = try? compute_state_transition_report(
+    nic, target, station, use_path, timeout,
+  )
+  nic.close()
+  let report = match report_result {
+    Ok(value) => value
+    Err(err) => raise err
+  }
+  if as_json {
+    println(state_transition_report_json(report).stringify(indent=2))
+  } else {
+    println(state_transition_report_text(report))
+  }
+}
+
+///|
+fn[N : @hal.Nic] compute_state_transition_report(
+  nic : N,
+  target : @protocol.EsmState,
+  station : UInt?,
+  use_path : Bool,
+  timeout : @hal.Duration,
+) -> StateTransitionReport raise @hal.EcError {
+  match station {
+    Some(configured_station) => {
+      let current = @protocol.read_al_status(nic, configured_station, timeout)
+      let final_state = if use_path {
+        let path = build_cli_transition_path(current, target)
+        @protocol.transition_through(nic, configured_station, path, timeout)
+      } else {
+        @protocol.request_state(nic, configured_station, target, timeout)
+      }
+      let status_code = try? @protocol.read_al_status_code(
+        nic, configured_station, timeout,
+      )
+      {
+        mode: if use_path {
+          "station-path"
+        } else {
+          "station-direct"
+        },
+        target,
+        station: Some(configured_station),
+        current: Some(current),
+        final_state: Some(final_state),
+        status_code: match status_code {
+          Ok(code) => Some(code)
+          Err(_) => None
+        },
+        wkc: None,
+      }
+    }
+    None => {
+      let wkc = @protocol.broadcast_state(nic, target, timeout)
+      {
+        mode: "broadcast",
+        target,
+        station: None,
+        current: None,
+        final_state: None,
+        status_code: None,
+        wkc: Some(wkc),
+      }
+    }
+  }
 }
 
 ///|
@@ -342,6 +451,99 @@ fn require_interface_name(args : Array[String]) -> String raise @hal.EcError {
         "native backend requires --if <interface>",
       )
   }
+}
+
+///|
+fn require_esm_state_flag(
+  args : Array[String],
+  flag : String,
+) -> @protocol.EsmState raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => parse_esm_state_flag(flag, text)
+    None =>
+      raise @hal.EcError::ConfigMismatch("missing state value for " + flag)
+  }
+}
+
+///|
+fn optional_uint_flag(
+  args : Array[String],
+  flag : String,
+) -> UInt? raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => Some(parse_uint_flag(flag, text))
+    None => None
+  }
+}
+
+///|
+fn parse_esm_state_flag(
+  flag : String,
+  text : String,
+) -> @protocol.EsmState raise @hal.EcError {
+  match text {
+    "init" => @protocol.Init
+    "preop" | "pre-op" => @protocol.PreOp
+    "safeop" | "safe-op" => @protocol.SafeOp
+    "op" => @protocol.Op
+    "boot" => @protocol.Boot
+    _ =>
+      raise @hal.EcError::ConfigMismatch(
+        "invalid ESM state for " + flag + ": " + text,
+      )
+  }
+}
+
+///|
+fn concat_state_paths(
+  left : Array[@protocol.EsmState],
+  right : Array[@protocol.EsmState],
+) -> Array[@protocol.EsmState] {
+  if left.is_empty() {
+    return right
+  }
+  if right.is_empty() {
+    return left
+  }
+  let result = left
+  for i = 1; i < right.length(); i = i + 1 {
+    result.push(right[i])
+  }
+  result
+}
+
+///|
+fn build_cli_transition_path(
+  current : @protocol.EsmState,
+  target : @protocol.EsmState,
+) -> Array[@protocol.EsmState] {
+  if current == target {
+    return [current]
+  }
+  if target == @protocol.Init {
+    return @protocol.build_shutdown_path(current)
+  }
+  if current == @protocol.Init {
+    return @protocol.build_transition_path(target)
+  }
+  if current.can_transition(target) {
+    return [current, target]
+  }
+  concat_state_paths(
+    @protocol.build_shutdown_path(current),
+    @protocol.build_transition_path(target),
+  )
+}
+
+///|
+struct StateTransitionReport {
+  mode : String
+  target : @protocol.EsmState
+  station : UInt?
+  current : @protocol.EsmState?
+  final_state : @protocol.EsmState?
+  status_code : UInt?
+  wkc : UInt?
 }
 
 ///|
@@ -1496,4 +1698,64 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       "dc_delay_updates": Json::number(tel.dc_delay_updates.to_double()),
     }),
   })
+}
+
+///|
+fn state_transition_report_json(report : StateTransitionReport) -> Json {
+  Json::object({
+    "mode": Json::string(report.mode),
+    "target_state": Json::string(report.target.to_string()),
+    "station": match report.station {
+      Some(station) => Json::number(station.to_double())
+      None => Json::null()
+    },
+    "current_state": match report.current {
+      Some(state) => Json::string(state.to_string())
+      None => Json::null()
+    },
+    "final_state": match report.final_state {
+      Some(state) => Json::string(state.to_string())
+      None => Json::null()
+    },
+    "status_code": match report.status_code {
+      Some(code) => Json::number(code.to_double())
+      None => Json::null()
+    },
+    "wkc": match report.wkc {
+      Some(wkc) => Json::number(wkc.to_double())
+      None => Json::null()
+    },
+  })
+}
+
+///|
+fn state_transition_report_text(report : StateTransitionReport) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("EtherCAT State Transition\n")
+  buf.write_string("=========================\n")
+  buf.write_string("Mode: " + report.mode + "\n")
+  buf.write_string("Target: " + report.target.to_string() + "\n")
+  match report.station {
+    Some(station) =>
+      buf.write_string("Station: " + format_hex(station, 4) + "\n")
+    None => ()
+  }
+  match report.current {
+    Some(state) => buf.write_string("Current: " + state.to_string() + "\n")
+    None => ()
+  }
+  match report.final_state {
+    Some(state) => buf.write_string("Final: " + state.to_string() + "\n")
+    None => ()
+  }
+  match report.status_code {
+    Some(code) =>
+      buf.write_string("AL Status Code: " + format_hex(code, 4) + "\n")
+    None => ()
+  }
+  match report.wkc {
+    Some(wkc) => buf.write_string("WKC: " + wkc.to_string() + "\n")
+    None => ()
+  }
+  buf.to_string()
 }
