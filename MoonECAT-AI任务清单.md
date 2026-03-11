@@ -292,7 +292,7 @@
   - 依赖：HAL 契约稳定、热路径分配约束继续收紧、CLI 输出模型保持不变、MoonBit Native FFI 包配置收口
 - [ ] **【新增】Extism / WASM 后端首版**：以宿主能力映射 + 共享内存缓冲区为核心，导出插件入口而不复制协议实现。
   - 规划文档： [docs/EXTISM_WASM_BACKEND_PLAN.md](docs/EXTISM_WASM_BACKEND_PLAN.md)
-  - 当前状态：已创建 [plugin/extism/moon.pkg](plugin/extism/moon.pkg) 包骨架，包含 envelope 类型、占位导出入口、错误码映射与最小 JSON 测试；尚未接入实际 host capability adapter
+  - 当前状态：已创建 [plugin/extism/moon.pkg](plugin/extism/moon.pkg) 包并接入基于 Mock HAL 的 `scan/validate/run` 回放入口，包含 envelope 类型、稳定错误码映射与最小 JSON 回放测试；实际 host capability adapter 与共享内存传输仍待接入
   - 目标范围：基于 moonbit-pdk / Extism 的插件封装，复用现有 `scan/validate/run` 库接口
   - 宿主前提：宿主负责 NIC open/send/recv/close、clock now/sleep、可选 file read/write；插件只持有句柄和序列化请求/响应
   - 数据边界：控制面优先 JSON/Bytes 信封；周期数据优先共享内存缓冲区，避免每周期大块拷贝
@@ -333,7 +333,7 @@
 - `minimal read-sii cli command`：新增 Native CLI 在线 SII 读取入口与最小 JSON/文本输出
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
-- `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封
+- `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封 + Mock replay 闭环
 - `extism host shared-memory transport`：共享内存缓冲区与 host capability 对接
 - `extism replay validation`：WASM/宿主最小回放验证与错误码对齐
 - `backend release matrix docs`：交付物矩阵、运行方式与回归入口整理
@@ -352,6 +352,7 @@
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
+- `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
 - `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
 
@@ -483,9 +484,12 @@
 
 ### FFI / 宿主边界
 
-- [ ] 检查 Native FFI 中所有非 primitive 参数是否已标注 `#borrow` / `#owned`，避免默认语义漂移。
-- [ ] 检查所有外部句柄是使用 finalizer external object 还是 `#external type`，并为每类句柄记录释放责任。
-- [ ] 检查 `.c` stub、`native-stub`、`targets` 配置是否只作用于 Native 路径，不破坏 wasm-gc 构建。
+- [x] 检查 Native FFI 中所有非 primitive 参数是否已标注 `#borrow` / `#owned`，避免默认语义漂移。
+  - ✅ [hal/native/windows_npcap_ffi.mbt](hal/native/windows_npcap_ffi.mbt) 与 [hal/native/linux_raw_socket_ffi.mbt](hal/native/linux_raw_socket_ffi.mbt) 的 `Bytes` 输入均已显式标注 `#borrow`
+- [x] 检查所有外部句柄是使用 finalizer external object 还是 `#external type`，并为每类句柄记录释放责任。
+  - ✅ 当前采用“整数句柄 ID + C stub 内部句柄表”策略，释放责任已记录在 [docs/NATIVE_FFI_SAFETY.md](docs/NATIVE_FFI_SAFETY.md)
+- [x] 检查 `.c` stub、`native-stub`、`targets` 配置是否只作用于 Native 路径，不破坏 wasm-gc 构建。
+  - ✅ [hal/native/moon.pkg](hal/native/moon.pkg) 已将 FFI 文件限制在 `native`，fallback 文件限制在 `wasm-gc`
 - [ ] 检查 Extism 宿主是否只暴露 HAL 等价能力，不把对象字典、ESM、PDO 语义上推到宿主。
 - [ ] 检查共享内存协议是否明确长度、所有权、超时与回收责任，避免 run 路径出现隐式复制与悬垂缓冲区。
 

@@ -72,4 +72,6 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture
 guide, data flow diagrams, testing strategy, common issues, and extension
 points. See [docs/BACKEND_RELEASE_MATRIX.md](docs/BACKEND_RELEASE_MATRIX.md)
 for the current Native CLI / Native Library / Extism Plugin release boundaries,
-environment requirements, and smoke commands.
+environment requirements, and smoke commands. See
+[docs/NATIVE_FFI_SAFETY.md](docs/NATIVE_FFI_SAFETY.md) for current Native FFI
+ownership notes, handle lifetime rules, and sanitizer validation guidance.
