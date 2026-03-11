@@ -267,7 +267,7 @@
   - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg](hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`）
+  - 当前状态：已创建 [hal/native/moon.pkg](hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移；Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
   - MoonBit Native FFI 工作包：
@@ -331,6 +331,7 @@
 - `native real smoke stability fix`：空总线 `run` 跳过无效 ESM 广播，CLI `run` 采用 probe/run 双实例 NIC 路径
 - `native slave identity recovery`：基于 SII/AP 优先回退链修复真实从站身份读取，并过滤 Native 自发回显帧
 - `minimal read-sii cli command`：新增 Native CLI 在线 SII 读取入口与最小 JSON/文本输出
+- `native state transition cli command`：新增 Native CLI 广播/定点 EtherCAT ESM 状态迁移入口与设计文档
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
 - `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封 + Mock replay 闭环
@@ -350,6 +351,7 @@
 - `Native real smoke stability fix` → `8ac4ce6` `fix(native): stabilize real smoke run path`
 - `Native slave identity recovery` → `f691f91` `fix(native): recover slave identity from real scans`
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
+- `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`

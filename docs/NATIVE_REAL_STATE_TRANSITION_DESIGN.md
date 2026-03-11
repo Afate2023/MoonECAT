@@ -1,0 +1,150 @@
+# Native Real-NIC State Transition Design
+
+本文档聚焦两件仍在推进中的 Native 主题：
+
+- Linux Raw Socket 后端从“可编译骨架”走向“可实机闭环”的完善项
+- Windows Npcap 实机链路上，从 `scan/run` 扩展到 EtherCAT 从站 ESM 状态迁移的运行设计
+
+## 1. 当前基线
+
+当前仓库已经具备：
+
+- Windows Npcap 的 `list-if -> scan -> validate -> run` 空总线 smoke 路径
+- Npcap 实机扫描中的非零从站身份恢复
+- Native CLI 在线 `read-sii`
+- 新增 CLI `state` 命令，可通过 Native 后端触发 EtherCAT 从站状态迁移
+
+当前仓库尚未完全具备：
+
+- Linux Raw Socket 的实机回归闭环与错误分类细化
+- Npcap 实机 `run` 路径与 ESM 定点确认迁移之间的统一策略
+- 广播迁移与定点确认迁移的明确操作边界文档
+
+## 2. Linux Raw Socket 完善项
+
+Raw Socket 后端下一阶段的完成标准，不是“已有 open/send/recv 包装”，而是以下能力全部闭环：
+
+1. 接口枚举结果稳定化
+
+- 输出接口索引、名称、是否 up/running、MTU 的结构化字段
+- 与 CLI `list-if --json` 输出格式保持一致
+
+2. 接收路径错误语义细化
+
+- 区分 `EAGAIN/EWOULDBLOCK` 到 `RecvTimeout`
+- 区分 `ENETDOWN/ENODEV` 到 `LinkDown`
+- 其它 socket 错误归类到 `RecvFailed(...)`
+
+3. 发送路径与回显过滤一致化
+
+- 保持与 Npcap 路径同样的自发包过滤策略
+- 避免把本机发出的 EtherCAT 帧误当作从站响应
+
+4. 实机 smoke 闭环
+
+- 至少完成 Linux 上的 `list-if -> scan -> validate -> run`
+- 若无从站，空总线结果仍应稳定返回 `0 slaves / PASS / Done`
+
+5. ESM 迁移闭环
+
+- 支持 CLI `state` 命令在 Raw Socket 后端发起广播迁移
+- 支持按站地址进行定点 `request_state` / `transition_through`
+- AL Status / AL Status Code 读回失败时保持明确错误分类
+
+## 3. Npcap 实机 run 与状态迁移设计
+
+Windows Npcap 实机路径需要区分两类状态迁移：
+
+### 3.1 广播迁移
+
+适用场景：
+
+- 总线级统一切换到 `Init` / `PreOp` / `SafeOp` / `Op`
+- `run` 之前的粗粒度准备动作
+- `run` 结束后的 best-effort 收尾
+
+实现方式：
+
+- 直接使用 `@protocol.broadcast_state(...)`
+- 优点是开销小、总线级一致
+- 缺点是不确认每个从站的最终 AL 状态
+
+### 3.2 定点确认迁移
+
+适用场景：
+
+- 某个站点的恢复、调试、故障定位
+- 需要读取 AL Status / AL Status Code 做确认
+- 从 `Op -> SafeOp -> PreOp -> Init` 或 `Init -> PreOp -> SafeOp -> Op` 的可追踪路径
+
+实现方式：
+
+- 使用 CLI `state --station <configured-address>`
+- 直接请求时走 `@protocol.request_state(...)`
+- 路径迁移时走 `@protocol.transition_through(...)`
+
+### 3.3 run 路径为何暂不直接暴露复杂 ESM 编排
+
+当前 `run` 命令仍保持单一职责：
+
+- scan
+- validate
+- 广播切到 `Op`
+- 运行 PDO 周期
+- best-effort 广播切回 `Init`
+
+原因：
+
+- `run` 的核心目标是 Free Run / PDO 周期闭环，不是调试型状态机控制台
+- 实机状态迁移通常需要按站确认、读 AL Status Code、处理 rollback，语义比 `run` 粗路径更重
+- 因此先单独引入 `state` 命令，避免把 `run` 的稳定 smoke 语义打碎
+
+## 4. CLI `state` 命令约定
+
+### 4.1 广播模式
+
+```powershell
+moon run cmd/main state -- --backend native-windows-npcap --if <interface> --state safeop
+```
+
+语义：
+
+- 对整条总线广播写 AL Control
+- 输出 WKC，不强制确认每个站点最终状态
+
+### 4.2 定点直接模式
+
+```powershell
+moon run cmd/main state -- --backend native-windows-npcap --if <interface> --state op --station 4097
+```
+
+语义：
+
+- 对单个 configured station 发起 `request_state`
+- 读回确认状态与 AL Status Code
+
+### 4.3 定点路径模式
+
+```powershell
+moon run cmd/main state -- --backend native-windows-npcap --if <interface> --state boot --station 4097 --path
+```
+
+语义：
+
+- 若当前状态无法直接到目标状态，则先回退到 `Init` 再前进
+- 示例：`Op -> SafeOp -> PreOp -> Init -> Boot`
+
+## 5. 后续实现顺序
+
+建议按以下顺序继续：
+
+1. 补 Linux Raw Socket 的 errno 到 `EcError` 精细映射
+2. 补 Linux 实机 smoke 记录与至少一条真实接口回归说明
+3. 为 `state` 命令增加实机回归脚本和文档示例
+4. 评估是否要把 `run` 的启动/收尾状态改成可配置项；若改，只允许在保留默认 `Op -> Init` 语义的前提下扩展
+
+## 6. 非目标
+
+- 当前阶段不在 `run` 中引入每站逐步确认的复杂 ESM 编排
+- 不在 Native HAL 里加入平台专属 Runtime 分叉
+- 不把 Raw Socket / Npcap 差异上推到 `protocol/` 或 `runtime/`

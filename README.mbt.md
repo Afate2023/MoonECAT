@@ -47,6 +47,12 @@ moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --w
 
 # Read the same SII window as JSON
 moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --words 128 --json
+
+# Request a bus-wide EtherCAT state transition
+moon run cmd/main state -- --backend native --if <interface> --state safeop
+
+# Request a confirmed per-slave state transition
+moon run cmd/main state -- --backend native --if <interface> --state op --station 4097 --path
 ```
 
 `list-if --json` returns a structured object with `backend` and `interfaces`.
@@ -62,6 +68,11 @@ via the native backend and reports the parsed header, General category, string
 table, and discovered category list. Use `--position` to select the slave index
 and `--words` to control the EEPROM word window to read.
 
+`state` exposes EtherCAT AL state changes over the native backend. Use it
+without `--station` for a bus-wide broadcast transition, or add `--station`
+for per-slave confirmed transitions. Add `--path` to let the CLI build a safe
+stepwise path via `Init` when the requested target is not directly reachable.
+
 MoonBit CLI flags belong to `moon run`, so MoonECAT parameters must be placed
 after `--`, otherwise flags like `--backend` and `--if` will be consumed by
 `moon` itself.
@@ -74,4 +85,6 @@ points. See [docs/BACKEND_RELEASE_MATRIX.md](docs/BACKEND_RELEASE_MATRIX.md)
 for the current Native CLI / Native Library / Extism Plugin release boundaries,
 environment requirements, and smoke commands. See
 [docs/NATIVE_FFI_SAFETY.md](docs/NATIVE_FFI_SAFETY.md) for current Native FFI
-ownership notes, handle lifetime rules, and sanitizer validation guidance.
+ownership notes, handle lifetime rules, and sanitizer validation guidance. See
+[docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+for the current raw socket completion plan and Npcap real-NIC ESM transition design.
