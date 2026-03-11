@@ -246,7 +246,7 @@
 - `传播延迟估计模型改进` → `d52498b` `feat: improve dc propagation delay estimation`
 - `运行态连续传播延迟补偿（周期重估）` → `766037d` `feat: complete sdo info and runtime dc compensation`
 
-### M8 CLI、文档与最终集成 — ⚠️ Extism 边界待整理
+### M8 CLI、文档、最终集成与多后端交付 — ⚠️ Native / Extism 后端待落地
 
 - [x] 实现 `moonecat scan` 命令（库层接口）。
   - 📦 [runtime/scan.mbt](runtime/scan.mbt): scan() → ScanReport
@@ -257,10 +257,76 @@
 - [x] 补全文档：架构、接口、测试方式。
   - 📦 [README.mbt.md](README.mbt.md) 已更新
 - [x] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 已接入 Mock HAL + scan/validate/run 流程
+  - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
+- [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
+  - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](docs/NATIVE_BACKEND_PLAN.md)
+  - 当前状态：已创建 [hal/native/moon.pkg.json](hal/native/moon.pkg.json) 包骨架，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap FFI 包装、占位 `NativeNic` 与最小测试；CLI 已可选择 native 后端，但 Linux Raw Socket 仍未实现
+  - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
+  - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
+  - MoonBit Native FFI 工作包：
+    - `moon.mod.json` 评估是否切换 `preferred-target: native`，若暂不切换则至少为 FFI 文件做 `targets` 限定，避免影响 wasm 构建链路
+    - 在后端包的 `moon.pkg` 中声明 `native-stub`，将 `ffi.mbt` 与平台相关 `.c` stub 绑定在同一包内
+    - 原始 `extern "c" fn` 保持私有，仅对外暴露安全 MoonBit 包装层，不允许把裸 FFI 签名扩散到 `runtime/`
+    - 对非 primitive 参数显式标注 `#borrow` / `#owned`；不确定生命周期时默认禁止 `#borrow`
+    - NIC 句柄、pcap handle、socket fd 按生命周期选择 `type Handle` + finalizer 或 `#external type`，并在清单中记录原因
+    - 字符串、接口名、设备路径统一按 UTF-8 `Bytes` 穿越 FFI；宿主返回文本时再在 MoonBit 侧解码
+  - 平台拆解建议：
+    - Linux：`AF_PACKET` / Raw Socket 收发、非阻塞轮询、超时换算、接口索引解析
+    - Windows：Npcap handle 打开、收发、超时与错误码映射；仅在 HAL 层处理 Win32/Npcap 差异
+    - Common：统一 `Nic/Clock/FileAccess` 适配器、错误映射、抓包导出接口
+  - 验收标准：
+    - `scan/validate/run` 三条库层路径能经由真实 NIC 跑通最小闭环
+    - Native 后端 `Nic/Clock/FileAccess` 实现与 Mock 共享同一组核心语义测试
+    - `RecvTimeout`、`LinkDown`、`UnexpectedWkc`、`EsmTransitionFailed` 的错误分类与现有 telemetry 语义保持一致
+    - Free Run 模式先稳定，DC 仅复用现有运行态能力，不额外引入平台特化调度语义
+    - Native 目标下 `moon check`、`moon test` 可独立执行，且 FFI 文件不会污染非 native 目标
+    - 至少有一条 AddressSanitizer/等价内存安全检查路径用于发现句柄泄漏、悬垂引用或错误 ownership 注解
+  - 非目标：本阶段不引入多任务调度、冗余链路、平台专属 Runtime 分叉
+  - 依赖：HAL 契约稳定、热路径分配约束继续收紧、CLI 输出模型保持不变、MoonBit Native FFI 包配置收口
+- [ ] **【新增】Extism / WASM 后端首版**：以宿主能力映射 + 共享内存缓冲区为核心，导出插件入口而不复制协议实现。
+  - 规划文档： [docs/EXTISM_WASM_BACKEND_PLAN.md](docs/EXTISM_WASM_BACKEND_PLAN.md)
+  - 当前状态：已创建 [plugin/extism/moon.pkg](plugin/extism/moon.pkg) 包骨架，包含 envelope 类型、占位导出入口、错误码映射与最小 JSON 测试；尚未接入实际 host capability adapter
+  - 目标范围：基于 moonbit-pdk / Extism 的插件封装，复用现有 `scan/validate/run` 库接口
+  - 宿主前提：宿主负责 NIC open/send/recv/close、clock now/sleep、可选 file read/write；插件只持有句柄和序列化请求/响应
+  - 数据边界：控制面优先 JSON/Bytes 信封；周期数据优先共享内存缓冲区，避免每周期大块拷贝
+  - 插件封装工作包：
+    - 导出 `scan`、`validate`、`run` 三个稳定入口，禁止复制第二套调度逻辑
+    - 定义请求/响应 envelope：版本号、命令类型、payload、错误码、诊断摘要
+    - 定义共享内存缓冲区协定：所有权、可见性、长度字段、超时语义、宿主回收责任
+    - Host capability contract 中的 `nic_*`、`clock_*`、`file_*` 保持最小集，不把插件宿主变成新的协议层
+    - 明确插件内状态保持策略：短生命周期命令式调用优先，长周期 run 由宿主显式启动/停止
+  - 兼容性约束：
+    - WASM/Extism 路线不得要求修改现有 `scan/validate/run` 返回模型，只允许增加序列化层
+    - 错误码、telemetry 字段名、状态迁移顺序需与 Native CLI/Library 保持同一规范
+    - 插件入口要允许无文件系统宿主运行，因此 ESI/SII 等输入必须支持 bytes 直传
+  - 验收标准：
+    - 提供稳定的插件导出入口，对齐 `scan`、`validate`、`run`
+    - Host capability contract 与 [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md) 保持一致，超时单位统一为 ns
+    - ESM / PDO / mailbox 行为与 native 语义一致，不新增插件特化状态机
+    - 至少有一条最小集成回放覆盖 `scan -> validate -> run -> stop`
+    - 错误输出保持稳定字符串码 + 明细消息，能映射到现有 `EcError` 分类
+  - 非目标：插件内部直连 Raw Socket、在 `protocol/` 或 `runtime/` 中直接依赖 Extism API、单独维护第二套 CLI 逻辑
+  - 依赖：`docs/EXTISM_HOST_BOUNDARY.md`、共享内存信封格式、稳定的库层 API
+- [ ] **【新增】多后端发布物矩阵**：把 CLI Native、Library Native、Extism Plugin 三类产物的边界、配置与回归入口写清楚。
+  - 验收标准：
+    - 明确每类产物的输入、输出、依赖环境与最小验证命令
+    - 文档区分“后端差异”与“协议语义”，避免把平台问题写进协议清单
+    - 后续 commit 可以按“HAL 适配 / 入口封装 / 集成验证 / 文档发布”独立回填
+
+建议提交拆分（未完成）：
+- `native ffi package scaffold`：FFI 包布局、`moon.pkg` `native-stub`、target gating、基础 stub 框架
+- `linux raw-socket nic binding`：Linux Raw Socket extern + 安全包装 + 错误映射
+- `windows npcap nic binding`：Npcap extern + 安全包装 + 错误映射
+- `native backend cli smoke path`：CLI 复用 native HAL 跑通 scan/validate/run
+- `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
+- `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封
+- `extism host shared-memory transport`：共享内存缓冲区与 host capability 对接
+- `extism replay validation`：WASM/宿主最小回放验证与错误码对齐
+- `backend release matrix docs`：交付物矩阵、运行方式与回归入口整理
 
 提交映射（选项 → commit）：
 - `moonecat scan` 库层接口 → `04b1e6d` `feat: add moonecat scan command`
@@ -268,6 +334,9 @@
 - `moonecat run` 库层接口框架 → `9c9bc85` `feat: add moonecat run command`
 - `补全文档（架构/接口/测试方式）` → `e5d8a81` `docs: document architecture and user workflows`
 - `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
+- `Windows Npcap Native 后端骨架` → `92c9a5e` `feat(native): add windows npcap backend scaffold`
+- `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
+- `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
 - `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
 
@@ -292,23 +361,23 @@
 
 ---
 
-## 8. 参考项目实现核对矩阵（调用流 + 本地源码）
+## 8. Reference_Project实现核对矩阵（调用流 + 本地源码）
 
 > 调用流依据：[src/SOEM-callflow-analysis.md](src/SOEM-callflow-analysis.md)、[src/CherryECAT-callflow-analysis.md](src/CherryECAT-callflow-analysis.md)、[src/ethercrab-callflow-analysis.md](src/ethercrab-callflow-analysis.md)、[src/EtherCAT.net-callflow-analysis.md](src/EtherCAT.net-callflow-analysis.md)、[src/gatorcat-callflow-analysis.md](src/gatorcat-callflow-analysis.md)、[src/igh-callflow-analysis.md](src/igh-callflow-analysis.md)  
 > 本地实现依据：SOEM、CherryECAT、ethercrab、EtherCAT.NET、gatorcat、IGH 各参考实现源码（见下表具体文件与行号链接）
 
 | 功能 | 调用流文档依据 | 参考实现（本地代码） | MoonECAT 对应实现 | 结论 |
 |---|---|---|---|---|
-| 扫描/拓扑/基础发现 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [CherryECAT-callflow-analysis.md:178](src/CherryECAT-callflow-analysis.md#L178) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | SOEM: [ec_config.c:172](参考项目/SOEM/src/ec_config.c#L172) (`ecx_config_init`) Cherry: [ec_slave.c:955](参考项目/CherryECAT/src/ec_slave.c#L955) (`ec_slaves_scanning`) ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) | [runtime/scan.mbt](runtime/scan.mbt) [protocol/discovery.mbt](protocol/discovery.mbt) | 已对齐 |
-| ESM 状态机与回退 | [SOEM-callflow-analysis.md:465](src/SOEM-callflow-analysis.md#L465) [IGH-callflow-analysis.md:486](src/igh-callflow-analysis.md#L486) | SOEM: [ec_main.c:1017](参考项目/SOEM/src/ec_main.c#L1017) (`ecx_writestate`) + [ec_main.c:1052](参考项目/SOEM/src/ec_main.c#L1052) (`ecx_statecheck`)；IGH: [fsm_slave_config.c:223](参考项目/ethercat/master/fsm_slave_config.c#L223) (`ec_fsm_slave_config_state_start`) | [protocol/esm.mbt](protocol/esm.mbt) [protocol/esm_engine.mbt](protocol/esm_engine.mbt) [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | 已对齐 |
-| PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](参考项目/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](参考项目/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](参考项目/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |
-| Mailbox 传输与轮询 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [CherryECAT-callflow-analysis.md:63](src/CherryECAT-callflow-analysis.md#L63) | SOEM: [ec_main.c:1521](参考项目/SOEM/src/ec_main.c#L1521) (`ecx_mbxsend`) + [ec_main.c:1592](参考项目/SOEM/src/ec_main.c#L1592) (`ecx_mbxreceive`) + [ec_main.c:1506](参考项目/SOEM/src/ec_main.c#L1506) (`ecx_mbxhandler`)；Cherry: [ec_mailbox.c:31](参考项目/CherryECAT/src/ec_mailbox.c#L31) (`ec_mailbox_send`) + [ec_mailbox.c:84](参考项目/CherryECAT/src/ec_mailbox.c#L84) (`ec_mailbox_receive`) | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | 已对齐 |
-| CoE SDO 事务 | [CherryECAT-callflow-analysis.md:416](src/CherryECAT-callflow-analysis.md#L416) [ethercrab-callflow-analysis.md:389](src/ethercrab-callflow-analysis.md#L389) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_coe.c:856](参考项目/SOEM/src/ec_coe.c#L856) (`ecx_readPDOmap`)；ethercrab: [mod.rs:180](参考项目/ethercrab/src/mailbox/coe/mod.rs#L180) (`mailbox_write_read`) + [mod.rs:561](参考项目/ethercrab/src/mailbox/coe/mod.rs#L561) (`sdo_read`) + [mod.rs:371](参考项目/ethercrab/src/mailbox/coe/mod.rs#L371) (`sdo_write`)；EtherCAT.NET: [EcUtilities.cs:728](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L728) (`SdoWrite`) + [EcUtilities.cs:773](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L773) (`TryReadSdoValue`) | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已对齐 |
-| Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](参考项目/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](参考项目/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
-| EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](参考项目/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](参考项目/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](参考项目/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](参考项目/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
-| DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](参考项目/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](参考项目/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](参考项目/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](参考项目/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](参考项目/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](参考项目/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
-| Alias Addressing | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](参考项目/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](参考项目/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | [protocol/discovery.mbt](protocol/discovery.mbt) (`read_station_alias` / `enable_alias_addressing`) | 已对齐 |
-| Explicit Device ID | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](参考项目/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](参考项目/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](参考项目/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](参考项目/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | [runtime/scan.mbt](runtime/scan.mbt) + [runtime/validate.mbt](runtime/validate.mbt) + [hal/config.mbt](hal/config.mbt) | 已对齐 |
+| 扫描/拓扑/基础发现 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [CherryECAT-callflow-analysis.md:178](src/CherryECAT-callflow-analysis.md#L178) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | SOEM: [ec_config.c:172](Reference_Project/SOEM/src/ec_config.c#L172) (`ecx_config_init`) Cherry: [ec_slave.c:955](Reference_Project/CherryECAT/src/ec_slave.c#L955) (`ec_slaves_scanning`) ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) | [runtime/scan.mbt](runtime/scan.mbt) [protocol/discovery.mbt](protocol/discovery.mbt) | 已对齐 |
+| ESM 状态机与回退 | [SOEM-callflow-analysis.md:465](src/SOEM-callflow-analysis.md#L465) [IGH-callflow-analysis.md:486](src/igh-callflow-analysis.md#L486) | SOEM: [ec_main.c:1017](Reference_Project/SOEM/src/ec_main.c#L1017) (`ecx_writestate`) + [ec_main.c:1052](Reference_Project/SOEM/src/ec_main.c#L1052) (`ecx_statecheck`)；IGH: [fsm_slave_config.c:223](Reference_Project/ethercat/master/fsm_slave_config.c#L223) (`ec_fsm_slave_config_state_start`) | [protocol/esm.mbt](protocol/esm.mbt) [protocol/esm_engine.mbt](protocol/esm_engine.mbt) [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | 已对齐 |
+| PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](Reference_Project/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](Reference_Project/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](Reference_Project/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |
+| Mailbox 传输与轮询 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [CherryECAT-callflow-analysis.md:63](src/CherryECAT-callflow-analysis.md#L63) | SOEM: [ec_main.c:1521](Reference_Project/SOEM/src/ec_main.c#L1521) (`ecx_mbxsend`) + [ec_main.c:1592](Reference_Project/SOEM/src/ec_main.c#L1592) (`ecx_mbxreceive`) + [ec_main.c:1506](Reference_Project/SOEM/src/ec_main.c#L1506) (`ecx_mbxhandler`)；Cherry: [ec_mailbox.c:31](Reference_Project/CherryECAT/src/ec_mailbox.c#L31) (`ec_mailbox_send`) + [ec_mailbox.c:84](Reference_Project/CherryECAT/src/ec_mailbox.c#L84) (`ec_mailbox_receive`) | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | 已对齐 |
+| CoE SDO 事务 | [CherryECAT-callflow-analysis.md:416](src/CherryECAT-callflow-analysis.md#L416) [ethercrab-callflow-analysis.md:389](src/ethercrab-callflow-analysis.md#L389) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_coe.c:856](Reference_Project/SOEM/src/ec_coe.c#L856) (`ecx_readPDOmap`)；ethercrab: [mod.rs:180](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L180) (`mailbox_write_read`) + [mod.rs:561](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L561) (`sdo_read`) + [mod.rs:371](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L371) (`sdo_write`)；EtherCAT.NET: [EcUtilities.cs:728](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L728) (`SdoWrite`) + [EcUtilities.cs:773](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L773) (`TryReadSdoValue`) | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已对齐 |
+| Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](Reference_Project/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](Reference_Project/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
+| EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](Reference_Project/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](Reference_Project/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](Reference_Project/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
+| DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](Reference_Project/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](Reference_Project/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](Reference_Project/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](Reference_Project/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](Reference_Project/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
+| Alias Addressing | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](Reference_Project/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](Reference_Project/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | [protocol/discovery.mbt](protocol/discovery.mbt) (`read_station_alias` / `enable_alias_addressing`) | 已对齐 |
+| Explicit Device ID | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](Reference_Project/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](Reference_Project/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](Reference_Project/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | [runtime/scan.mbt](runtime/scan.mbt) + [runtime/validate.mbt](runtime/validate.mbt) + [hal/config.mbt](hal/config.mbt) | 已对齐 |
 
 ---
 
@@ -318,7 +387,9 @@
 
 - [x] 固化跨平台最小接口和错误模型。
 - [x] 先完成 `Mock Loopback`，再补单一真实平台原型。
-- [ ] 为 Windows、RTOS/Embedded、Extism 预留适配点。
+- [ ] 落地 Native 后端：Linux Raw Socket 优先，Windows Npcap 与同一 HAL 契约对齐。
+- [ ] 落地 Extism / WASM Host Adapter：通过宿主函数与共享内存映射 `Nic/Clock/FileAccess`。
+- [ ] 为 RTOS/Embedded 保留与 Native / Extism 不冲突的 HAL 扩展位。
 
 ### Protocol Core
 
@@ -339,7 +410,8 @@
 - [x] 完成运行时调度器框架和 Telemetry 指标。
 - [x] 完成 PDO pdo_exchange 实体实现。
 - [x] 完成 mailbox 推进、超时治理和背压控制。
-- [ ] 优先达成 Free Run，逐步增强 DC。
+- [ ] 先在 Native 后端完成 Free Run 真实链路闭环，再逐步增强 DC 集成验证。
+- [ ] 为 Extism / WASM 路径补一套不改变语义的回放式运行编排验证。
 
 ### CLI/Library
 
@@ -367,6 +439,10 @@
 - [x] 先形成 Runtime 主循环，再完成 `run` 命令和 SDO 整合。
 - [x] CLI 只能复用核心库，不能先实现命令再反推库接口。
 - [x] DC 相关能力不能阻塞 Free Run 最小可用版本。
+- [ ] 先完成 Native FFI 包脚手架，再分别落 Linux Raw Socket / Windows Npcap 绑定。
+- [ ] 先冻结 Native HAL 错误语义与句柄生命周期，再开放 CLI 在真实后端上的 smoke 验证。
+- [ ] 先冻结 Extism 请求/响应信封和 host capability contract，再落共享内存优化。
+- [ ] Extism / WASM 只能包装既有库入口，不能先写插件逻辑再反推 `runtime/` 改接口。
 
 ## 6. 风险检查清单
 
@@ -384,7 +460,17 @@
 
 - [x] 检查新增平台后端是否污染 Protocol Core。（当前仅 Mock，接口隔离良好）
 - [x] 保证同一组核心测试可复用于不同 HAL。
-- [ ] 新后端接入前先验证 HAL 接口是否足够稳定。
+- [ ] Native 后端接入前先验证 HAL 接口是否足够稳定。
+- [ ] Extism / WASM 适配前先冻结 host capability contract 与请求/响应信封格式。
+- [ ] Native 与 Extism 两条路径共用同一组 scan/validate/run 语义验收，不允许演化出双语义。
+
+### FFI / 宿主边界
+
+- [ ] 检查 Native FFI 中所有非 primitive 参数是否已标注 `#borrow` / `#owned`，避免默认语义漂移。
+- [ ] 检查所有外部句柄是使用 finalizer external object 还是 `#external type`，并为每类句柄记录释放责任。
+- [ ] 检查 `.c` stub、`native-stub`、`targets` 配置是否只作用于 Native 路径，不破坏 wasm-gc 构建。
+- [ ] 检查 Extism 宿主是否只暴露 HAL 等价能力，不把对象字典、ESM、PDO 语义上推到宿主。
+- [ ] 检查共享内存协议是否明确长度、所有权、超时与回收责任，避免 run 路径出现隐式复制与悬垂缓冲区。
 
 ### 状态机死锁
 
@@ -415,7 +501,11 @@
 
 剩余高优先任务（按依赖顺序）：
 
-1. **（本轮高优先已清空）**：后续新增参考约束时按 `docs/REFERENCE_CONSTRAINTS.md` 继续增量落标。
+1. **Native 后端首版**：先以 Linux Raw Socket 打通真实网卡的 `scan/validate/run` 最小闭环，并冻结其 HAL 契约与错误语义。
+2. **Native CLI smoke 验证**：把现有 CLI 在真实后端上跑通，确认输出格式、诊断字段和 Mock 路径一致。
+3. **Extism / WASM 适配入口**：补插件导出层与 host capability 映射，保持核心协议层零感知。
+4. **Extism 共享内存数据路径**：补控制面信封与周期数据缓冲区约定，避免热路径序列化放大。
+5. **后端发布物矩阵文档**：明确 Native CLI、Native Library、Extism Plugin 的交付边界、依赖和回归入口。
 
 ## 10. 提交执行方式
 
