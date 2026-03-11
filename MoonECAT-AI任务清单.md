@@ -313,6 +313,8 @@
   - 非目标：插件内部直连 Raw Socket、在 `protocol/` 或 `runtime/` 中直接依赖 Extism API、单独维护第二套 CLI 逻辑
   - 依赖：`docs/EXTISM_HOST_BOUNDARY.md`、共享内存信封格式、稳定的库层 API
 - [ ] **【新增】多后端发布物矩阵**：把 CLI Native、Library Native、Extism Plugin 三类产物的边界、配置与回归入口写清楚。
+  - ✅ [docs/BACKEND_RELEASE_MATRIX.md](docs/BACKEND_RELEASE_MATRIX.md)：已补齐 Native CLI / Native Library / Extism Plugin 的输入、输出、依赖环境与最小验证命令（commit: `8aa93aa`）
+  - ✅ 当前 Native CLI smoke 已在 Windows Npcap 1.8.4 上实测跑通：`list-if -> scan -> validate -> run`，其中空总线场景返回 `0 slaves / PASS / Done`
   - 验收标准：
     - 明确每类产物的输入、输出、依赖环境与最小验证命令
     - 文档区分“后端差异”与“协议语义”，避免把平台问题写进协议清单
@@ -324,6 +326,7 @@
 - `windows npcap nic binding`：Npcap extern + 安全包装 + 错误映射
 - `native interface enumeration + runtime loading`：Windows Npcap 动态加载、Linux Raw Socket 枚举、CLI `list-if` JSON 输出
 - `native backend cli smoke path`：CLI 复用 native HAL 跑通 scan/validate/run
+- `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
 - `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封
 - `extism host shared-memory transport`：共享内存缓冲区与 host capability 对接
@@ -338,6 +341,7 @@
 - `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
 - `Windows Npcap Native 后端骨架` → `92c9a5e` `feat(native): add windows npcap backend scaffold`
 - `Native interface enumeration + runtime loading` → `061928d` `feat(native): load npcap at runtime and enable list-if`
+- `Native CLI smoke regression + release matrix docs` → `8aa93aa` `test(cli): add native smoke regression and release matrix docs`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
