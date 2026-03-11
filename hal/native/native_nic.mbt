@@ -21,7 +21,7 @@ pub fn default_windows_npcap_config(interface_name : String) -> NativeNicConfig 
 
 ///|
 pub fn NativeNic::new(config : NativeNicConfig) -> NativeNic {
-  { config, handle_id: 0, is_open: false }
+  { config, handle_id: 0, is_open: false, last_sent: Bytes::new(0) }
 }
 
 ///|
@@ -87,12 +87,12 @@ pub fn NativeNic::open_with_config(
     WindowsNpcap => {
       let resolved = { ..config, backend: WindowsNpcap }
       let handle_id = windows_npcap_open(resolved)
-      { config: resolved, handle_id, is_open: true }
+      { config: resolved, handle_id, is_open: true, last_sent: Bytes::new(0) }
     }
     LinuxRawSocket => {
       let resolved = { ..config, backend: LinuxRawSocket }
       let handle_id = linux_raw_socket_open(resolved)
-      { config: resolved, handle_id, is_open: true }
+      { config: resolved, handle_id, is_open: true, last_sent: Bytes::new(0) }
     }
   }
 }
@@ -107,6 +107,7 @@ pub impl @hal.Nic for NativeNic with send(self, data) {
   if not(self.is_open) {
     raise @hal.EcError::LinkDown
   }
+  self.last_sent = data
   match self.config.backend {
     WindowsNpcap => windows_npcap_send(self.handle_id, data)
     Auto => raise native_not_supported("send")
@@ -120,11 +121,18 @@ pub impl @hal.Nic for NativeNic with recv(self, timeout~) {
   if not(self.is_open) {
     raise @hal.EcError::LinkDown
   }
-  match self.config.backend {
-    WindowsNpcap => windows_npcap_recv(self.handle_id)
-    Auto => raise native_not_supported("recv")
-    LinuxRawSocket => linux_raw_socket_recv(self.handle_id)
+  for _attempt = 0; _attempt < 4; _attempt = _attempt + 1 {
+    let response = match self.config.backend {
+      WindowsNpcap => windows_npcap_recv(self.handle_id)
+      Auto => raise native_not_supported("recv")
+      LinuxRawSocket => linux_raw_socket_recv(self.handle_id)
+    }
+    if response == self.last_sent {
+      continue
+    }
+    return response
   }
+  raise @hal.EcError::RecvTimeout
 }
 
 ///|
@@ -138,4 +146,5 @@ pub impl @hal.Nic for NativeNic with close(self) {
   }
   self.handle_id = 0
   self.is_open = false
+  self.last_sent = Bytes::new(0)
 }

@@ -46,9 +46,7 @@ test "cli native backend mapping stays stable" {
 
 ///|
 test "cli run helper reopens nic for run path" {
-  let result : Result[Unit, Error] = try? run_command_with_probe_and_fresh_nic(
-    @mock.MockNic::new(),
-    @mock.MockNic::new(),
+  let result : Result[Unit, Error] = try? run_mock_command_with_fresh_nic(
     true,
     @hal.Duration(1000L),
   )

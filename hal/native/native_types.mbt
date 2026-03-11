@@ -19,4 +19,5 @@ pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int
   mut is_open : Bool
+  mut last_sent : Bytes
 } derive(Eq, Show)

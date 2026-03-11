@@ -59,6 +59,8 @@ pub let ecat_header_len : Int
 
 pub fn[N : @hal.Nic] eeprom_read(N, UInt, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] eeprom_read_ap(N, UInt, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
@@ -156,6 +158,8 @@ pub let reg_fmmu_base : UInt
 pub let reg_revision : UInt
 
 pub let reg_sii_address : UInt
+
+pub let reg_sii_config : UInt
 
 pub let reg_sii_control : UInt
 

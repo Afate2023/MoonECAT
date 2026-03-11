@@ -17,14 +17,10 @@ static void moonecat_set_error(int32_t code, const char *message) {
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_native_stub_version(void) {
-  return 1;
-}
+int32_t moonecat_native_stub_version(void) { return 1; }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_native_last_error_code(void) {
-  return g_last_error_code;
-}
+int32_t moonecat_native_last_error_code(void) { return g_last_error_code; }
 
 MOONBIT_FFI_EXPORT
 moonbit_bytes_t moonecat_native_last_error_message(void) {
@@ -34,7 +30,8 @@ moonbit_bytes_t moonecat_native_last_error_message(void) {
   return bytes;
 }
 
-static size_t moonecat_append_text(char *buffer, size_t capacity, size_t used, const char *text) {
+static size_t moonecat_append_text(char *buffer, size_t capacity, size_t used,
+                                   const char *text) {
   size_t remaining;
   size_t len;
   if (used >= capacity) {
@@ -54,40 +51,43 @@ static size_t moonecat_append_text(char *buffer, size_t capacity, size_t used, c
   return used;
 }
 
-static size_t moonecat_append_json_string(char *buffer, size_t capacity, size_t used, const char *text) {
-  const unsigned char *cursor = (const unsigned char *)(text == NULL ? "" : text);
+static size_t moonecat_append_json_string(char *buffer, size_t capacity,
+                                          size_t used, const char *text) {
+  const unsigned char *cursor =
+      (const unsigned char *)(text == NULL ? "" : text);
   used = moonecat_append_text(buffer, capacity, used, "\"");
   while (*cursor != '\0' && used + 2 < capacity) {
     switch (*cursor) {
-      case '\\':
-        used = moonecat_append_text(buffer, capacity, used, "\\\\");
-        break;
-      case '"':
-        used = moonecat_append_text(buffer, capacity, used, "\\\"");
-        break;
-      case '\n':
-        used = moonecat_append_text(buffer, capacity, used, "\\n");
-        break;
-      case '\r':
-        used = moonecat_append_text(buffer, capacity, used, "\\r");
-        break;
-      case '\t':
-        used = moonecat_append_text(buffer, capacity, used, "\\t");
-        break;
-      default: {
-        char ch[2];
-        ch[0] = (char)*cursor;
-        ch[1] = '\0';
-        used = moonecat_append_text(buffer, capacity, used, ch);
-        break;
-      }
+    case '\\':
+      used = moonecat_append_text(buffer, capacity, used, "\\\\");
+      break;
+    case '"':
+      used = moonecat_append_text(buffer, capacity, used, "\\\"");
+      break;
+    case '\n':
+      used = moonecat_append_text(buffer, capacity, used, "\\n");
+      break;
+    case '\r':
+      used = moonecat_append_text(buffer, capacity, used, "\\r");
+      break;
+    case '\t':
+      used = moonecat_append_text(buffer, capacity, used, "\\t");
+      break;
+    default: {
+      char ch[2];
+      ch[0] = (char)*cursor;
+      ch[1] = '\0';
+      used = moonecat_append_text(buffer, capacity, used, ch);
+      break;
+    }
     }
     cursor++;
   }
   return moonecat_append_text(buffer, capacity, used, "\"");
 }
 
-static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer, size_t used) {
+static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer,
+                                                  size_t used) {
   moonbit_bytes_t bytes = moonbit_make_bytes((int32_t)used, 0);
   memcpy(bytes, buffer, used);
   return bytes;
@@ -96,18 +96,25 @@ static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer, size_t use
 #ifdef _WIN32
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <tchar.h>
 #include <pcap.h>
+#include <tchar.h>
+#include <windows.h>
 
-typedef int (__cdecl *moonecat_pcap_init_fn)(unsigned int, char *);
-typedef int (__cdecl *moonecat_pcap_findalldevs_fn)(pcap_if_t **, char *);
-typedef void (__cdecl *moonecat_pcap_freealldevs_fn)(pcap_if_t *);
-typedef pcap_t *(__cdecl *moonecat_pcap_open_live_fn)(const char *, int, int, int, char *);
-typedef int (__cdecl *moonecat_pcap_datalink_fn)(pcap_t *);
-typedef void (__cdecl *moonecat_pcap_close_fn)(pcap_t *);
-typedef int (__cdecl *moonecat_pcap_sendpacket_fn)(pcap_t *, const u_char *, int);
-typedef int (__cdecl *moonecat_pcap_next_ex_fn)(pcap_t *, struct pcap_pkthdr **, const u_char **);
+
+typedef int(__cdecl *moonecat_pcap_init_fn)(unsigned int, char *);
+typedef int(__cdecl *moonecat_pcap_findalldevs_fn)(pcap_if_t **, char *);
+typedef void(__cdecl *moonecat_pcap_freealldevs_fn)(pcap_if_t *);
+typedef pcap_t *(__cdecl *moonecat_pcap_open_fn)(const char *, int, int, int,
+                                                 struct pcap_rmtauth *, char *);
+typedef pcap_t *(__cdecl *moonecat_pcap_open_live_fn)(const char *, int, int,
+                                                      int, char *);
+typedef int(__cdecl *moonecat_pcap_datalink_fn)(pcap_t *);
+typedef int(__cdecl *moonecat_pcap_setdirection_fn)(pcap_t *, pcap_direction_t);
+typedef void(__cdecl *moonecat_pcap_close_fn)(pcap_t *);
+typedef int(__cdecl *moonecat_pcap_sendpacket_fn)(pcap_t *, const u_char *,
+                                                  int);
+typedef int(__cdecl *moonecat_pcap_next_ex_fn)(pcap_t *, struct pcap_pkthdr **,
+                                               const u_char **);
 typedef char *(__cdecl *moonecat_pcap_geterr_fn)(pcap_t *);
 
 static pcap_t *g_npcap_handles[32] = {0};
@@ -116,8 +123,10 @@ static HMODULE g_npcap_module = NULL;
 static moonecat_pcap_init_fn g_pcap_init = NULL;
 static moonecat_pcap_findalldevs_fn g_pcap_findalldevs = NULL;
 static moonecat_pcap_freealldevs_fn g_pcap_freealldevs = NULL;
+static moonecat_pcap_open_fn g_pcap_open = NULL;
 static moonecat_pcap_open_live_fn g_pcap_open_live = NULL;
 static moonecat_pcap_datalink_fn g_pcap_datalink = NULL;
+static moonecat_pcap_setdirection_fn g_pcap_setdirection = NULL;
 static moonecat_pcap_close_fn g_pcap_close = NULL;
 static moonecat_pcap_sendpacket_fn g_pcap_sendpacket = NULL;
 static moonecat_pcap_next_ex_fn g_pcap_next_ex = NULL;
@@ -157,26 +166,34 @@ static int moonecat_load_npcap_symbols(void) {
     moonecat_set_error(-1, "LoadLibrary(wpcap.dll) failed while loading Npcap");
     return 0;
   }
-  g_pcap_init = (moonecat_pcap_init_fn)GetProcAddress(g_npcap_module, "pcap_init");
-  g_pcap_findalldevs = (moonecat_pcap_findalldevs_fn)GetProcAddress(g_npcap_module, "pcap_findalldevs");
-  g_pcap_freealldevs = (moonecat_pcap_freealldevs_fn)GetProcAddress(g_npcap_module, "pcap_freealldevs");
-  g_pcap_open_live = (moonecat_pcap_open_live_fn)GetProcAddress(g_npcap_module, "pcap_open_live");
-  g_pcap_datalink = (moonecat_pcap_datalink_fn)GetProcAddress(g_npcap_module, "pcap_datalink");
-  g_pcap_close = (moonecat_pcap_close_fn)GetProcAddress(g_npcap_module, "pcap_close");
-  g_pcap_sendpacket = (moonecat_pcap_sendpacket_fn)GetProcAddress(g_npcap_module, "pcap_sendpacket");
-  g_pcap_next_ex = (moonecat_pcap_next_ex_fn)GetProcAddress(g_npcap_module, "pcap_next_ex");
-  g_pcap_geterr = (moonecat_pcap_geterr_fn)GetProcAddress(g_npcap_module, "pcap_geterr");
-  if (
-    g_pcap_init == NULL ||
-    g_pcap_findalldevs == NULL ||
-    g_pcap_freealldevs == NULL ||
-    g_pcap_open_live == NULL ||
-    g_pcap_datalink == NULL ||
-    g_pcap_close == NULL ||
-    g_pcap_sendpacket == NULL ||
-    g_pcap_next_ex == NULL ||
-    g_pcap_geterr == NULL
-  ) {
+  g_pcap_init =
+      (moonecat_pcap_init_fn)GetProcAddress(g_npcap_module, "pcap_init");
+  g_pcap_findalldevs = (moonecat_pcap_findalldevs_fn)GetProcAddress(
+      g_npcap_module, "pcap_findalldevs");
+  g_pcap_freealldevs = (moonecat_pcap_freealldevs_fn)GetProcAddress(
+      g_npcap_module, "pcap_freealldevs");
+  g_pcap_open =
+      (moonecat_pcap_open_fn)GetProcAddress(g_npcap_module, "pcap_open");
+  g_pcap_open_live = (moonecat_pcap_open_live_fn)GetProcAddress(
+      g_npcap_module, "pcap_open_live");
+  g_pcap_datalink = (moonecat_pcap_datalink_fn)GetProcAddress(g_npcap_module,
+                                                              "pcap_datalink");
+  g_pcap_setdirection = (moonecat_pcap_setdirection_fn)GetProcAddress(
+      g_npcap_module, "pcap_setdirection");
+  g_pcap_close =
+      (moonecat_pcap_close_fn)GetProcAddress(g_npcap_module, "pcap_close");
+  g_pcap_sendpacket = (moonecat_pcap_sendpacket_fn)GetProcAddress(
+      g_npcap_module, "pcap_sendpacket");
+  g_pcap_next_ex =
+      (moonecat_pcap_next_ex_fn)GetProcAddress(g_npcap_module, "pcap_next_ex");
+  g_pcap_geterr =
+      (moonecat_pcap_geterr_fn)GetProcAddress(g_npcap_module, "pcap_geterr");
+  if (g_pcap_init == NULL || g_pcap_findalldevs == NULL ||
+      g_pcap_freealldevs == NULL ||
+      (g_pcap_open == NULL && g_pcap_open_live == NULL) ||
+      g_pcap_datalink == NULL || g_pcap_close == NULL ||
+      g_pcap_sendpacket == NULL || g_pcap_next_ex == NULL ||
+      g_pcap_geterr == NULL) {
     moonecat_set_error(-1, "GetProcAddress failed for required Npcap symbol");
     return 0;
   }
@@ -226,7 +243,8 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_text(void) {
   for (dev = alldevs; dev != NULL; dev = dev->next) {
     used = moonecat_append_text(listing, sizeof(listing), used, dev->name);
     used = moonecat_append_text(listing, sizeof(listing), used, "\t");
-    used = moonecat_append_text(listing, sizeof(listing), used, dev->description);
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, dev->description);
     used = moonecat_append_text(listing, sizeof(listing), used, "\n");
     if (used + 1 >= sizeof(listing)) {
       break;
@@ -254,23 +272,26 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_json(void) {
     moonecat_set_error(-1, errbuf[0] ? errbuf : "pcap_findalldevs failed");
     return moonbit_make_bytes(0, 0);
   }
-  used = moonecat_append_text(listing, sizeof(listing), used, "{\"backend\":\"native-windows-npcap\",\"interfaces\":[");
+  used = moonecat_append_text(
+      listing, sizeof(listing), used,
+      "{\"backend\":\"native-windows-npcap\",\"interfaces\":[");
   for (dev = alldevs; dev != NULL; dev = dev->next) {
     if (!first) {
       used = moonecat_append_text(listing, sizeof(listing), used, ",");
     }
     first = 0;
     used = moonecat_append_text(listing, sizeof(listing), used, "{\"name\":");
-    used = moonecat_append_json_string(listing, sizeof(listing), used, dev->name);
-    used = moonecat_append_text(listing, sizeof(listing), used, ",\"description\":");
-    used = moonecat_append_json_string(listing, sizeof(listing), used, dev->description);
-    used = moonecat_append_text(listing, sizeof(listing), used, ",\"loopback\":");
-    used = moonecat_append_text(
-      listing,
-      sizeof(listing),
-      used,
-      (dev->flags & PCAP_IF_LOOPBACK) ? "true" : "false"
-    );
+    used =
+        moonecat_append_json_string(listing, sizeof(listing), used, dev->name);
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                                ",\"description\":");
+    used = moonecat_append_json_string(listing, sizeof(listing), used,
+                                       dev->description);
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"loopback\":");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                                (dev->flags & PCAP_IF_LOOPBACK) ? "true"
+                                                                : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
       break;
@@ -283,14 +304,25 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_json(void) {
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen, int32_t promisc, int32_t timeout_ms) {
+int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen,
+                                    int32_t promisc, int32_t timeout_ms) {
   char errbuf[PCAP_ERRBUF_SIZE + 1] = {0};
   pcap_t *handle;
   int slot;
   if (!moonecat_ensure_npcap_initialized()) {
     return -1;
   }
-  handle = g_pcap_open_live(name, snaplen, promisc ? 1 : 0, timeout_ms, errbuf);
+  if (g_pcap_open != NULL) {
+    int flags =
+        PCAP_OPENFLAG_MAX_RESPONSIVENESS | PCAP_OPENFLAG_NOCAPTURE_LOCAL;
+    if (promisc) {
+      flags |= PCAP_OPENFLAG_PROMISCUOUS;
+    }
+    handle = g_pcap_open(name, snaplen, flags, timeout_ms, NULL, errbuf);
+  } else {
+    handle =
+        g_pcap_open_live(name, snaplen, promisc ? 1 : 0, timeout_ms, errbuf);
+  }
   if (handle == NULL) {
     moonecat_set_error(-1, errbuf[0] ? errbuf : "pcap_open_live failed");
     return -1;
@@ -312,7 +344,8 @@ int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen, int32_t p
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_windows_npcap_send(int32_t handle_id, moonbit_bytes_t data, int32_t length) {
+int32_t moonecat_windows_npcap_send(int32_t handle_id, moonbit_bytes_t data,
+                                    int32_t length) {
   pcap_t *handle;
   int rc;
   if (handle_id <= 0 || handle_id > 32) {
@@ -397,7 +430,8 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_text(void) {
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen, int32_t promisc, int32_t timeout_ms) {
+int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen,
+                                    int32_t promisc, int32_t timeout_ms) {
   (void)name;
   (void)snaplen;
   (void)promisc;
@@ -407,7 +441,8 @@ int32_t moonecat_windows_npcap_open(const char *name, int32_t snaplen, int32_t p
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_windows_npcap_send(int32_t handle_id, moonbit_bytes_t data, int32_t length) {
+int32_t moonecat_windows_npcap_send(int32_t handle_id, moonbit_bytes_t data,
+                                    int32_t length) {
   (void)handle_id;
   (void)data;
   (void)length;
@@ -469,8 +504,10 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_text(void) {
     moonecat_set_error(-1, strerror(errno));
     return moonbit_make_bytes(0, 0);
   }
-  for (cursor = interfaces; cursor->if_index != 0 || cursor->if_name != NULL; cursor++) {
-    used = moonecat_append_text(listing, sizeof(listing), used, cursor->if_name);
+  for (cursor = interfaces; cursor->if_index != 0 || cursor->if_name != NULL;
+       cursor++) {
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, cursor->if_name);
     used = moonecat_append_text(listing, sizeof(listing), used, "\tindex=");
     {
       char index_text[32];
@@ -498,8 +535,11 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
     moonecat_set_error(-1, strerror(errno));
     return moonbit_make_bytes(0, 0);
   }
-  used = moonecat_append_text(listing, sizeof(listing), used, "{\"backend\":\"native-linux-raw\",\"interfaces\":[");
-  for (cursor = interfaces; cursor->if_index != 0 || cursor->if_name != NULL; cursor++) {
+  used = moonecat_append_text(
+      listing, sizeof(listing), used,
+      "{\"backend\":\"native-linux-raw\",\"interfaces\":[");
+  for (cursor = interfaces; cursor->if_index != 0 || cursor->if_name != NULL;
+       cursor++) {
     char index_text[32];
     if (!first) {
       used = moonecat_append_text(listing, sizeof(listing), used, ",");
@@ -507,8 +547,11 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
     first = 0;
     _snprintf(index_text, sizeof(index_text), "%u", cursor->if_index);
     used = moonecat_append_text(listing, sizeof(listing), used, "{\"name\":");
-    used = moonecat_append_json_string(listing, sizeof(listing), used, cursor->if_name);
-    used = moonecat_append_text(listing, sizeof(listing), used, ",\"description\":\"linux raw socket\",\"index\":");
+    used = moonecat_append_json_string(listing, sizeof(listing), used,
+                                       cursor->if_name);
+    used = moonecat_append_text(
+        listing, sizeof(listing), used,
+        ",\"description\":\"linux raw socket\",\"index\":");
     used = moonecat_append_text(listing, sizeof(listing), used, index_text);
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
@@ -522,7 +565,8 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen, int32_t promisc, int32_t timeout_ms) {
+int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
+                                       int32_t promisc, int32_t timeout_ms) {
   int fd;
   int slot;
   unsigned int ifindex;
@@ -560,7 +604,8 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen, int32_
     memset(&mreq, 0, sizeof(mreq));
     mreq.mr_ifindex = (int)ifindex;
     mreq.mr_type = PACKET_MR_PROMISC;
-    if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0) {
+    if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq,
+                   sizeof(mreq)) != 0) {
       close(fd);
       moonecat_set_error(-1, strerror(errno));
       return -1;
@@ -578,7 +623,8 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen, int32_
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_linux_raw_socket_send(int32_t handle_id, moonbit_bytes_t data, int32_t length) {
+int32_t moonecat_linux_raw_socket_send(int32_t handle_id, moonbit_bytes_t data,
+                                       int32_t length) {
   int fd;
   ssize_t rc;
   if (handle_id <= 0 || handle_id > 32) {
@@ -659,7 +705,8 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen, int32_t promisc, int32_t timeout_ms) {
+int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
+                                       int32_t promisc, int32_t timeout_ms) {
   (void)name;
   (void)snaplen;
   (void)promisc;
@@ -669,7 +716,8 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen, int32_
 }
 
 MOONBIT_FFI_EXPORT
-int32_t moonecat_linux_raw_socket_send(int32_t handle_id, moonbit_bytes_t data, int32_t length) {
+int32_t moonecat_linux_raw_socket_send(int32_t handle_id, moonbit_bytes_t data,
+                                       int32_t length) {
   (void)handle_id;
   (void)data;
   (void)length;

@@ -67,6 +67,7 @@ pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int
   mut is_open : Bool
+  mut last_sent : Bytes
 }
 pub fn NativeNic::new(NativeNicConfig) -> Self
 pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError

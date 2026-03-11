@@ -42,6 +42,10 @@ pub let reg_station_alias : UInt = 0x0012U
 
 ///|
 /// SII (EEPROM) control/status register.
+pub let reg_sii_config : UInt = 0x0500U
+
+///|
+/// SII (EEPROM) control/status register.
 pub let reg_sii_control : UInt = 0x0502U
 
 ///|

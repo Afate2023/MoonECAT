@@ -29,6 +29,10 @@ pub(all) struct SlaveReport {
 let default_identification_ado : UInt = 0x0014U
 
 ///|
+/// Bytes needed to cover the fixed SII header through mailbox protocol word.
+let sii_header_read_dwords : Int = 15
+
+///|
 /// Run the scan procedure: count slaves, assign addresses, read identity
 /// from SII EEPROM registers.
 /// Returns a ScanReport summarizing what was found.
@@ -52,39 +56,146 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
     let position = i.reinterpret_as_uint()
     let station = 0x1001U + position
     @protocol.assign_station_address(nic, position, station, timeout)
-    // Read identity via configured (FP) addressing from DL registers
-    // ESC type register at 0x0008 holds Vendor ID (4 bytes)
-    let vendor_pdu = @protocol.read_register_fp(
-      nic, station, 0x0008U, 4, timeout,
-    )
-    let vendor_id = read_u32_le(vendor_pdu.data, 0)
-    let product_pdu = @protocol.read_register_fp(
-      nic, station, 0x000CU, 4, timeout,
-    )
-    let product_code = read_u32_le(product_pdu.data, 0)
-    let revision_pdu = @protocol.read_register_fp(
-      nic, station, 0x0010U, 4, timeout,
-    )
-    let revision = read_u32_le(revision_pdu.data, 0)
-    let serial_pdu = @protocol.read_register_fp(
-      nic, station, 0x0014U, 4, timeout,
-    )
-    let serial = read_u32_le(serial_pdu.data, 0)
-    let identification_pdu = @protocol.read_register_fp(
-      nic, station, identification_ado, 4, timeout,
+    let identity = read_best_identity(nic, position, station, timeout)
+    let identification_pdu = @protocol.read_register_ap(
+      nic, position, identification_ado, 4, timeout,
     )
     let identification = read_u32_le(identification_pdu.data, 0)
     slaves.push({
       position: i,
       station_address: station,
-      vendor_id,
-      product_code,
-      revision,
-      serial,
+      vendor_id: identity.vendor_id,
+      product_code: identity.product_code,
+      revision: identity.revision,
+      serial: identity.serial,
       identification,
     })
   }
   { slave_count: count, slaves }
+}
+
+///|
+fn[N : @hal.Nic] read_best_identity(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> @hal.SlaveIdentity {
+  let ap_sii = try? read_identity_from_sii_ap(nic, position, timeout)
+  match ap_sii {
+    Ok(identity) if not(identity_is_zero(identity)) => identity
+    _ => {
+      let fp_sii = try? read_identity_from_sii(nic, station, timeout)
+      match fp_sii {
+        Ok(identity) if not(identity_is_zero(identity)) => identity
+        _ => {
+          let ap_regs = try? read_identity_from_registers_ap(
+            nic, position, timeout,
+          )
+          match ap_regs {
+            Ok(identity) if not(identity_is_zero(identity)) => identity
+            _ =>
+              read_identity_from_registers(nic, station, timeout) catch {
+                _ =>
+                  { vendor_id: 0U, product_code: 0U, revision: 0U, serial: 0U }
+              }
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
+fn identity_is_zero(identity : @hal.SlaveIdentity) -> Bool {
+  identity.vendor_id == 0U &&
+  identity.product_code == 0U &&
+  identity.revision == 0U &&
+  identity.serial == 0U
+}
+
+///|
+fn[N : @hal.Nic] read_identity_from_sii_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> @hal.SlaveIdentity raise @hal.EcError {
+  let eeprom = @protocol.eeprom_read_ap(
+    nic, position, 0U, sii_header_read_dwords, timeout,
+  )
+  let sii = @mailbox.parse_sii_header(eeprom)
+  {
+    vendor_id: sii.vendor_id,
+    product_code: sii.product_code,
+    revision: sii.revision,
+    serial: sii.serial,
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_identity_from_sii(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> @hal.SlaveIdentity raise @hal.EcError {
+  let eeprom = @protocol.eeprom_read(
+    nic, station, 0U, sii_header_read_dwords, timeout,
+  )
+  let sii = @mailbox.parse_sii_header(eeprom)
+  {
+    vendor_id: sii.vendor_id,
+    product_code: sii.product_code,
+    revision: sii.revision,
+    serial: sii.serial,
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_identity_from_registers(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> @hal.SlaveIdentity raise @hal.EcError {
+  let vendor_pdu = @protocol.read_register_fp(nic, station, 0x0008U, 4, timeout)
+  let product_pdu = @protocol.read_register_fp(
+    nic, station, 0x000CU, 4, timeout,
+  )
+  let revision_pdu = @protocol.read_register_fp(
+    nic, station, 0x0010U, 4, timeout,
+  )
+  let serial_pdu = @protocol.read_register_fp(nic, station, 0x0014U, 4, timeout)
+  {
+    vendor_id: read_u32_le(vendor_pdu.data, 0),
+    product_code: read_u32_le(product_pdu.data, 0),
+    revision: read_u32_le(revision_pdu.data, 0),
+    serial: read_u32_le(serial_pdu.data, 0),
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_identity_from_registers_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> @hal.SlaveIdentity raise @hal.EcError {
+  let vendor_pdu = @protocol.read_register_ap(
+    nic, position, 0x0008U, 4, timeout,
+  )
+  let product_pdu = @protocol.read_register_ap(
+    nic, position, 0x000CU, 4, timeout,
+  )
+  let revision_pdu = @protocol.read_register_ap(
+    nic, position, 0x0010U, 4, timeout,
+  )
+  let serial_pdu = @protocol.read_register_ap(
+    nic, position, 0x0014U, 4, timeout,
+  )
+  {
+    vendor_id: read_u32_le(vendor_pdu.data, 0),
+    product_code: read_u32_le(product_pdu.data, 0),
+    revision: read_u32_le(revision_pdu.data, 0),
+    serial: read_u32_le(serial_pdu.data, 0),
+  }
 }
 
 ///|
@@ -109,28 +220,12 @@ pub fn ScanReport::format(self : ScanReport) -> String {
   for i = 0; i < self.slaves.length(); i = i + 1 {
     let s = self.slaves[i]
     buf.write_string("Slave #" + s.position.to_string() + "\n")
-    buf.write_string(
-      "  Station: 0x" +
-      s.station_address.reinterpret_as_int().to_string() +
-      "\n",
-    )
-    buf.write_string(
-      "  Vendor:  0x" + s.vendor_id.reinterpret_as_int().to_string() + "\n",
-    )
-    buf.write_string(
-      "  Product: 0x" + s.product_code.reinterpret_as_int().to_string() + "\n",
-    )
-    buf.write_string(
-      "  Revision: 0x" + s.revision.reinterpret_as_int().to_string() + "\n",
-    )
-    buf.write_string(
-      "  Serial: 0x" + s.serial.reinterpret_as_int().to_string() + "\n",
-    )
-    buf.write_string(
-      "  Identification: 0x" +
-      s.identification.reinterpret_as_int().to_string() +
-      "\n",
-    )
+    buf.write_string("  Station: " + s.station_address.to_string() + "\n")
+    buf.write_string("  Vendor:  " + s.vendor_id.to_string() + "\n")
+    buf.write_string("  Product: " + s.product_code.to_string() + "\n")
+    buf.write_string("  Revision: " + s.revision.to_string() + "\n")
+    buf.write_string("  Serial: " + s.serial.to_string() + "\n")
+    buf.write_string("  Identification: " + s.identification.to_string() + "\n")
     if i < self.slaves.length() - 1 {
       buf.write_string("\n")
     }

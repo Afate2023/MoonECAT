@@ -90,6 +90,150 @@ test "Runtime configure_pdo sets context" {
 }
 
 ///|
+/// SiiIdentityNic simulates one slave whose identity is read from SII EEPROM.
+pub struct SiiIdentityNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut sii_word_address : UInt
+}
+
+///|
+fn SiiIdentityNic::new() -> SiiIdentityNic {
+  { next_response: Bytes::new(0), is_open: true, sii_word_address: 0U }
+}
+
+///|
+fn sii_identity_eeprom_bytes() -> Bytes {
+  let data = FixedArray::make(60, b'\x00')
+  data[16] = b'\x02'
+  data[20] = b'\x52'
+  data[21] = b'\x2C'
+  data[22] = b'\x4C'
+  data[23] = b'\x04'
+  data[26] = b'\x11'
+  Bytes::makei(data.length(), fn(i) { data[i] })
+}
+
+///|
+fn read_u16_from_bytes(data : Bytes, offset : Int) -> UInt {
+  data[offset].to_uint() | (data[offset + 1].to_uint() << 8)
+}
+
+///|
+fn sii_window_bytes(word_address : UInt) -> Bytes {
+  let eeprom = sii_identity_eeprom_bytes()
+  let byte_offset = word_address.reinterpret_as_int() * 2
+  Bytes::makei(4, fn(i) {
+    if byte_offset + i < eeprom.length() {
+      eeprom[byte_offset + i]
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn build_response_frame(
+  request : @protocol.EcFrame,
+  data : Bytes,
+  wkc : UInt,
+) -> Bytes {
+  let request_pdu = request.pdus[0]
+  (
+    {
+      dst_mac: request.src_mac,
+      src_mac: request.dst_mac,
+      pdus: [
+        {
+          header: {
+            command: request_pdu.header.command,
+            index: request_pdu.header.index,
+            address: request_pdu.header.address,
+            len_flags: data.length().reinterpret_as_uint(),
+            irq: request_pdu.header.irq,
+          },
+          data,
+          wkc,
+        },
+      ],
+    } : @protocol.EcFrame).encode()
+}
+
+///|
+pub impl @hal.Nic for SiiIdentityNic with open_(name) {
+  ignore(name)
+  SiiIdentityNic::new()
+}
+
+///|
+pub impl @hal.Nic for SiiIdentityNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  self.next_response = match pdu.header.command {
+    @protocol.BRD =>
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    @protocol.APWR => {
+      if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPWR => {
+      if offset == @protocol.reg_sii_address && pdu.data.length() >= 2 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 0)
+      } else if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPRD => {
+      let response_data = if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else if offset == 0x0014U {
+        Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.APRD => {
+      let response_data = if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else if offset == 0x0014U {
+        Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    _ => build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for SiiIdentityNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for SiiIdentityNic with close(self) {
+  self.is_open = false
+}
+
+///|
 /// TimeoutNic is a deterministic test double that always times out on recv.
 pub struct TimeoutNic {
   mut is_open : Bool
@@ -1246,6 +1390,17 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
   assert_eq(report.scan.slave_count, 0)
   assert_eq(report.validation.all_ok, true)
   assert_true(report.final_phase is @runtime.Done)
+}
+
+///|
+test "scan reads slave identity from sii header" {
+  let nic = SiiIdentityNic::new()
+  let report = @runtime.scan(nic, @hal.Duration(1000L))
+  assert_eq(report.slave_count, 1)
+  assert_eq(report.slaves[0].vendor_id, 0x2U)
+  assert_eq(report.slaves[0].product_code, 0x044C2C52U)
+  assert_eq(report.slaves[0].revision, 0x00110000U)
+  assert_eq(report.slaves[0].serial, 0U)
 }
 
 ///|

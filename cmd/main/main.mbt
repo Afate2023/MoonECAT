@@ -37,48 +37,27 @@ fn cli_main() -> Unit raise @hal.EcError {
 
   if command == "run" {
     match backend {
-      Mock =>
-        run_command_with_probe_and_fresh_nic(
-          @mock.MockNic::new(),
-          @mock.MockNic::new(),
-          as_json,
-          timeout,
-        )
+      Mock => run_mock_command_with_fresh_nic(as_json, timeout)
       NativeAuto => {
         let interface_name = require_interface_name(args)
-        run_command_with_probe_and_fresh_nic(
-          @native.NativeNic::open_with_config(
-            @native.default_native_config(interface_name),
-          ),
-          @native.NativeNic::open_with_config(
-            @native.default_native_config(interface_name),
-          ),
+        run_native_command_with_fresh_nic(
+          @native.default_native_config(interface_name),
           as_json,
           timeout,
         )
       }
       NativeWindowsNpcap => {
         let interface_name = require_interface_name(args)
-        run_command_with_probe_and_fresh_nic(
-          @native.NativeNic::open_with_config(
-            @native.default_windows_npcap_config(interface_name),
-          ),
-          @native.NativeNic::open_with_config(
-            @native.default_windows_npcap_config(interface_name),
-          ),
+        run_native_command_with_fresh_nic(
+          @native.default_windows_npcap_config(interface_name),
           as_json,
           timeout,
         )
       }
       NativeLinuxRaw => {
         let interface_name = require_interface_name(args)
-        run_command_with_probe_and_fresh_nic(
-          @native.NativeNic::open_with_config(
-            @native.default_linux_config(interface_name),
-          ),
-          @native.NativeNic::open_with_config(
-            @native.default_linux_config(interface_name),
-          ),
+        run_native_command_with_fresh_nic(
+          @native.default_linux_config(interface_name),
           as_json,
           timeout,
         )
@@ -115,15 +94,44 @@ fn cli_main() -> Unit raise @hal.EcError {
 }
 
 ///|
-fn[N : @hal.Nic] run_command_with_probe_and_fresh_nic(
-  probe_nic : N,
-  run_nic : N,
+fn run_mock_command_with_fresh_nic(
   as_json : Bool,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
+  let probe_nic = @mock.MockNic::new()
   let scan_report = @runtime.scan(probe_nic, timeout)
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
+  let run_nic = @mock.MockNic::new()
+  let pdo_ctx = @protocol.PdoContext::build([], 0U)
+  let run_report = @runtime.run(
+    run_nic,
+    @hal.MasterConfig::default(),
+    expected,
+    pdo_ctx,
+    0U,
+    10,
+    timeout,
+  )
+  run_nic.close()
+  if as_json {
+    println(run_report_json(run_report).stringify(indent=2))
+  } else {
+    println(run_report.format())
+  }
+}
+
+///|
+fn run_native_command_with_fresh_nic(
+  config : @native.NativeNicConfig,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let probe_nic = @native.NativeNic::open_with_config(config)
+  let scan_report = @runtime.scan(probe_nic, timeout)
+  let expected = expected_from_scan(scan_report)
+  probe_nic.close()
+  let run_nic = @native.NativeNic::open_with_config(config)
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
   let run_report = @runtime.run(
     run_nic,

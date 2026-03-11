@@ -1029,13 +1029,103 @@ test "mailbox_recv times out when poll never succeeds" {
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }
 
+///|
+pub struct EepromMockNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut sii_word_address : UInt
+}
+
+///|
+fn EepromMockNic::new() -> EepromMockNic {
+  { next_response: Bytes::new(0), is_open: true, sii_word_address: 0U }
+}
+
+///|
+fn build_eeprom_response(
+  request : @protocol.EcFrame,
+  data : Bytes,
+  wkc : UInt,
+) -> Bytes {
+  let request_pdu = request.pdus[0]
+  (
+    {
+      dst_mac: request.src_mac,
+      src_mac: request.dst_mac,
+      pdus: [
+        {
+          header: {
+            command: request_pdu.header.command,
+            index: request_pdu.header.index,
+            address: request_pdu.header.address,
+            len_flags: data.length().reinterpret_as_uint(),
+            irq: request_pdu.header.irq,
+          },
+          data,
+          wkc,
+        },
+      ],
+    } : @protocol.EcFrame).encode()
+}
+
+///|
+pub impl @hal.Nic for EepromMockNic with open_(name) {
+  ignore(name)
+  EepromMockNic::new()
+}
+
+///|
+pub impl @hal.Nic for EepromMockNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  self.next_response = match pdu.header.command {
+    @protocol.FPWR => {
+      if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = pdu.data[2].to_uint() |
+          (pdu.data[3].to_uint() << 8)
+      }
+      build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPRD => {
+      let response_data = if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        Bytes::makei(pdu.data.length(), fn(i) {
+          (self.sii_word_address.reinterpret_as_int() * 2 + i).to_byte()
+        })
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_eeprom_response(request, response_data, 1U)
+    }
+    _ => build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for EepromMockNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for EepromMockNic with close(self) {
+  self.is_open = false
+}
+
 // ========== EEPROM Read Tests ==========
 
 ///|
 test "eeprom_read_word via mock loopback" {
-  // MockNic echoes frames. The SII control register read returns zeros,
-  // which means busy=0 → ready. Data register read also returns zeros.
-  let nic = @mock.MockNic::new()
+  let nic = EepromMockNic::new()
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read_word(nic, 0x1001U, 0U, timeout)
   assert_eq(data.length(), 4)
@@ -1043,7 +1133,7 @@ test "eeprom_read_word via mock loopback" {
 
 ///|
 test "eeprom_read multi-word via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = EepromMockNic::new()
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read(nic, 0x1001U, 0U, 3, timeout)
   assert_eq(data.length(), 12) // 3 words * 4 bytes
