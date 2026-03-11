@@ -3,8 +3,10 @@ import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/hal/native" @native,
   "afate/MoonECAT/hal/mock" @mock,
+  "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",
+  "moonbitlang/core/buffer",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }

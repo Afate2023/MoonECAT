@@ -8,7 +8,7 @@ enum CliBackend {
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run.
+/// Commands: list-if, scan, validate, run, read-sii.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -32,6 +32,35 @@ fn cli_main() -> Unit raise @hal.EcError {
 
   if command == "list-if" {
     print_interfaces(backend, as_json)
+    return
+  }
+
+  if command == "read-sii" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported("read-sii requires a native backend")
+      NativeAuto => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_native_config(interface_name),
+        )
+        run_read_sii_command(nic, args, as_json, timeout)
+      }
+      NativeWindowsNpcap => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_windows_npcap_config(interface_name),
+        )
+        run_read_sii_command(nic, args, as_json, timeout)
+      }
+      NativeLinuxRaw => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_linux_config(interface_name),
+        )
+        run_read_sii_command(nic, args, as_json, timeout)
+      }
+    }
     return
   }
 
@@ -186,12 +215,45 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>]",
   )
   println("Default backend: mock")
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
   println("  moon run cmd/main scan -- --backend native --if <interface>")
+  println(
+    "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
+  )
+}
+
+///|
+fn[N : @hal.Nic] run_read_sii_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let position = require_uint_flag(args, "--position", 0U)
+  let word_count = require_int_flag(args, "--words", 128)
+  let eeprom = @protocol.eeprom_read_ap(nic, position, 0U, word_count, timeout)
+  let header = @mailbox.parse_sii_header(eeprom)
+  let categories = @mailbox.parse_sii_categories(eeprom)
+  let strings = collect_sii_strings(categories)
+  let general = collect_sii_general(categories)
+  nic.close()
+  if as_json {
+    println(
+      read_sii_json(position, word_count, header, general, strings, categories).stringify(
+        indent=2,
+      ),
+    )
+  } else {
+    println(
+      read_sii_text(
+        position, word_count, eeprom, header, general, strings, categories,
+      ),
+    )
+  }
 }
 
 ///|
@@ -281,6 +343,220 @@ fn flag_value(args : Array[String], flag : String) -> String? {
     }
   }
   None
+}
+
+///|
+fn require_uint_flag(
+  args : Array[String],
+  flag : String,
+  default : UInt,
+) -> UInt raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => parse_uint_flag(flag, text)
+    None => default
+  }
+}
+
+///|
+fn require_int_flag(
+  args : Array[String],
+  flag : String,
+  default : Int,
+) -> Int raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => parse_int_flag(flag, text)
+    None => default
+  }
+}
+
+///|
+fn parse_uint_flag(flag : String, text : String) -> UInt raise @hal.EcError {
+  let mut value = 0U
+  if text == "" {
+    raise @hal.EcError::ConfigMismatch("missing numeric value for " + flag)
+  }
+  let bytes = text.to_bytes()
+  for ch in bytes {
+    if ch == b'\x00' {
+      continue
+    }
+    if ch < b'0' || ch > b'9' {
+      raise @hal.EcError::ConfigMismatch(
+        "invalid numeric value for " + flag + ": " + text,
+      )
+    }
+    value = value * 10U + (ch.to_uint() - b'0'.to_uint())
+  }
+  value
+}
+
+///|
+fn parse_int_flag(flag : String, text : String) -> Int raise @hal.EcError {
+  parse_uint_flag(flag, text).reinterpret_as_int()
+}
+
+///|
+fn collect_sii_strings(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[String] {
+  for entry in categories {
+    if entry.category == @mailbox.Strings {
+      return @mailbox.parse_sii_strings(entry.data)
+    }
+  }
+  []
+}
+
+///|
+fn collect_sii_general(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> @mailbox.SiiGeneral? {
+  for entry in categories {
+    if entry.category == @mailbox.General {
+      return Some(
+        @mailbox.parse_sii_general(entry.data) catch {
+          _ => return None
+        },
+      )
+    }
+  }
+  None
+}
+
+///|
+fn read_sii_json(
+  position : UInt,
+  word_count : Int,
+  header : @mailbox.SiiData,
+  general : @mailbox.SiiGeneral?,
+  strings : Array[String],
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Json {
+  let categories_json = categories.map(fn(entry) {
+    Json::object({
+      "category": Json::string(entry.category.to_string()),
+      "byte_length": Json::number(entry.data.length().to_double()),
+    })
+  })
+  let strings_json = strings.map(fn(text) { Json::string(text) })
+  let general_json = match general {
+    Some(info) =>
+      Json::object({
+        "group_idx": Json::number(info.group_idx.to_uint().to_double()),
+        "image_idx": Json::number(info.image_idx.to_uint().to_double()),
+        "order_idx": Json::number(info.order_idx.to_uint().to_double()),
+        "name_idx": Json::number(info.name_idx.to_uint().to_double()),
+        "coe_details": Json::number(info.coe_details.to_uint().to_double()),
+        "foe_supported": Json::boolean(info.foe_supported),
+        "eoe_supported": Json::boolean(info.eoe_supported),
+        "soe_supported": Json::boolean(info.soe_supported),
+        "flags": Json::number(info.flags.to_uint().to_double()),
+        "current_on_ebus": Json::number(info.current_on_ebus.to_double()),
+      })
+    None => Json::null()
+  }
+  Json::object({
+    "position": Json::number(position.to_double()),
+    "word_count": Json::number(word_count.to_double()),
+    "header": Json::object({
+      "vendor_id": Json::number(header.vendor_id.to_double()),
+      "product_code": Json::number(header.product_code.to_double()),
+      "revision": Json::number(header.revision.to_double()),
+      "serial": Json::number(header.serial.to_double()),
+      "bootstrap_rx_offset": Json::number(
+        header.bootstrap_rx_offset.to_double(),
+      ),
+      "bootstrap_rx_size": Json::number(header.bootstrap_rx_size.to_double()),
+      "bootstrap_tx_offset": Json::number(
+        header.bootstrap_tx_offset.to_double(),
+      ),
+      "bootstrap_tx_size": Json::number(header.bootstrap_tx_size.to_double()),
+      "mailbox_rx_offset": Json::number(header.mailbox_rx_offset.to_double()),
+      "mailbox_rx_size": Json::number(header.mailbox_rx_size.to_double()),
+      "mailbox_tx_offset": Json::number(header.mailbox_tx_offset.to_double()),
+      "mailbox_tx_size": Json::number(header.mailbox_tx_size.to_double()),
+      "mailbox_protocols": Json::number(header.mailbox_protocols.to_double()),
+    }),
+    "general": general_json,
+    "strings": Json::array(strings_json),
+    "categories": Json::array(categories_json),
+  })
+}
+
+///|
+fn read_sii_text(
+  position : UInt,
+  word_count : Int,
+  eeprom : Bytes,
+  header : @mailbox.SiiData,
+  general : @mailbox.SiiGeneral?,
+  strings : Array[String],
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> String {
+  let buf = @buffer.new(size_hint=512)
+  buf.write_string("SII Read Report\n")
+  buf.write_string("===============\n")
+  buf.write_string("Position: " + position.to_string() + "\n")
+  buf.write_string("Bytes read: " + eeprom.length().to_string() + "\n")
+  buf.write_string("Words requested: " + word_count.to_string() + "\n\n")
+  buf.write_string("Header\n")
+  buf.write_string("  Vendor: " + header.vendor_id.to_string() + "\n")
+  buf.write_string("  Product: " + header.product_code.to_string() + "\n")
+  buf.write_string("  Revision: " + header.revision.to_string() + "\n")
+  buf.write_string("  Serial: " + header.serial.to_string() + "\n")
+  buf.write_string(
+    "  Mailbox RX: " +
+    header.mailbox_rx_offset.to_string() +
+    " / " +
+    header.mailbox_rx_size.to_string() +
+    "\n",
+  )
+  buf.write_string(
+    "  Mailbox TX: " +
+    header.mailbox_tx_offset.to_string() +
+    " / " +
+    header.mailbox_tx_size.to_string() +
+    "\n",
+  )
+  match general {
+    Some(info) => {
+      buf.write_string("\nGeneral\n")
+      buf.write_string(
+        "  CoE details: " + info.coe_details.to_uint().to_string() + "\n",
+      )
+      buf.write_string(
+        "  FoE supported: " + info.foe_supported.to_string() + "\n",
+      )
+      buf.write_string(
+        "  EoE supported: " + info.eoe_supported.to_string() + "\n",
+      )
+      buf.write_string(
+        "  SoE supported: " + info.soe_supported.to_string() + "\n",
+      )
+      buf.write_string("  Flags: " + info.flags.to_uint().to_string() + "\n")
+      buf.write_string(
+        "  Current on EBus: " + info.current_on_ebus.to_string() + "\n",
+      )
+    }
+    None => ()
+  }
+  if not(strings.is_empty()) {
+    buf.write_string("\nStrings\n")
+    for i = 0; i < strings.length(); i = i + 1 {
+      buf.write_string("  [" + (i + 1).to_string() + "] " + strings[i] + "\n")
+    }
+  }
+  buf.write_string("\nCategories\n")
+  for entry in categories {
+    buf.write_string(
+      "  " +
+      entry.category.to_string() +
+      ": " +
+      entry.data.length().to_string() +
+      " bytes\n",
+    )
+  }
+  buf.to_string()
 }
 
 ///|
