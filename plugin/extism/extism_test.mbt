@@ -34,14 +34,8 @@ test "extism scan entry returns scan payload" {
     "ok": true,
     "error_code": null,
     "error_message": null,
-    "payload": {
-      "slave_count": 0,
-      "slaves": [],
-    },
-    "diagnostics": {
-      "command": "scan",
-      "backend": "mock",
-    },
+    "payload": { "slave_count": 0, "slaves": [] },
+    "diagnostics": { "command": "scan", "backend": "mock" },
   })
 }
 
@@ -68,10 +62,7 @@ test "extism validate entry returns pass on mock replay" {
       "all_ok": true,
       "result_count": 0,
     },
-    "diagnostics": {
-      "command": "validate",
-      "backend": "mock",
-    },
+    "diagnostics": { "command": "validate", "backend": "mock" },
   })
 }
 
@@ -93,10 +84,7 @@ test "extism run entry returns replay run summary" {
     "error_code": null,
     "error_message": null,
     "payload": {
-      "scan": {
-        "slave_count": 0,
-        "slaves": [],
-      },
+      "scan": { "slave_count": 0, "slaves": [] },
       "validation": {
         "total_expected": 0,
         "total_found": 0,
@@ -117,9 +105,6 @@ test "extism run entry returns replay run summary" {
         "dc_delay_updates": 0,
       },
     },
-    "diagnostics": {
-      "command": "run",
-      "backend": "mock",
-    },
+    "diagnostics": { "command": "run", "backend": "mock" },
   })
 }
