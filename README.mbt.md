@@ -20,3 +20,9 @@ moon run cmd/main      # Run CLI
 moon test              # Run all tests
 moon test hal/mock     # Run mock HAL tests
 ```
+
+## Documentation
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture
+guide, data flow diagrams, testing strategy, common issues, and extension
+points.
