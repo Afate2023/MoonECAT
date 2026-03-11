@@ -116,7 +116,7 @@ pub fn[N : @hal.Nic] sdo_download_retry(
     Err(e) => raise e
   }
   // Retry loop
-  for {
+  for ;; {
     if not(rmsm.record_timeout()) {
       raise @hal.EcError::MailboxTimeout
     }
@@ -154,7 +154,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
     Err(e) => raise e
   }
   // Retry loop
-  for {
+  for ;; {
     if not(rmsm.record_timeout()) {
       raise @hal.EcError::MailboxTimeout
     }
