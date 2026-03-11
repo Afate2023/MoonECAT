@@ -4,7 +4,7 @@ enum CliBackend {
   NativeAuto
   NativeWindowsNpcap
   NativeLinuxRaw
-}
+} derive(Eq, Show)
 
 ///|
 /// MoonECAT CLI entry point.

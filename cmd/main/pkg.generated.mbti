@@ -7,6 +7,8 @@ package "afate/MoonECAT/cmd/main"
 
 // Types and methods
 type CliBackend
+pub impl Eq for CliBackend
+pub impl Show for CliBackend
 
 // Type aliases
 

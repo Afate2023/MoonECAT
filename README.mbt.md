@@ -59,4 +59,6 @@ after `--`, otherwise flags like `--backend` and `--if` will be consumed by
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture
 guide, data flow diagrams, testing strategy, common issues, and extension
-points.
+points. See [docs/BACKEND_RELEASE_MATRIX.md](docs/BACKEND_RELEASE_MATRIX.md)
+for the current Native CLI / Native Library / Extism Plugin release boundaries,
+environment requirements, and smoke commands.
