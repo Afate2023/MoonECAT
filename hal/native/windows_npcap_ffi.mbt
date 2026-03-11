@@ -31,6 +31,9 @@ extern "c" fn ffi_windows_npcap_available() -> Int = "moonecat_windows_npcap_ava
 extern "c" fn ffi_windows_npcap_list_interfaces_text() -> Bytes = "moonecat_windows_npcap_list_interfaces_text"
 
 ///|
+extern "c" fn ffi_windows_npcap_list_interfaces_json() -> Bytes = "moonecat_windows_npcap_list_interfaces_json"
+
+///|
 pub fn windows_npcap_runtime_available() -> Bool {
   ffi_windows_npcap_available() != 0
 }
@@ -41,6 +44,14 @@ pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError {
     raise @hal.EcError::NotSupported("Npcap runtime is not available")
   }
   @utf8.decode_lossy(ffi_windows_npcap_list_interfaces_text())
+}
+
+///|
+pub fn windows_npcap_list_interfaces_json() -> String raise @hal.EcError {
+  if not(windows_npcap_runtime_available()) {
+    raise @hal.EcError::NotSupported("Npcap runtime is not available")
+  }
+  @utf8.decode_lossy(ffi_windows_npcap_list_interfaces_json())
 }
 
 ///|

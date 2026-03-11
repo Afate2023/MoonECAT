@@ -12,13 +12,35 @@ pub fn default_native_config(String) -> NativeNicConfig
 
 pub fn default_windows_npcap_config(String) -> NativeNicConfig
 
+pub let linux_raw_socket_backend_label : String
+
+pub fn linux_raw_socket_close(Int) -> Unit
+
+pub fn linux_raw_socket_list_interfaces_json() -> String raise @hal.EcError
+
+pub fn linux_raw_socket_list_interfaces_text() -> String raise @hal.EcError
+
+pub fn linux_raw_socket_open(NativeNicConfig) -> Int raise @hal.EcError
+
+pub fn linux_raw_socket_recv(Int) -> Bytes raise @hal.EcError
+
+pub fn linux_raw_socket_runtime_available() -> Bool
+
+pub fn linux_raw_socket_send(Int, Bytes) -> Int raise @hal.EcError
+
 pub fn native_backend_available(NativeBackendKind) -> Bool
+
+pub fn native_list_interfaces_json(NativeBackendKind) -> String raise @hal.EcError
+
+pub fn native_list_interfaces_text(NativeBackendKind) -> String raise @hal.EcError
 
 pub fn native_stub_version() -> Int
 
 pub let windows_npcap_backend_label : String
 
 pub fn windows_npcap_close(Int) -> Unit
+
+pub fn windows_npcap_list_interfaces_json() -> String raise @hal.EcError
 
 pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError
 

@@ -121,6 +121,9 @@ fn print_usage() -> Unit {
     "Usage: moonecat <list-if|scan|validate|run> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>]",
   )
   println("Default backend: mock")
+  println("Examples:")
+  println("  moon run cmd/main list-if -- --backend native --json")
+  println("  moon run cmd/main scan -- --backend native --if <interface>")
 }
 
 ///|
@@ -141,25 +144,31 @@ fn print_interfaces(
       } else {
         println("mock backend does not expose real interfaces")
       }
-    NativeAuto | NativeWindowsNpcap => {
-      let listing = @native.windows_npcap_list_interfaces_text()
-      if as_json {
-        println(
-          Json::object({
-            "backend": Json::string("native-windows-npcap"),
-            "interfaces_text": Json::string(listing),
-          }).stringify(indent=2),
-        )
-      } else if listing == "" {
+    NativeAuto | NativeWindowsNpcap | NativeLinuxRaw => {
+      let native_backend = cli_backend_to_native_backend(backend)
+      let listing = if as_json {
+        @native.native_list_interfaces_json(native_backend)
+      } else {
+        @native.native_list_interfaces_text(native_backend)
+      }
+      if listing == "" {
         println("no interfaces found")
       } else {
         println(listing)
       }
     }
-    NativeLinuxRaw =>
-      raise @hal.EcError::NotSupported(
-        "native-linux-raw interface enumeration is not implemented yet",
-      )
+  }
+}
+
+///|
+fn cli_backend_to_native_backend(
+  backend : CliBackend,
+) -> @native.NativeBackendKind {
+  match backend {
+    Mock => @native.Auto
+    NativeAuto => @native.Auto
+    NativeWindowsNpcap => @native.WindowsNpcap
+    NativeLinuxRaw => @native.LinuxRawSocket
   }
 }
 

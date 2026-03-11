@@ -5,5 +5,6 @@
   "repository": "",
   "license": "Apache-2.0",
   "keywords": ["ethercat", "industrial", "fieldbus"],
-  "description": "A modular EtherCAT master library written in MoonBit"
+  "description": "A modular EtherCAT master library written in MoonBit",
+  "preferred-target": "native"
 }

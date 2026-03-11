@@ -10,7 +10,6 @@ import {
 options(
   link: {
     "native": {
-      "cc-link-flags": "-LE:/Repos/EtherCAT/MoonECAT/Reference_Project/npcap-sdk-1.16/Lib/x64 -lwpcap -lPacket -lws2_32",
       "stub-cc-flags": "-IE:/Repos/EtherCAT/MoonECAT/Reference_Project/npcap-sdk-1.16/Include",
     },
   },
@@ -19,6 +18,7 @@ options(
     "ffi_native.mbt": [ "native" ],
     "ffi_native_fallback.mbt": [ "wasm-gc" ],
     "linux_raw_socket_ffi.mbt": [ "native" ],
+    "linux_raw_socket_ffi_fallback.mbt": [ "wasm-gc" ],
     "windows_npcap_ffi.mbt": [ "native" ],
     "windows_npcap_ffi_fallback.mbt": [ "wasm-gc" ],
   },
