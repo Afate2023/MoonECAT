@@ -129,6 +129,50 @@ pub impl @hal.Nic for TimeoutNic with close(self) {
 }
 
 ///|
+/// RejectEmptyBusTransitionNic behaves like MockNic until a BWR to AL Control
+/// is attempted, which lets tests detect invalid ESM broadcasts on an empty bus.
+pub struct RejectEmptyBusTransitionNic {
+  inner : @mock.MockNic
+  mut state_transition_attempts : Int
+}
+
+///|
+fn RejectEmptyBusTransitionNic::new() -> RejectEmptyBusTransitionNic {
+  { inner: @mock.MockNic::new(), state_transition_attempts: 0 }
+}
+
+///|
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with open_(name) {
+  ignore(name)
+  RejectEmptyBusTransitionNic::new()
+}
+
+///|
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with send(self, data) {
+  let frame = @protocol.EcFrame::decode(data)
+  for pdu in frame.pdus {
+    if pdu.header.command is @protocol.BWR &&
+      @protocol.address_offset(pdu.header.address) == @protocol.reg_al_control {
+      self.state_transition_attempts = self.state_transition_attempts + 1
+      raise @hal.EcError::SendFailed(
+        "unexpected AL control broadcast on empty bus",
+      )
+    }
+  }
+  self.inner.send(data)
+}
+
+///|
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with recv(self, timeout~) {
+  self.inner.recv(timeout~)
+}
+
+///|
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with close(self) {
+  self.inner.close()
+}
+
+///|
 test "Runtime init_dc disabled keeps state Disabled" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
@@ -1202,6 +1246,33 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
   assert_eq(report.scan.slave_count, 0)
   assert_eq(report.validation.all_ok, true)
   assert_true(report.final_phase is @runtime.Done)
+}
+
+///|
+test "run with empty bus skips ESM broadcasts" {
+  let nic = RejectEmptyBusTransitionNic::new()
+  let config = @hal.MasterConfig::default()
+  let expected : Array[@hal.SlaveConfig] = []
+  let ctx : @protocol.PdoContext = {
+    image: @protocol.ProcessImage::new(0, 0),
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 0,
+  }
+  let report = @runtime.run(
+    nic,
+    config,
+    expected,
+    ctx,
+    0U,
+    3,
+    @hal.Duration(1000L),
+  )
+  assert_eq(report.scan.slave_count, 0)
+  assert_eq(report.validation.all_ok, true)
+  assert_eq(report.cycles_ok, 3)
+  assert_true(report.final_phase is @runtime.Done)
+  assert_eq(nic.state_transition_attempts, 0)
 }
 
 ///|

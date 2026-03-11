@@ -43,6 +43,7 @@ pub fn[N : @hal.Nic] run(
 ) -> RunReport raise @hal.EcError {
   // Phase 1: Scan
   let scan_report = scan(nic, timeout)
+  let has_discovered_slaves = scan_report.slave_count > 0
 
   // Phase 2: Validate
   let validate_report = validate(scan_report, expected)
@@ -58,7 +59,9 @@ pub fn[N : @hal.Nic] run(
   }
 
   // Phase 3: Configure — transition slaves to Operational
-  ignore(@protocol.broadcast_state(nic, @protocol.EsmState::Op, timeout))
+  if has_discovered_slaves {
+    ignore(@protocol.broadcast_state(nic, @protocol.EsmState::Op, timeout))
+  }
 
   // Phase 4: Run PDO cycles
   let rt = Runtime::new(config)
@@ -69,11 +72,13 @@ pub fn[N : @hal.Nic] run(
   let ok_count = rt.run_cycles(nic, cycles, timeout)
 
   // Phase 5: Shutdown — transition slaves back to Init
-  ignore(
-    @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout) catch {
-      _ => 0U // Best-effort shutdown; report already captured
-    },
-  )
+  if has_discovered_slaves {
+    ignore(
+      @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout) catch {
+        _ => 0U // Best-effort shutdown; report already captured
+      },
+    )
+  }
   rt.set_state(Idle)
 
   {

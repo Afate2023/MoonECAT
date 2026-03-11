@@ -37,6 +37,13 @@ moon run cmd/main run -- --backend native --if <interface> --json
   `moon run cmd/main list-if -- --backend native-windows-npcap --json`
 - Windows 非 EtherCAT 链路 smoke：
   `scan -> validate -> run` 在空总线场景下成功返回 0 slaves / PASS / Done
+- 2026-03-11 实测接口：
+  `\\Device\\NPF_{21208AED-855D-48E0-B0AF-A5B92C93EEDC}`
+  （Realtek USB GbE Family Controller）
+- 2026-03-11 实测结果：
+  `scan` => `{"slave_count":0,"slaves":[]}`；
+  `validate` => `{"total_expected":0,"total_found":0,"all_ok":true,"result_count":0}`；
+  `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
 
 ## 2. Native Library
 
@@ -67,6 +74,7 @@ moon test hal/native/native_test.mbt --target native
 - Windows Npcap：接口枚举、open/send/recv/close、运行时动态加载已实现
 - Linux Raw Socket：接口枚举、open/send/recv/close 已实现
 - 真实 `scan/validate/run` 回归尚未补成自动化硬件测试
+- CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
 
 ## 3. Extism Plugin
 
@@ -103,6 +111,7 @@ moon test plugin/extism/extism_test.mbt
 - 建议安装兼容 WinPcap 模式
 - `list-if` 成功不代表 EtherCAT 总线存在，只代表链路层打开与枚举成功
 - 当前实现按 Npcap SDK 示例先 `SetDllDirectory(...\\Npcap)`，再动态加载 `wpcap.dll`
+- 当前 CLI `run` 会先用一条探测会话生成 expected，再重新打开同一接口执行正式 `run`，这属于真实后端所需行为，不改变库层 `RunReport` 语义
 
 ### Linux Raw Socket
 

@@ -43,3 +43,14 @@ test "cli native backend mapping stays stable" {
     @native.LinuxRawSocket,
   )
 }
+
+///|
+test "cli run helper reopens nic for run path" {
+  let result : Result[Unit, Error] = try? run_command_with_probe_and_fresh_nic(
+    @mock.MockNic::new(),
+    @mock.MockNic::new(),
+    true,
+    @hal.Duration(1000L),
+  )
+  assert_true(result is Ok(_))
+}

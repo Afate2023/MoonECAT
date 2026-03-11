@@ -35,6 +35,58 @@ fn cli_main() -> Unit raise @hal.EcError {
     return
   }
 
+  if command == "run" {
+    match backend {
+      Mock =>
+        run_command_with_probe_and_fresh_nic(
+          @mock.MockNic::new(),
+          @mock.MockNic::new(),
+          as_json,
+          timeout,
+        )
+      NativeAuto => {
+        let interface_name = require_interface_name(args)
+        run_command_with_probe_and_fresh_nic(
+          @native.NativeNic::open_with_config(
+            @native.default_native_config(interface_name),
+          ),
+          @native.NativeNic::open_with_config(
+            @native.default_native_config(interface_name),
+          ),
+          as_json,
+          timeout,
+        )
+      }
+      NativeWindowsNpcap => {
+        let interface_name = require_interface_name(args)
+        run_command_with_probe_and_fresh_nic(
+          @native.NativeNic::open_with_config(
+            @native.default_windows_npcap_config(interface_name),
+          ),
+          @native.NativeNic::open_with_config(
+            @native.default_windows_npcap_config(interface_name),
+          ),
+          as_json,
+          timeout,
+        )
+      }
+      NativeLinuxRaw => {
+        let interface_name = require_interface_name(args)
+        run_command_with_probe_and_fresh_nic(
+          @native.NativeNic::open_with_config(
+            @native.default_linux_config(interface_name),
+          ),
+          @native.NativeNic::open_with_config(
+            @native.default_linux_config(interface_name),
+          ),
+          as_json,
+          timeout,
+        )
+      }
+    }
+    return
+  }
+
   match backend {
     Mock =>
       run_command_with_nic(command, @mock.MockNic::new(), as_json, timeout)
@@ -59,6 +111,34 @@ fn cli_main() -> Unit raise @hal.EcError {
       )
       run_command_with_nic(command, nic, as_json, timeout)
     }
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_command_with_probe_and_fresh_nic(
+  probe_nic : N,
+  run_nic : N,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let scan_report = @runtime.scan(probe_nic, timeout)
+  let expected = expected_from_scan(scan_report)
+  probe_nic.close()
+  let pdo_ctx = @protocol.PdoContext::build([], 0U)
+  let run_report = @runtime.run(
+    run_nic,
+    @hal.MasterConfig::default(),
+    expected,
+    pdo_ctx,
+    0U,
+    10,
+    timeout,
+  )
+  run_nic.close()
+  if as_json {
+    println(run_report_json(run_report).stringify(indent=2))
+  } else {
+    println(run_report.format())
   }
 }
 
@@ -88,26 +168,6 @@ fn[N : @hal.Nic] run_command_with_nic(
         println(validate_report_json(validate_report).stringify(indent=2))
       } else {
         println(validate_report.format())
-      }
-    }
-    "run" => {
-      let scan_report = @runtime.scan(nic, timeout)
-      let expected = expected_from_scan(scan_report)
-      let pdo_ctx = @protocol.PdoContext::build([], 0U)
-      let run_report = @runtime.run(
-        nic,
-        @hal.MasterConfig::default(),
-        expected,
-        pdo_ctx,
-        0U,
-        10,
-        timeout,
-      )
-      nic.close()
-      if as_json {
-        println(run_report_json(run_report).stringify(indent=2))
-      } else {
-        println(run_report.format())
       }
     }
     _ => print_usage()
