@@ -68,6 +68,7 @@
 - 每次提交只覆盖一个清晰目标，避免把无关改动混进同一个 commit。
 - 优先提交可验证结果，例如接口、测试、最小闭环、文档更新。
 - 提交顺序必须服从依赖关系，不能先做 CLI 再倒逼核心库改接口。
+- 新增能力默认遵循固定链路：先补 `Reference_Project` / 标准映射，再生成 MoonECAT 实现与测试，再执行最小验证、提交，最后回填本清单与 memory。
 
 ## 2. 里程碑任务
 
@@ -264,7 +265,7 @@
   - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg.json](hal/native/moon.pkg.json) 包骨架，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap FFI 包装、占位 `NativeNic` 与最小测试；CLI 已可选择 native 后端，但 Linux Raw Socket 仍未实现
+  - 当前状态：已创建 [hal/native/moon.pkg](hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），`scan/validate/run` 的真实网卡 smoke 仍待补全
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
   - MoonBit Native FFI 工作包：
@@ -321,6 +322,7 @@
 - `native ffi package scaffold`：FFI 包布局、`moon.pkg` `native-stub`、target gating、基础 stub 框架
 - `linux raw-socket nic binding`：Linux Raw Socket extern + 安全包装 + 错误映射
 - `windows npcap nic binding`：Npcap extern + 安全包装 + 错误映射
+- `native interface enumeration + runtime loading`：Windows Npcap 动态加载、Linux Raw Socket 枚举、CLI `list-if` JSON 输出
 - `native backend cli smoke path`：CLI 复用 native HAL 跑通 scan/validate/run
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
 - `extism wasm adapter entrypoints`：插件导出入口 + 请求/响应信封
@@ -335,6 +337,7 @@
 - `补全文档（架构/接口/测试方式）` → `e5d8a81` `docs: document architecture and user workflows`
 - `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
 - `Windows Npcap Native 后端骨架` → `92c9a5e` `feat(native): add windows npcap backend scaffold`
+- `Native interface enumeration + runtime loading` → `061928d` `feat(native): load npcap at runtime and enable list-if`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
@@ -368,6 +371,7 @@
 
 | 功能 | 调用流文档依据 | 参考实现（本地代码） | MoonECAT 对应实现 | 结论 |
 |---|---|---|---|---|
+| Native NIC backend / `list-if` / 真实链路入口 | [gatorcat-callflow-analysis.md:44](src/gatorcat-callflow-analysis.md#L44) [ethercrab-callflow-analysis.md:74](src/ethercrab-callflow-analysis.md#L74) [igh-callflow-analysis.md:90](src/igh-callflow-analysis.md#L90) | Npcap SDK: [UserBridge.c:44](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L44) (`LoadNpcapDlls`) + [UserBridge.c:110](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L110) (`pcap_findalldevs_ex`) + [UserBridge.c:193](Reference_Project/npcap-sdk-1.16/Examples-remote/UserLevelBridge/UserBridge.c#L193) (`pcap_open`)；IGH: [generic.c:219](Reference_Project/ethercat/devices/generic.c#L219) (`sock_create_kern`) + [generic.c:234](Reference_Project/ethercat/devices/generic.c#L234) (`sockaddr_ll`)；GatorCAT: [nic.zig:182](Reference_Project/gatorcat/src/module/nic.zig#L182) (`npcap.pcap_open`) | [hal/native/platform_stub.c](hal/native/platform_stub.c) [hal/native/windows_npcap_ffi.mbt](hal/native/windows_npcap_ffi.mbt) [hal/native/linux_raw_socket_ffi.mbt](hal/native/linux_raw_socket_ffi.mbt) [hal/native/native_nic.mbt](hal/native/native_nic.mbt) [cmd/main/main.mbt](cmd/main/main.mbt) | 进行中：已完成接口枚举、运行时装载与双后端 HAL；待补真实 `scan/validate/run` smoke |
 | 扫描/拓扑/基础发现 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [CherryECAT-callflow-analysis.md:178](src/CherryECAT-callflow-analysis.md#L178) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | SOEM: [ec_config.c:172](Reference_Project/SOEM/src/ec_config.c#L172) (`ecx_config_init`) Cherry: [ec_slave.c:955](Reference_Project/CherryECAT/src/ec_slave.c#L955) (`ec_slaves_scanning`) ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) | [runtime/scan.mbt](runtime/scan.mbt) [protocol/discovery.mbt](protocol/discovery.mbt) | 已对齐 |
 | ESM 状态机与回退 | [SOEM-callflow-analysis.md:465](src/SOEM-callflow-analysis.md#L465) [IGH-callflow-analysis.md:486](src/igh-callflow-analysis.md#L486) | SOEM: [ec_main.c:1017](Reference_Project/SOEM/src/ec_main.c#L1017) (`ecx_writestate`) + [ec_main.c:1052](Reference_Project/SOEM/src/ec_main.c#L1052) (`ecx_statecheck`)；IGH: [fsm_slave_config.c:223](Reference_Project/ethercat/master/fsm_slave_config.c#L223) (`ec_fsm_slave_config_state_start`) | [protocol/esm.mbt](protocol/esm.mbt) [protocol/esm_engine.mbt](protocol/esm_engine.mbt) [protocol/esm_extensions.mbt](protocol/esm_extensions.mbt) | 已对齐 |
 | PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](Reference_Project/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](Reference_Project/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](Reference_Project/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |
@@ -510,5 +514,6 @@
 ## 10. 提交执行方式
 
 - 每完成一个"建议提交拆分"条目，就单独 `git add` 对应文件并提交。
+- 新增能力先补 Section 8 的“参考实现（本地代码）/ MoonECAT 对应实现”，再落测试与实现；缺少映射时不直接编码。
 - 提交前先运行本次改动对应的最小验证；文档改动至少检查链接、标题和任务编号是否一致。
 - 完成后更新本文档对应条目的 `[ ]` → `[x]` 并注明 commit hash。
