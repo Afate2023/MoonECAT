@@ -148,12 +148,34 @@ test "cli read_sii_json includes header and categories" {
         description_idx: b'\x01',
       },
     ],
+    [
+      {
+        pdo_index: 0x1A00U,
+        entry_count: b'\x01',
+        sync_manager: b'\x03',
+        synchronization: b'\x00',
+        name_idx: b'\x01',
+        flags: 0U,
+        entries: [
+          {
+            entry_index: 0x6000U,
+            subindex: b'\x01',
+            name_idx: b'\x01',
+            data_type: b'\x05',
+            bit_length: b'\x10',
+            flags: 0U,
+          },
+        ],
+      },
+    ],
+    [],
     [{ category: @mailbox.General, data: Bytes::new(32) }],
   )
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"vendor_id\": 1"))
   assert_true(text.contains("\"preamble\""))
   assert_true(text.contains("\"dc_clocks\""))
+  assert_true(text.contains("\"tx_pdo\""))
   assert_true(text.contains("\"strings\""))
   assert_true(text.contains("\"categories\""))
 }

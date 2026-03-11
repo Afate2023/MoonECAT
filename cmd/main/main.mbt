@@ -245,12 +245,14 @@ fn[N : @hal.Nic] run_read_sii_command(
   let fmmu = collect_sii_fmmu(categories)
   let sync_managers = collect_sii_sync_managers(categories)
   let dc_clocks = collect_sii_dc(categories)
+  let tx_pdo = collect_sii_pdo(categories, @mailbox.TxPdo)
+  let rx_pdo = collect_sii_pdo(categories, @mailbox.RxPdo)
   nic.close()
   if as_json {
     println(
       read_sii_json(
         position, word_count, preamble, standard, header, general, strings, fmmu,
-        sync_managers, dc_clocks, categories,
+        sync_managers, dc_clocks, tx_pdo, rx_pdo, categories,
       ).stringify(indent=2),
     )
   } else {
@@ -489,6 +491,22 @@ fn collect_sii_dc(
 }
 
 ///|
+fn collect_sii_pdo(
+  categories : Array[@mailbox.SiiCategoryEntry],
+  category : @mailbox.SiiCategory,
+) -> Array[@mailbox.SiiPdo] {
+  let result : Array[@mailbox.SiiPdo] = []
+  for entry in categories {
+    if entry.category == category {
+      for pdo in @mailbox.parse_sii_pdo(entry.data) {
+        result.push(pdo)
+      }
+    }
+  }
+  result
+}
+
+///|
 fn mailbox_protocol_supported(protocols : UInt, mask : UInt) -> Bool {
   (protocols & mask) != 0U
 }
@@ -657,6 +675,31 @@ fn general_json(info : @mailbox.SiiGeneral, strings : Array[String]) -> Json {
 }
 
 ///|
+fn pdo_json(pdo : @mailbox.SiiPdo, strings : Array[String]) -> Json {
+  let entries_json = pdo.entries.map(fn(entry) {
+    Json::object({
+      "entry_index": Json::number(entry.entry_index.to_double()),
+      "subindex": Json::number(entry.subindex.to_uint().to_double()),
+      "name_idx": Json::number(entry.name_idx.to_uint().to_double()),
+      "name": Json::string(resolved_sii_string(strings, entry.name_idx)),
+      "data_type": Json::number(entry.data_type.to_uint().to_double()),
+      "bit_length": Json::number(entry.bit_length.to_uint().to_double()),
+      "flags": Json::number(entry.flags.to_double()),
+    })
+  })
+  Json::object({
+    "pdo_index": Json::number(pdo.pdo_index.to_double()),
+    "entry_count": Json::number(pdo.entry_count.to_uint().to_double()),
+    "sync_manager": Json::number(pdo.sync_manager.to_uint().to_double()),
+    "synchronization": Json::number(pdo.synchronization.to_uint().to_double()),
+    "name_idx": Json::number(pdo.name_idx.to_uint().to_double()),
+    "name": Json::string(resolved_sii_string(strings, pdo.name_idx)),
+    "flags": Json::number(pdo.flags.to_double()),
+    "entries": Json::array(entries_json),
+  })
+}
+
+///|
 fn read_sii_json(
   position : UInt,
   word_count : Int,
@@ -668,6 +711,8 @@ fn read_sii_json(
   fmmu : Array[@mailbox.FmmuDirection],
   sync_managers : Array[@mailbox.SiiSmEntry],
   dc_clocks : Array[@mailbox.SiiDcClock],
+  tx_pdo : Array[@mailbox.SiiPdo],
+  rx_pdo : Array[@mailbox.SiiPdo],
   categories : Array[@mailbox.SiiCategoryEntry],
 ) -> Json {
   let categories_json = categories.map(fn(entry) {
@@ -716,6 +761,8 @@ fn read_sii_json(
       ),
     })
   })
+  let tx_pdo_json = tx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
+  let rx_pdo_json = rx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
   Json::object({
     "position": Json::number(position.to_double()),
     "word_count": Json::number(word_count.to_double()),
@@ -783,6 +830,8 @@ fn read_sii_json(
     "fmmu": Json::array(fmmu_json),
     "sync_managers": Json::array(sm_json),
     "dc_clocks": Json::array(dc_json),
+    "tx_pdo": Json::array(tx_pdo_json),
+    "rx_pdo": Json::array(rx_pdo_json),
     "categories": Json::array(categories_json),
   })
 }
@@ -1119,6 +1168,75 @@ fn append_sii_dc_section(
 }
 
 ///|
+fn append_sii_pdo_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  pdos : Array[@mailbox.SiiPdo],
+  strings : Array[String],
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string("  Number of PDOs: " + pdos.length().to_string() + "\n")
+  for i = 0; i < pdos.length(); i = i + 1 {
+    let pdo = pdos[i]
+    buf.write_string(
+      "  PDO " +
+      i.to_string() +
+      ": index=" +
+      format_hex(pdo.pdo_index, 4) +
+      ", name=" +
+      resolved_sii_string(strings, pdo.name_idx) +
+      "\n",
+    )
+    buf.write_string(
+      "    Sync Manager: ............ " +
+      pdo.sync_manager.to_uint().to_string() +
+      "\n",
+    )
+    buf.write_string(
+      "    Synchronization: ......... " +
+      pdo.synchronization.to_uint().to_string() +
+      "\n",
+    )
+    buf.write_string(
+      "    Entry Count: ............. " +
+      pdo.entry_count.to_uint().to_string() +
+      "\n",
+    )
+    buf.write_string(
+      "    Flags: ................... " + format_hex(pdo.flags, 4) + "\n",
+    )
+    for j = 0; j < pdo.entries.length(); j = j + 1 {
+      let pdo_entry = pdo.entries[j]
+      buf.write_string(
+        "    Entry " +
+        j.to_string() +
+        ": " +
+        format_hex(pdo_entry.entry_index, 4) +
+        ":" +
+        pdo_entry.subindex.to_uint().to_string() +
+        " " +
+        resolved_sii_string(strings, pdo_entry.name_idx) +
+        " (" +
+        pdo_entry.bit_length.to_uint().to_string() +
+        " bits, type=" +
+        format_hex(pdo_entry.data_type.to_uint(), 2) +
+        ", flags=" +
+        format_hex(pdo_entry.flags, 4) +
+        ")\n",
+      )
+    }
+  }
+  buf.write_string("\n")
+}
+
+///|
 fn read_sii_text(
   position : UInt,
   word_count : Int,
@@ -1284,6 +1402,20 @@ fn read_sii_text(
         append_sii_fmmu_section(buf, entry, @mailbox.parse_sii_fmmu(entry.data))
       SyncManager =>
         append_sii_sm_section(buf, entry, @mailbox.parse_sii_sm(entry.data))
+      TxPdo =>
+        append_sii_pdo_section(
+          buf,
+          entry,
+          @mailbox.parse_sii_pdo(entry.data),
+          strings,
+        )
+      RxPdo =>
+        append_sii_pdo_section(
+          buf,
+          entry,
+          @mailbox.parse_sii_pdo(entry.data),
+          strings,
+        )
       Dc => {
         let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
           entry.data,
@@ -1293,7 +1425,6 @@ fn read_sii_text(
           Err(_) => ()
         }
       }
-      _ => ()
     }
   }
   buf.to_string()
