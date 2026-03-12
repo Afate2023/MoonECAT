@@ -41,6 +41,33 @@ pub fn[N : @hal.Nic] run(
   cycles : Int,
   timeout : @hal.Duration,
 ) -> RunReport raise @hal.EcError {
+  run_with_states(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    cycles,
+    @protocol.Op,
+    Some(@protocol.Init),
+    timeout,
+  )
+}
+
+///|
+/// Execute a full EtherCAT run workflow with configurable startup and shutdown
+/// broadcast states.
+pub fn[N : @hal.Nic] run_with_states(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  cycles : Int,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
   // Phase 1: Scan
   let scan_report = scan(nic, timeout)
   let has_discovered_slaves = scan_report.slave_count > 0
@@ -60,7 +87,7 @@ pub fn[N : @hal.Nic] run(
 
   // Phase 3: Configure — transition slaves to Operational
   if has_discovered_slaves {
-    ignore(@protocol.broadcast_state(nic, @protocol.EsmState::Op, timeout))
+    ignore(@protocol.broadcast_state(nic, startup_state, timeout))
   }
 
   // Phase 4: Run PDO cycles
@@ -73,11 +100,15 @@ pub fn[N : @hal.Nic] run(
 
   // Phase 5: Shutdown — transition slaves back to Init
   if has_discovered_slaves {
-    ignore(
-      @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout) catch {
-        _ => 0U // Best-effort shutdown; report already captured
-      },
-    )
+    match shutdown_state {
+      Some(target) =>
+        ignore(
+          @protocol.broadcast_state(nic, target, timeout) catch {
+            _ => 0U // Best-effort shutdown; report already captured
+          },
+        )
+      None => ()
+    }
   }
   rt.set_state(Idle)
 

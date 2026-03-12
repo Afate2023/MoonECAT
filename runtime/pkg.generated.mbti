@@ -20,6 +20,8 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mail
 
 pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn[N : @hal.Nic] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError

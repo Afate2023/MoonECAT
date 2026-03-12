@@ -10,6 +10,8 @@ type CliBackend
 pub impl Eq for CliBackend
 pub impl Show for CliBackend
 
+type StateTransitionReport
+
 // Type aliases
 
 // Traits

@@ -74,8 +74,9 @@ pub fn linux_raw_socket_open(
     config.timeout_ms,
   )
   if handle_id <= 0 {
-    raise @hal.EcError::Internal(
-      "Linux Raw Socket open failed: " + native_last_error_message(),
+    raise_linux_raw_socket_open_error(
+      native_last_error_code(),
+      native_last_error_message(),
     )
   }
   handle_id
@@ -88,7 +89,10 @@ pub fn linux_raw_socket_send(
 ) -> Int raise @hal.EcError {
   let sent = ffi_linux_raw_socket_send(handle_id, data, data.length())
   if sent < 0 {
-    raise @hal.EcError::SendFailed(native_last_error_message())
+    raise_linux_raw_socket_send_error(
+      native_last_error_code(),
+      native_last_error_message(),
+    )
   }
   sent
 }
@@ -97,9 +101,62 @@ pub fn linux_raw_socket_send(
 pub fn linux_raw_socket_recv(handle_id : Int) -> Bytes raise @hal.EcError {
   let data = ffi_linux_raw_socket_recv(handle_id)
   match native_last_error_code() {
-    1 => data
-    0 => raise @hal.EcError::RecvTimeout
-    _ => raise @hal.EcError::RecvFailed(native_last_error_message())
+    code if code == native_error_success => data
+    code if code == native_error_timeout => raise @hal.EcError::RecvTimeout
+    code => {
+      raise_linux_raw_socket_recv_error(code, native_last_error_message())
+      Bytes::new(0)
+    }
+  }
+}
+
+///|
+fn raise_linux_raw_socket_open_error(
+  code : Int,
+  message : String,
+) -> Unit raise @hal.EcError {
+  match code {
+    c if c == native_error_link_down => raise @hal.EcError::LinkDown
+    c if c == native_error_permission =>
+      raise @hal.EcError::NotSupported(
+        "Linux Raw Socket requires raw-socket privileges: " + message,
+      )
+    c if c == native_error_not_found =>
+      raise @hal.EcError::ConfigMismatch(
+        "Linux Raw Socket interface is not available: " + message,
+      )
+    _ =>
+      raise @hal.EcError::Internal("Linux Raw Socket open failed: " + message)
+  }
+}
+
+///|
+fn raise_linux_raw_socket_send_error(
+  code : Int,
+  message : String,
+) -> Unit raise @hal.EcError {
+  match code {
+    c if c == native_error_link_down => raise @hal.EcError::LinkDown
+    c if c == native_error_permission =>
+      raise @hal.EcError::NotSupported(
+        "Linux Raw Socket send requires raw-socket privileges: " + message,
+      )
+    _ => raise @hal.EcError::SendFailed(message)
+  }
+}
+
+///|
+fn raise_linux_raw_socket_recv_error(
+  code : Int,
+  message : String,
+) -> Unit raise @hal.EcError {
+  match code {
+    c if c == native_error_link_down => raise @hal.EcError::LinkDown
+    c if c == native_error_permission =>
+      raise @hal.EcError::NotSupported(
+        "Linux Raw Socket recv requires raw-socket privileges: " + message,
+      )
+    _ => raise @hal.EcError::RecvFailed(message)
   }
 }
 

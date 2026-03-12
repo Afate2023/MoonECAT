@@ -63,6 +63,48 @@ test "cli esm state parser rejects unknown names" {
 }
 
 ///|
+test "cli optional esm state flag defaults and parses values" {
+  assert_eq(
+    optional_esm_state_flag(
+      ["moonecat", "run"],
+      "--startup-state",
+      @protocol.Op,
+    ),
+    @protocol.Op,
+  )
+  assert_eq(
+    optional_esm_state_flag(
+      ["moonecat", "run", "--startup-state", "safeop"],
+      "--startup-state",
+      @protocol.Op,
+    ),
+    @protocol.SafeOp,
+  )
+}
+
+///|
+test "cli optional shutdown state flag supports default and none" {
+  assert_eq(
+    optional_shutdown_state_flag(["moonecat", "run"], "--shutdown-state"),
+    Some(@protocol.Init),
+  )
+  assert_eq(
+    optional_shutdown_state_flag(
+      ["moonecat", "run", "--shutdown-state", "none"],
+      "--shutdown-state",
+    ),
+    None,
+  )
+  assert_eq(
+    optional_shutdown_state_flag(
+      ["moonecat", "run", "--shutdown-state", "preop"],
+      "--shutdown-state",
+    ),
+    Some(@protocol.PreOp),
+  )
+}
+
+///|
 test "cli transition path falls back through init when needed" {
   let path = build_cli_transition_path(@protocol.Op, @protocol.Boot)
   assert_eq(path.length(), 5)
@@ -108,6 +150,8 @@ test "cli native backend mapping stays stable" {
 test "cli run helper reopens nic for run path" {
   let result : Result[Unit, Error] = try? run_mock_command_with_fresh_nic(
     true,
+    @protocol.Op,
+    Some(@protocol.Init),
     @hal.Duration(1000L),
   )
   assert_true(result is Ok(_))

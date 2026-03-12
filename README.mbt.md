@@ -53,6 +53,9 @@ moon run cmd/main state -- --backend native --if <interface> --state safeop
 
 # Request a confirmed per-slave state transition
 moon run cmd/main state -- --backend native --if <interface> --state op --station 4097 --path
+
+# Run cyclic exchange but stop at SafeOp first and skip shutdown rollback
+moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state none
 ```
 
 `list-if --json` returns a structured object with `backend` and `interfaces`.
@@ -72,6 +75,10 @@ and `--words` to control the EEPROM word window to read.
 without `--station` for a bus-wide broadcast transition, or add `--station`
 for per-slave confirmed transitions. Add `--path` to let the CLI build a safe
 stepwise path via `Init` when the requested target is not directly reachable.
+
+`run` now accepts `--startup-state` and `--shutdown-state` so Native and Mock
+smoke runs can stop at `Init|PreOp|SafeOp|Op|Boot` on entry, and optionally
+leave the bus in place by using `--shutdown-state none`.
 
 MoonBit CLI flags belong to `moon run`, so MoonECAT parameters must be placed
 after `--`, otherwise flags like `--backend` and `--if` will be consumed by

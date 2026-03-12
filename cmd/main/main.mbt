@@ -94,13 +94,24 @@ fn cli_main() -> Unit raise @hal.EcError {
   }
 
   if command == "run" {
+    let startup_state = optional_esm_state_flag(
+      args,
+      "--startup-state",
+      @protocol.Op,
+    )
+    let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
     match backend {
-      Mock => run_mock_command_with_fresh_nic(as_json, timeout)
+      Mock =>
+        run_mock_command_with_fresh_nic(
+          as_json, startup_state, shutdown_state, timeout,
+        )
       NativeAuto => {
         let interface_name = require_interface_name(args)
         run_native_command_with_fresh_nic(
           @native.default_native_config(interface_name),
           as_json,
+          startup_state,
+          shutdown_state,
           timeout,
         )
       }
@@ -109,6 +120,8 @@ fn cli_main() -> Unit raise @hal.EcError {
         run_native_command_with_fresh_nic(
           @native.default_windows_npcap_config(interface_name),
           as_json,
+          startup_state,
+          shutdown_state,
           timeout,
         )
       }
@@ -117,6 +130,8 @@ fn cli_main() -> Unit raise @hal.EcError {
         run_native_command_with_fresh_nic(
           @native.default_linux_config(interface_name),
           as_json,
+          startup_state,
+          shutdown_state,
           timeout,
         )
       }
@@ -154,6 +169,8 @@ fn cli_main() -> Unit raise @hal.EcError {
 ///|
 fn run_mock_command_with_fresh_nic(
   as_json : Bool,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @mock.MockNic::new()
@@ -162,13 +179,15 @@ fn run_mock_command_with_fresh_nic(
   probe_nic.close()
   let run_nic = @mock.MockNic::new()
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let run_report = @runtime.run(
+  let run_report = @runtime.run_with_states(
     run_nic,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
     0U,
     10,
+    startup_state,
+    shutdown_state,
     timeout,
   )
   run_nic.close()
@@ -183,6 +202,8 @@ fn run_mock_command_with_fresh_nic(
 fn run_native_command_with_fresh_nic(
   config : @native.NativeNicConfig,
   as_json : Bool,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @native.NativeNic::open_with_config(config)
@@ -191,13 +212,15 @@ fn run_native_command_with_fresh_nic(
   probe_nic.close()
   let run_nic = @native.NativeNic::open_with_config(config)
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let run_report = @runtime.run(
+  let run_report = @runtime.run_with_states(
     run_nic,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
     0U,
     10,
+    startup_state,
+    shutdown_state,
     timeout,
   )
   run_nic.close()
@@ -244,7 +267,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--station <configured-address>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
   )
   println("Default backend: mock")
   println("Examples:")
@@ -255,6 +278,9 @@ fn print_usage() -> Unit {
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path",
+  )
+  println(
+    "  moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state init",
   )
 }
 
@@ -268,7 +294,7 @@ fn[N : @hal.Nic] run_state_command(
   let target = require_esm_state_flag(args, "--state")
   let station = optional_uint_flag(args, "--station")
   let use_path = has_flag(args, "--path")
-    let report_result : Result[StateTransitionReport, @hal.EcError] = try? compute_state_transition_report(
+  let report_result : Result[StateTransitionReport, @hal.EcError] = try? compute_state_transition_report(
     nic, target, station, use_path, timeout,
   )
   nic.close()
@@ -462,6 +488,30 @@ fn require_esm_state_flag(
     Some(text) => parse_esm_state_flag(flag, text)
     None =>
       raise @hal.EcError::ConfigMismatch("missing state value for " + flag)
+  }
+}
+
+///|
+fn optional_esm_state_flag(
+  args : Array[String],
+  flag : String,
+  default : @protocol.EsmState,
+) -> @protocol.EsmState raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => parse_esm_state_flag(flag, text)
+    None => default
+  }
+}
+
+///|
+fn optional_shutdown_state_flag(
+  args : Array[String],
+  flag : String,
+) -> @protocol.EsmState? raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some("none") => None
+    Some(text) => Some(parse_esm_state_flag(flag, text))
+    None => Some(@protocol.Init)
   }
 }
 
