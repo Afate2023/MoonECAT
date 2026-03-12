@@ -34,9 +34,9 @@
 | 404 | Mailbox polling | shall | ✅ | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | mailbox_poll SM status bit 检查 |
 | **CoE (5.7)** | | | | | |
 | 501 | SDO Up/Download (normal + expedited) | shall | ✅ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | sdo_download/upload + retry 事务已闭环 |
-| 502 | Segmented Transfer | should | ⚠️ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt), [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已支持分段上传拼接；分段下载待补 |
-| 503 | Complete Access | should (shall if ENI) | ⚠️ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt), [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | 已支持 CA 位编码与 CA Upload/Download 事务入口；CA 分段续传待补 |
-| 504 | SDO Info service | should | ⚠️ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已支持 Get OD List 请求构造与 SDO Info 响应头解码；OD读取流程待补 |
+| 502 | Segmented Transfer | should | ✅ | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt), [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 分段上传/下载与续传循环均已闭环 |
+| 503 | Complete Access | should (shall if ENI) | ✅ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt), [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | CA 编码、上传/下载事务与分段续传均已完成 |
+| 504 | SDO Info service | should | ✅ | [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt), [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt), [cmd/main/main.mbt](cmd/main/main.mbt) | SDO Info 事务与 Native `od` 浏览入口均已落地 |
 | 505 | Emergency Message | shall | ✅ | [mailbox/emergency.mbt](mailbox/emergency.mbt) | decode_emergency/decode_emergency_frame |
 | 506 | PDO in CoE | may | ➖ | — | |
 | **EoE (5.8)** | | | | | |
@@ -69,7 +69,7 @@
 | 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 仅完成 online scanning | 补 ENI 导入、离线配置载入、启动时网络差异报告与配置工具数据模型 |
 | CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
 | Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
-| SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ SDO Info 库层已完成，CLI / UI 浏览尚未上浮 | 补 OD list / object description / entry description 的稳定输出模型与浏览入口 |
+| SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
 | Master Object Dictionary | ETG.1500 5.15.1，Class A 更强调统一主站信息表面 | ❌ 未实现 | 设计主站对象字典、配置摘要与诊断状态汇聚模型 |
 | 拓扑变化、显式标识与 Hot Connect | EtherCAT_Compendium 对拓扑比较、Explicit Device Identification、Hot Connect group 的说明 | ⚠️ 已有显式标识读取与 4-tuple 校验 | 补拓扑差异、Hot Connect 分组、启动时更细粒度告警 |
 | Multiple Tasks / Process Image 分区 | ETG.1500 5.4.2；EtherCrab/Gatorcat 展示了更细粒度 process image 与任务切分 | ➖ 目前以单任务 Free Run 优先 | 在 Free Run/DC 基线稳定后，再设计多任务调度与 process image 切片 |
@@ -79,25 +79,27 @@
 
 - `moon test` 已通过，可作为仓库级最小回归闸门。
 - Windows Npcap 路径下 `moon run cmd/main state -- --backend native-windows-npcap --if <interface>` 已成功执行，可作为 Native `state` 入口 smoke 证据。
-- Native CLI 当前至少已具备 `list-if`、`read-sii`、`state`、`diagnosis` 等交付表面；其中 `state` 的最近一次实机执行已成功。
+- Native CLI 当前至少已具备 `list-if`、`read-sii`、`state`、`diagnosis`、`od` 等交付表面；其中 `state` 的最近一次实机执行已成功，`od` 已具备稳定文本/JSON 浏览输出。
 
 ## 0.3 对象字典浏览产品化拆解
 
 > 目标不是重复实现 CoE 事务，而是把已经落仓的 `SDO Info / Complete Access / Segmented Transfer` 能力组织成稳定的 CLI / 配置工具表面。
 
-- [ ] 定义对象字典浏览统一结果对象：覆盖 `OD List`、`OD Description`、`OE Description`、错误摘要与来源从站信息。
-- [ ] 设计 CLI 入口：至少包含“列出对象索引”“查看对象描述”“查看子项描述”三类只读查询。
-- [ ] 统一输出模型：文本输出服务人工诊断，JSON 输出服务后续配置工具/网页工作台直接消费。
-- [ ] 明确与 ENI / online scan 的关联：浏览入口应能复用扫描得到的站信息与从站定位，而不是再引入一套独立寻址模型。
+最新回填：已在 [cmd/main/main.mbt](cmd/main/main.mbt) 新增 Native `od` 命令，并在 [runtime/diagnosis.mbt](runtime/diagnosis.mbt) 抽出通用 mailbox prepare/restore helper；代码提交：`3832187` `feat(cli): add object dictionary browsing command`。
+
+- [x] 定义对象字典浏览统一结果对象：覆盖 `OD List`、`OD Description`、`OE Description` 与来源从站信息；当前以 `OdBrowseReport` 承载，错误分类后续继续细化。
+- [x] 设计 CLI 入口：至少包含“列出对象索引”“查看对象描述”“查看子项描述”三类只读查询。
+- [x] 统一输出模型：文本输出服务人工诊断，JSON 输出服务后续配置工具/网页工作台直接消费。
+- [x] 明确与 ENI / online scan 的关联：浏览入口复用当前 scan 结果与 `--station` 定位，不再引入第二套寻址模型。
 - [ ] 明确失败语义：对象不存在、Mailbox 超时、Abort Code、分段中断、Complete Access 不支持等错误要进入稳定分类。
-- [ ] 建立最小验证：优先 mock / replay 覆盖输出模型，再在真实从站恢复可用后补一条 Native smoke。
+- [ ] 建立最小验证：当前已补 CLI white-box 解析/输出测试；后续补一条真实从站 Native smoke。
 
 对象字典浏览产品化验收标准：
 
-- [ ] CLI 能稳定输出 `OD List`、单个对象描述、单个子项描述。
-- [ ] JSON 结果对象可被配置工具直接复用，不需要再次解析文本。
+- [x] CLI 能稳定输出 `OD List`、单个对象描述、单个子项描述。
+- [x] JSON 结果对象可被配置工具直接复用，不需要再次解析文本。
 - [ ] 错误输出能区分“协议失败”“传输失败”“从站不支持”三类情形。
-- [ ] 不修改既有库层 CoE 事务 public API 的语义，仅在产品面增加封装与结果组织。
+- [x] 不修改既有库层 CoE 事务 public API 的语义，仅在产品面增加封装与结果组织。
 
 ## 0.4 配置工具 / ENI 主线拆解
 
@@ -338,6 +340,7 @@
   - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
   - ✅ `run` 已支持 `--startup-state` / `--shutdown-state`，可控制运行前后 EtherCAT 从站状态机迁移
   - ✅ `diagnosis` 已支持通过 Native 后端对指定从站读取 Error Register / Diagnosis Counter，支持 `--station` 与 JSON 输出
+  - ✅ `od` 已支持通过 Native 后端对指定从站执行 `OD List` / `OD Description` / `OE Description` 只读浏览，支持 `--station`、`--index`、`--subindex`、`--list-type` 与 JSON 输出（commit: `3832187`）
   - ✅ diagnosis 的 mailbox/ESM 准备与恢复逻辑已下沉到 [runtime/diagnosis.mbt](runtime/diagnosis.mbt)，CLI 保持为薄封装；`Init -> PreOp` 归一化仅用于 diagnosis，不泛化到通用 state 命令（commit: `46592ca`）
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
@@ -438,6 +441,7 @@
 - `Native mailbox diagnosis CLI 入口` → `d581026` `feat(cli): add native diagnosis command`
 - `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
 - `CLI diagnosis 改为 runtime session helper 薄封装` → `46592ca` `Refactor CLI diagnosis to use runtime session helpers`
+- `对象字典浏览 CLI 入口` → `3832187` `feat(cli): add object dictionary browsing command`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`
@@ -480,6 +484,7 @@
 | PDO 周期交换 | [CherryECAT-callflow-analysis.md:321](src/CherryECAT-callflow-analysis.md#L321) [gatorcat-callflow-analysis.md:172](src/gatorcat-callflow-analysis.md#L172) [ethercrab-callflow-analysis.md:286](src/ethercrab-callflow-analysis.md#L286) | Cherry: [ec_master.c:769](Reference_Project/CherryECAT/src/ec_master.c#L769) (`ec_master_period_process`)；gatorcat: [MainDevice.zig:430](Reference_Project/gatorcat/src/module/MainDevice.zig#L430) (`sendRecvCyclicFrames`)；ethercrab: [mod.rs:865](Reference_Project/ethercrab/src/subdevice_group/mod.rs#L865) (`tx_rx`) | [protocol/pdo.mbt](protocol/pdo.mbt) (`pdo_exchange`) [runtime/runtime.mbt](runtime/runtime.mbt) | 已对齐 |
 | Mailbox 传输与轮询 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [CherryECAT-callflow-analysis.md:63](src/CherryECAT-callflow-analysis.md#L63) | SOEM: [ec_main.c:1521](Reference_Project/SOEM/src/ec_main.c#L1521) (`ecx_mbxsend`) + [ec_main.c:1592](Reference_Project/SOEM/src/ec_main.c#L1592) (`ecx_mbxreceive`) + [ec_main.c:1506](Reference_Project/SOEM/src/ec_main.c#L1506) (`ecx_mbxhandler`)；Cherry: [ec_mailbox.c:31](Reference_Project/CherryECAT/src/ec_mailbox.c#L31) (`ec_mailbox_send`) + [ec_mailbox.c:84](Reference_Project/CherryECAT/src/ec_mailbox.c#L84) (`ec_mailbox_receive`) | [protocol/mailbox_transport.mbt](protocol/mailbox_transport.mbt) | 已对齐 |
 | CoE SDO 事务 | [CherryECAT-callflow-analysis.md:416](src/CherryECAT-callflow-analysis.md#L416) [ethercrab-callflow-analysis.md:389](src/ethercrab-callflow-analysis.md#L389) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_coe.c:856](Reference_Project/SOEM/src/ec_coe.c#L856) (`ecx_readPDOmap`)；ethercrab: [mod.rs:180](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L180) (`mailbox_write_read`) + [mod.rs:561](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L561) (`sdo_read`) + [mod.rs:371](Reference_Project/ethercrab/src/mailbox/coe/mod.rs#L371) (`sdo_write`)；EtherCAT.NET: [EcUtilities.cs:728](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L728) (`SdoWrite`) + [EcUtilities.cs:773](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcUtilities.cs#L773) (`TryReadSdoValue`) | [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) [mailbox/coe_engine.mbt](mailbox/coe_engine.mbt) | 已对齐 |
+| 对象字典浏览 / SDO Info 产品面 | [CherryECAT-callflow-analysis.md:416](src/CherryECAT-callflow-analysis.md#L416) [ethercrab-callflow-analysis.md:389](src/ethercrab-callflow-analysis.md#L389) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_coe.c:1046](Reference_Project/SOEM/src/ec_coe.c#L1046) (`ecx_readODlist`) + [ec_coe.c:1172](Reference_Project/SOEM/src/ec_coe.c#L1172) (`ecx_readODdescription`) + [ec_coe.c:1265](Reference_Project/SOEM/src/ec_coe.c#L1265) (`ecx_readOEsingle`)；SOEM sample: [slaveinfo.c:533](Reference_Project/SOEM/samples/slaveinfo/slaveinfo.c#L533) + [slaveinfo.c:541](Reference_Project/SOEM/samples/slaveinfo/slaveinfo.c#L541) + [slaveinfo.c:557](Reference_Project/SOEM/samples/slaveinfo/slaveinfo.c#L557)；GatorCAT: [coe.zig:1218](Reference_Project/gatorcat/src/module/mailbox/coe.zig#L1218) (`readSDOInfoFragments`) + [client.zig:501](Reference_Project/gatorcat/src/module/mailbox/coe/client.zig#L501) (`Get OD List Request`) | [cmd/main/main.mbt](cmd/main/main.mbt) [runtime/diagnosis.mbt](runtime/diagnosis.mbt) [protocol/sdo_transaction.mbt](protocol/sdo_transaction.mbt) | 已新增 Native `od` 浏览入口，形成 `OD List` / `OD Description` / `OE Description` 的稳定文本/JSON 输出；后续仅剩错误分类与配置工具复用收口 |
 | Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](Reference_Project/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](Reference_Project/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
 | EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](Reference_Project/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](Reference_Project/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](Reference_Project/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
 | DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](Reference_Project/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](Reference_Project/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](Reference_Project/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](Reference_Project/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](Reference_Project/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
