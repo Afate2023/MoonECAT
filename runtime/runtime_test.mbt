@@ -1333,6 +1333,84 @@ test "compare_configurations reports topology and identity differences" {
 }
 
 ///|
+test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified model" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATConfig>
+    #|  <Config>
+    #|    <Slave>
+    #|      <Info>
+    #|        <Name><![CDATA[Drive 1]]></Name>
+    #|        <PhysAddr>1001</PhysAddr>
+    #|        <AutoIncAddr>0</AutoIncAddr>
+    #|        <Identification Value="0">
+    #|          <Ado>#x0134</Ado>
+    #|        </Identification>
+    #|        <VendorId>4739149</VendorId>
+    #|        <ProductCode>3</ProductCode>
+    #|        <RevisionNo>1</RevisionNo>
+    #|        <SerialNo>0</SerialNo>
+    #|      </Info>
+    #|    </Slave>
+    #|    <Slave>
+    #|      <Info>
+    #|        <PhysAddr>1002</PhysAddr>
+    #|        <AutoIncAddr>1</AutoIncAddr>
+    #|        <Identification Value="#x20" />
+    #|        <VendorId>2</VendorId>
+    #|        <ProductCode>#x04D2</ProductCode>
+    #|        <RevisionNo>1</RevisionNo>
+    #|        <SerialNo>4660</SerialNo>
+    #|      </Info>
+    #|    </Slave>
+    #|  </Config>
+    #|</EtherCATConfig>
+  let model = @runtime.configuration_from_eni_xml(xml)
+  assert_eq(model.source, @runtime.EniImport)
+  assert_eq(model.total_slaves, 2)
+  assert_eq(model.slaves.length(), 2)
+  assert_eq(model.slaves[0].position, 0)
+  assert_eq(model.slaves[0].configured_address, Some(1001U))
+  assert_eq(model.slaves[0].identification, Some(0U))
+  assert_eq(
+    model.slaves[0].identity,
+    Some({ vendor_id: 4739149U, product_code: 3U, revision: 1U, serial: 0U }),
+  )
+  assert_eq(model.slaves[1].position, 1)
+  assert_eq(model.slaves[1].configured_address, Some(1002U))
+  assert_eq(model.slaves[1].identification, Some(0x20U))
+  assert_eq(
+    model.slaves[1].identity,
+    Some({ vendor_id: 2U, product_code: 0x04D2U, revision: 1U, serial: 4660U }),
+  )
+}
+
+///|
+test "configuration_from_eni_xml raises parse error for invalid numeric field" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATConfig>
+    #|  <Config>
+    #|    <Slave>
+    #|      <Info>
+    #|        <PhysAddr>bad-address</PhysAddr>
+    #|      </Info>
+    #|    </Slave>
+    #|  </Config>
+    #|</EtherCATConfig>
+  let result : Result[@runtime.ConfigurationModel, Error] = try? @runtime.configuration_from_eni_xml(
+    xml,
+  )
+  guard result is Err(@hal.EcError::EsiParseFailed(message)) else {
+    fail("expected invalid ENI numeric field to raise EsiParseFailed")
+  }
+  assert_true(
+    message.contains("invalid numeric ENI field at Slave/Info/PhysAddr") &&
+    message.contains("bad-address"),
+  )
+}
+
+///|
 test "validate: matches by position even when expected order differs" {
   let scan : @runtime.ScanReport = {
     slave_count: 2,

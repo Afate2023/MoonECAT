@@ -86,6 +86,14 @@ pub fn configuration_from_expected(
 }
 
 ///|
+/// Parse ENI XML and project slave info into the unified configuration model.
+pub fn configuration_from_eni_xml(
+  xml_content : String,
+) -> ConfigurationModel raise @hal.EcError {
+  project_eni_slaves(parse_eni_slave_projection(xml_content))
+}
+
+///|
 pub fn compare_configurations(
   expected : ConfigurationModel,
   actual : ConfigurationModel,

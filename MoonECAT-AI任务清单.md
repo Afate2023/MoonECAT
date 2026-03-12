@@ -66,7 +66,7 @@
 
 | Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
 |---|---|---|---|
-| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 已新增统一配置模型骨架，online scan 与离线期望配置已进入同一比较路径；ENI import 尚未接入 | 补 ENI 导入、离线配置载入、启动时网络差异报告与配置工具数据模型 |
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 已新增统一配置模型骨架，并补上最小 ENI XML 投影；online scan、离线期望配置、ENI import 已进入同一比较路径，但 ENI 仍只覆盖最小身份/地址字段 | 继续补离线配置载入、ENI 的 SM/FMMU/PDO 摘要、启动时网络差异报告与配置工具数据模型 |
 | CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
 | Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
 | SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
@@ -105,18 +105,18 @@
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
-最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；代码提交：`27401a8` `feat(runtime): add unified configuration model`。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 [src/SOEM-callflow-analysis.md](src/SOEM-callflow-analysis.md#L865) 中 SOEM 对可选 ENI 支持的边界约束。
+最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的最小 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification 投影到同一 `ConfigurationModel`，由 [runtime/runtime_test.mbt](runtime/runtime_test.mbt) 覆盖成功路径与失败路径。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 EtherCAT.NET `EsiUtilities` 分层解析的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
 
-- [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置与统一差异列表；ENI 导入投影待补。
-- [ ] 定义 ENI 导入最小边界：至少覆盖从站顺序、身份信息、SM/FMMU/PDO 映射摘要与必要的 mailbox/DC 配置元数据。
+- [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置、最小 ENI 导入结果与统一差异列表。
+- [x] 定义 ENI 导入最小边界：当前已覆盖从站顺序、站地址、身份信息与 Identification；SM/FMMU/PDO 映射摘要及 mailbox/DC 配置元数据待补。
 - [x] 明确 online scan 到统一配置对象的投影规则，避免“扫描结果对象”和“配置结果对象”长期分叉。
 - [ ] 设计启动比对结果：至少区分拓扑差异、身份差异、配置差异、可忽略差异四类。
 - [ ] 设计 JSON 输出模型：保证 CLI 和后续网页工作台能直接消费，不需要再从文本重建结构化差异。
-- [x] 建立最小验证：当前已补 unified model / compare / validate 兼容语义测试；后续补 ENI 导入夹具与真实总线 Native smoke。
+- [x] 建立最小验证：当前已补 unified model / compare / validate 兼容语义测试，并新增 ENI 导入夹具的成功/失败用例；后续补真实总线 Native smoke。
 
 配置工具 / ENI 主线验收标准：
 
-- [ ] online scan 与 ENI import 能进入同一配置对象模型。
+- [x] online scan 与 ENI import 能进入同一配置对象模型。
 - [ ] 启动比对结果可稳定输出“通过 / 警告 / 阻塞”三级结论与具体差异项。
 - [ ] CLI 输出同时支持人工阅读和配置工具复用。
 - [ ] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
@@ -520,7 +520,7 @@
 - [x] 完成 CoE/SDO 请求队列和状态推进。
 - [x] 完成 Mailbox Resilient Layer (RMSM)。
 - [x] 完成 Emergency Message 接收。
-- [ ] 补 ENI 导入与配置工具数据模型，使 online/offline 两条配置来源进入同一校验路径。
+- [ ] 继续补 ENI 导入的配置工具数据模型，使 online/offline 两条配置来源在共享校验路径之外，进一步共享 SM/FMMU/PDO/诊断摘要等更完整配置语义。
 - [ ] 把已完成的 SDO Info / Complete Access / segmented 能力上浮到 CLI / 配置工具表面，形成稳定的对象字典浏览输出。
 
 ### Runtime
@@ -562,7 +562,7 @@
 - [x] DC 相关能力不能阻塞 Free Run 最小可用版本。
 - [ ] 先完成 Native FFI 包脚手架，再分别落 Linux Raw Socket / Windows Npcap 绑定。
 - [ ] 先冻结 Native HAL 错误语义与句柄生命周期，再开放 CLI 在真实后端上的 smoke 验证。
-- [ ] 先冻结 ENI / online scan 的统一配置对象模型，再开放配置工具或网页工作台入口，避免形成第二套配置语义。
+- [x] 先冻结 ENI / online scan 的统一配置对象模型，再开放配置工具或网页工作台入口，避免形成第二套配置语义。
 - [ ] 先冻结 Extism 请求/响应信封和 host capability contract，再落共享内存优化。
 - [ ] Extism / WASM 只能包装既有库入口，不能先写插件逻辑再反推 `runtime/` 改接口。
 
