@@ -319,9 +319,10 @@
     - 错误输出保持稳定字符串码 + 明细消息，能映射到现有 `EcError` 分类
   - 非目标：插件内部直连 Raw Socket、在 `protocol/` 或 `runtime/` 中直接依赖 Extism API、单独维护第二套 CLI 逻辑
   - 依赖：`docs/EXTISM_HOST_BOUNDARY.md`、共享内存信封格式、稳定的库层 API
-- [ ] **【新增】多后端发布物矩阵**：把 CLI Native、Library Native、Extism Plugin 三类产物的边界、配置与回归入口写清楚。
+- [x] **【新增】多后端发布物矩阵**：把 CLI Native、Library Native、Extism Plugin 三类产物的边界、配置与回归入口写清楚。
   - ✅ [docs/BACKEND_RELEASE_MATRIX.md](docs/BACKEND_RELEASE_MATRIX.md)：已补齐 Native CLI / Native Library / Extism Plugin 的输入、输出、依赖环境与最小验证命令（commit: `8aa93aa`）
   - ✅ 当前 Native CLI smoke 已在 Windows Npcap 1.8.4 上实测跑通：`list-if -> scan -> validate -> run`，其中空总线场景返回 `0 slaves / PASS / Done`
+  - ✅ 2026-03-12 再验证：`moon test` = `286/286`、`moon test hal/native` = `5/5`、`moon test plugin/extism` = `5/5`，且 `list-if` 与 Realtek USB GbE 接口上的 `scan` 均成功
   - 验收标准：
     - 明确每类产物的输入、输出、依赖环境与最小验证命令
     - 文档区分“后端差异”与“协议语义”，避免把平台问题写进协议清单
