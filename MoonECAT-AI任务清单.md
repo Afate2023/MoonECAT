@@ -260,6 +260,7 @@
 - [x] **【缺口】CLI 实际接入**：[cmd/main/main.mbt](cmd/main/main.mbt) 已接入 Mock HAL + scan/validate/run 流程
   - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
   - ✅ `run` 已支持 `--startup-state` / `--shutdown-state`，可控制运行前后 EtherCAT 从站状态机迁移
+  - ✅ `diagnosis` 已支持通过 Native 后端对指定从站读取 Error Register / Diagnosis Counter，支持 `--station` 与 JSON 输出
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
   - ✅ [cmd/main/main.mbt](cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](cmd/main/main_wbtest.mbt)，代码提交：`0b374aa`
@@ -293,7 +294,7 @@
   - 依赖：HAL 契约稳定、热路径分配约束继续收紧、CLI 输出模型保持不变、MoonBit Native FFI 包配置收口
 - [ ] **【新增】Extism / WASM 后端首版**：以宿主能力映射 + 共享内存缓冲区为核心，导出插件入口而不复制协议实现。
   - 规划文档： [docs/EXTISM_WASM_BACKEND_PLAN.md](docs/EXTISM_WASM_BACKEND_PLAN.md)
-  - 当前状态：已创建 [plugin/extism/moon.pkg](plugin/extism/moon.pkg) 包并接入基于 Mock HAL 的 `scan/validate/run` 回放入口，包含 envelope 类型、稳定错误码映射与最小 JSON 回放测试；实际 host capability adapter 与共享内存传输仍待接入
+  - 当前状态：已创建 [plugin/extism/moon.pkg](plugin/extism/moon.pkg) 包并接入基于 Mock HAL 的 `scan/validate/run` 回放入口，包含 envelope 类型、稳定错误码映射与最小 JSON 回放测试；宿主所需 `nic_*` / `clock_*` / `file_*` / `shared_memory` capability contract 已建模并随 diagnostics 输出，实际 host capability adapter 与共享内存传输仍待接入
   - 目标范围：基于 moonbit-pdk / Extism 的插件封装，复用现有 `scan/validate/run` 库接口
   - 宿主前提：宿主负责 NIC open/send/recv/close、clock now/sleep、可选 file read/write；插件只持有句柄和序列化请求/响应
   - 数据边界：控制面优先 JSON/Bytes 信封；周期数据优先共享内存缓冲区，避免每周期大块拷贝
@@ -354,9 +355,11 @@
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
+- `Native mailbox diagnosis CLI 入口` → `d581026` `feat(cli): add native diagnosis command`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`
+- `Extism host capability contract` → `f9c7131` `feat(extism): describe required host capabilities`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
 - `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
 
