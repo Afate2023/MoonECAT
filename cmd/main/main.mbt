@@ -27,7 +27,7 @@ fn cli_main() -> Unit raise @hal.EcError {
   }
   let command = args[1]
   let as_json = has_flag(args, "--json")
-  let timeout = @hal.Duration(1_000_000L)
+  let timeout = resolve_timeout(args)
   let backend = parse_backend(args)
 
   if command == "list-if" {
@@ -296,9 +296,10 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
   )
   println("Default backend: mock")
+  println("Default timeout: 1 ms")
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
   println("  moon run cmd/main scan -- --backend native --if <interface>")
@@ -312,7 +313,7 @@ fn print_usage() -> Unit {
     "  moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state init",
   )
   println(
-    "  moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 --json",
+    "  moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 --timeout-ms 50 --json",
   )
 }
 
@@ -781,6 +782,17 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
   )
   buf.write_string("Diagnosis Counter: " + diagnosis_counter_text + "\n")
   buf.to_string()
+}
+
+///|
+fn resolve_timeout(args : Array[String]) -> @hal.Duration raise @hal.EcError {
+  let timeout_ms = require_int_flag(args, "--timeout-ms", 1)
+  if timeout_ms <= 0 {
+    raise @hal.EcError::ConfigMismatch(
+      "timeout value for --timeout-ms must be > 0",
+    )
+  }
+  @hal.Duration(timeout_ms.to_int64() * 1_000_000L)
 }
 
 ///|

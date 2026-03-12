@@ -46,6 +46,23 @@ test "cli numeric flag parsers reject invalid integers" {
 }
 
 ///|
+test "cli timeout flag defaults to 1ms and parses milliseconds" {
+  assert_eq(resolve_timeout(["moonecat", "scan"]), @hal.Duration(1_000_000L))
+  assert_eq(
+    resolve_timeout(["moonecat", "diagnosis", "--timeout-ms", "50"]),
+    @hal.Duration(50_000_000L),
+  )
+}
+
+///|
+test "cli timeout flag rejects non-positive values" {
+  let zero : Result[@hal.Duration, Error] = try? resolve_timeout([
+    "moonecat", "diagnosis", "--timeout-ms", "0",
+  ])
+  assert_true(zero is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
 test "cli esm state parser accepts canonical names" {
   assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
   assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)

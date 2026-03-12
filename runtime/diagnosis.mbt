@@ -82,10 +82,15 @@ pub fn[N : @hal.Nic] read_error_register_ap(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
-  let payload = diagnosis_timeout_step(
-    try? @protocol.sdo_upload_retry_ap(
-      nic, position, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
-    ),
+  let payload = diagnosis_sdo_upload_ap(
+    nic,
+    position,
+    station,
+    mb_config,
+    rmsm,
+    0x1001U,
+    b'\x00',
+    timeout,
     "AP CoE 0x1001:0 upload",
   )
   parse_error_register_payload(payload)
@@ -101,10 +106,15 @@ pub fn[N : @hal.Nic] read_diagnosis_counter_ap(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> UInt raise @hal.EcError {
-  let payload = diagnosis_timeout_step(
-    try? @protocol.sdo_upload_retry_ap(
-      nic, position, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
-    ),
+  let payload = diagnosis_sdo_upload_ap(
+    nic,
+    position,
+    station,
+    mb_config,
+    rmsm,
+    0x10F3U,
+    b'\x00',
+    timeout,
     "AP CoE 0x10F3:0 upload",
   )
   parse_u32_payload(payload)
@@ -167,4 +177,61 @@ fn[T] diagnosis_timeout_step(
       raise @hal.EcError::Internal(stage + " -> " + message)
     Err(err) => raise @hal.EcError::Internal(err.to_string())
   }
+}
+
+///|
+fn[N : @hal.Nic] diagnosis_sdo_upload_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+  stage : String,
+) -> Bytes raise @hal.EcError {
+  let counter = diagnosis_timeout_step(
+    try? rmsm.begin_transaction(),
+    stage + ".begin_transaction",
+  )
+  let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
+  let frame = txn.encode()
+  ignore(
+    diagnosis_timeout_step(
+      try? @protocol.mailbox_send_ap(nic, position, mb_config, frame, timeout),
+      stage + ".mailbox_send_ap",
+    ),
+  )
+  let response_raw = diagnosis_timeout_step(
+    try? @protocol.mailbox_recv_ap(nic, position, mb_config, timeout),
+    stage + ".mailbox_recv_ap",
+  )
+  let decoded = diagnosis_timeout_step(
+    try? @mailbox.decode_sdo_response(response_raw),
+    stage + ".decode_sdo_response",
+  )
+  let (mbh, resp) = decoded
+  ignore(
+    diagnosis_timeout_step(
+      try? rmsm.validate_response(mbh.counter),
+      stage + ".validate_response",
+    ),
+  )
+  if resp.command != @mailbox.SdoCommand::UploadResponse {
+    raise @hal.EcError::MailboxProtocol(
+      stage + ": expected UploadResponse, got " + resp.command.to_string(),
+    )
+  }
+  if resp.index != index || resp.subindex != subindex {
+    raise @hal.EcError::MailboxProtocol(
+      stage + ": index/subindex mismatch in response",
+    )
+  }
+  if resp.segmented {
+    raise @hal.EcError::MailboxProtocol(
+      stage + ": segmented response is not supported in diagnosis path",
+    )
+  }
+  resp.data
 }
