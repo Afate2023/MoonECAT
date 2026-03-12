@@ -18,6 +18,22 @@ test "extism envelope encodes command and request id" {
 }
 
 ///|
+test "extism host contract encodes required capabilities" {
+  let json = encode_host_contract(required_host_contract(Run))
+  json_inspect(json, content={
+    "nic_open": true,
+    "nic_send": true,
+    "nic_recv": true,
+    "nic_close": true,
+    "clock_now": true,
+    "clock_sleep": true,
+    "file_read": false,
+    "file_write": false,
+    "shared_memory": false,
+  })
+}
+
+///|
 test "extism scan entry returns scan payload" {
   let req : PluginRequest = {
     version: "v1",
@@ -35,7 +51,21 @@ test "extism scan entry returns scan payload" {
     "error_code": null,
     "error_message": null,
     "payload": { "slave_count": 0, "slaves": [] },
-    "diagnostics": { "command": "scan", "backend": "mock" },
+    "diagnostics": {
+      "command": "scan",
+      "backend": "mock",
+      "host_capabilities_required": {
+        "nic_open": true,
+        "nic_send": true,
+        "nic_recv": true,
+        "nic_close": true,
+        "clock_now": true,
+        "clock_sleep": true,
+        "file_read": false,
+        "file_write": false,
+        "shared_memory": false,
+      },
+    },
   })
 }
 
@@ -62,7 +92,21 @@ test "extism validate entry returns pass on mock replay" {
       "all_ok": true,
       "result_count": 0,
     },
-    "diagnostics": { "command": "validate", "backend": "mock" },
+    "diagnostics": {
+      "command": "validate",
+      "backend": "mock",
+      "host_capabilities_required": {
+        "nic_open": true,
+        "nic_send": true,
+        "nic_recv": true,
+        "nic_close": true,
+        "clock_now": true,
+        "clock_sleep": true,
+        "file_read": false,
+        "file_write": false,
+        "shared_memory": false,
+      },
+    },
   })
 }
 
@@ -105,6 +149,20 @@ test "extism run entry returns replay run summary" {
         "dc_delay_updates": 0,
       },
     },
-    "diagnostics": { "command": "run", "backend": "mock" },
+    "diagnostics": {
+      "command": "run",
+      "backend": "mock",
+      "host_capabilities_required": {
+        "nic_open": true,
+        "nic_send": true,
+        "nic_recv": true,
+        "nic_close": true,
+        "clock_now": true,
+        "clock_sleep": true,
+        "file_read": false,
+        "file_write": false,
+        "shared_memory": false,
+      },
+    },
   })
 }
