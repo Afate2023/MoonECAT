@@ -36,6 +36,12 @@ let sdo_header_len : Int = 8
 let sdo_info_header_len : Int = 4
 
 ///|
+/// Master-originated mailbox requests use address 0x0000 in the header.
+fn mailbox_request_address(_station : UInt) -> UInt {
+  0U
+}
+
+///|
 /// Encode a mailbox header into 6 bytes.
 pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
   let buf = @buffer.new(size_hint=mailbox_header_len)
@@ -187,7 +193,7 @@ pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
   // Mailbox header
   let mbh : MailboxHeader = {
     length: data_len.reinterpret_as_uint(),
-    address: self.station,
+    address: mailbox_request_address(self.station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,
@@ -399,7 +405,7 @@ pub fn decode_sdo_response(
 }
 
 ///|
-/// MailboxCounter manages the 4-bit counter cycling (1-15, wrapping).
+/// MailboxCounter manages the mailbox session counter cycling (1-7, wrapping).
 pub(all) struct MailboxCounter {
   mut value : Byte
 } derive(Show)
@@ -413,7 +419,7 @@ pub fn MailboxCounter::new() -> MailboxCounter {
 /// Get the current counter value and advance.
 pub fn MailboxCounter::next(self : MailboxCounter) -> Byte {
   let current = self.value
-  let next_val = self.value.to_int() % 15 + 1
+  let next_val = self.value.to_int() % 7 + 1
   self.value = next_val.to_byte()
   current
 }
@@ -518,7 +524,7 @@ pub fn build_sdo_upload_segment_request(
   let data_len = coe_header_len + sdo_header_len
   let mbh : MailboxHeader = {
     length: data_len.reinterpret_as_uint(),
-    address: station,
+    address: mailbox_request_address(station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,
@@ -560,7 +566,7 @@ pub fn build_sdo_download_segment_request(
   let data_len = coe_header_len + 1 + segment.length()
   let mbh : MailboxHeader = {
     length: data_len.reinterpret_as_uint(),
-    address: station,
+    address: mailbox_request_address(station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,
@@ -601,7 +607,7 @@ pub fn build_sdo_info_get_od_list_request(
   let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
-    address: station,
+    address: mailbox_request_address(station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,
@@ -636,7 +642,7 @@ pub fn build_sdo_info_get_od_request(
   let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
-    address: station,
+    address: mailbox_request_address(station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,
@@ -672,7 +678,7 @@ pub fn build_sdo_info_get_oe_request(
   let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
-    address: station,
+    address: mailbox_request_address(station),
     channel: b'\x00',
     priority: b'\x00',
     mb_type: CoE,

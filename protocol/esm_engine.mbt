@@ -3,6 +3,9 @@
 /// Drives slave state transitions with confirmation and error rollback.
 
 ///|
+let request_state_max_polls : Int = 32
+
+///|
 /// Request an ESM state transition on a specific slave (by configured address).
 /// Writes AL Control, then reads AL Status to confirm.
 /// Returns the confirmed state or raises an error.
@@ -12,16 +15,31 @@ pub fn[N : @hal.Nic] request_state(
   target : EsmState,
   timeout : @hal.Duration,
 ) -> EsmState raise @hal.EcError {
-  // Write target state to AL Control register
-  let target_byte = target.to_byte()
-  let buf = Bytes::from_array([target_byte, b'\x00'])
-  let _ = write_register_fp(nic, station, reg_al_control, buf, timeout)
-  // Read back AL Status register to confirm
-  let status_pdu = read_register_fp(nic, station, reg_al_status, 2, timeout)
-  if status_pdu.data.length() < 1 {
-    raise @hal.EcError::EsmStateError("empty AL Status response")
+  let current_status = read_al_status_raw_fp(nic, station, timeout)
+  if (current_status & b'\x10') != b'\x00' {
+    ignore(
+      request_state_control_fp(
+        nic,
+        station,
+        (current_status & b'\x0F') | b'\x10',
+        timeout,
+      ),
+    )
   }
-  let actual_state = EsmState::from_byte(status_pdu.data[0])
+  let target_byte = target.to_byte()
+  let _ = request_state_control_fp(nic, station, target_byte, timeout)
+  let status = wait_for_state_fp(nic, station, target, timeout)
+  let actual_state = EsmState::from_byte(status)
+  if actual_state != target && (status & b'\x10') != b'\x00' {
+    let _ = request_state_control_fp(
+      nic,
+      station,
+      target_byte | b'\x10',
+      timeout,
+    )
+    let acknowledged = wait_for_state_fp(nic, station, target, timeout)
+    return EsmState::from_byte(acknowledged)
+  }
   actual_state
 }
 
@@ -33,15 +51,124 @@ pub fn[N : @hal.Nic] request_state_ap(
   target : EsmState,
   timeout : @hal.Duration,
 ) -> EsmState raise @hal.EcError {
+  let current_status = read_al_status_raw_ap(nic, position, timeout)
+  if (current_status & b'\x10') != b'\x00' {
+    ignore(
+      request_state_control_ap(
+        nic,
+        position,
+        (current_status & b'\x0F') | b'\x10',
+        timeout,
+      ),
+    )
+  }
   let target_byte = target.to_byte()
-  let buf = Bytes::from_array([target_byte, b'\x00'])
+  let _ = request_state_control_ap(nic, position, target_byte, timeout)
+  let status = wait_for_state_ap(nic, position, target, timeout)
+  let actual_state = EsmState::from_byte(status)
+  if actual_state != target && (status & b'\x10') != b'\x00' {
+    let _ = request_state_control_ap(
+      nic,
+      position,
+      target_byte | b'\x10',
+      timeout,
+    )
+    let acknowledged = wait_for_state_ap(nic, position, target, timeout)
+    return EsmState::from_byte(acknowledged)
+  }
+  actual_state
+}
+
+///|
+fn[N : @hal.Nic] wait_for_state_fp(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let mut last_status = b'\x00'
+  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+    last_status = read_al_status_raw_fp(nic, station, timeout)
+    if (last_status & b'\x0F') == target.to_byte() {
+      return last_status
+    }
+  }
+  last_status
+}
+
+///|
+fn[N : @hal.Nic] wait_for_state_ap(
+  nic : N,
+  position : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let mut last_status = b'\x00'
+  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+    last_status = read_al_status_raw_ap(nic, position, timeout)
+    if (last_status & b'\x0F') == target.to_byte() {
+      return last_status
+    }
+  }
+  last_status
+}
+
+///|
+fn[N : @hal.Nic] request_state_control_fp(
+  nic : N,
+  station : UInt,
+  control : Byte,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let buf = Bytes::from_array([control, b'\x00'])
+  let _ = write_register_fp(nic, station, reg_al_control, buf, timeout)
+  let status_pdu = read_register_fp(nic, station, reg_al_status, 2, timeout)
+  if status_pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  status_pdu.data[0]
+}
+
+///|
+fn[N : @hal.Nic] read_al_status_raw_fp(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let status_pdu = read_register_fp(nic, station, reg_al_status, 2, timeout)
+  if status_pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  status_pdu.data[0]
+}
+
+///|
+fn[N : @hal.Nic] request_state_control_ap(
+  nic : N,
+  position : UInt,
+  control : Byte,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let buf = Bytes::from_array([control, b'\x00'])
   let _ = write_register_ap(nic, position, reg_al_control, buf, timeout)
   let status_pdu = read_register_ap(nic, position, reg_al_status, 2, timeout)
   if status_pdu.data.length() < 1 {
     raise @hal.EcError::EsmStateError("empty AL Status response")
   }
-  let actual_state = EsmState::from_byte(status_pdu.data[0])
-  actual_state
+  status_pdu.data[0]
+}
+
+///|
+fn[N : @hal.Nic] read_al_status_raw_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let status_pdu = read_register_ap(nic, position, reg_al_status, 2, timeout)
+  if status_pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  status_pdu.data[0]
 }
 
 ///|

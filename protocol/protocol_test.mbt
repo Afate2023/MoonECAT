@@ -184,6 +184,7 @@ test "EcFrame decode rejects wrong ethertype" {
 ///|
 test "address helpers - configured address packing" {
   let addr = @protocol.configured_address(0x1001U, 0x0130U)
+  assert_eq(addr, 0x01301001U)
   assert_eq(@protocol.address_station(addr), 0x1001U)
   assert_eq(@protocol.address_offset(addr), 0x0130U)
 }
@@ -191,6 +192,7 @@ test "address helpers - configured address packing" {
 ///|
 test "address helpers - broadcast address" {
   let addr = @protocol.broadcast_address(0x0130U)
+  assert_eq(addr, 0x01300000U)
   assert_eq(@protocol.address_station(addr), 0U)
   assert_eq(@protocol.address_offset(addr), 0x0130U)
 }
@@ -240,7 +242,11 @@ test "FrameBuilder - add and build single PDU" {
 test "FrameBuilder - sequential index assignment" {
   let builder = @protocol.FrameBuilder::new()
   let idx0 = builder.add(BRD, 0U, Bytes::new(0))
-  let idx1 = builder.add(FPRD, 0x10010130U, Bytes::new(4))
+  let idx1 = builder.add(
+    FPRD,
+    @protocol.configured_address(0x1001U, 0x0130U),
+    Bytes::new(4),
+  )
   let idx2 = builder.add(LRW, 0x1000U, Bytes::new(8))
   assert_eq(idx0, b'\x00')
   assert_eq(idx1, b'\x01')
@@ -564,6 +570,32 @@ test "EcFrame roundtrip preserves address through encode/decode" {
   let decoded = @protocol.EcFrame::decode(frame.encode())
   assert_eq(@protocol.address_station(decoded.pdus[0].header.address), 0x1001U)
   assert_eq(@protocol.address_offset(decoded.pdus[0].header.address), 0x0130U)
+}
+
+///|
+test "EcFrame encode writes ADP before ADO on wire" {
+  let frame : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [
+      {
+        header: {
+          command: FPRD,
+          index: b'\x00',
+          address: @protocol.configured_address(0x1001U, 0x0130U),
+          len_flags: 0U,
+          irq: 0U,
+        },
+        data: Bytes::new(0),
+        wkc: 0U,
+      },
+    ],
+  }
+  let encoded = frame.encode()
+  assert_eq(encoded[18], b'\x01')
+  assert_eq(encoded[19], b'\x10')
+  assert_eq(encoded[20], b'\x30')
+  assert_eq(encoded[21], b'\x01')
 }
 
 ///|
@@ -1162,7 +1194,7 @@ fn build_ap_mailbox_sdo_upload_response(
     counter,
   }
   let hdr = mbh.to_bytes()
-  Bytes::makei(16, fn(i) {
+  let frame = Bytes::makei(16, fn(i) {
     if i < 6 {
       hdr[i]
     } else if i == 6 {
@@ -1183,6 +1215,13 @@ fn build_ap_mailbox_sdo_upload_response(
       b'\x00'
     }
   })
+  Bytes::makei(128, fn(i) {
+    if i < frame.length() {
+      frame[i]
+    } else {
+      b'\x00'
+    }
+  })
 }
 
 ///|
@@ -1199,15 +1238,14 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
   let request = @protocol.EcFrame::decode(data)
   let pdu = request.pdus[0]
   self.last_command = pdu.header.command.to_byte()
-  self.last_offset = @protocol.address_station(pdu.header.address)
+  self.last_offset = @protocol.address_offset(pdu.header.address)
   self.next_response = match pdu.header.command {
     @protocol.APRD => {
-      let sm1_status_addr = @protocol.reg_sm_base +
-        @protocol.sm_entry_size.reinterpret_as_uint() +
-        5U
-      let response_data = if self.last_offset == sm1_status_addr {
+      let sm1_base_addr = @protocol.reg_sm_base +
+        @protocol.sm_entry_size.reinterpret_as_uint()
+      let response_data = if self.last_offset == sm1_base_addr {
         let status = if self.mailbox_ready { b'\x08' } else { b'\x00' }
-        Bytes::from_array([status])
+        Bytes::makei(8, fn(i) { if i == 5 { status } else { b'\x00' } })
       } else if self.last_offset == 0x1080U {
         build_ap_mailbox_sdo_upload_response(
           0x1001U,
@@ -1253,17 +1291,16 @@ test "mailbox_poll_ap reads status via APRD" {
   nic.mailbox_ready = true
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
-    out_size: 64U,
+    out_size: 128U,
     out_sm_index: 0,
     in_address: 0x1080U,
-    in_size: 64U,
+    in_size: 128U,
     in_sm_index: 1,
   }
   let ready = @protocol.mailbox_poll_ap(nic, 0U, cfg, timeout)
   let expected_status_addr = @protocol.reg_sm_base +
     cfg.in_sm_index.reinterpret_as_uint() *
-    @protocol.sm_entry_size.reinterpret_as_uint() +
-    5U
+    @protocol.sm_entry_size.reinterpret_as_uint()
   assert_true(ready)
   assert_eq(nic.last_command, @protocol.APRD.to_byte())
   assert_eq(nic.last_offset, expected_status_addr)
@@ -1275,10 +1312,10 @@ test "mailbox_send_ap writes output mailbox via APWR" {
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
-    out_size: 64U,
+    out_size: 128U,
     out_sm_index: 0,
     in_address: 0x1080U,
-    in_size: 64U,
+    in_size: 128U,
     in_sm_index: 1,
   }
   @protocol.mailbox_send_ap(nic, 0U, cfg, Bytes::new(16), timeout)
@@ -1287,15 +1324,33 @@ test "mailbox_send_ap writes output mailbox via APWR" {
 }
 
 ///|
+test "mailbox_read_ap reads input mailbox via APRD" {
+  let nic = ApMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let data = @protocol.mailbox_read_ap(nic, 0U, cfg, timeout)
+  assert_eq(nic.last_command, @protocol.APRD.to_byte())
+  assert_eq(nic.last_offset, 0x1080U)
+  assert_eq(data.length(), 128)
+}
+
+///|
 test "sdo_upload_ap reads expedited payload via AP mailbox transport" {
   let nic = ApMailboxMockNic::new()
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
-    out_size: 64U,
+    out_size: 128U,
     out_sm_index: 0,
     in_address: 0x1080U,
-    in_size: 64U,
+    in_size: 128U,
     in_sm_index: 1,
   }
   let payload = @protocol.sdo_upload_ap(

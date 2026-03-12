@@ -692,6 +692,18 @@ test "Free-run: ESM shutdown path building" {
 }
 
 ///|
+test "Diagnosis restore path uses legal state sequence" {
+  let restore_op = @runtime.diagnosis_restore_path(@protocol.Op)
+  assert_eq(restore_op, [@protocol.PreOp, @protocol.SafeOp, @protocol.Op])
+}
+
+///|
+test "Diagnosis restore path reaches boot via init" {
+  let restore_boot = @runtime.diagnosis_restore_path(@protocol.Boot)
+  assert_eq(restore_boot, [@protocol.PreOp, @protocol.Init, @protocol.Boot])
+}
+
+///|
 test "Free-run: ESM can_transition validates allowed transitions" {
   // Forward transitions
   assert_true(

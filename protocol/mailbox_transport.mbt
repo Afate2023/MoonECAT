@@ -4,6 +4,9 @@
 /// with slave mailboxes per ETG.1000.4.
 
 ///|
+let sm_register_window_size : Int = 8
+
+///|
 /// SM status register offset within the SM config register area.
 let sm_status_offset : UInt = 5U
 
@@ -18,11 +21,14 @@ let mb_status_bit : Byte = b'\x08'
 let default_max_polls : Int = 1000
 
 ///|
-/// Compute the SM status register address for a given SM index.
-fn sm_status_address(sm_index : Int) -> UInt {
+/// Maximum number of polls when waiting for the output mailbox to become empty.
+let mailbox_send_wait_max_polls : Int = 32
+
+///|
+/// Compute the SM register window base address for a given SM index.
+fn sm_register_address(sm_index : Int) -> UInt {
   reg_sm_base +
-  sm_index.reinterpret_as_uint() * sm_entry_size.reinterpret_as_uint() +
-  sm_status_offset
+  sm_index.reinterpret_as_uint() * sm_entry_size.reinterpret_as_uint()
 }
 
 ///|
@@ -34,12 +40,14 @@ pub fn[N : @hal.Nic] mailbox_poll(
   mb_config : @mailbox.MailboxConfig,
   timeout : @hal.Duration,
 ) -> Bool raise @hal.EcError {
-  let status_addr = sm_status_address(mb_config.in_sm_index)
-  let pdu = read_register_fp(nic, station, status_addr, 1, timeout)
-  if pdu.data.length() < 1 {
+  let status_addr = sm_register_address(mb_config.in_sm_index)
+  let pdu = read_register_fp(
+    nic, station, status_addr, sm_register_window_size, timeout,
+  )
+  if pdu.data.length() <= sm_status_offset.reinterpret_as_int() {
     return false
   }
-  (pdu.data[0] & mb_status_bit) != b'\x00'
+  (pdu.data[sm_status_offset.reinterpret_as_int()] & mb_status_bit) != b'\x00'
 }
 
 ///|
@@ -51,12 +59,14 @@ pub fn[N : @hal.Nic] mailbox_poll_ap(
   mb_config : @mailbox.MailboxConfig,
   timeout : @hal.Duration,
 ) -> Bool raise @hal.EcError {
-  let status_addr = sm_status_address(mb_config.in_sm_index)
-  let pdu = read_register_ap(nic, position, status_addr, 1, timeout)
-  if pdu.data.length() < 1 {
+  let status_addr = sm_register_address(mb_config.in_sm_index)
+  let pdu = read_register_ap(
+    nic, position, status_addr, sm_register_window_size, timeout,
+  )
+  if pdu.data.length() <= sm_status_offset.reinterpret_as_int() {
     return false
   }
-  (pdu.data[0] & mb_status_bit) != b'\x00'
+  (pdu.data[sm_status_offset.reinterpret_as_int()] & mb_status_bit) != b'\x00'
 }
 
 ///|
@@ -89,13 +99,27 @@ pub fn[N : @hal.Nic] mailbox_send(
       b'\x00'
     }
   })
-  let _ = write_register_fp(
-    nic,
-    station,
-    mb_config.out_address,
-    padded,
-    timeout,
-  )
+  let status_addr = sm_register_address(mb_config.out_sm_index)
+  for _attempt = 0
+      _attempt < mailbox_send_wait_max_polls
+      _attempt = _attempt + 1 {
+    let pdu = read_register_fp(
+      nic, station, status_addr, sm_register_window_size, timeout,
+    )
+    if pdu.data.length() > sm_status_offset.reinterpret_as_int() &&
+      (pdu.data[sm_status_offset.reinterpret_as_int()] & mb_status_bit) ==
+      b'\x00' {
+      let _ = write_register_fp(
+        nic,
+        station,
+        mb_config.out_address,
+        padded,
+        timeout,
+      )
+      return
+    }
+  }
+  raise @hal.EcError::MailboxTimeout
 }
 
 ///|
@@ -123,13 +147,27 @@ pub fn[N : @hal.Nic] mailbox_send_ap(
       b'\x00'
     }
   })
-  let _ = write_register_ap(
-    nic,
-    position,
-    mb_config.out_address,
-    padded,
-    timeout,
-  )
+  let status_addr = sm_register_address(mb_config.out_sm_index)
+  for _attempt = 0
+      _attempt < mailbox_send_wait_max_polls
+      _attempt = _attempt + 1 {
+    let pdu = read_register_ap(
+      nic, position, status_addr, sm_register_window_size, timeout,
+    )
+    if pdu.data.length() > sm_status_offset.reinterpret_as_int() &&
+      (pdu.data[sm_status_offset.reinterpret_as_int()] & mb_status_bit) ==
+      b'\x00' {
+      let _ = write_register_ap(
+        nic,
+        position,
+        mb_config.out_address,
+        padded,
+        timeout,
+      )
+      return
+    }
+  }
+  raise @hal.EcError::MailboxTimeout
 }
 
 ///|
@@ -164,6 +202,24 @@ pub fn[N : @hal.Nic] mailbox_recv(
 }
 
 ///|
+/// Read the current AP mailbox input buffer once without polling.
+pub fn[N : @hal.Nic] mailbox_read_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let pdu = read_register_ap(
+    nic,
+    position,
+    mb_config.in_address,
+    mb_config.in_size.reinterpret_as_int(),
+    timeout,
+  )
+  pdu.data
+}
+
+///|
 /// Receive a mailbox frame from a slave using auto-increment addressing.
 pub fn[N : @hal.Nic] mailbox_recv_ap(
   nic : N,
@@ -175,14 +231,7 @@ pub fn[N : @hal.Nic] mailbox_recv_ap(
   for _attempt = 0; _attempt < max_polls; _attempt = _attempt + 1 {
     let ready = mailbox_poll_ap(nic, position, mb_config, timeout)
     if ready {
-      let pdu = read_register_ap(
-        nic,
-        position,
-        mb_config.in_address,
-        mb_config.in_size.reinterpret_as_int(),
-        timeout,
-      )
-      return pdu.data
+      return mailbox_read_ap(nic, position, mb_config, timeout)
     }
   }
   raise @hal.EcError::MailboxTimeout

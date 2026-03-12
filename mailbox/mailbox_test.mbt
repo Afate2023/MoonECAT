@@ -506,12 +506,12 @@ test "MailboxHeader::from_bytes rejects short data" {
 }
 
 ///|
-test "MailboxCounter cycles 1 through 15" {
+test "MailboxCounter cycles 1 through 7" {
   let ctr = @mailbox.MailboxCounter::new()
   let mut last = b'\x00'
   for _i = 0; _i < 30; _i = _i + 1 {
     let v = ctr.next()
-    assert_true(v >= b'\x01' && v <= b'\x0F')
+    assert_true(v >= b'\x01' && v <= b'\x07')
     last = v
   }
   // After 30 calls it should have wrapped at least once
@@ -547,7 +547,7 @@ test "SdoTransaction encode mailbox header fields" {
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
   assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
   assert_eq(mbh.counter, b'\x03')
-  assert_eq(mbh.address, 0x2002U)
+  assert_eq(mbh.address, 0U)
   assert_eq(mbh.length, 10U) // 2 + 8
 }
 
@@ -556,6 +556,8 @@ test "SdoTransaction upload request encode" {
   let txn = @mailbox.build_sdo_upload(b'\x01', 0x1001U, 0x1018U, b'\x01')
   let frame = txn.encode()
   assert_eq(frame.length(), 16)
+  assert_eq(frame[2], b'\x00')
+  assert_eq(frame[3], b'\x00')
   // SDO command byte should be 0x40 (upload request)
   assert_eq(frame[8], b'\x40')
   // Index should be 0x1018 LE
@@ -802,6 +804,7 @@ test "build_sdo_download_segment_request encodes segment header" {
   assert_eq(frame.length(), 12) // 6 + 2 + 1 + 3
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
   assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(mbh.address, 0U)
   assert_eq(mbh.length, 6U)
   // cmd: toggle=1, n_unused=4, last=1 -> 0x19
   assert_eq(frame[8], b'\x19')
