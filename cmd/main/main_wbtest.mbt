@@ -108,18 +108,73 @@ test "cli optional shutdown state flag supports default and none" {
 test "cli resolve diagnosis station uses explicit or single slave" {
   let scan_report : @runtime.ScanReport = {
     slave_count: 1,
-    slaves: [{
-      position: 0,
-      station_address: 0x1001U,
-      vendor_id: 1U,
-      product_code: 2U,
-      revision: 3U,
-      serial: 4U,
-      identification: 5U,
-    }],
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
   }
-  assert_eq(resolve_cli_station(scan_report, None), 0x1001U)
-  assert_eq(resolve_cli_station(scan_report, Some(0x2000U)), 0x2000U)
+  let slave = resolve_cli_slave(scan_report, None)
+  assert_eq(slave.station_address, 0x1001U)
+}
+
+///|
+test "cli resolve diagnosis slave finds explicit station" {
+  let scan_report : @runtime.ScanReport = {
+    slave_count: 2,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        vendor_id: 6U,
+        product_code: 7U,
+        revision: 8U,
+        serial: 9U,
+        identification: 10U,
+      },
+    ],
+  }
+  let slave = resolve_cli_slave(scan_report, Some(0x1002U))
+  assert_eq(slave.position, 1)
+  assert_eq(slave.station_address, 0x1002U)
+}
+
+///|
+test "cli resolve diagnosis slave rejects missing explicit station" {
+  let scan_report : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let result : Result[@runtime.SlaveReport, Error] = try? resolve_cli_slave(
+    scan_report,
+    Some(0x2000U),
+  )
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
 ///|
@@ -147,7 +202,10 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
       },
     ],
   }
-  let result : Result[UInt, Error] = try? resolve_cli_station(scan_report, None)
+  let result : Result[@runtime.SlaveReport, Error] = try? resolve_cli_slave(
+    scan_report,
+    None,
+  )
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 

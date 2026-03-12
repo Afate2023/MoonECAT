@@ -1,4 +1,7 @@
 ///|
+let max_ignored_rx_frames : Int = 32
+
+///|
 /// Perform a single EtherCAT transaction: build a frame with the given PDUs,
 /// send it via the NIC, receive the response, and decode it.
 /// Returns the decoded response frame.
@@ -9,8 +12,30 @@ pub fn[N : @hal.Nic] transact(
 ) -> EcFrame raise @hal.EcError {
   let raw = frame.encode()
   let _sent = nic.send(raw)
-  let response = nic.recv(timeout~)
-  EcFrame::decode(response)
+  let mut ignored = 0
+  for ;; {
+    let response = nic.recv(timeout~)
+    let decoded = try? EcFrame::decode(response)
+    match decoded {
+      Ok(value) => return value
+      Err(err) if should_ignore_rx_decode_error(err) => {
+        ignored = ignored + 1
+        if ignored > max_ignored_rx_frames {
+          raise err
+        }
+      }
+      Err(err) => raise err
+    }
+  }
+}
+
+///|
+fn should_ignore_rx_decode_error(err : @hal.EcError) -> Bool {
+  match err {
+    @hal.EcError::InvalidFrame(message) =>
+      message.contains("wrong ethertype") || message.contains("wrong ecat type")
+    _ => false
+  }
 }
 
 ///|

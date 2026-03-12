@@ -332,6 +332,76 @@ test "transact loopback - full frame transaction via MockNic" {
 }
 
 ///|
+pub struct NoiseMockNic {
+  mut next_response : Bytes
+  mut emit_noise : Bool
+  mut is_open : Bool
+}
+
+///|
+fn NoiseMockNic::new() -> NoiseMockNic {
+  { next_response: Bytes::new(0), emit_noise: true, is_open: true }
+}
+
+///|
+fn ipv4_noise_frame() -> Bytes {
+  Bytes::from_array([
+    b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\x02', b'\x00', b'\x00',
+    b'\x00', b'\x00', b'\x01', b'\x08', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+    b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+    b'\x00',
+  ])
+}
+
+///|
+pub impl @hal.Nic for NoiseMockNic with open_(name) {
+  ignore(name)
+  NoiseMockNic::new()
+}
+
+///|
+pub impl @hal.Nic for NoiseMockNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response = data
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  if self.emit_noise {
+    self.emit_noise = false
+    return ipv4_noise_frame()
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for NoiseMockNic with close(self) {
+  self.is_open = false
+}
+
+///|
+test "transact ignores non-ethercat noise frames before response" {
+  let nic = NoiseMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let pdu = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  assert_eq(pdu.wkc, 0U)
+}
+
+///|
 test "transact_pdu_retry - succeeds on first try" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
