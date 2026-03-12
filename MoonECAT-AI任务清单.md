@@ -268,7 +268,7 @@
   - ✅ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg](hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket MoonBit 包装层已细化 link-down / privilege / missing-interface / timeout 诊断；Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+  - 当前状态：已创建 [hal/native/moon.pkg](hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
   - MoonBit Native FFI 工作包：
@@ -353,6 +353,7 @@
 - `Native slave identity recovery` → `f691f91` `fix(native): recover slave identity from real scans`
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
+- `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`

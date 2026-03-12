@@ -100,7 +100,6 @@ static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer,
 #include <tchar.h>
 #include <windows.h>
 
-
 typedef int(__cdecl *moonecat_pcap_init_fn)(unsigned int, char *);
 typedef int(__cdecl *moonecat_pcap_findalldevs_fn)(pcap_if_t **, char *);
 typedef void(__cdecl *moonecat_pcap_freealldevs_fn)(pcap_if_t *);
@@ -478,6 +477,53 @@ void moonecat_windows_npcap_close(int32_t handle_id) {
 
 static int g_linux_raw_handles[32] = {0};
 
+static int32_t moonecat_linux_errno_code(int err) {
+  switch (err) {
+#ifdef ENETDOWN
+  case ENETDOWN:
+    return -2;
+#endif
+#ifdef ENETRESET
+  case ENETRESET:
+    return -2;
+#endif
+#ifdef ENONET
+  case ENONET:
+    return -2;
+#endif
+#ifdef ENOLINK
+  case ENOLINK:
+    return -2;
+#endif
+#ifdef EPERM
+  case EPERM:
+    return -3;
+#endif
+#ifdef EACCES
+  case EACCES:
+    return -3;
+#endif
+#ifdef ENODEV
+  case ENODEV:
+    return -4;
+#endif
+#ifdef ENOENT
+  case ENOENT:
+    return -4;
+#endif
+#ifdef ENXIO
+  case ENXIO:
+    return -4;
+#endif
+  default:
+    return -1;
+  }
+}
+
+static void moonecat_linux_set_errno_error(int err) {
+  moonecat_set_error(moonecat_linux_errno_code(err), strerror(err));
+}
+
 static int moonecat_linux_find_free_handle_slot(void) {
   int i;
   for (i = 0; i < 32; i++) {
@@ -575,19 +621,19 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
   (void)snaplen;
   ifindex = if_nametoindex(name);
   if (ifindex == 0) {
-    moonecat_set_error(-1, "Linux interface not found");
+    moonecat_set_error(-4, "Linux interface not found");
     return -1;
   }
   fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
   if (fd < 0) {
-    moonecat_set_error(-1, strerror(errno));
+    moonecat_linux_set_errno_error(errno);
     return -1;
   }
   tv.tv_sec = timeout_ms / 1000;
   tv.tv_usec = (timeout_ms % 1000) * 1000;
   if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0) {
     close(fd);
-    moonecat_set_error(-1, strerror(errno));
+    moonecat_linux_set_errno_error(errno);
     return -1;
   }
   memset(&addr, 0, sizeof(addr));
@@ -596,7 +642,7 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
   addr.sll_ifindex = (int)ifindex;
   if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
     close(fd);
-    moonecat_set_error(-1, strerror(errno));
+    moonecat_linux_set_errno_error(errno);
     return -1;
   }
   if (promisc) {
@@ -607,7 +653,7 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
     if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq,
                    sizeof(mreq)) != 0) {
       close(fd);
-      moonecat_set_error(-1, strerror(errno));
+      moonecat_linux_set_errno_error(errno);
       return -1;
     }
   }
@@ -638,7 +684,7 @@ int32_t moonecat_linux_raw_socket_send(int32_t handle_id, moonbit_bytes_t data,
   }
   rc = send(fd, data, (size_t)length, 0);
   if (rc < 0) {
-    moonecat_set_error(-1, strerror(errno));
+    moonecat_linux_set_errno_error(errno);
     return -1;
   }
   moonecat_set_error(1, "ok");
@@ -668,7 +714,7 @@ moonbit_bytes_t moonecat_linux_raw_socket_recv(int32_t handle_id) {
     moonecat_set_error(0, "recv timeout");
     return moonbit_make_bytes(0, 0);
   }
-  moonecat_set_error(-1, strerror(errno));
+  moonecat_linux_set_errno_error(errno);
   return moonbit_make_bytes(0, 0);
 }
 
