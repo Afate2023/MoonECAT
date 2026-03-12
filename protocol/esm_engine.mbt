@@ -26,6 +26,25 @@ pub fn[N : @hal.Nic] request_state(
 }
 
 ///|
+/// Request an ESM state transition using auto-increment addressing.
+pub fn[N : @hal.Nic] request_state_ap(
+  nic : N,
+  position : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let target_byte = target.to_byte()
+  let buf = Bytes::from_array([target_byte, b'\x00'])
+  let _ = write_register_ap(nic, position, reg_al_control, buf, timeout)
+  let status_pdu = read_register_ap(nic, position, reg_al_status, 2, timeout)
+  if status_pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  let actual_state = EsmState::from_byte(status_pdu.data[0])
+  actual_state
+}
+
+///|
 /// Optional per-target ESM transition timeout overrides.
 ///
 /// Fields map to the target state of each transition step.
@@ -181,6 +200,20 @@ pub fn[N : @hal.Nic] read_al_status(
   timeout : @hal.Duration,
 ) -> EsmState raise @hal.EcError {
   let pdu = read_register_fp(nic, station, reg_al_status, 2, timeout)
+  if pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  EsmState::from_byte(pdu.data[0])
+}
+
+///|
+/// Read the current ESM state using auto-increment addressing.
+pub fn[N : @hal.Nic] read_al_status_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let pdu = read_register_ap(nic, position, reg_al_status, 2, timeout)
   if pdu.data.length() < 1 {
     raise @hal.EcError::EsmStateError("empty AL Status response")
   }

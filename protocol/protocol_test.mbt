@@ -334,13 +334,24 @@ test "transact loopback - full frame transaction via MockNic" {
 ///|
 pub struct NoiseMockNic {
   mut next_response : Bytes
+  noise_response : Bytes
   mut emit_noise : Bool
   mut is_open : Bool
 }
 
 ///|
 fn NoiseMockNic::new() -> NoiseMockNic {
-  { next_response: Bytes::new(0), emit_noise: true, is_open: true }
+  NoiseMockNic::new_with_noise(ipv4_noise_frame())
+}
+
+///|
+fn NoiseMockNic::new_with_noise(noise_response : Bytes) -> NoiseMockNic {
+  {
+    next_response: Bytes::new(0),
+    noise_response,
+    emit_noise: true,
+    is_open: true,
+  }
 }
 
 ///|
@@ -376,7 +387,7 @@ pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
   }
   if self.emit_noise {
     self.emit_noise = false
-    return ipv4_noise_frame()
+    return self.noise_response
   }
   self.next_response
 }
@@ -389,6 +400,21 @@ pub impl @hal.Nic for NoiseMockNic with close(self) {
 ///|
 test "transact ignores non-ethercat noise frames before response" {
   let nic = NoiseMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let pdu = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  assert_eq(pdu.wkc, 0U)
+}
+
+///|
+test "transact ignores short noise frames before response" {
+  let nic = NoiseMockNic::new_with_noise(Bytes::new(10))
   let timeout = @hal.Duration(1000L)
   let pdu = @protocol.transact_pdu(
     nic,
@@ -1097,6 +1123,192 @@ test "mailbox_recv times out when poll never succeeds" {
     max_polls=3,
   )
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
+}
+
+///|
+pub struct ApMailboxMockNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut mailbox_ready : Bool
+  mut last_command : Byte
+  mut last_offset : UInt
+}
+
+///|
+fn ApMailboxMockNic::new() -> ApMailboxMockNic {
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    mailbox_ready: false,
+    last_command: b'\xFF',
+    last_offset: 0U,
+  }
+}
+
+///|
+fn build_ap_mailbox_sdo_upload_response(
+  station : UInt,
+  counter : Byte,
+  index : UInt,
+  subindex : Byte,
+  payload : Bytes,
+) -> Bytes {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30'
+    } else if i == 8 {
+      b'\x43'
+    } else if i == 9 {
+      (index & 0xFFU).to_byte()
+    } else if i == 10 {
+      ((index >> 8) & 0xFFU).to_byte()
+    } else if i == 11 {
+      subindex
+    } else if i < 12 + payload.length() {
+      payload[i - 12]
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+pub impl @hal.Nic for ApMailboxMockNic with open_(name) {
+  ignore(name)
+  ApMailboxMockNic::new()
+}
+
+///|
+pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  self.last_command = pdu.header.command.to_byte()
+  self.last_offset = @protocol.address_station(pdu.header.address)
+  self.next_response = match pdu.header.command {
+    @protocol.APRD => {
+      let sm1_status_addr = @protocol.reg_sm_base +
+        @protocol.sm_entry_size.reinterpret_as_uint() +
+        5U
+      let response_data = if self.last_offset == sm1_status_addr {
+        let status = if self.mailbox_ready { b'\x08' } else { b'\x00' }
+        Bytes::from_array([status])
+      } else if self.last_offset == 0x1080U {
+        build_ap_mailbox_sdo_upload_response(
+          0x1001U,
+          b'\x01',
+          0x1001U,
+          b'\x00',
+          Bytes::from_array([b'\xAA', b'\x00', b'\x00', b'\x00']),
+        )
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_eeprom_response(request, response_data, 1U)
+    }
+    @protocol.APWR => {
+      if self.last_offset == 0x1000U {
+        self.mailbox_ready = true
+      }
+      build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    _ => build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for ApMailboxMockNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for ApMailboxMockNic with close(self) {
+  self.is_open = false
+}
+
+///|
+test "mailbox_poll_ap reads status via APRD" {
+  let nic = ApMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  nic.mailbox_ready = true
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  let ready = @protocol.mailbox_poll_ap(nic, 0U, cfg, timeout)
+  let expected_status_addr = @protocol.reg_sm_base +
+    cfg.in_sm_index.reinterpret_as_uint() *
+    @protocol.sm_entry_size.reinterpret_as_uint() +
+    5U
+  assert_true(ready)
+  assert_eq(nic.last_command, @protocol.APRD.to_byte())
+  assert_eq(nic.last_offset, expected_status_addr)
+}
+
+///|
+test "mailbox_send_ap writes output mailbox via APWR" {
+  let nic = ApMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  @protocol.mailbox_send_ap(nic, 0U, cfg, Bytes::new(16), timeout)
+  assert_eq(nic.last_command, @protocol.APWR.to_byte())
+  assert_eq(nic.last_offset, 0x1000U)
+}
+
+///|
+test "sdo_upload_ap reads expedited payload via AP mailbox transport" {
+  let nic = ApMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  let payload = @protocol.sdo_upload_ap(
+    nic,
+    0U,
+    0x1001U,
+    cfg,
+    @mailbox.Rmsm::new(),
+    0x1001U,
+    b'\x00',
+    timeout,
+  )
+  assert_eq(payload, Bytes::from_array([b'\xAA', b'\x00', b'\x00', b'\x00']))
 }
 
 ///|

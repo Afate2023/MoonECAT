@@ -400,21 +400,28 @@ fn[N : @hal.Nic] run_diagnosis_command(
   as_json : Bool,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  let scan_report = @runtime.scan(nic, timeout)
+  let scan_report = diagnosis_stage(
+    try? @runtime.scan(nic, timeout),
+    "diagnosis.scan",
+  )
   let target_slave = resolve_cli_slave(
     scan_report,
     optional_uint_flag(args, "--station"),
   )
   let station = target_slave.station_address
   let position = target_slave.position.reinterpret_as_uint()
-  let original_state_result : Result[@protocol.EsmState, Error] = try? read_al_status_ap(
-    nic, position, timeout,
+  let original_state_result : Result[@protocol.EsmState, Error] = try? diagnosis_stage(
+    try? @protocol.read_al_status_ap(nic, position, timeout),
+    "diagnosis.read_al_status_ap",
   )
   let original_state = match original_state_result {
     Ok(state) => state
     Err(_) => @protocol.Init
   }
-  let eeprom = @protocol.eeprom_read_ap(nic, position, 0U, 15, timeout)
+  let eeprom = diagnosis_stage(
+    try? @protocol.eeprom_read_ap(nic, position, 0U, 15, timeout),
+    "diagnosis.eeprom_read_ap",
+  )
   let sii = @mailbox.parse_sii_header(eeprom)
   let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
   if not(mailbox_config.is_valid()) {
@@ -424,20 +431,32 @@ fn[N : @hal.Nic] run_diagnosis_command(
       station.to_string(),
     )
   }
+  let diagnosis_rmsm = @mailbox.Rmsm::new(max_retries=0)
   if original_state != @protocol.PreOp {
-    ignore(request_state_ap_confirm(nic, position, @protocol.PreOp, timeout))
+    ignore(
+      diagnosis_stage(
+        try? @protocol.request_state_ap(nic, position, @protocol.PreOp, timeout),
+        "diagnosis.request_preop_ap",
+      ),
+    )
   }
-  let report = read_slave_diagnosis_ap(
-    nic,
-    position,
-    station,
-    mailbox_config,
-    @mailbox.Rmsm::new(),
-    timeout,
+  let report = diagnosis_stage(
+    try? @runtime.read_slave_diagnosis_ap(
+      nic,
+      position,
+      station,
+      mailbox_config,
+      diagnosis_rmsm,
+      timeout,
+    ),
+    "diagnosis.read_slave_diagnosis_ap",
   )
   if original_state != @protocol.PreOp {
     ignore(
-      request_state_ap_confirm(nic, position, original_state, timeout) catch {
+      diagnosis_stage(
+        try? @protocol.request_state_ap(nic, position, original_state, timeout),
+        "diagnosis.restore_original_state_ap",
+      ) catch {
         _ => @protocol.PreOp
       },
     )
@@ -589,192 +608,22 @@ fn resolve_cli_slave(
 }
 
 ///|
-fn[N : @hal.Nic] read_al_status_ap(
-  nic : N,
-  position : UInt,
-  timeout : @hal.Duration,
-) -> @protocol.EsmState raise @hal.EcError {
-  let pdu = @protocol.read_register_ap(
-    nic, position, @protocol.reg_al_status, 2, timeout,
-  )
-  if pdu.data.length() < 1 {
-    raise @hal.EcError::EsmStateError("empty AL Status response")
-  }
-  @protocol.EsmState::from_byte(pdu.data[0])
-}
-
-///|
-fn[N : @hal.Nic] request_state_ap_confirm(
-  nic : N,
-  position : UInt,
-  target : @protocol.EsmState,
-  timeout : @hal.Duration,
-) -> @protocol.EsmState raise @hal.EcError {
-  let buf = Bytes::from_array([target.to_byte(), b'\x00'])
-  let _ = @protocol.write_register_ap(
-    nic, position, @protocol.reg_al_control, buf, timeout,
-  )
-  read_al_status_ap(nic, position, timeout)
-}
-
-///|
-fn[N : @hal.Nic] mailbox_poll_ap(
-  nic : N,
-  position : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  timeout : @hal.Duration,
-) -> Bool raise @hal.EcError {
-  let status_addr = @protocol.reg_sm_base +
-    mb_config.in_sm_index.reinterpret_as_uint() *
-    @protocol.sm_entry_size.reinterpret_as_uint() +
-    5U
-  let pdu = @protocol.read_register_ap(nic, position, status_addr, 1, timeout)
-  if pdu.data.length() < 1 {
-    return false
-  }
-  (pdu.data[0] & b'\x08') != b'\x00'
-}
-
-///|
-fn[N : @hal.Nic] mailbox_send_ap(
-  nic : N,
-  position : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  data : Bytes,
-  timeout : @hal.Duration,
-) -> Unit raise @hal.EcError {
-  let out_size = mb_config.out_size.reinterpret_as_int()
-  if data.length() > out_size {
-    raise @hal.EcError::MailboxProtocol(
-      "mailbox data too large: " +
-      data.length().to_string() +
-      " > " +
-      out_size.to_string(),
-    )
-  }
-  let padded = Bytes::makei(out_size, fn(i) {
-    if i < data.length() {
-      data[i]
-    } else {
-      b'\x00'
-    }
-  })
-  let _ = @protocol.write_register_ap(
-    nic,
-    position,
-    mb_config.out_address,
-    padded,
-    timeout,
-  )
-}
-
-///|
-fn[N : @hal.Nic] mailbox_recv_ap(
-  nic : N,
-  position : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  timeout : @hal.Duration,
-  max_polls? : Int = 1000,
-) -> Bytes raise @hal.EcError {
-  for _attempt = 0; _attempt < max_polls; _attempt = _attempt + 1 {
-    if mailbox_poll_ap(nic, position, mb_config, timeout) {
-      let pdu = @protocol.read_register_ap(
-        nic,
-        position,
-        mb_config.in_address,
-        mb_config.in_size.reinterpret_as_int(),
-        timeout,
+fn[T] diagnosis_stage(
+  result : Result[T, Error],
+  stage : String,
+) -> T raise @hal.EcError {
+  match result {
+    Ok(value) => value
+    Err(@hal.EcError::RecvTimeout) =>
+      raise @hal.EcError::Internal("timeout at " + stage + " (RecvTimeout)")
+    Err(@hal.EcError::MailboxTimeout) =>
+      raise @hal.EcError::Internal(
+        "timeout at " + stage + " (MailboxTimeout)",
       )
-      return pdu.data
-    }
+    Err(@hal.EcError::Internal(message)) if message.contains("timeout at ") =>
+      raise @hal.EcError::Internal(stage + " -> " + message)
+    Err(err) => raise @hal.EcError::Internal(err.to_string())
   }
-  raise @hal.EcError::MailboxTimeout
-}
-
-///|
-fn[N : @hal.Nic] sdo_upload_ap(
-  nic : N,
-  position : UInt,
-  station : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  rmsm : @mailbox.Rmsm,
-  index : UInt,
-  subindex : Byte,
-  timeout : @hal.Duration,
-) -> Bytes raise @hal.EcError {
-  let counter = rmsm.begin_transaction()
-  let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
-  let frame = txn.encode()
-  mailbox_send_ap(nic, position, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_ap(nic, position, mb_config, timeout)
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
-  if resp.command != @mailbox.SdoCommand::UploadResponse {
-    raise @hal.EcError::MailboxProtocol(
-      "SDO upload: expected UploadResponse, got " + resp.command.to_string(),
-    )
-  }
-  if resp.index != index || resp.subindex != subindex {
-    raise @hal.EcError::MailboxProtocol(
-      "SDO upload: index/subindex mismatch in response",
-    )
-  }
-  if resp.segmented {
-    raise @hal.EcError::MailboxProtocol(
-      "diagnosis AP path does not support segmented SDO upload yet",
-    )
-  }
-  resp.data
-}
-
-///|
-fn[N : @hal.Nic] read_error_register_ap(
-  nic : N,
-  position : UInt,
-  station : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  rmsm : @mailbox.Rmsm,
-  timeout : @hal.Duration,
-) -> Byte raise @hal.EcError {
-  let payload = sdo_upload_ap(
-    nic, position, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
-  )
-  @runtime.parse_error_register_payload(payload)
-}
-
-///|
-fn[N : @hal.Nic] read_diagnosis_counter_ap(
-  nic : N,
-  position : UInt,
-  station : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  rmsm : @mailbox.Rmsm,
-  timeout : @hal.Duration,
-) -> UInt raise @hal.EcError {
-  let payload = sdo_upload_ap(
-    nic, position, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
-  )
-  @runtime.parse_u32_payload(payload)
-}
-
-///|
-fn[N : @hal.Nic] read_slave_diagnosis_ap(
-  nic : N,
-  position : UInt,
-  station : UInt,
-  mb_config : @mailbox.MailboxConfig,
-  rmsm : @mailbox.Rmsm,
-  timeout : @hal.Duration,
-) -> @runtime.SlaveDiagnosis raise @hal.EcError {
-  let err = read_error_register_ap(
-    nic, position, station, mb_config, rmsm, timeout,
-  )
-  let diag = Some(
-    read_diagnosis_counter_ap(nic, position, station, mb_config, rmsm, timeout),
-  ) catch {
-    _ => None
-  }
-  { station_address: station, error_register: err, diagnosis_counter: diag }
 }
 
 ///|

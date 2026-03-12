@@ -14,9 +14,15 @@ pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_diagnosis_counter_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_error_register(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_error_register_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
 pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 

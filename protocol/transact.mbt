@@ -21,7 +21,12 @@ pub fn[N : @hal.Nic] transact(
       Err(err) if should_ignore_rx_decode_error(err) => {
         ignored = ignored + 1
         if ignored > max_ignored_rx_frames {
-          raise err
+          raise @hal.EcError::Internal(
+            "timeout at transact.recv: ignored " +
+            max_ignored_rx_frames.to_string() +
+            " invalid frames; last error=" +
+            err.to_string(),
+          )
         }
       }
       Err(err) => raise err
@@ -33,7 +38,9 @@ pub fn[N : @hal.Nic] transact(
 fn should_ignore_rx_decode_error(err : @hal.EcError) -> Bool {
   match err {
     @hal.EcError::InvalidFrame(message) =>
-      message.contains("wrong ethertype") || message.contains("wrong ecat type")
+      message.contains("frame too short") ||
+      message.contains("wrong ethertype") ||
+      message.contains("wrong ecat type")
     _ => false
   }
 }

@@ -94,6 +94,44 @@ pub fn[N : @hal.Nic] sdo_upload(
 }
 
 ///|
+/// Execute an SDO Upload using auto-increment mailbox transport.
+pub fn[N : @hal.Nic] sdo_upload_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let counter = rmsm.begin_transaction()
+  let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
+  let frame = txn.encode()
+  mailbox_send_ap(nic, position, mb_config, frame, timeout)
+  let response_raw = mailbox_recv_ap(nic, position, mb_config, timeout)
+  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+  let _ = rmsm.validate_response(mbh.counter)
+  if resp.command != @mailbox.SdoCommand::UploadResponse {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO upload: expected UploadResponse, got " + resp.command.to_string(),
+    )
+  }
+  if resp.index != index || resp.subindex != subindex {
+    raise @hal.EcError::MailboxProtocol(
+      "SDO upload: index/subindex mismatch in response",
+    )
+  }
+  if not(resp.segmented) {
+    return resp.data
+  }
+
+  sdo_upload_collect_segmented_ap(
+    nic, position, station, mb_config, rmsm, timeout, resp, "SDO upload",
+  )
+}
+
+///|
 /// Execute an SDO Download with RMSM retry support.
 /// Retries on MailboxTimeout up to RMSM's max_retries limit.
 pub fn[N : @hal.Nic] sdo_download_retry(
@@ -163,6 +201,42 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
       nic, station, mb_config, rmsm, index, subindex, timeout,
     )
     match result {
+      Ok(data) => return data
+      Err(@hal.EcError::MailboxTimeout) => continue
+      Err(e) => raise e
+    }
+  }
+}
+
+///|
+/// Execute an SDO Upload with RMSM retry support using auto-increment transport.
+pub fn[N : @hal.Nic] sdo_upload_retry_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let result = try? sdo_upload_ap(
+    nic, position, station, mb_config, rmsm, index, subindex, timeout,
+  )
+  match result {
+    Ok(data) => return data
+    Err(@hal.EcError::MailboxTimeout) => ()
+    Err(e) => raise e
+  }
+  for ;; {
+    if not(rmsm.record_timeout()) {
+      raise @hal.EcError::MailboxTimeout
+    }
+    rmsm.reset()
+    let retry = try? sdo_upload_ap(
+      nic, position, station, mb_config, rmsm, index, subindex, timeout,
+    )
+    match retry {
       Ok(data) => return data
       Err(@hal.EcError::MailboxTimeout) => continue
       Err(e) => raise e
@@ -326,6 +400,66 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
     )
     mailbox_send(nic, station, mb_config, seg_req, timeout)
     let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
+    let _ = rmsm.validate_response(seg_mbh.counter)
+    if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
+      not(seg_resp.segmented) {
+      raise @hal.EcError::MailboxProtocol(
+        context + ": expected segmented UploadResponse",
+      )
+    }
+    if seg_resp.toggle != toggle {
+      raise @hal.EcError::MailboxProtocol(context + ": segment toggle mismatch")
+    }
+    for b in seg_resp.data {
+      acc.write_byte(b)
+    }
+    current = seg_resp
+    toggle = not(toggle)
+  }
+
+  let out = acc.to_bytes()
+  match current.complete_size {
+    Some(sz) =>
+      if out.length() >= sz.reinterpret_as_int() {
+        Bytes::makei(sz.reinterpret_as_int(), fn(i) { out[i] })
+      } else {
+        out
+      }
+    None => out
+  }
+}
+
+///|
+fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  initial : @mailbox.SdoResponse,
+  context : String,
+) -> Bytes raise @hal.EcError {
+  let acc = @buffer.new(
+    size_hint=match initial.complete_size {
+      Some(sz) => sz.reinterpret_as_int()
+      None => 64
+    },
+  )
+  for b in initial.data {
+    acc.write_byte(b)
+  }
+
+  let mut current = initial
+  let mut toggle = false
+  while not(current.last_segment) {
+    let seg_counter = rmsm.begin_transaction()
+    let seg_req = @mailbox.build_sdo_upload_segment_request(
+      seg_counter, station, toggle,
+    )
+    mailbox_send_ap(nic, position, mb_config, seg_req, timeout)
+    let seg_raw = mailbox_recv_ap(nic, position, mb_config, timeout)
     let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
     let _ = rmsm.validate_response(seg_mbh.counter)
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||

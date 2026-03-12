@@ -43,6 +43,23 @@ pub fn[N : @hal.Nic] mailbox_poll(
 }
 
 ///|
+/// Poll a slave's input mailbox using auto-increment addressing.
+/// Returns true if the mailbox contains data ready to be read.
+pub fn[N : @hal.Nic] mailbox_poll_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  timeout : @hal.Duration,
+) -> Bool raise @hal.EcError {
+  let status_addr = sm_status_address(mb_config.in_sm_index)
+  let pdu = read_register_ap(nic, position, status_addr, 1, timeout)
+  if pdu.data.length() < 1 {
+    return false
+  }
+  (pdu.data[0] & mb_status_bit) != b'\x00'
+}
+
+///|
 /// Send a mailbox frame to a slave by writing to the SM Output address range.
 /// This function:
 /// 1. Checks that the data fits in the slave's mailbox.
@@ -82,6 +99,40 @@ pub fn[N : @hal.Nic] mailbox_send(
 }
 
 ///|
+/// Send a mailbox frame to a slave using auto-increment addressing.
+pub fn[N : @hal.Nic] mailbox_send_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let out_size = mb_config.out_size.reinterpret_as_int()
+  if data.length() > out_size {
+    raise @hal.EcError::MailboxProtocol(
+      "mailbox data too large: " +
+      data.length().to_string() +
+      " > " +
+      out_size.to_string(),
+    )
+  }
+  let padded = Bytes::makei(out_size, fn(i) {
+    if i < data.length() {
+      data[i]
+    } else {
+      b'\x00'
+    }
+  })
+  let _ = write_register_ap(
+    nic,
+    position,
+    mb_config.out_address,
+    padded,
+    timeout,
+  )
+}
+
+///|
 /// Receive a mailbox frame from a slave by reading the SM Input address range.
 /// This function:
 /// 1. Polls the SM In status until data is available (up to max_polls attempts).
@@ -113,6 +164,31 @@ pub fn[N : @hal.Nic] mailbox_recv(
 }
 
 ///|
+/// Receive a mailbox frame from a slave using auto-increment addressing.
+pub fn[N : @hal.Nic] mailbox_recv_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  timeout : @hal.Duration,
+  max_polls? : Int = default_max_polls,
+) -> Bytes raise @hal.EcError {
+  for _attempt = 0; _attempt < max_polls; _attempt = _attempt + 1 {
+    let ready = mailbox_poll_ap(nic, position, mb_config, timeout)
+    if ready {
+      let pdu = read_register_ap(
+        nic,
+        position,
+        mb_config.in_address,
+        mb_config.in_size.reinterpret_as_int(),
+        timeout,
+      )
+      return pdu.data
+    }
+  }
+  raise @hal.EcError::MailboxTimeout
+}
+
+///|
 /// Send a mailbox frame and wait for the response.
 /// Combines mailbox_send + mailbox_recv into a single round-trip.
 pub fn[N : @hal.Nic] mailbox_exchange(
@@ -124,4 +200,17 @@ pub fn[N : @hal.Nic] mailbox_exchange(
 ) -> Bytes raise @hal.EcError {
   mailbox_send(nic, station, mb_config, data, timeout)
   mailbox_recv(nic, station, mb_config, timeout)
+}
+
+///|
+/// Send a mailbox frame and wait for the response using auto-increment addressing.
+pub fn[N : @hal.Nic] mailbox_exchange_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  mailbox_send_ap(nic, position, mb_config, data, timeout)
+  mailbox_recv_ap(nic, position, mb_config, timeout)
 }

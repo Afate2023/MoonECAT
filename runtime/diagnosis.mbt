@@ -44,8 +44,11 @@ pub fn[N : @hal.Nic] read_error_register(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
-  let payload = @protocol.sdo_upload_retry(
-    nic, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
+  let payload = diagnosis_timeout_step(
+    try? @protocol.sdo_upload_retry(
+      nic, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
+    ),
+    "CoE 0x1001:0 upload",
   )
   parse_error_register_payload(payload)
 }
@@ -60,8 +63,49 @@ pub fn[N : @hal.Nic] read_diagnosis_counter(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> UInt raise @hal.EcError {
-  let payload = @protocol.sdo_upload_retry(
-    nic, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
+  let payload = diagnosis_timeout_step(
+    try? @protocol.sdo_upload_retry(
+      nic, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
+    ),
+    "CoE 0x10F3:0 upload",
+  )
+  parse_u32_payload(payload)
+}
+
+///|
+/// Read Error Register (0x1001:0) from one slave via AP mailbox transport.
+pub fn[N : @hal.Nic] read_error_register_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> Byte raise @hal.EcError {
+  let payload = diagnosis_timeout_step(
+    try? @protocol.sdo_upload_retry_ap(
+      nic, position, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
+    ),
+    "AP CoE 0x1001:0 upload",
+  )
+  parse_error_register_payload(payload)
+}
+
+///|
+/// Read diagnosis object counter (0x10F3:0) via AP mailbox transport.
+pub fn[N : @hal.Nic] read_diagnosis_counter_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let payload = diagnosis_timeout_step(
+    try? @protocol.sdo_upload_retry_ap(
+      nic, position, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
+    ),
+    "AP CoE 0x10F3:0 upload",
   )
   parse_u32_payload(payload)
 }
@@ -83,4 +127,44 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(
     _ => None
   }
   { station_address: station, error_register: err, diagnosis_counter: diag }
+}
+
+///|
+/// Read a diagnosis snapshot for one slave via AP mailbox transport.
+pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> SlaveDiagnosis raise @hal.EcError {
+  let err = read_error_register_ap(
+    nic, position, station, mb_config, rmsm, timeout,
+  )
+  let diag = Some(
+    read_diagnosis_counter_ap(nic, position, station, mb_config, rmsm, timeout),
+  ) catch {
+    _ => None
+  }
+  { station_address: station, error_register: err, diagnosis_counter: diag }
+}
+
+///|
+fn[T] diagnosis_timeout_step(
+  result : Result[T, Error],
+  stage : String,
+) -> T raise @hal.EcError {
+  match result {
+    Ok(value) => value
+    Err(@hal.EcError::RecvTimeout) =>
+      raise @hal.EcError::Internal("timeout at " + stage + " (RecvTimeout)")
+    Err(@hal.EcError::MailboxTimeout) =>
+      raise @hal.EcError::Internal(
+        "timeout at " + stage + " (MailboxTimeout)",
+      )
+    Err(@hal.EcError::Internal(message)) if message.contains("timeout at ") =>
+      raise @hal.EcError::Internal(stage + " -> " + message)
+    Err(err) => raise @hal.EcError::Internal(err.to_string())
+  }
 }
