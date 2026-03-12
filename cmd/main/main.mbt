@@ -411,52 +411,32 @@ fn[N : @hal.Nic] run_diagnosis_command(
   )
   let station = target_slave.station_address
   let position = target_slave.position.reinterpret_as_uint()
-  let original_state_result : Result[@protocol.EsmState, Error] = try? diagnosis_stage(
-    try? @protocol.read_al_status_ap(nic, position, timeout),
-    "diagnosis.read_al_status_ap",
+  let diagnosis_session = diagnosis_stage(
+    try? @runtime.prepare_slave_diagnosis_ap(nic, position, station, timeout),
+    "diagnosis.prepare",
   )
-  let original_state = match original_state_result {
-    Ok(state) => state
-    Err(_) => @protocol.Init
-  }
-  let eeprom = diagnosis_stage(
-    try? @protocol.eeprom_read_ap(nic, position, 0U, 15, timeout),
-    "diagnosis.eeprom_read_ap",
-  )
-  let sii = @mailbox.parse_sii_header(eeprom)
-  let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
-  if not(mailbox_config.is_valid()) {
-    nic.close()
-    raise @hal.EcError::ConfigMismatch(
-      "diagnosis requires mailbox-capable slave at station " +
-      station.to_string(),
-    )
-  }
   let diagnosis_rmsm = @mailbox.Rmsm::new(max_retries=0)
-  if original_state != @protocol.PreOp {
-    ignore(
-      diagnosis_stage(
-        try? @protocol.request_state_ap(nic, position, @protocol.PreOp, timeout),
-        "diagnosis.request_preop_ap",
-      ),
-    )
-  }
   let report = diagnosis_stage(
     try? @runtime.read_slave_diagnosis_ap(
       nic,
       position,
       station,
-      mailbox_config,
+      diagnosis_session.mailbox_config,
       diagnosis_rmsm,
       timeout,
     ),
     "diagnosis.read_slave_diagnosis_ap",
   )
-  if original_state != @protocol.PreOp {
+  if diagnosis_session.original_state != @protocol.PreOp {
     ignore(
       diagnosis_stage(
-        try? @protocol.request_state_ap(nic, position, original_state, timeout),
-        "diagnosis.restore_original_state_ap",
+        try? @runtime.restore_slave_diagnosis_state(
+          nic,
+          station,
+          diagnosis_session.original_state,
+          timeout,
+        ),
+        "diagnosis.restore",
       ) catch {
         _ => @protocol.PreOp
       },
@@ -618,9 +598,7 @@ fn[T] diagnosis_stage(
     Err(@hal.EcError::RecvTimeout) =>
       raise @hal.EcError::Internal("timeout at " + stage + " (RecvTimeout)")
     Err(@hal.EcError::MailboxTimeout) =>
-      raise @hal.EcError::Internal(
-        "timeout at " + stage + " (MailboxTimeout)",
-      )
+      raise @hal.EcError::Internal("timeout at " + stage + " (MailboxTimeout)")
     Err(@hal.EcError::Internal(message)) if message.contains("timeout at ") =>
       raise @hal.EcError::Internal(stage + " -> " + message)
     Err(err) => raise @hal.EcError::Internal(err.to_string())
