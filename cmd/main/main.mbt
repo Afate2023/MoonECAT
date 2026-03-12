@@ -511,7 +511,7 @@ struct OdBrowseQuery {
 
 ///|
 struct OdBrowseReport {
-  station_address : UInt
+  station_address : UInt?
   mode : String
   list_type : UInt
   index : UInt?
@@ -519,6 +519,9 @@ struct OdBrowseReport {
   indices : Array[UInt]?
   object_description : @mailbox.SdoInfoObjectDescription?
   entry_description : @mailbox.SdoInfoEntryDescription?
+  error_category : String?
+  error_detail : String?
+  abort_code : UInt?
 }
 
 ///|
@@ -539,21 +542,44 @@ fn[N : @hal.Nic] run_od_command(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let query = resolve_od_query(args)
-  let scan_report = diagnosis_stage(try? @runtime.scan(nic, timeout), "od.scan")
+  let report_result : Result[OdBrowseReport, @hal.EcError] = try? compute_od_report(
+    nic, args, query, timeout,
+  )
+  nic.close()
+  let report = match report_result {
+    Ok(value) => value
+    Err(err) =>
+      od_failure_report(optional_uint_flag(args, "--station"), query, err)
+  }
+  if as_json {
+    println(od_report_json(report).stringify(indent=2))
+  } else {
+    println(od_report_text(report))
+  }
+}
+
+///|
+fn[N : @hal.Nic] compute_od_report(
+  nic : N,
+  args : Array[String],
+  query : OdBrowseQuery,
+  timeout : @hal.Duration,
+) -> OdBrowseReport raise @hal.EcError {
+  let scan_report = od_stage(try? @runtime.scan(nic, timeout), "od.scan")
   let target_slave = resolve_cli_slave(
     scan_report,
     optional_uint_flag(args, "--station"),
   )
   let station = target_slave.station_address
   let position = target_slave.position.reinterpret_as_uint()
-  let mailbox_session = diagnosis_stage(
+  let mailbox_session = od_stage(
     try? @runtime.prepare_slave_mailbox_ap(nic, position, station, timeout),
     "od.prepare",
   )
   let browse_rmsm = @mailbox.Rmsm::new(max_retries=0)
   let report = match (query.index, query.subindex) {
     (None, _) => {
-      let indices = diagnosis_stage(
+      let indices = od_stage(
         try? @protocol.sdo_info_get_od_list(
           nic,
           station,
@@ -565,7 +591,7 @@ fn[N : @hal.Nic] run_od_command(
         "od.get_od_list",
       )
       {
-        station_address: station,
+        station_address: Some(station),
         mode: "od-list",
         list_type: query.list_type,
         index: None,
@@ -573,10 +599,13 @@ fn[N : @hal.Nic] run_od_command(
         indices: Some(indices),
         object_description: None,
         entry_description: None,
+        error_category: None,
+        error_detail: None,
+        abort_code: None,
       }
     }
     (Some(index), None) => {
-      let description = diagnosis_stage(
+      let description = od_stage(
         try? @protocol.sdo_info_get_od_description(
           nic,
           station,
@@ -588,7 +617,7 @@ fn[N : @hal.Nic] run_od_command(
         "od.get_od_description",
       )
       {
-        station_address: station,
+        station_address: Some(station),
         mode: "od-object",
         list_type: query.list_type,
         index: Some(index),
@@ -596,10 +625,13 @@ fn[N : @hal.Nic] run_od_command(
         indices: None,
         object_description: Some(description),
         entry_description: None,
+        error_category: None,
+        error_detail: None,
+        abort_code: None,
       }
     }
     (Some(index), Some(subindex)) => {
-      let description = diagnosis_stage(
+      let description = od_stage(
         try? @protocol.sdo_info_get_oe_description(
           nic,
           station,
@@ -613,7 +645,7 @@ fn[N : @hal.Nic] run_od_command(
         "od.get_oe_description",
       )
       {
-        station_address: station,
+        station_address: Some(station),
         mode: "od-entry",
         list_type: query.list_type,
         index: Some(index),
@@ -621,12 +653,15 @@ fn[N : @hal.Nic] run_od_command(
         indices: None,
         object_description: None,
         entry_description: Some(description),
+        error_category: None,
+        error_detail: None,
+        abort_code: None,
       }
     }
   }
   if mailbox_session.original_state != @protocol.PreOp {
     ignore(
-      diagnosis_stage(
+      od_stage(
         try? @runtime.restore_slave_mailbox_state(
           nic,
           station,
@@ -639,12 +674,7 @@ fn[N : @hal.Nic] run_od_command(
       },
     )
   }
-  nic.close()
-  if as_json {
-    println(od_report_json(report).stringify(indent=2))
-  } else {
-    println(od_report_text(report))
-  }
+  report
 }
 
 ///|
@@ -799,6 +829,39 @@ fn[T] diagnosis_stage(
     Err(@hal.EcError::Internal(message)) if message.contains("timeout at ") =>
       raise @hal.EcError::Internal(stage + " -> " + message)
     Err(err) => raise @hal.EcError::Internal(err.to_string())
+  }
+}
+
+///|
+fn[T] od_stage(
+  result : Result[T, @hal.EcError],
+  stage : String,
+) -> T raise @hal.EcError {
+  match result {
+    Ok(value) => value
+    Err(@hal.EcError::SendFailed(message)) =>
+      raise @hal.EcError::SendFailed(stage + " -> " + message)
+    Err(@hal.EcError::RecvFailed(message)) =>
+      raise @hal.EcError::RecvFailed(stage + " -> " + message)
+    Err(@hal.EcError::InvalidFrame(message)) =>
+      raise @hal.EcError::InvalidFrame(stage + " -> " + message)
+    Err(@hal.EcError::InvalidPdu(message)) =>
+      raise @hal.EcError::InvalidPdu(stage + " -> " + message)
+    Err(@hal.EcError::EsmStateError(message)) =>
+      raise @hal.EcError::EsmStateError(stage + " -> " + message)
+    Err(@hal.EcError::MailboxProtocol(message)) =>
+      raise @hal.EcError::MailboxProtocol(stage + " -> " + message)
+    Err(@hal.EcError::SiiReadFailed(message)) =>
+      raise @hal.EcError::SiiReadFailed(stage + " -> " + message)
+    Err(@hal.EcError::EsiParseFailed(message)) =>
+      raise @hal.EcError::EsiParseFailed(stage + " -> " + message)
+    Err(@hal.EcError::ConfigMismatch(message)) =>
+      raise @hal.EcError::ConfigMismatch(stage + " -> " + message)
+    Err(@hal.EcError::NotSupported(message)) =>
+      raise @hal.EcError::NotSupported(stage + " -> " + message)
+    Err(@hal.EcError::Internal(message)) =>
+      raise @hal.EcError::Internal(stage + " -> " + message)
+    Err(err) => raise err
   }
 }
 
@@ -1001,7 +1064,10 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
 ///|
 fn od_report_json(report : OdBrowseReport) -> Json {
   Json::object({
-    "station": Json::number(report.station_address.to_double()),
+    "station": match report.station_address {
+      Some(station) => Json::number(station.to_double())
+      None => Json::null()
+    },
     "mode": Json::string(report.mode),
     "list_type": Json::number(report.list_type.to_double()),
     "index": match report.index {
@@ -1047,6 +1113,21 @@ fn od_report_json(report : OdBrowseReport) -> Json {
         })
       None => Json::null()
     },
+    "error": match report.error_category {
+      Some(category) =>
+        Json::object({
+          "category": Json::string(category),
+          "detail": match report.error_detail {
+            Some(detail) => Json::string(detail)
+            None => Json::null()
+          },
+          "abort_code": match report.abort_code {
+            Some(code) => Json::number(code.to_double())
+            None => Json::null()
+          },
+        })
+      None => Json::null()
+    },
   })
 }
 
@@ -1055,8 +1136,27 @@ fn od_report_text(report : OdBrowseReport) -> String {
   let buf = @buffer.new(size_hint=256)
   buf.write_string("EtherCAT Object Dictionary\n")
   buf.write_string("==========================\n")
-  buf.write_string("Station: " + report.station_address.to_string() + "\n")
+  let station_text = match report.station_address {
+    Some(station) => station.to_string()
+    None => "unknown"
+  }
+  buf.write_string("Station: " + station_text + "\n")
   buf.write_string("Mode: " + report.mode + "\n")
+  match report.error_category {
+    Some(category) => {
+      buf.write_string("Error Category: " + category + "\n")
+      match report.abort_code {
+        Some(code) =>
+          buf.write_string("Abort Code: " + format_hex(code, 8) + "\n")
+        None => ()
+      }
+      match report.error_detail {
+        Some(detail) => buf.write_string("Error Detail: " + detail + "\n")
+        None => ()
+      }
+    }
+    None => ()
+  }
   match report.indices {
     Some(indices) => {
       buf.write_string("List Type: " + report.list_type.to_string() + "\n")
@@ -1106,6 +1206,57 @@ fn od_report_text(report : OdBrowseReport) -> String {
     None => ()
   }
   buf.to_string()
+}
+
+///|
+fn od_failure_report(
+  station : UInt?,
+  query : OdBrowseQuery,
+  err : @hal.EcError,
+) -> OdBrowseReport {
+  {
+    station_address: station,
+    mode: od_mode_from_query(query),
+    list_type: query.list_type,
+    index: query.index,
+    subindex: query.subindex,
+    indices: None,
+    object_description: None,
+    entry_description: None,
+    error_category: Some(od_error_category(err)),
+    error_detail: Some(err.to_string()),
+    abort_code: match err {
+      @hal.EcError::SdoAbort(code) => Some(code)
+      _ => None
+    },
+  }
+}
+
+///|
+fn od_mode_from_query(query : OdBrowseQuery) -> String {
+  match (query.index, query.subindex) {
+    (None, _) => "od-list"
+    (Some(_), None) => "od-object"
+    (Some(_), Some(_)) => "od-entry"
+  }
+}
+
+///|
+fn od_error_category(err : @hal.EcError) -> String {
+  match err {
+    @hal.EcError::LinkDown => "transport-failure"
+    @hal.EcError::SendFailed(_) => "transport-failure"
+    @hal.EcError::RecvTimeout => "transport-failure"
+    @hal.EcError::RecvFailed(_) => "transport-failure"
+    @hal.EcError::MailboxTimeout => "transport-failure"
+    @hal.EcError::InvalidFrame(_) => "protocol-failure"
+    @hal.EcError::InvalidPdu(_) => "protocol-failure"
+    @hal.EcError::UnexpectedWkc(..) => "protocol-failure"
+    @hal.EcError::MailboxProtocol(_) => "protocol-failure"
+    @hal.EcError::SdoAbort(_) => "protocol-failure"
+    @hal.EcError::NotSupported(_) => "unsupported"
+    _ => "command-failure"
+  }
 }
 
 ///|

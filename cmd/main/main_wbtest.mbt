@@ -308,7 +308,7 @@ test "cli diagnosis report text includes AL snapshot fields" {
 ///|
 test "cli od report json includes list indices" {
   let json = od_report_json({
-    station_address: 0x1001U,
+    station_address: Some(0x1001U),
     mode: "od-list",
     list_type: 0U,
     index: None,
@@ -316,18 +316,22 @@ test "cli od report json includes list indices" {
     indices: Some([0x1000U, 0x1C13U]),
     object_description: None,
     entry_description: None,
+    error_category: None,
+    error_detail: None,
+    abort_code: None,
   })
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"mode\": \"od-list\""))
   assert_true(text.contains("\"indices\""))
   assert_true(text.contains("4096"))
   assert_true(text.contains("7187"))
+  assert_true(text.contains("\"error\": null"))
 }
 
 ///|
 test "cli od report text includes object description fields" {
   let text = od_report_text({
-    station_address: 0x1001U,
+    station_address: Some(0x1001U),
     mode: "od-object",
     list_type: 0U,
     index: Some(0x1C13U),
@@ -341,6 +345,9 @@ test "cli od report text includes object description fields" {
       name: "MapPDO",
     }),
     entry_description: None,
+    error_category: None,
+    error_detail: None,
+    abort_code: None,
   })
   assert_true(text.contains("Mode: od-object"))
   assert_true(text.contains("Index: 0x1C13"))
@@ -351,7 +358,7 @@ test "cli od report text includes object description fields" {
 ///|
 test "cli od report text includes entry description fields" {
   let text = od_report_text({
-    station_address: 0x1001U,
+    station_address: Some(0x1001U),
     mode: "od-entry",
     list_type: 0U,
     index: Some(0x1A00U),
@@ -367,11 +374,71 @@ test "cli od report text includes entry description fields" {
       access: 0x003FU,
       name: "Entry2",
     }),
+    error_category: None,
+    error_detail: None,
+    abort_code: None,
   })
   assert_true(text.contains("Mode: od-entry"))
   assert_true(text.contains("Subindex: 2"))
   assert_true(text.contains("Bit Length: 16"))
   assert_true(text.contains("Value Info: 0x3F"))
+}
+
+///|
+test "cli od error category distinguishes major failure classes" {
+  assert_eq(
+    od_error_category(@hal.EcError::MailboxTimeout),
+    "transport-failure",
+  )
+  assert_eq(
+    od_error_category(@hal.EcError::SdoAbort(0x06020000U)),
+    "protocol-failure",
+  )
+  assert_eq(
+    od_error_category(@hal.EcError::NotSupported("od requires native")),
+    "unsupported",
+  )
+}
+
+///|
+test "cli od failure report json includes structured error" {
+  let json = od_report_json(
+    od_failure_report(
+      Some(0x1001U),
+      { list_type: 0U, index: Some(0x2000U), subindex: Some(b'\x01') },
+      @hal.EcError::SdoAbort(0x06020000U),
+    ),
+  )
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"category\": \"protocol-failure\""))
+  assert_true(text.contains("\"abort_code\": 100794368"))
+  assert_true(text.contains("\"station\": 4097"))
+}
+
+///|
+test "cli od failure text includes error summary" {
+  let text = od_report_text(
+    od_failure_report(
+      None,
+      { list_type: 0U, index: None, subindex: None },
+      @hal.EcError::MailboxTimeout,
+    ),
+  )
+  assert_true(text.contains("Station: unknown"))
+  assert_true(text.contains("Error Category: transport-failure"))
+  assert_true(text.contains("Error Detail: MailboxTimeout"))
+}
+
+///|
+test "cli od stage preserves mailbox protocol classification" {
+  let result : Result[Int, Error] = try? od_stage(
+    Err(@hal.EcError::MailboxProtocol("payload too short")),
+    "od.get_od_list",
+  )
+  guard result is Err(@hal.EcError::MailboxProtocol(message)) else {
+    fail("expected mailbox protocol error")
+  }
+  assert_true(message.contains("od.get_od_list -> payload too short"))
 }
 
 ///|
