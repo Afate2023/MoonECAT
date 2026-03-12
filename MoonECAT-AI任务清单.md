@@ -220,12 +220,14 @@
   - ✅ [protocol/discovery.mbt](protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
 - [x] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
   - ✅ [runtime/diagnosis.mbt](runtime/diagnosis.mbt): `read_error_register`/`read_diagnosis_counter`/`read_slave_diagnosis`
+  - ✅ 真实设备诊断路径已稳定：修复 FP 地址打包、ESM 轮询/告警确认、Mailbox 轮询窗口与 CoE 头地址语义，并补齐 diagnosis 专用 prepare/restore helper（commit: `9529449`）
 
 提交映射（选项 → commit）：
 - `EEPROM/SII 寄存器级读取流程` → `ff166d4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
 - `Explicit Device Identification (#303)` → `8c6070f` `feat: add explicit device identification validation`
 - `Station Alias Addressing` → `690427d` `feat: implement IRQ consumption and alias addressing path`
 - `Error Register / Diagnosis Object 接口` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
+- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
 
 ### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
 
@@ -261,6 +263,7 @@
   - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
   - ✅ `run` 已支持 `--startup-state` / `--shutdown-state`，可控制运行前后 EtherCAT 从站状态机迁移
   - ✅ `diagnosis` 已支持通过 Native 后端对指定从站读取 Error Register / Diagnosis Counter，支持 `--station` 与 JSON 输出
+  - ✅ diagnosis 的 mailbox/ESM 准备与恢复逻辑已下沉到 [runtime/diagnosis.mbt](runtime/diagnosis.mbt)，CLI 保持为薄封装；`Init -> PreOp` 归一化仅用于 diagnosis，不泛化到通用 state 命令（commit: `46592ca`）
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
   - ✅ [cmd/main/main.mbt](cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](cmd/main/main_wbtest.mbt)，代码提交：`0b374aa`
@@ -356,6 +359,8 @@
 - `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
 - `Native mailbox diagnosis CLI 入口` → `d581026` `feat(cli): add native diagnosis command`
+- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
+- `CLI diagnosis 改为 runtime session helper 薄封装` → `46592ca` `Refactor CLI diagnosis to use runtime session helpers`
 - `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
 - `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
 - `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`
