@@ -8,7 +8,9 @@ pub fn scan_entry(req : PluginRequest) -> PluginResponse {
       Json::object({
         "command": Json::string(req.command.to_wire()),
         "backend": Json::string("mock"),
-        "host_capabilities_required": encode_host_contract(required_host_contract(req.command)),
+        "host_capabilities_required": encode_host_contract(
+          required_host_contract(req.command),
+        ),
       }),
     )
   })
@@ -26,7 +28,9 @@ pub fn validate_entry(req : PluginRequest) -> PluginResponse {
       Json::object({
         "command": Json::string(req.command.to_wire()),
         "backend": Json::string("mock"),
-        "host_capabilities_required": encode_host_contract(required_host_contract(req.command)),
+        "host_capabilities_required": encode_host_contract(
+          required_host_contract(req.command),
+        ),
       }),
     )
   })
@@ -53,7 +57,9 @@ pub fn run_entry(req : PluginRequest) -> PluginResponse {
       Json::object({
         "command": Json::string(req.command.to_wire()),
         "backend": Json::string("mock"),
-        "host_capabilities_required": encode_host_contract(required_host_contract(req.command)),
+        "host_capabilities_required": encode_host_contract(
+          required_host_contract(req.command),
+        ),
       }),
     )
   })
@@ -93,7 +99,9 @@ fn error_response(req : PluginRequest, err : @hal.EcError) -> PluginResponse {
     payload: Json::object({}),
     diagnostics: Json::object({
       "command": Json::string(req.command.to_wire()),
-      "host_capabilities_required": encode_host_contract(required_host_contract(req.command)),
+      "host_capabilities_required": encode_host_contract(
+        required_host_contract(req.command),
+      ),
     }),
   }
 }

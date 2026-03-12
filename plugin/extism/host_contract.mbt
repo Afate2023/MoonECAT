@@ -12,19 +12,22 @@ pub(all) struct HostCapabilityContract {
 } derive(Eq, Show)
 
 ///|
-pub fn required_host_contract(command : PluginCommand) -> HostCapabilityContract {
+pub fn required_host_contract(
+  command : PluginCommand,
+) -> HostCapabilityContract {
   match command {
-    Scan | Validate | Run => {
-      nic_open: true,
-      nic_send: true,
-      nic_recv: true,
-      nic_close: true,
-      clock_now: true,
-      clock_sleep: true,
-      file_read: false,
-      file_write: false,
-      shared_memory: false,
-    }
+    Scan | Validate | Run =>
+      {
+        nic_open: true,
+        nic_send: true,
+        nic_recv: true,
+        nic_close: true,
+        clock_now: true,
+        clock_sleep: true,
+        file_read: false,
+        file_write: false,
+        shared_memory: false,
+      }
   }
 }
 

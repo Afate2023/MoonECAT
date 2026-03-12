@@ -8,11 +8,15 @@ import {
 // Values
 pub fn ec_error_code(@hal.EcError) -> String
 
+pub fn encode_host_contract(HostCapabilityContract) -> Json
+
 pub fn encode_request(PluginRequest) -> Json
 
 pub fn encode_response(PluginResponse) -> Json
 
 pub fn placeholder_response(PluginRequest, String, String) -> PluginResponse
+
+pub fn required_host_contract(PluginCommand) -> HostCapabilityContract
 
 pub fn run_entry(PluginRequest) -> PluginResponse
 
@@ -23,6 +27,20 @@ pub fn validate_entry(PluginRequest) -> PluginResponse
 // Errors
 
 // Types and methods
+pub(all) struct HostCapabilityContract {
+  nic_open : Bool
+  nic_send : Bool
+  nic_recv : Bool
+  nic_close : Bool
+  clock_now : Bool
+  clock_sleep : Bool
+  file_read : Bool
+  file_write : Bool
+  shared_memory : Bool
+}
+pub impl Eq for HostCapabilityContract
+pub impl Show for HostCapabilityContract
+
 pub(all) enum PluginCommand {
   Scan
   Validate
