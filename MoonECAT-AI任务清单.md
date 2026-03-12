@@ -1,6 +1,6 @@
 # MoonECAT AI 任务清单
 
-本清单基于 [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 与 [ETG.1500 Master Classes](ETG1500_V1i0i2_D_R_MasterClasses/ETG1500_V1i0i2_D_R_MasterClasses.md) 整理，用于把项目目标转成可执行任务和可追踪提交。范围保持不变：产品面为 `Library API + CLI(scan/validate/run)` 双入口，目标对齐 ETG.1500 `Class B`，`EoE/FoE/SoE/AoE/VoE` 继续排除在外。
+本清单基于 [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 与 [ETG.1500 Master Classes](ETG1500_V1i0i2_D_R_MasterClasses/ETG1500_V1i0i2_D_R_MasterClasses.md) 整理，用于把项目目标转成可执行任务和可追踪提交。其中 [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 现主要作为交付基线文档使用，不再按立项申报材料维护。产品面仍保持 `Library API + CLI(scan/validate/run)` 双入口，但总体路线已调整为“**Class B 强制项已完成，继续向 ETG.1500 Class A 工程能力演进**”。`EoE/FoE/SoE/AoE/VoE` 不再作为永久排除项，而是保留为后续 feature pack 级扩展，不阻塞当前主线。
 
 ## 0. ETG.1500 Class B 功能对照表
 
@@ -59,6 +59,81 @@
 | 1301 | Master Object Dictionary | may | ➖ | — | Class B 可选 |
 
 **Class B 强制(shall)功能覆盖率：17/17 = 100%**
+
+## 0.1 Class A 增量路线图
+
+> 来源：ETG.1500 对 Class A 的能力分层、EtherCAT_Compendium 对 Configuration Tool / ENI / 拓扑比较 / Hot Connect / 诊断分层的说明，以及 [src/SOEM-callflow-analysis.md](src/SOEM-callflow-analysis.md)、[src/gatorcat-callflow-analysis.md](src/gatorcat-callflow-analysis.md)、[src/ethercrab-callflow-analysis.md](src/ethercrab-callflow-analysis.md)、[src/CherryECAT-callflow-analysis.md](src/CherryECAT-callflow-analysis.md) 中的工程实现对照。
+
+| Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
+|---|---|---|---|
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 仅完成 online scanning | 补 ENI 导入、离线配置载入、启动时网络差异报告与配置工具数据模型 |
+| CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
+| Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
+| SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ SDO Info 库层已完成，CLI / UI 浏览尚未上浮 | 补 OD list / object description / entry description 的稳定输出模型与浏览入口 |
+| Master Object Dictionary | ETG.1500 5.15.1，Class A 更强调统一主站信息表面 | ❌ 未实现 | 设计主站对象字典、配置摘要与诊断状态汇聚模型 |
+| 拓扑变化、显式标识与 Hot Connect | EtherCAT_Compendium 对拓扑比较、Explicit Device Identification、Hot Connect group 的说明 | ⚠️ 已有显式标识读取与 4-tuple 校验 | 补拓扑差异、Hot Connect 分组、启动时更细粒度告警 |
+| Multiple Tasks / Process Image 分区 | ETG.1500 5.4.2；EtherCrab/Gatorcat 展示了更细粒度 process image 与任务切分 | ➖ 目前以单任务 Free Run 优先 | 在 Free Run/DC 基线稳定后，再设计多任务调度与 process image 切片 |
+| EoE/FoE/SoE 等 feature pack | ETG.1500 5.8~5.10；CherryECAT/SOEM 提供协议面参考 | ➖ 当前不阻塞主线 | 在 Class A 主站基线完成后，按 feature pack 独立评估与落地 |
+
+## 0.2 当前交付验收基线（2026-03-12）
+
+- `moon test` 已通过，可作为仓库级最小回归闸门。
+- Windows Npcap 路径下 `moon run cmd/main state -- --backend native-windows-npcap --if <interface>` 已成功执行，可作为 Native `state` 入口 smoke 证据。
+- Native CLI 当前至少已具备 `list-if`、`read-sii`、`state`、`diagnosis` 等交付表面；其中 `state` 的最近一次实机执行已成功。
+
+## 0.3 对象字典浏览产品化拆解
+
+> 目标不是重复实现 CoE 事务，而是把已经落仓的 `SDO Info / Complete Access / Segmented Transfer` 能力组织成稳定的 CLI / 配置工具表面。
+
+- [ ] 定义对象字典浏览统一结果对象：覆盖 `OD List`、`OD Description`、`OE Description`、错误摘要与来源从站信息。
+- [ ] 设计 CLI 入口：至少包含“列出对象索引”“查看对象描述”“查看子项描述”三类只读查询。
+- [ ] 统一输出模型：文本输出服务人工诊断，JSON 输出服务后续配置工具/网页工作台直接消费。
+- [ ] 明确与 ENI / online scan 的关联：浏览入口应能复用扫描得到的站信息与从站定位，而不是再引入一套独立寻址模型。
+- [ ] 明确失败语义：对象不存在、Mailbox 超时、Abort Code、分段中断、Complete Access 不支持等错误要进入稳定分类。
+- [ ] 建立最小验证：优先 mock / replay 覆盖输出模型，再在真实从站恢复可用后补一条 Native smoke。
+
+对象字典浏览产品化验收标准：
+
+- [ ] CLI 能稳定输出 `OD List`、单个对象描述、单个子项描述。
+- [ ] JSON 结果对象可被配置工具直接复用，不需要再次解析文本。
+- [ ] 错误输出能区分“协议失败”“传输失败”“从站不支持”三类情形。
+- [ ] 不修改既有库层 CoE 事务 public API 的语义，仅在产品面增加封装与结果组织。
+
+## 0.4 配置工具 / ENI 主线拆解
+
+> 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
+
+- [ ] 定义统一配置对象模型：同时承载 online scan 结果、ENI 导入结果、运行时校验摘要和差异列表。
+- [ ] 定义 ENI 导入最小边界：至少覆盖从站顺序、身份信息、SM/FMMU/PDO 映射摘要与必要的 mailbox/DC 配置元数据。
+- [ ] 明确 online scan 到统一配置对象的投影规则，避免“扫描结果对象”和“配置结果对象”长期分叉。
+- [ ] 设计启动比对结果：至少区分拓扑差异、身份差异、配置差异、可忽略差异四类。
+- [ ] 设计 JSON 输出模型：保证 CLI 和后续网页工作台能直接消费，不需要再从文本重建结构化差异。
+- [ ] 建立最小验证：优先夹具 / replay 覆盖 ENI 导入与比对逻辑，真实总线恢复后补 Native smoke。
+
+配置工具 / ENI 主线验收标准：
+
+- [ ] online scan 与 ENI import 能进入同一配置对象模型。
+- [ ] 启动比对结果可稳定输出“通过 / 警告 / 阻塞”三级结论与具体差异项。
+- [ ] CLI 输出同时支持人工阅读和配置工具复用。
+- [ ] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
+
+## 0.5 主站对象字典与统一诊断表面拆解
+
+> 目标是把 AL / WKC / DC / 拓扑 / 配置摘要汇聚到一个稳定结果对象，避免 CLI、库和配置工具各自维护状态解释逻辑。
+
+- [ ] 定义主站对象字典最小范围：主站状态、配置摘要、从站摘要、诊断计数器、运行态关键指标。
+- [ ] 定义统一诊断结果对象：至少覆盖 AL State / AL Code、WKC、Diagnosis History、DC 状态、拓扑/配置差异摘要。
+- [ ] 明确诊断来源分层：寄存器级、Mailbox/CoE 级、运行时遥测级三层信息如何合并。
+- [ ] 明确错误与告警等级：阻塞、降级、提示三级，避免不同入口对同一问题给出不同结论。
+- [ ] 设计 CLI / 配置工具共享输出模型：文本适合运维诊断，JSON 适合 UI 直接消费。
+- [ ] 建立最小验证：优先回放与现有 diagnosis helper 结果对齐，真实从站恢复后补 Native 诊断 smoke。
+
+主站对象字典与统一诊断表面验收标准：
+
+- [ ] 至少有一个统一结果对象能同时服务 CLI、库和配置工具。
+- [ ] 相同诊断输入在不同产品面输出同一状态结论和错误分类。
+- [ ] 现有 `diagnosis`、`state`、`validate` 中重复的状态解释逻辑可以收敛到统一模型。
+- [ ] 不把平台专属实现细节泄漏进诊断 public surface。
 
 ---
 
@@ -372,9 +447,9 @@
 
 ---
 
-## 3. Class B shall 缺口清单（按优先级排序）
+## 3. Class B shall 收口清单（已清零）
 
-> 以下为 ETG.1500 Class B 强制(shall)要求中尚未完成的核心缺口，达成后可宣称 Class B 符合。
+> 以下项目曾是 ETG.1500 Class B 强制(shall)要求中的核心缺口，现已全部收口；保留该节用于追踪“何时完成、由什么实现支撑”，不再作为当前阶段主优先级。
 
 | 优先级 | Feature ID | 缺口 | 说明 | 依赖 |
 |:---:|:---:|---|---|---|
@@ -436,6 +511,8 @@
 - [x] 完成 CoE/SDO 请求队列和状态推进。
 - [x] 完成 Mailbox Resilient Layer (RMSM)。
 - [x] 完成 Emergency Message 接收。
+- [ ] 补 ENI 导入与配置工具数据模型，使 online/offline 两条配置来源进入同一校验路径。
+- [ ] 把已完成的 SDO Info / Complete Access / segmented 能力上浮到 CLI / 配置工具表面，形成稳定的对象字典浏览输出。
 
 ### Runtime
 
@@ -444,6 +521,8 @@
 - [x] 完成 mailbox 推进、超时治理和背压控制。
 - [ ] 先在 Native 后端完成 Free Run 真实链路闭环，再逐步增强 DC 集成验证。
 - [ ] 为 Extism / WASM 路径补一套不改变语义的回放式运行编排验证。
+- [ ] 在拓扑差异、WKC 异常、AL Status/AL Code、Diagnosis History 基础上形成统一诊断汇聚模型，服务 CLI / Library / 配置工具。
+- [ ] Free Run / DC 稳定后评估 Multiple Tasks 与 process image 分区，不提前引入第二套调度语义。
 
 ### CLI/Library
 
@@ -451,6 +530,7 @@
 - [x] 完成 `scan/validate/run` 库层接口。
 - [x] 接入 CLI 实际命令。
 - [x] 统一命令输出和库层结果对象。
+- [ ] 增加面向配置工具的统一数据表面：ENI 导入结果、对象字典浏览结果、拓扑差异报告、主站对象字典视图。
 
 ### 文档与测试
 
@@ -473,6 +553,7 @@
 - [x] DC 相关能力不能阻塞 Free Run 最小可用版本。
 - [ ] 先完成 Native FFI 包脚手架，再分别落 Linux Raw Socket / Windows Npcap 绑定。
 - [ ] 先冻结 Native HAL 错误语义与句柄生命周期，再开放 CLI 在真实后端上的 smoke 验证。
+- [ ] 先冻结 ENI / online scan 的统一配置对象模型，再开放配置工具或网页工作台入口，避免形成第二套配置语义。
 - [ ] 先冻结 Extism 请求/响应信封和 host capability contract，再落共享内存优化。
 - [ ] Extism / WASM 只能包装既有库入口，不能先写插件逻辑再反推 `runtime/` 改接口。
 
@@ -532,15 +613,23 @@
 - [x] 已形成可输出结构化结果的扫描与配置原型。
 - [x] 已形成可继续拆解 issue 和 commit 的统一任务基线。
 
-## 9. 下一阶段优先级建议（剩余项）
+## 9. 主线 Backlog 与完成判定
 
-剩余高优先任务（按依赖顺序）：
+当前主线 backlog（按依赖顺序）：
 
-1. **Native 后端首版**：先以 Linux Raw Socket 打通真实网卡的 `scan/validate/run` 最小闭环，并冻结其 HAL 契约与错误语义。
-2. **Native CLI smoke 验证**：把现有 CLI 在真实后端上跑通，确认输出格式、诊断字段和 Mock 路径一致。
-3. **Extism / WASM 适配入口**：补插件导出层与 host capability 映射，保持核心协议层零感知。
-4. **Extism 共享内存数据路径**：补控制面信封与周期数据缓冲区约定，避免热路径序列化放大。
-5. **后端发布物矩阵文档**：明确 Native CLI、Native Library、Extism Plugin 的交付边界、依赖和回归入口。
+1. **配置工具 / ENI 主线**：完成 [MoonECAT-AI任务清单.md](MoonECAT-AI任务清单.md#L101) 的统一配置对象、差异报告与 ENI 导入边界。
+2. **对象字典浏览产品化**：完成 [MoonECAT-AI任务清单.md](MoonECAT-AI任务清单.md#L84) 的 CLI / JSON 浏览表面与错误分类。
+3. **主站对象字典与统一诊断表面**：完成 [MoonECAT-AI任务清单.md](MoonECAT-AI任务清单.md#L117) 的统一结果对象、分层诊断汇聚与告警等级。
+4. **拓扑变化 / Hot Connect**：把显式设备标识扩展成稳定的拓扑差异与 Hot Connect 分组能力。
+5. **Native 后端首版收口**：真实网卡恢复可用后，补齐 Native `scan/validate/run` 闭环、错误语义冻结与内存安全检查。
+6. **Extism / WASM 产品化**：在前述模型稳定后，补宿主入口、共享内存路径与最小集成回放。
+
+主线完成判定：
+
+- [ ] 0.3、0.4、0.5 三个拆解节的验收标准全部完成。
+- [ ] `scan`、`validate`、`state`、`diagnosis`、对象字典浏览与配置差异报告形成统一 CLI / JSON 输出规范。
+- [ ] Native 与 Extism 两条产品面共享同一配置对象、诊断对象和错误分类。
+- [ ] [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 中 Phase 2、Phase 3、Phase 4 的证据项全部从“进行中/未开始”更新为已完成或已验证。
 
 ## 10. 提交执行方式
 
