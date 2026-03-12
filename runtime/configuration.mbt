@@ -18,10 +18,24 @@ pub(all) struct ConfigurationSlave {
 } derive(Eq, Show)
 
 ///|
+pub(all) struct ConfigurationMailboxProtocols {
+  aoe : Bool
+  coe : Bool
+  eoe : Bool
+  foe : Bool
+  soe : Bool
+  voe : Bool
+} derive(Eq, Show)
+
+///|
 pub(all) struct ConfigurationProcessDataSummary {
   sync_manager_count : Int
+  fmmu_count : Int
   rx_pdo_count : Int
   tx_pdo_count : Int
+  mailbox_protocols : ConfigurationMailboxProtocols?
+  dc_op_mode_count : Int
+  dc_assign_activate_count : Int
 } derive(Eq, Show)
 
 ///|
@@ -42,6 +56,11 @@ pub(all) enum ConfigurationDifference {
     actual~ : @hal.SlaveIdentity?
   )
   IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+  ProcessDataSummaryMismatch(
+    position~ : Int,
+    expected~ : ConfigurationProcessDataSummary,
+    actual~ : ConfigurationProcessDataSummary
+  )
 } derive(Eq, Show)
 
 ///|
@@ -167,6 +186,21 @@ pub fn compare_configurations(
             )
             all_ok = false
           }
+        }
+
+        match (exp.process_data_summary, found.process_data_summary) {
+          (Some(expected_summary), Some(actual_summary)) =>
+            if actual_summary != expected_summary {
+              differences.push(
+                ProcessDataSummaryMismatch(
+                  position=pos,
+                  expected=expected_summary,
+                  actual=actual_summary,
+                ),
+              )
+              all_ok = false
+            }
+          _ => ()
         }
       }
       None => {

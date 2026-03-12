@@ -87,10 +87,15 @@ test "extism validate entry returns pass on mock replay" {
     "error_code": null,
     "error_message": null,
     "payload": {
+      "expected_source": "OfflineConfig",
+      "actual_source": "OnlineScan",
       "total_expected": 0,
       "total_found": 0,
       "all_ok": true,
+      "grade": "Pass",
       "result_count": 0,
+      "difference_count": 0,
+      "differences": [],
     },
     "diagnostics": {
       "command": "validate",
@@ -130,10 +135,15 @@ test "extism run entry returns replay run summary" {
     "payload": {
       "scan": { "slave_count": 0, "slaves": [] },
       "validation": {
+        "expected_source": "OfflineConfig",
+        "actual_source": "OnlineScan",
         "total_expected": 0,
         "total_found": 0,
         "all_ok": true,
+        "grade": "Pass",
         "result_count": 0,
+        "difference_count": 0,
+        "differences": [],
       },
       "cycles_requested": 10,
       "cycles_ok": 10,

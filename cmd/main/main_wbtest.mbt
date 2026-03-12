@@ -337,6 +337,7 @@ test "cli validate report json includes grade and sources" {
     total_expected: 1,
     total_found: 2,
     results: [@runtime.Ok, @runtime.Extra(position=1)],
+    differences: [@runtime.ConfigurationDifference::Extra(position=1)],
     all_ok: false,
     grade: @runtime.Warn,
   })
@@ -344,6 +345,8 @@ test "cli validate report json includes grade and sources" {
   assert_true(text.contains("\"expected_source\": \"EniImport\""))
   assert_true(text.contains("\"actual_source\": \"OnlineScan\""))
   assert_true(text.contains("\"grade\": \"Warn\""))
+  assert_true(text.contains("\"difference_count\": 1"))
+  assert_true(text.contains("\"type\": \"extra\""))
 }
 
 ///|

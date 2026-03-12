@@ -160,12 +160,125 @@ fn scan_report_json(report : @runtime.ScanReport) -> Json {
 }
 
 ///|
+fn option_uint_json(value : UInt?) -> Json {
+  match value {
+    Some(number) => Json::number(number.to_double())
+    None => Json::null()
+  }
+}
+
+///|
+fn identity_json(identity : @hal.SlaveIdentity) -> Json {
+  Json::object({
+    "vendor_id": Json::number(identity.vendor_id.to_double()),
+    "product_code": Json::number(identity.product_code.to_double()),
+    "revision": Json::number(identity.revision.to_double()),
+    "serial": Json::number(identity.serial.to_double()),
+  })
+}
+
+///|
+fn option_identity_json(value : @hal.SlaveIdentity?) -> Json {
+  match value {
+    Some(identity) => identity_json(identity)
+    None => Json::null()
+  }
+}
+
+///|
+fn mailbox_protocols_json(
+  protocols : @runtime.ConfigurationMailboxProtocols,
+) -> Json {
+  Json::object({
+    "aoe": Json::boolean(protocols.aoe),
+    "coe": Json::boolean(protocols.coe),
+    "eoe": Json::boolean(protocols.eoe),
+    "foe": Json::boolean(protocols.foe),
+    "soe": Json::boolean(protocols.soe),
+    "voe": Json::boolean(protocols.voe),
+  })
+}
+
+///|
+fn process_data_summary_json(
+  summary : @runtime.ConfigurationProcessDataSummary,
+) -> Json {
+  Json::object({
+    "sync_manager_count": Json::number(summary.sync_manager_count.to_double()),
+    "fmmu_count": Json::number(summary.fmmu_count.to_double()),
+    "rx_pdo_count": Json::number(summary.rx_pdo_count.to_double()),
+    "tx_pdo_count": Json::number(summary.tx_pdo_count.to_double()),
+    "mailbox_protocols": match summary.mailbox_protocols {
+      Some(protocols) => mailbox_protocols_json(protocols)
+      None => Json::null()
+    },
+    "dc_op_mode_count": Json::number(summary.dc_op_mode_count.to_double()),
+    "dc_assign_activate_count": Json::number(
+      summary.dc_assign_activate_count.to_double(),
+    ),
+  })
+}
+
+///|
+fn configuration_difference_json(
+  diff : @runtime.ConfigurationDifference,
+) -> Json {
+  match diff {
+    @runtime.Missing(position~) =>
+      Json::object({
+        "type": Json::string("missing"),
+        "position": Json::number(position.to_double()),
+      })
+    @runtime.Extra(position~) =>
+      Json::object({
+        "type": Json::string("extra"),
+        "position": Json::number(position.to_double()),
+      })
+    @runtime.StationAddressMismatch(position~, expected~, actual~) =>
+      Json::object({
+        "type": Json::string("station-address-mismatch"),
+        "position": Json::number(position.to_double()),
+        "expected": option_uint_json(expected),
+        "actual": option_uint_json(actual),
+      })
+    @runtime.IdentityMismatch(position~, expected~, actual~) =>
+      Json::object({
+        "type": Json::string("identity-mismatch"),
+        "position": Json::number(position.to_double()),
+        "expected": option_identity_json(expected),
+        "actual": option_identity_json(actual),
+      })
+    @runtime.IdentificationMismatch(position~, expected~, actual~) =>
+      Json::object({
+        "type": Json::string("identification-mismatch"),
+        "position": Json::number(position.to_double()),
+        "expected": option_uint_json(expected),
+        "actual": option_uint_json(actual),
+      })
+    @runtime.ProcessDataSummaryMismatch(position~, expected~, actual~) =>
+      Json::object({
+        "type": Json::string("process-data-summary-mismatch"),
+        "position": Json::number(position.to_double()),
+        "expected": process_data_summary_json(expected),
+        "actual": process_data_summary_json(actual),
+      })
+  }
+}
+
+///|
 fn validate_report_json(report : @runtime.ValidateReport) -> Json {
   Json::object({
+    "expected_source": Json::string(report.expected_source.to_string()),
+    "actual_source": Json::string(report.actual_source.to_string()),
     "total_expected": Json::number(report.total_expected.to_double()),
     "total_found": Json::number(report.total_found.to_double()),
     "all_ok": Json::boolean(report.all_ok),
+    "grade": Json::string(report.grade.to_string()),
     "result_count": Json::number(report.results.length().to_double()),
+    "difference_count": Json::number(report.differences.length().to_double()),
+    "differences": Json::array(
+      report.differences.map(fn(diff) { configuration_difference_json(diff) }),
+    ),
   })
 }
 

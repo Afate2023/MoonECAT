@@ -13,6 +13,8 @@ pub(all) enum ValidationResult {
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   /// Slave explicit identification mismatch.
   IdentificationMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
+  /// Slave process-data/config summary mismatch.
+  ProcessDataMismatch(position~ : Int)
   /// Slave not found at expected position.
   Missing(position~ : Int)
   /// Extra slave found that was not expected.
@@ -34,6 +36,7 @@ pub(all) struct ValidateReport {
   total_expected : Int
   total_found : Int
   results : Array[ValidationResult]
+  differences : Array[ConfigurationDifference]
   all_ok : Bool
   grade : ValidateGrade
 } derive(Show)
@@ -70,7 +73,7 @@ pub fn validate_configuration(
           }
           for diff in diffs {
             match diff {
-              IdentificationMismatch(..) =>
+              IdentificationMismatch(..) | ProcessDataSummaryMismatch(..) =>
                 results.push(configuration_difference_to_validation(diff))
               _ => ()
             }
@@ -91,6 +94,7 @@ pub fn validate_configuration(
     total_expected: comparison.total_expected,
     total_found: comparison.total_found,
     results,
+    differences: comparison.differences,
     all_ok: comparison.all_ok,
     grade: validation_grade_from_differences(comparison.differences),
   }
@@ -126,6 +130,8 @@ fn differences_for_position(
       IdentityMismatch(position~, ..) if position == wanted_position =>
         matches.push(diff)
       IdentificationMismatch(position~, ..) if position == wanted_position =>
+        matches.push(diff)
+      ProcessDataSummaryMismatch(position~, ..) if position == wanted_position =>
         matches.push(diff)
       _ => ()
     }
@@ -185,6 +191,7 @@ fn configuration_difference_to_validation(
         expected=option_uint_or_zero(expected),
         actual=option_uint_or_zero(actual),
       )
+    ProcessDataSummaryMismatch(position~, ..) => ProcessDataMismatch(position~)
   }
 }
 
@@ -264,6 +271,12 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
           " actual 0x" +
           actual.reinterpret_as_int().to_string() +
           "\n",
+        )
+      ProcessDataMismatch(position~) =>
+        buf.write_string(
+          "  [CONFIG-MISMATCH] Slave #" +
+          position.to_string() +
+          ": process-data summary mismatch\n",
         )
       Missing(position~) =>
         buf.write_string(

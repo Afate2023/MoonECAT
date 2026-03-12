@@ -74,9 +74,21 @@ pub(all) enum ConfigurationDifference {
   StationAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   IdentityMismatch(position~ : Int, expected~ : @hal.SlaveIdentity?, actual~ : @hal.SlaveIdentity?)
   IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+  ProcessDataSummaryMismatch(position~ : Int, expected~ : ConfigurationProcessDataSummary, actual~ : ConfigurationProcessDataSummary)
 }
 pub impl Eq for ConfigurationDifference
 pub impl Show for ConfigurationDifference
+
+pub(all) struct ConfigurationMailboxProtocols {
+  aoe : Bool
+  coe : Bool
+  eoe : Bool
+  foe : Bool
+  soe : Bool
+  voe : Bool
+}
+pub impl Eq for ConfigurationMailboxProtocols
+pub impl Show for ConfigurationMailboxProtocols
 
 pub(all) struct ConfigurationModel {
   source : ConfigurationSource
@@ -88,8 +100,12 @@ pub impl Show for ConfigurationModel
 
 pub(all) struct ConfigurationProcessDataSummary {
   sync_manager_count : Int
+  fmmu_count : Int
   rx_pdo_count : Int
   tx_pdo_count : Int
+  mailbox_protocols : ConfigurationMailboxProtocols?
+  dc_op_mode_count : Int
+  dc_assign_activate_count : Int
 }
 pub impl Eq for ConfigurationProcessDataSummary
 pub impl Show for ConfigurationProcessDataSummary
@@ -266,6 +282,7 @@ pub(all) struct ValidateReport {
   total_expected : Int
   total_found : Int
   results : Array[ValidationResult]
+  differences : Array[ConfigurationDifference]
   all_ok : Bool
   grade : ValidateGrade
 }
@@ -277,6 +294,7 @@ pub(all) enum ValidationResult {
   StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   IdentificationMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
+  ProcessDataMismatch(position~ : Int)
   Missing(position~ : Int)
   Extra(position~ : Int)
 }

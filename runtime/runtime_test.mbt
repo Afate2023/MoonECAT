@@ -1351,7 +1351,7 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     #|          <Ado>#x0134</Ado>
     #|        </Identification>
     #|        <VendorId>4739149</VendorId>
-    #|        <ProductCode>3</ProductCode>
+    #|        <ProductCode>0x3</ProductCode>
     #|        <RevisionNo>1</RevisionNo>
     #|        <SerialNo>0</SerialNo>
     #|      </Info>
@@ -1361,6 +1361,19 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     #|        <RxPdo Fixed="1" />
     #|        <TxPdo Fixed="1" />
     #|      </ProcessData>
+    #|      <Fmmu>Outputs</Fmmu>
+    #|      <Fmmu>Inputs</Fmmu>
+    #|      <Mailbox>
+    #|        <Protocol>CoE</Protocol>
+    #|      </Mailbox>
+    #|      <Dc>
+    #|        <OpMode>
+    #|          <AssignActivate>#x0300</AssignActivate>
+    #|        </OpMode>
+    #|        <OpMode>
+    #|          <AssignActivate>#x0000</AssignActivate>
+    #|        </OpMode>
+    #|      </Dc>
     #|    </Slave>
     #|    <Slave>
     #|      <Info>
@@ -1377,6 +1390,17 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     #|        <RxPdo Fixed="1" />
     #|        <RxPdo Fixed="1" />
     #|      </ProcessData>
+    #|      <Fmmu>Outputs</Fmmu>
+    #|      <Mailbox>
+    #|        <EoE />
+    #|        <CoE />
+    #|        <FoE />
+    #|      </Mailbox>
+    #|      <Dc>
+    #|        <OpMode>
+    #|          <AssignActivate>0x300</AssignActivate>
+    #|        </OpMode>
+    #|      </Dc>
     #|    </Slave>
     #|  </Config>
     #|</EtherCATConfig>
@@ -1393,7 +1417,22 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
   )
   assert_eq(
     model.slaves[0].process_data_summary,
-    Some({ sync_manager_count: 2, rx_pdo_count: 1, tx_pdo_count: 1 }),
+    Some({
+      sync_manager_count: 2,
+      fmmu_count: 2,
+      rx_pdo_count: 1,
+      tx_pdo_count: 1,
+      mailbox_protocols: Some({
+        aoe: false,
+        coe: true,
+        eoe: false,
+        foe: false,
+        soe: false,
+        voe: false,
+      }),
+      dc_op_mode_count: 2,
+      dc_assign_activate_count: 1,
+    }),
   )
   assert_eq(model.slaves[1].position, 1)
   assert_eq(model.slaves[1].configured_address, Some(1002U))
@@ -1404,7 +1443,22 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
   )
   assert_eq(
     model.slaves[1].process_data_summary,
-    Some({ sync_manager_count: 1, rx_pdo_count: 2, tx_pdo_count: 0 }),
+    Some({
+      sync_manager_count: 1,
+      fmmu_count: 1,
+      rx_pdo_count: 2,
+      tx_pdo_count: 0,
+      mailbox_protocols: Some({
+        aoe: false,
+        coe: true,
+        eoe: true,
+        foe: true,
+        soe: false,
+        voe: false,
+      }),
+      dc_op_mode_count: 1,
+      dc_assign_activate_count: 1,
+    }),
   )
 }
 
@@ -1531,6 +1585,7 @@ test "ValidateReport format shows PASS" {
     total_expected: 1,
     total_found: 1,
     results: [@runtime.Ok],
+    differences: [],
     all_ok: true,
     grade: @runtime.Pass,
   }
@@ -1547,6 +1602,7 @@ test "ValidateReport format shows FAIL with details" {
     total_expected: 2,
     total_found: 1,
     results: [@runtime.Ok, @runtime.Missing(position=1)],
+    differences: [@runtime.Missing(position=1)],
     all_ok: false,
     grade: @runtime.Block,
   }
@@ -1573,8 +1629,19 @@ test "validate_configuration grades extra-only topology as warn" {
         identification: Some(5U),
         process_data_summary: Some({
           sync_manager_count: 2,
+          fmmu_count: 1,
           rx_pdo_count: 1,
           tx_pdo_count: 1,
+          mailbox_protocols: Some({
+            aoe: false,
+            coe: true,
+            eoe: false,
+            foe: false,
+            soe: false,
+            voe: false,
+          }),
+          dc_op_mode_count: 1,
+          dc_assign_activate_count: 1,
         }),
       },
     ],
@@ -1616,6 +1683,91 @@ test "validate_configuration grades extra-only topology as warn" {
 }
 
 ///|
+test "validate_configuration emits process-data summary mismatch when both sides define it" {
+  let summary_expected : @runtime.ConfigurationProcessDataSummary = {
+    sync_manager_count: 2,
+    fmmu_count: 2,
+    rx_pdo_count: 1,
+    tx_pdo_count: 1,
+    mailbox_protocols: Some({
+      aoe: false,
+      coe: true,
+      eoe: false,
+      foe: false,
+      soe: false,
+      voe: false,
+    }),
+    dc_op_mode_count: 2,
+    dc_assign_activate_count: 1,
+  }
+  let summary_actual : @runtime.ConfigurationProcessDataSummary = {
+    sync_manager_count: 2,
+    fmmu_count: 1,
+    rx_pdo_count: 1,
+    tx_pdo_count: 1,
+    mailbox_protocols: Some({
+      aoe: false,
+      coe: true,
+      eoe: false,
+      foe: false,
+      soe: false,
+      voe: false,
+    }),
+    dc_op_mode_count: 1,
+    dc_assign_activate_count: 0,
+  }
+  let expected : @runtime.ConfigurationModel = {
+    source: @runtime.EniImport,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        identification: Some(5U),
+        process_data_summary: Some(summary_expected),
+      },
+    ],
+  }
+  let actual : @runtime.ConfigurationModel = {
+    source: @runtime.EniImport,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        identification: Some(5U),
+        process_data_summary: Some(summary_actual),
+      },
+    ],
+  }
+  let report = @runtime.validate_configuration(actual, expected)
+  assert_eq(report.grade, @runtime.Block)
+  assert_true(
+    report.differences.contains(
+      @runtime.ProcessDataSummaryMismatch(
+        position=0,
+        expected=summary_expected,
+        actual=summary_actual,
+      ),
+    ),
+  )
+  assert_eq(report.results.length(), 2)
+  assert_true(report.results[1] is @runtime.ProcessDataMismatch(position=0))
+}
+
+///|
 test "RunPhase equality" {
   assert_eq(@runtime.RunPhase::Scanning, @runtime.RunPhase::Scanning)
   assert_eq(@runtime.RunPhase::Done, @runtime.RunPhase::Done)
@@ -1632,6 +1784,7 @@ test "RunReport format with zero cycles" {
       total_expected: 0,
       total_found: 0,
       results: [],
+      differences: [],
       all_ok: true,
       grade: @runtime.Pass,
     },
@@ -1668,6 +1821,7 @@ test "RunReport format with cycles and telemetry" {
       total_expected: 2,
       total_found: 2,
       results: [],
+      differences: [],
       all_ok: true,
       grade: @runtime.Pass,
     },
