@@ -8,6 +8,12 @@ import {
 }
 
 // Values
+pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
+
+pub fn configuration_from_expected(Array[@hal.SlaveConfig]) -> ConfigurationModel
+
+pub fn configuration_from_scan(ScanReport) -> ConfigurationModel
+
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
 pub fn parse_error_register_payload(Bytes) -> Byte raise @hal.EcError
@@ -44,9 +50,57 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> Sca
 
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
+pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> ValidateReport
+
 // Errors
 
 // Types and methods
+pub(all) struct ConfigurationComparisonReport {
+  expected_source : ConfigurationSource
+  actual_source : ConfigurationSource
+  total_expected : Int
+  total_found : Int
+  differences : Array[ConfigurationDifference]
+  all_ok : Bool
+}
+pub impl Eq for ConfigurationComparisonReport
+pub impl Show for ConfigurationComparisonReport
+
+pub(all) enum ConfigurationDifference {
+  Missing(position~ : Int)
+  Extra(position~ : Int)
+  StationAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+  IdentityMismatch(position~ : Int, expected~ : @hal.SlaveIdentity?, actual~ : @hal.SlaveIdentity?)
+  IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+}
+pub impl Eq for ConfigurationDifference
+pub impl Show for ConfigurationDifference
+
+pub(all) struct ConfigurationModel {
+  source : ConfigurationSource
+  total_slaves : Int
+  slaves : Array[ConfigurationSlave]
+}
+pub impl Eq for ConfigurationModel
+pub impl Show for ConfigurationModel
+
+pub(all) struct ConfigurationSlave {
+  position : Int
+  configured_address : UInt?
+  identity : @hal.SlaveIdentity?
+  identification : UInt?
+}
+pub impl Eq for ConfigurationSlave
+pub impl Show for ConfigurationSlave
+
+pub(all) enum ConfigurationSource {
+  OnlineScan
+  OfflineConfig
+  EniImport
+}
+pub impl Eq for ConfigurationSource
+pub impl Show for ConfigurationSource
+
 pub(all) struct CycleResult {
   wkc : UInt
   expected_wkc : UInt

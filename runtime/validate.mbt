@@ -31,29 +31,148 @@ pub(all) struct ValidateReport {
 ///|
 /// Validate that a scan report matches an expected slave configuration.
 /// Each expected slave is checked by position.
-fn find_slave_at_position(
-  slaves : Array[SlaveReport],
-  position : Int,
-) -> SlaveReport? {
-  for slave in slaves {
-    if slave.position == position {
-      return Some(slave)
+fn zero_identity() -> @hal.SlaveIdentity {
+  { vendor_id: 0U, product_code: 0U, revision: 0U, serial: 0U }
+}
+
+///|
+pub fn validate_configuration(
+  actual : ConfigurationModel,
+  expected : ConfigurationModel,
+) -> ValidateReport {
+  let comparison = compare_configurations(expected, actual)
+  let results : Array[ValidationResult] = []
+  for exp in expected.slaves {
+    let position = exp.position
+    let diffs = differences_for_position(comparison.differences, position)
+    if diffs.length() == 0 {
+      results.push(Ok)
+    } else {
+      let missing_or_address = first_missing_or_address_diff(diffs)
+      match missing_or_address {
+        Some(diff) => results.push(configuration_difference_to_validation(diff))
+        None => {
+          let identity_diff = first_identity_diff(diffs)
+          match identity_diff {
+            Some(diff) =>
+              results.push(configuration_difference_to_validation(diff))
+            None => results.push(Ok)
+          }
+          for diff in diffs {
+            match diff {
+              IdentificationMismatch(..) =>
+                results.push(configuration_difference_to_validation(diff))
+              _ => ()
+            }
+          }
+        }
+      }
+    }
+  }
+  for diff in comparison.differences {
+    match diff {
+      Extra(_) => results.push(configuration_difference_to_validation(diff))
+      _ => ()
+    }
+  }
+  {
+    total_expected: comparison.total_expected,
+    total_found: comparison.total_found,
+    results,
+    all_ok: comparison.all_ok,
+  }
+}
+
+///|
+fn differences_for_position(
+  differences : Array[ConfigurationDifference],
+  wanted_position : Int,
+) -> Array[ConfigurationDifference] {
+  let matches : Array[ConfigurationDifference] = []
+  for diff in differences {
+    match diff {
+      Missing(position~) if position == wanted_position => matches.push(diff)
+      StationAddressMismatch(position~, ..) if position == wanted_position =>
+        matches.push(diff)
+      IdentityMismatch(position~, ..) if position == wanted_position =>
+        matches.push(diff)
+      IdentificationMismatch(position~, ..) if position == wanted_position =>
+        matches.push(diff)
+      _ => ()
+    }
+  }
+  matches
+}
+
+///|
+fn first_missing_or_address_diff(
+  differences : Array[ConfigurationDifference],
+) -> ConfigurationDifference? {
+  for diff in differences {
+    match diff {
+      Missing(..) | StationAddressMismatch(..) => return Some(diff)
+      _ => ()
     }
   }
   None
 }
 
 ///|
-fn has_expected_position(
-  expected : Array[@hal.SlaveConfig],
-  position : Int,
-) -> Bool {
-  for exp in expected {
-    if exp.position.reinterpret_as_int() == position {
-      return true
+fn first_identity_diff(
+  differences : Array[ConfigurationDifference],
+) -> ConfigurationDifference? {
+  for diff in differences {
+    match diff {
+      IdentityMismatch(..) => return Some(diff)
+      _ => ()
     }
   }
-  false
+  None
+}
+
+///|
+fn configuration_difference_to_validation(
+  difference : ConfigurationDifference,
+) -> ValidationResult {
+  match difference {
+    Missing(position~) => Missing(position~)
+    Extra(position~) => Extra(position~)
+    StationAddressMismatch(position~, expected~, actual~) =>
+      StationAddressMismatch(
+        position~,
+        expected=option_uint_or_zero(expected),
+        actual=option_uint_or_zero(actual),
+      )
+    IdentityMismatch(position~, expected~, actual~) => {
+      let _ = position
+      ValidationResult::IdentityMismatch(
+        expected=option_identity_or_zero(expected),
+        actual=option_identity_or_zero(actual),
+      )
+    }
+    IdentificationMismatch(position~, expected~, actual~) =>
+      IdentificationMismatch(
+        position~,
+        expected=option_uint_or_zero(expected),
+        actual=option_uint_or_zero(actual),
+      )
+  }
+}
+
+///|
+fn option_uint_or_zero(value : UInt?) -> UInt {
+  match value {
+    Some(number) => number
+    None => 0U
+  }
+}
+
+///|
+fn option_identity_or_zero(value : @hal.SlaveIdentity?) -> @hal.SlaveIdentity {
+  match value {
+    Some(identity) => identity
+    None => zero_identity()
+  }
 }
 
 ///|
@@ -62,81 +181,10 @@ pub fn validate(
   scan_report : ScanReport,
   expected : Array[@hal.SlaveConfig],
 ) -> ValidateReport {
-  let results : Array[ValidationResult] = []
-  let mut all_ok = true
-  // Check each expected slave by configured position.
-  for exp in expected {
-    let pos = exp.position.reinterpret_as_int()
-    match find_slave_at_position(scan_report.slaves, pos) {
-      Some(found) => {
-        if found.station_address != exp.configured_address {
-          results.push(
-            StationAddressMismatch(
-              position=pos,
-              expected=exp.configured_address,
-              actual=found.station_address,
-            ),
-          )
-          all_ok = false
-          continue
-        }
-        let actual_identity : @hal.SlaveIdentity = {
-          vendor_id: found.vendor_id,
-          product_code: found.product_code,
-          revision: found.revision,
-          serial: found.serial,
-        }
-        match exp.expected_identity {
-          Some(expected_id) =>
-            if actual_identity.vendor_id == expected_id.vendor_id &&
-              actual_identity.product_code == expected_id.product_code &&
-              actual_identity.revision == expected_id.revision &&
-              actual_identity.serial == expected_id.serial {
-              results.push(Ok)
-            } else {
-              results.push(
-                IdentityMismatch(expected=expected_id, actual=actual_identity),
-              )
-              all_ok = false
-            }
-          None => results.push(Ok) // No identity constraint — accept any
-        }
-        match exp.expected_identification {
-          Some(expected_id) =>
-            if found.identification != expected_id {
-              results.push(
-                IdentificationMismatch(
-                  position=pos,
-                  expected=expected_id,
-                  actual=found.identification,
-                ),
-              )
-              all_ok = false
-            }
-          None => ()
-        }
-      }
-      None => {
-        results.push(Missing(position=pos))
-        all_ok = false
-      }
-    }
-  }
-
-  // Check for extra slaves whose positions are not configured.
-  for found in scan_report.slaves {
-    if not(has_expected_position(expected, found.position)) {
-      results.push(Extra(position=found.position))
-      all_ok = false
-    }
-  }
-
-  {
-    total_expected: expected.length(),
-    total_found: scan_report.slave_count,
-    results,
-    all_ok,
-  }
+  validate_configuration(
+    configuration_from_scan(scan_report),
+    configuration_from_expected(expected),
+  )
 }
 
 ///|

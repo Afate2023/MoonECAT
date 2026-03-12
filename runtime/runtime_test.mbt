@@ -1189,6 +1189,150 @@ test "validate: empty config and empty scan" {
 }
 
 ///|
+test "configuration_from_scan projects scan into unified model" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+        identification: 0x0020U,
+      },
+    ],
+  }
+  let model = @runtime.configuration_from_scan(scan)
+  assert_eq(model.source, @runtime.OnlineScan)
+  assert_eq(model.total_slaves, 1)
+  assert_eq(model.slaves.length(), 1)
+  let slave = model.slaves[0]
+  assert_eq(slave.position, 0)
+  assert_eq(slave.configured_address, Some(0x1001U))
+  assert_eq(slave.identification, Some(0x0020U))
+  assert_eq(
+    slave.identity,
+    Some({
+      vendor_id: 0x0002U,
+      product_code: 0x04D2U,
+      revision: 0x0001U,
+      serial: 0x1234U,
+    }),
+  )
+}
+
+///|
+test "configuration_from_expected projects offline config into unified model" {
+  let expected : Array[@hal.SlaveConfig] = [
+    {
+      position: 1U,
+      expected_identity: Some({
+        vendor_id: 0x0003U,
+        product_code: 0x0064U,
+        revision: 0x0002U,
+        serial: 0x5678U,
+      }),
+      expected_identification: Some(0x0042U),
+      configured_address: 0x1002U,
+    },
+  ]
+  let model = @runtime.configuration_from_expected(expected)
+  assert_eq(model.source, @runtime.OfflineConfig)
+  assert_eq(model.total_slaves, 1)
+  let slave = model.slaves[0]
+  assert_eq(slave.position, 1)
+  assert_eq(slave.configured_address, Some(0x1002U))
+  assert_eq(slave.identification, Some(0x0042U))
+}
+
+///|
+test "compare_configurations reports topology and identity differences" {
+  let expected : @runtime.ConfigurationModel = {
+    source: @runtime.OfflineConfig,
+    total_slaves: 2,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 0x0002U,
+          product_code: 0x04D2U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        identification: Some(0x0020U),
+      },
+      {
+        position: 1,
+        configured_address: Some(0x1002U),
+        identity: Some({
+          vendor_id: 0x0003U,
+          product_code: 0x0064U,
+          revision: 0x0002U,
+          serial: 0x5678U,
+        }),
+        identification: Some(0x0042U),
+      },
+    ],
+  }
+  let actual : @runtime.ConfigurationModel = {
+    source: @runtime.OnlineScan,
+    total_slaves: 2,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 0x0002U,
+          product_code: 0x9999U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        identification: Some(0x0020U),
+      },
+      {
+        position: 2,
+        configured_address: Some(0x1003U),
+        identity: Some({
+          vendor_id: 0x0004U,
+          product_code: 0x0001U,
+          revision: 0x0001U,
+          serial: 0x9999U,
+        }),
+        identification: Some(0x0055U),
+      },
+    ],
+  }
+  let report = @runtime.compare_configurations(expected, actual)
+  assert_eq(report.all_ok, false)
+  assert_eq(report.total_expected, 2)
+  assert_eq(report.total_found, 2)
+  assert_true(
+    report.differences.contains(
+      @runtime.IdentityMismatch(
+        position=0,
+        expected=Some({
+          vendor_id: 0x0002U,
+          product_code: 0x04D2U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        actual=Some({
+          vendor_id: 0x0002U,
+          product_code: 0x9999U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+      ),
+    ),
+  )
+  assert_true(report.differences.contains(@runtime.Missing(position=1)))
+  assert_true(report.differences.contains(@runtime.Extra(position=2)))
+}
+
+///|
 test "validate: matches by position even when expected order differs" {
   let scan : @runtime.ScanReport = {
     slave_count: 2,
