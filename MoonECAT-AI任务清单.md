@@ -66,7 +66,7 @@
 
 | Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
 |---|---|---|---|
-| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 仅完成 online scanning | 补 ENI 导入、离线配置载入、启动时网络差异报告与配置工具数据模型 |
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 已新增统一配置模型骨架，online scan 与离线期望配置已进入同一比较路径；ENI import 尚未接入 | 补 ENI 导入、离线配置载入、启动时网络差异报告与配置工具数据模型 |
 | CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
 | Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
 | SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
@@ -105,12 +105,14 @@
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
-- [ ] 定义统一配置对象模型：同时承载 online scan 结果、ENI 导入结果、运行时校验摘要和差异列表。
+最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；代码提交：`27401a8` `feat(runtime): add unified configuration model`。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 [src/SOEM-callflow-analysis.md](src/SOEM-callflow-analysis.md#L865) 中 SOEM 对可选 ENI 支持的边界约束。
+
+- [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置与统一差异列表；ENI 导入投影待补。
 - [ ] 定义 ENI 导入最小边界：至少覆盖从站顺序、身份信息、SM/FMMU/PDO 映射摘要与必要的 mailbox/DC 配置元数据。
-- [ ] 明确 online scan 到统一配置对象的投影规则，避免“扫描结果对象”和“配置结果对象”长期分叉。
+- [x] 明确 online scan 到统一配置对象的投影规则，避免“扫描结果对象”和“配置结果对象”长期分叉。
 - [ ] 设计启动比对结果：至少区分拓扑差异、身份差异、配置差异、可忽略差异四类。
 - [ ] 设计 JSON 输出模型：保证 CLI 和后续网页工作台能直接消费，不需要再从文本重建结构化差异。
-- [ ] 建立最小验证：优先夹具 / replay 覆盖 ENI 导入与比对逻辑，真实总线恢复后补 Native smoke。
+- [x] 建立最小验证：当前已补 unified model / compare / validate 兼容语义测试；后续补 ENI 导入夹具与真实总线 Native smoke。
 
 配置工具 / ENI 主线验收标准：
 
