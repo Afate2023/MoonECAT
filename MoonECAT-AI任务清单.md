@@ -66,7 +66,7 @@
 
 | Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
 |---|---|---|---|
-| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ `validate --eni <path>` 已接入同一配置比较路径，并补上通过/警告/阻塞三级结论与最小 SM/PDO 摘要；FMMU、mailbox/DC 配置摘要与配置工具消费模型仍待补齐 | 继续补 FMMU/mailbox/DC 摘要、启动时网络差异细分与配置工具数据模型 |
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ `validate --eni <path>` 已接入同一配置比较路径，并补上通过/警告/阻塞三级结论、完整差异项 JSON，以及最小 `SM/FMMU/PDO + mailbox/DC` 摘要；配置工具消费模型仍待补齐 | 继续补配置工具统一视图、启动时网络差异细分与更完整 offline 配置模型 |
 | CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
 | Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
 | SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
@@ -105,20 +105,20 @@
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
-最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification 与最小 `Sm/RxPdo/TxPdo` 摘要投影到同一 `ConfigurationModel`；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已支持 `validate --eni <path>`，把 offline ENI 文件直接接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论与来源信息。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 EtherCAT.NET `EsiUtilities` 分层解析的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
+最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification，以及 `SM/FMMU/PDO + mailbox/DC` 的最小通用摘要投影到同一 `ConfigurationModel`，并兼容十进制、`#x` 与 `0x` 数值写法；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已支持 `validate --eni <path>`，把 offline ENI 文件直接接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论、来源信息和完整差异项数组；[plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 也已保持同一 JSON 结构。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 SOEM sample ENI / ESI 中 `0x` 数值、`Mailbox`、`Dc`、`Fmmu` 结构的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
 
 - [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置、最小 ENI 导入结果与统一差异列表。
-- [x] 定义 ENI 导入最小边界：当前已覆盖从站顺序、站地址、身份信息、Identification 与最小 `SM/RxPDO/TxPDO` 摘要；FMMU 与 mailbox/DC 配置元数据待补。
+- [x] 定义 ENI 导入最小边界：当前已覆盖从站顺序、站地址、身份信息、Identification，以及最小 `SM/FMMU/RxPDO/TxPDO + mailbox/DC` 摘要。
 - [x] 明确 online scan 到统一配置对象的投影规则，避免“扫描结果对象”和“配置结果对象”长期分叉。
 - [x] 设计启动比对结果：当前已提供 `Pass/Warn/Block` 三级结论，其中 `Extra` 归入 `Warn`，缺失/身份/地址/Identification 差异归入 `Block`；后续继续细化到拓扑差异、身份差异、配置差异、可忽略差异。
-- [x] 设计 JSON 输出模型：当前 `validate` JSON 已输出 `expected_source` / `actual_source` / `grade` / totals，后续再补完整差异列表供配置工具直接消费。
+- [x] 设计 JSON 输出模型：当前 `validate` JSON 已输出 `expected_source` / `actual_source` / `grade` / totals 与完整 `differences[]`，CLI 与 Extism 可直接供配置工具消费。
 - [x] 建立最小验证：当前已补 unified model / compare / validate 兼容语义测试，并新增 ENI 导入夹具的成功/失败用例；后续补真实总线 Native smoke。
 
 配置工具 / ENI 主线验收标准：
 
 - [x] online scan 与 ENI import 能进入同一配置对象模型。
-- [ ] 启动比对结果可稳定输出“通过 / 警告 / 阻塞”三级结论与完整具体差异项。
-- [x] CLI 输出同时支持人工阅读和配置工具复用的最小结构化摘要；完整差异项列表后续继续补齐。
+- [x] 启动比对结果可稳定输出“通过 / 警告 / 阻塞”三级结论与完整具体差异项。
+- [x] CLI 输出同时支持人工阅读和配置工具复用；Extism 返回结构与 CLI 对齐。
 - [ ] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
 
 ## 0.5 主站对象字典与统一诊断表面拆解
