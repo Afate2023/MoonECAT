@@ -14,6 +14,14 @@ pub(all) struct ConfigurationSlave {
   configured_address : UInt?
   identity : @hal.SlaveIdentity?
   identification : UInt?
+  process_data_summary : ConfigurationProcessDataSummary?
+} derive(Eq, Show)
+
+///|
+pub(all) struct ConfigurationProcessDataSummary {
+  sync_manager_count : Int
+  rx_pdo_count : Int
+  tx_pdo_count : Int
 } derive(Eq, Show)
 
 ///|
@@ -62,6 +70,7 @@ pub fn configuration_from_scan(scan_report : ScanReport) -> ConfigurationModel {
           serial: slave.serial,
         }),
         identification: Some(slave.identification),
+        process_data_summary: None,
       }
     }),
   }
@@ -80,6 +89,7 @@ pub fn configuration_from_expected(
         configured_address: Some(slave.configured_address),
         identity: slave.expected_identity,
         identification: slave.expected_identification,
+        process_data_summary: None,
       }
     }),
   }

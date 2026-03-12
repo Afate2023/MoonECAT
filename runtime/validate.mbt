@@ -20,12 +20,22 @@ pub(all) enum ValidationResult {
 } derive(Show)
 
 ///|
+pub(all) enum ValidateGrade {
+  Pass
+  Warn
+  Block
+} derive(Eq, Show)
+
+///|
 /// ValidateReport holds the full validation result.
 pub(all) struct ValidateReport {
+  expected_source : ConfigurationSource
+  actual_source : ConfigurationSource
   total_expected : Int
   total_found : Int
   results : Array[ValidationResult]
   all_ok : Bool
+  grade : ValidateGrade
 } derive(Show)
 
 ///|
@@ -76,11 +86,30 @@ pub fn validate_configuration(
     }
   }
   {
+    expected_source: comparison.expected_source,
+    actual_source: comparison.actual_source,
     total_expected: comparison.total_expected,
     total_found: comparison.total_found,
     results,
     all_ok: comparison.all_ok,
+    grade: validation_grade_from_differences(comparison.differences),
   }
+}
+
+///|
+fn validation_grade_from_differences(
+  differences : Array[ConfigurationDifference],
+) -> ValidateGrade {
+  if differences.length() == 0 {
+    return Pass
+  }
+  for diff in differences {
+    match diff {
+      Extra(..) => ()
+      _ => return Block
+    }
+  }
+  Warn
 }
 
 ///|
@@ -188,16 +217,27 @@ pub fn validate(
 }
 
 ///|
+fn validate_grade_label(grade : ValidateGrade) -> String {
+  match grade {
+    Pass => "PASS"
+    Warn => "WARN"
+    Block => "BLOCK"
+  }
+}
+
+///|
 /// Format a ValidateReport as a human-readable string.
 pub fn ValidateReport::format(self : ValidateReport) -> String {
   let buf = @buffer.new(size_hint=256)
   buf.write_string("EtherCAT Validation Report\n")
   buf.write_string("==========================\n")
+  buf.write_string(
+    "Expected Source: " + self.expected_source.to_string() + "\n",
+  )
+  buf.write_string("Actual Source:   " + self.actual_source.to_string() + "\n")
   buf.write_string("Expected: " + self.total_expected.to_string() + " slaves\n")
   buf.write_string("Found:    " + self.total_found.to_string() + " slaves\n")
-  buf.write_string(
-    "Status:   " + (if self.all_ok { "PASS" } else { "FAIL" }) + "\n\n",
-  )
+  buf.write_string("Status:   " + validate_grade_label(self.grade) + "\n\n")
   for i = 0; i < self.results.length(); i = i + 1 {
     match self.results[i] {
       Ok => buf.write_string("  [OK] Slave #" + i.to_string() + "\n")

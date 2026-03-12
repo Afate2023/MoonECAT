@@ -86,11 +86,20 @@ pub(all) struct ConfigurationModel {
 pub impl Eq for ConfigurationModel
 pub impl Show for ConfigurationModel
 
+pub(all) struct ConfigurationProcessDataSummary {
+  sync_manager_count : Int
+  rx_pdo_count : Int
+  tx_pdo_count : Int
+}
+pub impl Eq for ConfigurationProcessDataSummary
+pub impl Show for ConfigurationProcessDataSummary
+
 pub(all) struct ConfigurationSlave {
   position : Int
   configured_address : UInt?
   identity : @hal.SlaveIdentity?
   identification : UInt?
+  process_data_summary : ConfigurationProcessDataSummary?
 }
 pub impl Eq for ConfigurationSlave
 pub impl Show for ConfigurationSlave
@@ -243,11 +252,22 @@ pub fn Telemetry::reset(Self) -> Unit
 pub impl Eq for Telemetry
 pub impl Show for Telemetry
 
+pub(all) enum ValidateGrade {
+  Pass
+  Warn
+  Block
+}
+pub impl Eq for ValidateGrade
+pub impl Show for ValidateGrade
+
 pub(all) struct ValidateReport {
+  expected_source : ConfigurationSource
+  actual_source : ConfigurationSource
   total_expected : Int
   total_found : Int
   results : Array[ValidationResult]
   all_ok : Bool
+  grade : ValidateGrade
 }
 pub fn ValidateReport::format(Self) -> String
 pub impl Show for ValidateReport

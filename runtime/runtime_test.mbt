@@ -1263,6 +1263,7 @@ test "compare_configurations reports topology and identity differences" {
           serial: 0x1234U,
         }),
         identification: Some(0x0020U),
+        process_data_summary: None,
       },
       {
         position: 1,
@@ -1274,6 +1275,7 @@ test "compare_configurations reports topology and identity differences" {
           serial: 0x5678U,
         }),
         identification: Some(0x0042U),
+        process_data_summary: None,
       },
     ],
   }
@@ -1291,6 +1293,7 @@ test "compare_configurations reports topology and identity differences" {
           serial: 0x1234U,
         }),
         identification: Some(0x0020U),
+        process_data_summary: None,
       },
       {
         position: 2,
@@ -1302,6 +1305,7 @@ test "compare_configurations reports topology and identity differences" {
           serial: 0x9999U,
         }),
         identification: Some(0x0055U),
+        process_data_summary: None,
       },
     ],
   }
@@ -1351,6 +1355,12 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     #|        <RevisionNo>1</RevisionNo>
     #|        <SerialNo>0</SerialNo>
     #|      </Info>
+    #|      <ProcessData>
+    #|        <Sm No="2" />
+    #|        <Sm No="3" />
+    #|        <RxPdo Fixed="1" />
+    #|        <TxPdo Fixed="1" />
+    #|      </ProcessData>
     #|    </Slave>
     #|    <Slave>
     #|      <Info>
@@ -1362,6 +1372,11 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     #|        <RevisionNo>1</RevisionNo>
     #|        <SerialNo>4660</SerialNo>
     #|      </Info>
+    #|      <ProcessData>
+    #|        <Sm No="2" />
+    #|        <RxPdo Fixed="1" />
+    #|        <RxPdo Fixed="1" />
+    #|      </ProcessData>
     #|    </Slave>
     #|  </Config>
     #|</EtherCATConfig>
@@ -1376,12 +1391,20 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
     model.slaves[0].identity,
     Some({ vendor_id: 4739149U, product_code: 3U, revision: 1U, serial: 0U }),
   )
+  assert_eq(
+    model.slaves[0].process_data_summary,
+    Some({ sync_manager_count: 2, rx_pdo_count: 1, tx_pdo_count: 1 }),
+  )
   assert_eq(model.slaves[1].position, 1)
   assert_eq(model.slaves[1].configured_address, Some(1002U))
   assert_eq(model.slaves[1].identification, Some(0x20U))
   assert_eq(
     model.slaves[1].identity,
     Some({ vendor_id: 2U, product_code: 0x04D2U, revision: 1U, serial: 4660U }),
+  )
+  assert_eq(
+    model.slaves[1].process_data_summary,
+    Some({ sync_manager_count: 1, rx_pdo_count: 2, tx_pdo_count: 0 }),
   )
 }
 
@@ -1503,10 +1526,13 @@ test "validate: reports missing and extra by position" {
 ///|
 test "ValidateReport format shows PASS" {
   let report : @runtime.ValidateReport = {
+    expected_source: @runtime.OfflineConfig,
+    actual_source: @runtime.OnlineScan,
     total_expected: 1,
     total_found: 1,
     results: [@runtime.Ok],
     all_ok: true,
+    grade: @runtime.Pass,
   }
   let text = report.format()
   assert_true(text.contains("PASS"))
@@ -1516,14 +1542,77 @@ test "ValidateReport format shows PASS" {
 ///|
 test "ValidateReport format shows FAIL with details" {
   let report : @runtime.ValidateReport = {
+    expected_source: @runtime.EniImport,
+    actual_source: @runtime.OnlineScan,
     total_expected: 2,
     total_found: 1,
     results: [@runtime.Ok, @runtime.Missing(position=1)],
     all_ok: false,
+    grade: @runtime.Block,
   }
   let text = report.format()
-  assert_true(text.contains("FAIL"))
+  assert_true(text.contains("BLOCK"))
   assert_true(text.contains("[MISSING]"))
+}
+
+///|
+test "validate_configuration grades extra-only topology as warn" {
+  let expected : @runtime.ConfigurationModel = {
+    source: @runtime.EniImport,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        identification: Some(5U),
+        process_data_summary: Some({
+          sync_manager_count: 2,
+          rx_pdo_count: 1,
+          tx_pdo_count: 1,
+        }),
+      },
+    ],
+  }
+  let actual : @runtime.ConfigurationModel = {
+    source: @runtime.OnlineScan,
+    total_slaves: 2,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        identity: Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        identification: Some(5U),
+        process_data_summary: None,
+      },
+      {
+        position: 1,
+        configured_address: Some(0x1002U),
+        identity: Some({
+          vendor_id: 6U,
+          product_code: 7U,
+          revision: 8U,
+          serial: 9U,
+        }),
+        identification: Some(10U),
+        process_data_summary: None,
+      },
+    ],
+  }
+  let report = @runtime.validate_configuration(actual, expected)
+  assert_eq(report.grade, @runtime.Warn)
+  assert_eq(report.all_ok, false)
+  assert_true(report.results[1] is @runtime.Extra(position=1))
 }
 
 ///|
@@ -1537,7 +1626,15 @@ test "RunPhase equality" {
 test "RunReport format with zero cycles" {
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },
-    validation: { total_expected: 0, total_found: 0, results: [], all_ok: true },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 0,
     cycles_ok: 0,
     telemetry: @runtime.Telemetry::new(),
@@ -1565,7 +1662,15 @@ test "RunReport format with cycles and telemetry" {
   }
   let report : @runtime.RunReport = {
     scan: { slave_count: 2, slaves: [] },
-    validation: { total_expected: 2, total_found: 2, results: [], all_ok: true },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 2,
+      total_found: 2,
+      results: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 100,
     cycles_ok: 97,
     telemetry: tel,

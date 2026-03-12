@@ -12,6 +12,9 @@ priv struct EniSlaveProjection {
   revision : UInt?
   serial : UInt?
   identification : UInt?
+  sync_manager_count : Int
+  rx_pdo_count : Int
+  tx_pdo_count : Int
 }
 
 ///|
@@ -42,6 +45,9 @@ fn parse_eni_slave_projection(
     serial: None,
   }
   let mut current_identification : UInt? = None
+  let mut current_sync_manager_count = 0
+  let mut current_rx_pdo_count = 0
+  let mut current_tx_pdo_count = 0
 
   while true {
     let event = reader.read_event() catch {
@@ -64,11 +70,24 @@ fn parse_eni_slave_projection(
             serial: None,
           }
           current_identification = None
+          current_sync_manager_count = 0
+          current_rx_pdo_count = 0
+          current_tx_pdo_count = 0
           continue
         }
 
         if not(in_slave) {
           continue
+        }
+
+        if elem.name == "Sm" {
+          current_sync_manager_count = current_sync_manager_count + 1
+        }
+        if elem.name == "RxPdo" {
+          current_rx_pdo_count = current_rx_pdo_count + 1
+        }
+        if elem.name == "TxPdo" {
+          current_tx_pdo_count = current_tx_pdo_count + 1
         }
 
         if elem.name == "Info" {
@@ -91,10 +110,21 @@ fn parse_eni_slave_projection(
         }
       }
       @xml.Empty(elem) =>
-        if in_slave && in_info && elem.name == "Identification" {
-          current_identification = parse_optional_numeric_attribute(
-            elem, "Value", "Slave/Info/Identification@Value",
-          )
+        if in_slave {
+          if elem.name == "Sm" {
+            current_sync_manager_count = current_sync_manager_count + 1
+          }
+          if elem.name == "RxPdo" {
+            current_rx_pdo_count = current_rx_pdo_count + 1
+          }
+          if elem.name == "TxPdo" {
+            current_tx_pdo_count = current_tx_pdo_count + 1
+          }
+          if in_info && elem.name == "Identification" {
+            current_identification = parse_optional_numeric_attribute(
+              elem, "Value", "Slave/Info/Identification@Value",
+            )
+          }
         }
       @xml.Text(content) =>
         current_values = update_eni_field(
@@ -122,6 +152,9 @@ fn parse_eni_slave_projection(
             revision: current_values.revision,
             serial: current_values.serial,
             identification: current_identification,
+            sync_manager_count: current_sync_manager_count,
+            rx_pdo_count: current_rx_pdo_count,
+            tx_pdo_count: current_tx_pdo_count,
           })
           current_position = current_position + 1
           in_slave = false
@@ -271,6 +304,11 @@ fn project_eni_slaves(slaves : Array[EniSlaveProjection]) -> ConfigurationModel 
         configured_address: slave.configured_address,
         identity: build_eni_identity(slave),
         identification: slave.identification,
+        process_data_summary: Some({
+          sync_manager_count: slave.sync_manager_count,
+          rx_pdo_count: slave.rx_pdo_count,
+          tx_pdo_count: slave.tx_pdo_count,
+        }),
       }
     }),
   }

@@ -198,27 +198,33 @@ fn cli_main() -> Unit raise @hal.EcError {
 
   match backend {
     Mock =>
-      run_command_with_nic(command, @mock.MockNic::new(), as_json, timeout)
+      run_command_with_nic(
+        command,
+        @mock.MockNic::new(),
+        args,
+        as_json,
+        timeout,
+      )
     NativeAuto => {
       let interface_name = require_interface_name(args)
       let nic = @native.NativeNic::open_with_config(
         @native.default_native_config(interface_name),
       )
-      run_command_with_nic(command, nic, as_json, timeout)
+      run_command_with_nic(command, nic, args, as_json, timeout)
     }
     NativeWindowsNpcap => {
       let interface_name = require_interface_name(args)
       let nic = @native.NativeNic::open_with_config(
         @native.default_windows_npcap_config(interface_name),
       )
-      run_command_with_nic(command, nic, as_json, timeout)
+      run_command_with_nic(command, nic, args, as_json, timeout)
     }
     NativeLinuxRaw => {
       let interface_name = require_interface_name(args)
       let nic = @native.NativeNic::open_with_config(
         @native.default_linux_config(interface_name),
       )
-      run_command_with_nic(command, nic, as_json, timeout)
+      run_command_with_nic(command, nic, args, as_json, timeout)
     }
   }
 }
@@ -292,6 +298,7 @@ fn run_native_command_with_fresh_nic(
 fn[N : @hal.Nic] run_command_with_nic(
   command : String,
   nic : N,
+  args : Array[String],
   as_json : Bool,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
@@ -308,8 +315,9 @@ fn[N : @hal.Nic] run_command_with_nic(
     "validate" => {
       let report = @runtime.scan(nic, timeout)
       nic.close()
-      let expected = expected_from_scan(report)
-      let validate_report = @runtime.validate(report, expected)
+      let actual = @runtime.configuration_from_scan(report)
+      let expected = resolve_validate_expected_configuration(report, args)
+      let validate_report = @runtime.validate_configuration(actual, expected)
       if as_json {
         println(validate_report_json(validate_report).stringify(indent=2))
       } else {
@@ -324,13 +332,16 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--eni <path>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
   println("  moon run cmd/main scan -- --backend native --if <interface>")
+  println(
+    "  moon run cmd/main validate -- --backend native --if <interface> --eni config.xml --json",
+  )
   println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
   )
@@ -759,6 +770,30 @@ fn cli_backend_to_native_backend(
     NativeAuto => @native.Auto
     NativeWindowsNpcap => @native.WindowsNpcap
     NativeLinuxRaw => @native.LinuxRawSocket
+  }
+}
+
+///|
+fn resolve_validate_expected_configuration(
+  scan_report : @runtime.ScanReport,
+  args : Array[String],
+) -> @runtime.ConfigurationModel raise @hal.EcError {
+  match flag_value(args, "--eni") {
+    Some(path) => {
+      let content_result : Result[String, Error] = try? @fs.read_file_to_string(
+        path,
+      )
+      let xml_content = match content_result {
+        Ok(content) => content
+        Err(err) =>
+          raise @hal.EcError::ConfigMismatch(
+            "failed to read ENI file " + path + ": " + err.to_string(),
+          )
+      }
+      @runtime.configuration_from_eni_xml(xml_content)
+    }
+    None =>
+      @runtime.configuration_from_expected(expected_from_scan(scan_report))
   }
 }
 
@@ -2406,9 +2441,12 @@ fn scan_report_json(report : @runtime.ScanReport) -> Json {
 ///|
 fn validate_report_json(report : @runtime.ValidateReport) -> Json {
   Json::object({
+    "expected_source": Json::string(report.expected_source.to_string()),
+    "actual_source": Json::string(report.actual_source.to_string()),
     "total_expected": Json::number(report.total_expected.to_double()),
     "total_found": Json::number(report.total_found.to_double()),
     "all_ok": Json::boolean(report.all_ok),
+    "grade": Json::string(report.grade.to_string()),
     "result_count": Json::number(report.results.length().to_double()),
   })
 }

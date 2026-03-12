@@ -63,6 +63,30 @@ test "cli timeout flag rejects non-positive values" {
 }
 
 ///|
+test "cli resolve validate expected configuration defaults to scan projection" {
+  let scan_report : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let expected = resolve_validate_expected_configuration(scan_report, [
+    "moonecat", "validate",
+  ])
+  assert_eq(expected.source, @runtime.OfflineConfig)
+  assert_eq(expected.total_slaves, 1)
+  assert_eq(expected.slaves[0].configured_address, Some(0x1001U))
+}
+
+///|
 test "cli esm state parser accepts canonical names" {
   assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
   assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)
@@ -303,6 +327,23 @@ test "cli diagnosis report text includes AL snapshot fields" {
   assert_true(text.contains("AL Error Flag: clear"))
   assert_true(text.contains("AL Status Code: 0x0000"))
   assert_true(text.contains("Diagnosis Counter: 3"))
+}
+
+///|
+test "cli validate report json includes grade and sources" {
+  let json = validate_report_json({
+    expected_source: @runtime.EniImport,
+    actual_source: @runtime.OnlineScan,
+    total_expected: 1,
+    total_found: 2,
+    results: [@runtime.Ok, @runtime.Extra(position=1)],
+    all_ok: false,
+    grade: @runtime.Warn,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"expected_source\": \"EniImport\""))
+  assert_true(text.contains("\"actual_source\": \"OnlineScan\""))
+  assert_true(text.contains("\"grade\": \"Warn\""))
 }
 
 ///|
