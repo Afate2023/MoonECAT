@@ -427,6 +427,21 @@ fn[N : @hal.Nic] run_diagnosis_command(
     ),
     "diagnosis.read_slave_diagnosis_ap",
   )
+  let report = {
+    ..report,
+    al_state: match diagnosis_session.observed_state {
+      Some(state) => Some(state)
+      None => report.al_state
+    },
+    al_error_flag: match diagnosis_session.observed_error_flag {
+      Some(flag) => Some(flag)
+      None => report.al_error_flag
+    },
+    al_status_code: match diagnosis_session.observed_status_code {
+      Some(code) => Some(code)
+      None => report.al_status_code
+    },
+  }
   if diagnosis_session.original_state != @protocol.PreOp {
     ignore(
       diagnosis_stage(
@@ -737,6 +752,18 @@ struct StateTransitionReport {
 fn diagnosis_report_json(report : @runtime.SlaveDiagnosis) -> Json {
   Json::object({
     "station": Json::number(report.station_address.to_double()),
+    "al_state": match report.al_state {
+      Some(state) => Json::string(state.to_string())
+      None => Json::null()
+    },
+    "al_error_flag": match report.al_error_flag {
+      Some(flag) => Json::boolean(flag)
+      None => Json::null()
+    },
+    "al_status_code": match report.al_status_code {
+      Some(code) => Json::number(code.to_double())
+      None => Json::null()
+    },
     "error_register": Json::number(report.error_register.to_uint().to_double()),
     "diagnosis_counter": match report.diagnosis_counter {
       Some(value) => Json::number(value.to_double())
@@ -747,7 +774,20 @@ fn diagnosis_report_json(report : @runtime.SlaveDiagnosis) -> Json {
 
 ///|
 fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
-  let buf = @buffer.new(size_hint=128)
+  let buf = @buffer.new(size_hint=192)
+  let al_state_text = match report.al_state {
+    Some(state) => state.to_string()
+    None => "unknown"
+  }
+  let al_error_flag_text = match report.al_error_flag {
+    Some(true) => "set"
+    Some(false) => "clear"
+    None => "unknown"
+  }
+  let al_status_code_text = match report.al_status_code {
+    Some(code) => format_hex(code, 4)
+    None => "unknown"
+  }
   let diagnosis_counter_text = match report.diagnosis_counter {
     Some(value) => value.to_string()
     None => "not available"
@@ -755,6 +795,9 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
   buf.write_string("EtherCAT Slave Diagnosis\n")
   buf.write_string("========================\n")
   buf.write_string("Station: " + report.station_address.to_string() + "\n")
+  buf.write_string("AL State: " + al_state_text + "\n")
+  buf.write_string("AL Error Flag: " + al_error_flag_text + "\n")
+  buf.write_string("AL Status Code: " + al_status_code_text + "\n")
   buf.write_string(
     "Error Register: " + format_hex(report.error_register.to_uint(), 2) + "\n",
   )

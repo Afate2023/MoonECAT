@@ -230,13 +230,35 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
 test "cli diagnosis report json includes nullable counter" {
   let json = diagnosis_report_json({
     station_address: 0x1001U,
+    al_state: Some(@protocol.SafeOp),
+    al_error_flag: Some(true),
+    al_status_code: Some(0x0016U),
     error_register: b'\x0A',
     diagnosis_counter: None,
   })
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"station\": 4097"))
+  assert_true(text.contains("\"al_state\": \"SafeOp\""))
+  assert_true(text.contains("\"al_error_flag\": true"))
+  assert_true(text.contains("\"al_status_code\": 22"))
   assert_true(text.contains("\"error_register\": 10"))
   assert_true(text.contains("\"diagnosis_counter\": null"))
+}
+
+///|
+test "cli diagnosis report text includes AL snapshot fields" {
+  let text = diagnosis_report_text({
+    station_address: 0x1001U,
+    al_state: Some(@protocol.Op),
+    al_error_flag: Some(false),
+    al_status_code: Some(0x0000U),
+    error_register: b'\x04',
+    diagnosis_counter: Some(3U),
+  })
+  assert_true(text.contains("AL State: Op"))
+  assert_true(text.contains("AL Error Flag: clear"))
+  assert_true(text.contains("AL Status Code: 0x0000"))
+  assert_true(text.contains("Diagnosis Counter: 3"))
 }
 
 ///|

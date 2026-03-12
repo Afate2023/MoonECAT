@@ -6,6 +6,12 @@
 /// SlaveDiagnosis aggregates a minimal diagnosis snapshot for one slave.
 pub(all) struct SlaveDiagnosis {
   station_address : UInt
+  /// Observed AL state when the snapshot was taken.
+  al_state : @protocol.EsmState?
+  /// AL Error Flag from AL Status register.
+  al_error_flag : Bool?
+  /// AL Status Code from register 0x0134.
+  al_status_code : UInt?
   /// CiA-301 Error Register (0x1001:0)
   error_register : Byte
   /// Diagnosis history object counter (0x10F3:0), when available.
@@ -16,7 +22,17 @@ pub(all) struct SlaveDiagnosis {
 /// DiagnosisSession captures the state needed around a diagnosis run.
 pub(all) struct DiagnosisSession {
   original_state : @protocol.EsmState
+  observed_state : @protocol.EsmState?
+  observed_error_flag : Bool?
+  observed_status_code : UInt?
   mailbox_config : @mailbox.MailboxConfig
+}
+
+///|
+priv struct AlStatusSnapshot {
+  state : @protocol.EsmState
+  error_flag : Bool
+  status_code : UInt
 }
 
 ///|
@@ -133,13 +149,32 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> SlaveDiagnosis raise @hal.EcError {
+  let al_snapshot = Some(read_al_status_snapshot_fp(nic, station, timeout)) catch {
+    _ => None
+  }
   let err = read_error_register(nic, station, mb_config, rmsm, timeout)
   let diag = Some(
     read_diagnosis_counter(nic, station, mb_config, rmsm, timeout),
   ) catch {
     _ => None
   }
-  { station_address: station, error_register: err, diagnosis_counter: diag }
+  {
+    station_address: station,
+    al_state: match al_snapshot {
+      Some(snapshot) => Some(snapshot.state)
+      None => None
+    },
+    al_error_flag: match al_snapshot {
+      Some(snapshot) => Some(snapshot.error_flag)
+      None => None
+    },
+    al_status_code: match al_snapshot {
+      Some(snapshot) => Some(snapshot.status_code)
+      None => None
+    },
+    error_register: err,
+    diagnosis_counter: diag,
+  }
 }
 
 ///|
@@ -152,6 +187,9 @@ pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
   rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
 ) -> SlaveDiagnosis raise @hal.EcError {
+  let al_snapshot = Some(read_al_status_snapshot_fp(nic, station, timeout)) catch {
+    _ => None
+  }
   let err = read_error_register_ap(
     nic, position, station, mb_config, rmsm, timeout,
   )
@@ -160,7 +198,23 @@ pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
   ) catch {
     _ => None
   }
-  { station_address: station, error_register: err, diagnosis_counter: diag }
+  {
+    station_address: station,
+    al_state: match al_snapshot {
+      Some(snapshot) => Some(snapshot.state)
+      None => None
+    },
+    al_error_flag: match al_snapshot {
+      Some(snapshot) => Some(snapshot.error_flag)
+      None => None
+    },
+    al_status_code: match al_snapshot {
+      Some(snapshot) => Some(snapshot.status_code)
+      None => None
+    },
+    error_register: err,
+    diagnosis_counter: diag,
+  }
 }
 
 ///|
@@ -174,12 +228,12 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
   station : UInt,
   timeout : @hal.Duration,
 ) -> DiagnosisSession raise @hal.EcError {
-  let original_state_result : Result[@protocol.EsmState, Error] = try? diagnosis_timeout_step(
-    try? @protocol.read_al_status(nic, station, timeout),
+  let original_snapshot_result : Result[AlStatusSnapshot, Error] = try? diagnosis_timeout_step(
+    try? read_al_status_snapshot_fp(nic, station, timeout),
     "diagnosis.prepare.read_al_status_fp",
   )
-  let original_state = match original_state_result {
-    Ok(state) => state
+  let original_state = match original_snapshot_result {
+    Ok(snapshot) => snapshot.state
     Err(_) => @protocol.Init
   }
   let eeprom = diagnosis_timeout_step(
@@ -198,7 +252,22 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
   }
   configure_diagnosis_mailbox_sms(nic, station, eeprom, timeout)
   enter_diagnosis_preop(nic, station, original_state, timeout)
-  { original_state, mailbox_config }
+  {
+    original_state,
+    observed_state: match original_snapshot_result {
+      Ok(snapshot) => Some(snapshot.state)
+      Err(_) => None
+    },
+    observed_error_flag: match original_snapshot_result {
+      Ok(snapshot) => Some(snapshot.error_flag)
+      Err(_) => None
+    },
+    observed_status_code: match original_snapshot_result {
+      Ok(snapshot) => Some(snapshot.status_code)
+      Err(_) => None
+    },
+    mailbox_config,
+  }
 }
 
 ///|
@@ -245,6 +314,29 @@ fn[T] diagnosis_timeout_step(
       raise @hal.EcError::Internal(stage + " -> " + message)
     Err(err) => raise @hal.EcError::Internal(err.to_string())
   }
+}
+
+///|
+fn[N : @hal.Nic] read_al_status_snapshot_fp(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> AlStatusSnapshot raise @hal.EcError {
+  let pdu = @protocol.read_register_fp(
+    nic, station, @protocol.reg_al_status, 6, timeout,
+  )
+  if pdu.data.length() < 1 {
+    raise @hal.EcError::EsmStateError("empty AL Status response")
+  }
+  let state = @protocol.EsmState::from_byte(pdu.data[0])
+  let error_flag = (pdu.data[0] & b'\x10') != b'\x00'
+  let status_code = if pdu.data.length() >= 6 {
+    pdu.data[4].to_int().reinterpret_as_uint() |
+    (pdu.data[5].to_int().reinterpret_as_uint() << 8)
+  } else {
+    0U
+  }
+  { state, error_flag, status_code }
 }
 
 ///|
