@@ -10,6 +10,10 @@ type CliBackend
 pub impl Eq for CliBackend
 pub impl Show for CliBackend
 
+type OdBrowseQuery
+
+type OdBrowseReport
+
 type StateTransitionReport
 
 // Type aliases

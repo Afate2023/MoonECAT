@@ -29,6 +29,13 @@ pub(all) struct DiagnosisSession {
 }
 
 ///|
+/// MailboxSession captures generic mailbox preparation state for one slave.
+pub(all) struct MailboxSession {
+  original_state : @protocol.EsmState
+  mailbox_config : @mailbox.MailboxConfig
+}
+
+///|
 priv struct AlStatusSnapshot {
   state : @protocol.EsmState
   error_flag : Bool
@@ -271,6 +278,43 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
 }
 
 ///|
+/// Prepare one slave for generic mailbox-based access via AP discovery and FP state control.
+/// Unlike diagnosis-specific helpers, this only returns the mailbox configuration and
+/// original state needed for restoring the slave after read-only mailbox operations.
+pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> MailboxSession raise @hal.EcError {
+  let original_snapshot_result : Result[AlStatusSnapshot, Error] = try? diagnosis_timeout_step(
+    try? read_al_status_snapshot_fp(nic, station, timeout),
+    "mailbox.prepare.read_al_status_fp",
+  )
+  let original_state = match original_snapshot_result {
+    Ok(snapshot) => snapshot.state
+    Err(_) => @protocol.Init
+  }
+  let eeprom = diagnosis_timeout_step(
+    try? @protocol.eeprom_read_ap(
+      nic, position, 0U, diagnosis_sii_word_count, timeout,
+    ),
+    "mailbox.prepare.eeprom_read_ap",
+  )
+  let sii = @mailbox.parse_sii_header(eeprom)
+  let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
+  if not(mailbox_config.is_valid()) {
+    raise @hal.EcError::ConfigMismatch(
+      "mailbox access requires mailbox-capable slave at station " +
+      station.to_string(),
+    )
+  }
+  configure_diagnosis_mailbox_sms(nic, station, eeprom, timeout)
+  enter_diagnosis_preop(nic, station, original_state, timeout)
+  { original_state, mailbox_config }
+}
+
+///|
 /// Restore a slave after diagnosis using a legal path from PreOp back to the original state.
 pub fn[N : @hal.Nic] restore_slave_diagnosis_state(
   nic : N,
@@ -282,6 +326,22 @@ pub fn[N : @hal.Nic] restore_slave_diagnosis_state(
   diagnosis_timeout_step(
     try? @protocol.transition_through(nic, station, restore_path, timeout),
     "diagnosis.restore_original_state_fp",
+  )
+}
+
+///|
+/// Restore a slave after generic mailbox-based access using the legal path from
+/// PreOp back to the original state.
+pub fn[N : @hal.Nic] restore_slave_mailbox_state(
+  nic : N,
+  station : UInt,
+  original_state : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> @protocol.EsmState raise @hal.EcError {
+  let restore_path = diagnosis_restore_path(original_state)
+  diagnosis_timeout_step(
+    try? @protocol.transition_through(nic, station, restore_path, timeout),
+    "mailbox.restore_original_state_fp",
   )
 }
 

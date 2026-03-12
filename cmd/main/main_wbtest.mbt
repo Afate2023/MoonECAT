@@ -122,6 +122,50 @@ test "cli optional shutdown state flag supports default and none" {
 }
 
 ///|
+test "cli optional byte flag parses values and defaults" {
+  assert_eq(optional_byte_flag(["moonecat", "od"], "--subindex"), None)
+  assert_eq(
+    optional_byte_flag(["moonecat", "od", "--subindex", "7"], "--subindex"),
+    Some(b'\x07'),
+  )
+}
+
+///|
+test "cli optional byte flag rejects out-of-range values" {
+  let result : Result[Byte?, Error] = try? optional_byte_flag(
+    ["moonecat", "od", "--subindex", "256"],
+    "--subindex",
+  )
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli resolve od query supports list object and entry modes" {
+  let list_query = resolve_od_query(["moonecat", "od"])
+  assert_eq(list_query.list_type, 0U)
+  assert_eq(list_query.index, None)
+  assert_eq(list_query.subindex, None)
+
+  let object_query = resolve_od_query(["moonecat", "od", "--index", "7187"])
+  assert_eq(object_query.index, Some(7187U))
+  assert_eq(object_query.subindex, None)
+
+  let entry_query = resolve_od_query([
+    "moonecat", "od", "--index", "6656", "--subindex", "1",
+  ])
+  assert_eq(entry_query.index, Some(6656U))
+  assert_eq(entry_query.subindex, Some(b'\x01'))
+}
+
+///|
+test "cli resolve od query rejects orphan subindex" {
+  let result : Result[OdBrowseQuery, Error] = try? resolve_od_query([
+    "moonecat", "od", "--subindex", "1",
+  ])
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
 test "cli resolve diagnosis station uses explicit or single slave" {
   let scan_report : @runtime.ScanReport = {
     slave_count: 1,
@@ -259,6 +303,75 @@ test "cli diagnosis report text includes AL snapshot fields" {
   assert_true(text.contains("AL Error Flag: clear"))
   assert_true(text.contains("AL Status Code: 0x0000"))
   assert_true(text.contains("Diagnosis Counter: 3"))
+}
+
+///|
+test "cli od report json includes list indices" {
+  let json = od_report_json({
+    station_address: 0x1001U,
+    mode: "od-list",
+    list_type: 0U,
+    index: None,
+    subindex: None,
+    indices: Some([0x1000U, 0x1C13U]),
+    object_description: None,
+    entry_description: None,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"mode\": \"od-list\""))
+  assert_true(text.contains("\"indices\""))
+  assert_true(text.contains("4096"))
+  assert_true(text.contains("7187"))
+}
+
+///|
+test "cli od report text includes object description fields" {
+  let text = od_report_text({
+    station_address: 0x1001U,
+    mode: "od-object",
+    list_type: 0U,
+    index: Some(0x1C13U),
+    subindex: None,
+    indices: None,
+    object_description: Some({
+      index: 0x1C13U,
+      data_type: 0x0007U,
+      object_code: b'\x09',
+      max_subindex: b'\x03',
+      name: "MapPDO",
+    }),
+    entry_description: None,
+  })
+  assert_true(text.contains("Mode: od-object"))
+  assert_true(text.contains("Index: 0x1C13"))
+  assert_true(text.contains("Name: MapPDO"))
+  assert_true(text.contains("Object Code: 0x09"))
+}
+
+///|
+test "cli od report text includes entry description fields" {
+  let text = od_report_text({
+    station_address: 0x1001U,
+    mode: "od-entry",
+    list_type: 0U,
+    index: Some(0x1A00U),
+    subindex: Some(b'\x02'),
+    indices: None,
+    object_description: None,
+    entry_description: Some({
+      index: 0x1A00U,
+      subindex: b'\x02',
+      value_info: b'\x3F',
+      data_type: 0x0005U,
+      bit_length: 16U,
+      access: 0x003FU,
+      name: "Entry2",
+    }),
+  })
+  assert_true(text.contains("Mode: od-entry"))
+  assert_true(text.contains("Subindex: 2"))
+  assert_true(text.contains("Bit Length: 16"))
+  assert_true(text.contains("Value Info: 0x3F"))
 }
 
 ///|

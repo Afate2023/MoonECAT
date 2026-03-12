@@ -8,7 +8,7 @@ enum CliBackend {
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, state, diagnosis.
+/// Commands: list-if, scan, validate, run, read-sii, state, diagnosis, od.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -88,6 +88,34 @@ fn cli_main() -> Unit raise @hal.EcError {
           @native.default_linux_config(interface_name),
         )
         run_diagnosis_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "od" {
+    match backend {
+      Mock => raise @hal.EcError::NotSupported("od requires a native backend")
+      NativeAuto => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_native_config(interface_name),
+        )
+        run_od_command(nic, args, as_json, timeout)
+      }
+      NativeWindowsNpcap => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_windows_npcap_config(interface_name),
+        )
+        run_od_command(nic, args, as_json, timeout)
+      }
+      NativeLinuxRaw => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_linux_config(interface_name),
+        )
+        run_od_command(nic, args, as_json, timeout)
       }
     }
     return
@@ -296,7 +324,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -314,6 +342,15 @@ fn print_usage() -> Unit {
   )
   println(
     "  moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 --timeout-ms 50 --json",
+  )
+  println(
+    "  moon run cmd/main od -- --backend native --if <interface> --station 4097 --json",
+  )
+  println(
+    "  moon run cmd/main od -- --backend native --if <interface> --station 4097 --index 7187",
+  )
+  println(
+    "  moon run cmd/main od -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --json",
   )
 }
 
@@ -462,6 +499,151 @@ fn[N : @hal.Nic] run_diagnosis_command(
     println(diagnosis_report_json(report).stringify(indent=2))
   } else {
     println(diagnosis_report_text(report))
+  }
+}
+
+///|
+struct OdBrowseQuery {
+  list_type : UInt
+  index : UInt?
+  subindex : Byte?
+}
+
+///|
+struct OdBrowseReport {
+  station_address : UInt
+  mode : String
+  list_type : UInt
+  index : UInt?
+  subindex : Byte?
+  indices : Array[UInt]?
+  object_description : @mailbox.SdoInfoObjectDescription?
+  entry_description : @mailbox.SdoInfoEntryDescription?
+}
+
+///|
+fn resolve_od_query(args : Array[String]) -> OdBrowseQuery raise @hal.EcError {
+  let index = optional_uint_flag(args, "--index")
+  let subindex = optional_byte_flag(args, "--subindex")
+  if subindex is Some(_) && index is None {
+    raise @hal.EcError::ConfigMismatch("--subindex requires --index")
+  }
+  { list_type: require_uint_flag(args, "--list-type", 0U), index, subindex }
+}
+
+///|
+fn[N : @hal.Nic] run_od_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let query = resolve_od_query(args)
+  let scan_report = diagnosis_stage(try? @runtime.scan(nic, timeout), "od.scan")
+  let target_slave = resolve_cli_slave(
+    scan_report,
+    optional_uint_flag(args, "--station"),
+  )
+  let station = target_slave.station_address
+  let position = target_slave.position.reinterpret_as_uint()
+  let mailbox_session = diagnosis_stage(
+    try? @runtime.prepare_slave_mailbox_ap(nic, position, station, timeout),
+    "od.prepare",
+  )
+  let browse_rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let report = match (query.index, query.subindex) {
+    (None, _) => {
+      let indices = diagnosis_stage(
+        try? @protocol.sdo_info_get_od_list(
+          nic,
+          station,
+          mailbox_session.mailbox_config,
+          browse_rmsm,
+          query.list_type,
+          timeout,
+        ),
+        "od.get_od_list",
+      )
+      {
+        station_address: station,
+        mode: "od-list",
+        list_type: query.list_type,
+        index: None,
+        subindex: None,
+        indices: Some(indices),
+        object_description: None,
+        entry_description: None,
+      }
+    }
+    (Some(index), None) => {
+      let description = diagnosis_stage(
+        try? @protocol.sdo_info_get_od_description(
+          nic,
+          station,
+          mailbox_session.mailbox_config,
+          browse_rmsm,
+          index,
+          timeout,
+        ),
+        "od.get_od_description",
+      )
+      {
+        station_address: station,
+        mode: "od-object",
+        list_type: query.list_type,
+        index: Some(index),
+        subindex: None,
+        indices: None,
+        object_description: Some(description),
+        entry_description: None,
+      }
+    }
+    (Some(index), Some(subindex)) => {
+      let description = diagnosis_stage(
+        try? @protocol.sdo_info_get_oe_description(
+          nic,
+          station,
+          mailbox_session.mailbox_config,
+          browse_rmsm,
+          index,
+          subindex,
+          0xFF,
+          timeout,
+        ),
+        "od.get_oe_description",
+      )
+      {
+        station_address: station,
+        mode: "od-entry",
+        list_type: query.list_type,
+        index: Some(index),
+        subindex: Some(subindex),
+        indices: None,
+        object_description: None,
+        entry_description: Some(description),
+      }
+    }
+  }
+  if mailbox_session.original_state != @protocol.PreOp {
+    ignore(
+      diagnosis_stage(
+        try? @runtime.restore_slave_mailbox_state(
+          nic,
+          station,
+          mailbox_session.original_state,
+          timeout,
+        ),
+        "od.restore",
+      ) catch {
+        _ => @protocol.PreOp
+      },
+    )
+  }
+  nic.close()
+  if as_json {
+    println(od_report_json(report).stringify(indent=2))
+  } else {
+    println(od_report_text(report))
   }
 }
 
@@ -679,6 +861,17 @@ fn optional_uint_flag(
 }
 
 ///|
+fn optional_byte_flag(
+  args : Array[String],
+  flag : String,
+) -> Byte? raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => Some(parse_byte_flag(flag, text))
+    None => None
+  }
+}
+
+///|
 fn parse_esm_state_flag(
   flag : String,
   text : String,
@@ -806,6 +999,116 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
 }
 
 ///|
+fn od_report_json(report : OdBrowseReport) -> Json {
+  Json::object({
+    "station": Json::number(report.station_address.to_double()),
+    "mode": Json::string(report.mode),
+    "list_type": Json::number(report.list_type.to_double()),
+    "index": match report.index {
+      Some(index) => Json::number(index.to_double())
+      None => Json::null()
+    },
+    "subindex": match report.subindex {
+      Some(subindex) => Json::number(subindex.to_uint().to_double())
+      None => Json::null()
+    },
+    "indices": match report.indices {
+      Some(indices) =>
+        Json::array(indices.map(fn(index) { Json::number(index.to_double()) }))
+      None => Json::null()
+    },
+    "object": match report.object_description {
+      Some(description) =>
+        Json::object({
+          "index": Json::number(description.index.to_double()),
+          "data_type": Json::number(description.data_type.to_double()),
+          "object_code": Json::number(
+            description.object_code.to_uint().to_double(),
+          ),
+          "max_subindex": Json::number(
+            description.max_subindex.to_uint().to_double(),
+          ),
+          "name": Json::string(description.name),
+        })
+      None => Json::null()
+    },
+    "entry": match report.entry_description {
+      Some(description) =>
+        Json::object({
+          "index": Json::number(description.index.to_double()),
+          "subindex": Json::number(description.subindex.to_uint().to_double()),
+          "value_info": Json::number(
+            description.value_info.to_uint().to_double(),
+          ),
+          "data_type": Json::number(description.data_type.to_double()),
+          "bit_length": Json::number(description.bit_length.to_double()),
+          "access": Json::number(description.access.to_double()),
+          "name": Json::string(description.name),
+        })
+      None => Json::null()
+    },
+  })
+}
+
+///|
+fn od_report_text(report : OdBrowseReport) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("EtherCAT Object Dictionary\n")
+  buf.write_string("==========================\n")
+  buf.write_string("Station: " + report.station_address.to_string() + "\n")
+  buf.write_string("Mode: " + report.mode + "\n")
+  match report.indices {
+    Some(indices) => {
+      buf.write_string("List Type: " + report.list_type.to_string() + "\n")
+      buf.write_string("Indices:\n")
+      for index in indices {
+        buf.write_string("  - " + format_hex(index, 4) + "\n")
+      }
+    }
+    None => ()
+  }
+  match report.object_description {
+    Some(description) => {
+      buf.write_string("Index: " + format_hex(description.index, 4) + "\n")
+      buf.write_string("Name: " + description.name + "\n")
+      buf.write_string(
+        "Data Type: " + format_hex(description.data_type, 4) + "\n",
+      )
+      buf.write_string(
+        "Object Code: " +
+        format_hex(description.object_code.to_uint(), 2) +
+        "\n",
+      )
+      buf.write_string(
+        "Max Subindex: " + description.max_subindex.to_uint().to_string() + "\n",
+      )
+    }
+    None => ()
+  }
+  match report.entry_description {
+    Some(description) => {
+      buf.write_string("Index: " + format_hex(description.index, 4) + "\n")
+      buf.write_string(
+        "Subindex: " + description.subindex.to_uint().to_string() + "\n",
+      )
+      buf.write_string("Name: " + description.name + "\n")
+      buf.write_string(
+        "Data Type: " + format_hex(description.data_type, 4) + "\n",
+      )
+      buf.write_string(
+        "Bit Length: " + description.bit_length.to_string() + "\n",
+      )
+      buf.write_string("Access: " + format_hex(description.access, 4) + "\n")
+      buf.write_string(
+        "Value Info: " + format_hex(description.value_info.to_uint(), 2) + "\n",
+      )
+    }
+    None => ()
+  }
+  buf.to_string()
+}
+
+///|
 fn resolve_timeout(args : Array[String]) -> @hal.Duration raise @hal.EcError {
   let timeout_ms = require_int_flag(args, "--timeout-ms", 1)
   if timeout_ms <= 0 {
@@ -884,6 +1187,17 @@ fn parse_uint_flag(flag : String, text : String) -> UInt raise @hal.EcError {
     value = value * 10U + (ch.to_uint() - b'0'.to_uint())
   }
   value
+}
+
+///|
+fn parse_byte_flag(flag : String, text : String) -> Byte raise @hal.EcError {
+  let value = parse_uint_flag(flag, text)
+  if value > 255U {
+    raise @hal.EcError::ConfigMismatch(
+      "value out of byte range for " + flag + ": " + text,
+    )
+  }
+  value.to_byte()
 }
 
 ///|
