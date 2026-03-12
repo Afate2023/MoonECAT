@@ -105,6 +105,66 @@ test "cli optional shutdown state flag supports default and none" {
 }
 
 ///|
+test "cli resolve diagnosis station uses explicit or single slave" {
+  let scan_report : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [{
+      position: 0,
+      station_address: 0x1001U,
+      vendor_id: 1U,
+      product_code: 2U,
+      revision: 3U,
+      serial: 4U,
+      identification: 5U,
+    }],
+  }
+  assert_eq(resolve_cli_station(scan_report, None), 0x1001U)
+  assert_eq(resolve_cli_station(scan_report, Some(0x2000U)), 0x2000U)
+}
+
+///|
+test "cli resolve diagnosis station rejects ambiguous scan" {
+  let scan_report : @runtime.ScanReport = {
+    slave_count: 2,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        vendor_id: 6U,
+        product_code: 7U,
+        revision: 8U,
+        serial: 9U,
+        identification: 10U,
+      },
+    ],
+  }
+  let result : Result[UInt, Error] = try? resolve_cli_station(scan_report, None)
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli diagnosis report json includes nullable counter" {
+  let json = diagnosis_report_json({
+    station_address: 0x1001U,
+    error_register: b'\x0A',
+    diagnosis_counter: None,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"station\": 4097"))
+  assert_true(text.contains("\"error_register\": 10"))
+  assert_true(text.contains("\"diagnosis_counter\": null"))
+}
+
+///|
 test "cli transition path falls back through init when needed" {
   let path = build_cli_transition_path(@protocol.Op, @protocol.Boot)
   assert_eq(path.length(), 5)

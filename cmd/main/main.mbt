@@ -8,7 +8,7 @@ enum CliBackend {
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, state.
+/// Commands: list-if, scan, validate, run, read-sii, state, diagnosis.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -59,6 +59,35 @@ fn cli_main() -> Unit raise @hal.EcError {
           @native.default_linux_config(interface_name),
         )
         run_read_sii_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "diagnosis" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported("diagnosis requires a native backend")
+      NativeAuto => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_native_config(interface_name),
+        )
+        run_diagnosis_command(nic, args, as_json, timeout)
+      }
+      NativeWindowsNpcap => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_windows_npcap_config(interface_name),
+        )
+        run_diagnosis_command(nic, args, as_json, timeout)
+      }
+      NativeLinuxRaw => {
+        let interface_name = require_interface_name(args)
+        let nic = @native.NativeNic::open_with_config(
+          @native.default_linux_config(interface_name),
+        )
+        run_diagnosis_command(nic, args, as_json, timeout)
       }
     }
     return
@@ -267,7 +296,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--path]",
   )
   println("Default backend: mock")
   println("Examples:")
@@ -281,6 +310,9 @@ fn print_usage() -> Unit {
   )
   println(
     "  moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state init",
+  )
+  println(
+    "  moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 --json",
   )
 }
 
@@ -358,6 +390,39 @@ fn[N : @hal.Nic] compute_state_transition_report(
         wkc: Some(wkc),
       }
     }
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_diagnosis_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let scan_report = @runtime.scan(nic, timeout)
+  let station = resolve_cli_station(scan_report, optional_uint_flag(args, "--station"))
+  let eeprom = @protocol.eeprom_read(nic, station, 0U, 15, timeout)
+  let sii = @mailbox.parse_sii_header(eeprom)
+  let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
+  if not(mailbox_config.is_valid()) {
+    nic.close()
+    raise @hal.EcError::ConfigMismatch(
+      "diagnosis requires mailbox-capable slave at station " + station.to_string(),
+    )
+  }
+  let report = @runtime.read_slave_diagnosis(
+    nic,
+    station,
+    mailbox_config,
+    @mailbox.Rmsm::new(),
+    timeout,
+  )
+  nic.close()
+  if as_json {
+    println(diagnosis_report_json(report).stringify(indent=2))
+  } else {
+    println(diagnosis_report_text(report))
   }
 }
 
@@ -465,6 +530,27 @@ fn parse_backend(args : Array[String]) -> CliBackend raise @hal.EcError {
     Some("native-linux-raw") => NativeLinuxRaw
     Some(other) =>
       raise @hal.EcError::ConfigMismatch("unsupported backend: " + other)
+  }
+}
+
+///|
+fn resolve_cli_station(
+  scan_report : @runtime.ScanReport,
+  requested_station : UInt?,
+) -> UInt raise @hal.EcError {
+  match requested_station {
+    Some(station) => station
+    None => match scan_report.slaves {
+      [only] => only.station_address
+      [] =>
+        raise @hal.EcError::ConfigMismatch(
+          "diagnosis requires discovered slave or explicit --station",
+        )
+      _ =>
+        raise @hal.EcError::ConfigMismatch(
+          "diagnosis requires explicit --station when multiple slaves are present",
+        )
+    }
   }
 }
 
@@ -594,6 +680,35 @@ struct StateTransitionReport {
   final_state : @protocol.EsmState?
   status_code : UInt?
   wkc : UInt?
+}
+
+///|
+fn diagnosis_report_json(report : @runtime.SlaveDiagnosis) -> Json {
+  Json::object({
+    "station": Json::number(report.station_address.to_double()),
+    "error_register": Json::number(report.error_register.to_uint().to_double()),
+    "diagnosis_counter": match report.diagnosis_counter {
+      Some(value) => Json::number(value.to_double())
+      None => Json::null()
+    },
+  })
+}
+
+///|
+fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
+  let buf = @buffer.new(size_hint=128)
+  let diagnosis_counter_text = match report.diagnosis_counter {
+    Some(value) => value.to_string()
+    None => "not available"
+  }
+  buf.write_string("EtherCAT Slave Diagnosis\n")
+  buf.write_string("========================\n")
+  buf.write_string("Station: " + report.station_address.to_string() + "\n")
+  buf.write_string(
+    "Error Register: " + format_hex(report.error_register.to_uint(), 2) + "\n",
+  )
+  buf.write_string("Diagnosis Counter: " + diagnosis_counter_text + "\n")
+  buf.to_string()
 }
 
 ///|
