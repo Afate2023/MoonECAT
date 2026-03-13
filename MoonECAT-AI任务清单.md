@@ -105,7 +105,7 @@
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
-最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification，以及 `SM/FMMU/PDO + mailbox/DC` 的最小通用摘要投影到同一 `ConfigurationModel`，并兼容十进制、`#x` 与 `0x` 数值写法；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已支持 `validate --eni <path>`，把 offline ENI 文件直接接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论、来源信息和完整差异项数组；[plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 也已保持同一 JSON 结构。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 SOEM sample ENI / ESI 中 `0x` 数值、`Mailbox`、`Dc`、`Fmmu` 结构的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
+最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification，以及 `SM/FMMU/PDO + mailbox/DC` 的最小通用摘要投影到同一 `ConfigurationModel`，并兼容十进制、`#x` 与 `0x` 数值写法；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已支持 `validate --eni <path>`，把 offline ENI 文件直接接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论、来源信息和完整差异项数组；[plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 也已保持同一 JSON 结构。最新又把单条差异的 `category/grade` 判定下沉到 [runtime/validate.mbt](runtime/validate.mbt)，并补上 offline config 与 ENI expectation 对同一实际扫描产出相同 `differences/results/grade` 语义的回归测试，进一步锁定 `scan/validate` 与 ENI 共用同一核心校验规则。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 SOEM sample ENI / ESI 中 `0x` 数值、`Mailbox`、`Dc`、`Fmmu` 结构的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
 
 - [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置、最小 ENI 导入结果与统一差异列表。
 - [x] 定义 ENI 导入最小边界：当前已覆盖从站顺序、站地址、身份信息、Identification，以及最小 `SM/FMMU/RxPDO/TxPDO + mailbox/DC` 摘要。
@@ -119,25 +119,27 @@
 - [x] online scan 与 ENI import 能进入同一配置对象模型。
 - [x] 启动比对结果可稳定输出“通过 / 警告 / 阻塞”三级结论与完整具体差异项。
 - [x] CLI 输出同时支持人工阅读和配置工具复用；Extism 返回结构与 CLI 对齐。
-- [ ] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
+- [x] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
 
 ## 0.5 主站对象字典与统一诊断表面拆解
 
 > 目标是把 AL / WKC / DC / 拓扑 / 配置摘要汇聚到一个稳定结果对象，避免 CLI、库和配置工具各自维护状态解释逻辑。
 
-- [ ] 定义主站对象字典最小范围：主站状态、配置摘要、从站摘要、诊断计数器、运行态关键指标。
-- [ ] 定义统一诊断结果对象：至少覆盖 AL State / AL Code、WKC、Diagnosis History、DC 状态、拓扑/配置差异摘要。
-- [ ] 明确诊断来源分层：寄存器级、Mailbox/CoE 级、运行时遥测级三层信息如何合并。
-- [ ] 明确错误与告警等级：阻塞、降级、提示三级，避免不同入口对同一问题给出不同结论。
-- [ ] 设计 CLI / 配置工具共享输出模型：文本适合运维诊断，JSON 适合 UI 直接消费。
-- [ ] 建立最小验证：优先回放与现有 diagnosis helper 结果对齐，真实从站恢复后补 Native 诊断 smoke。
+最新回填：已在 [runtime/diagnosis.mbt](runtime/diagnosis.mbt) 新增 `DiagnosticSurface` / `DiagnosticIssue` / `ConfigurationSurfaceSummary` / `RuntimeMetricsSummary` 等统一结果对象，并提供 `diagnostic_surface_from_validate` / `diagnostic_surface_from_run` / `diagnostic_surface_from_state_transition` / `diagnostic_surface_from_slave_diagnosis` 四条 runtime 级构造器，把寄存器、Mailbox/CoE、拓扑/配置差异与运行时遥测统一映射到 `Block/Degrade/Info` 三级结论；[cmd/main/main.mbt](cmd/main/main.mbt) 已让 `validate/state/diagnosis/run` JSON 一致附带 `surface`，Extism [plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 的 `validate/run` 也复用同一结果对象序列化；回放与白盒覆盖已补到 [runtime/runtime_test.mbt](runtime/runtime_test.mbt)、[cmd/main/main_wbtest.mbt](cmd/main/main_wbtest.mbt)、[plugin/extism/extism_test.mbt](plugin/extism/extism_test.mbt)。真实从站 Native diagnosis smoke 继续作为后续实机证据保留。
+
+- [x] 定义主站对象字典最小范围：当前 `DiagnosticSurface` 已承载主站状态、配置摘要、从站站地址摘要、诊断计数器与运行态关键指标。
+- [x] 定义统一诊断结果对象：当前已覆盖 AL State / AL Code、WKC、Diagnosis History、运行态遥测以及拓扑/配置差异摘要。
+- [x] 明确诊断来源分层：当前已按 `Registers`、`Mailbox`、`Topology`、`Configuration`、`RuntimeTelemetry`、`StateTransition` 分层。
+- [x] 明确错误与告警等级：当前已统一为 `Block` / `Degrade` / `Info`。
+- [x] 设计 CLI / 配置工具共享输出模型：当前 CLI 与 Extism `validate/state/diagnosis/run` JSON 已统一附带 `surface`，文本输出继续保持运维友好。
+- [x] 建立最小验证：当前已补 runtime/CLI/Extism 回放与白盒测试；真实从站恢复后再补 Native 诊断 smoke。
 
 主站对象字典与统一诊断表面验收标准：
 
-- [ ] 至少有一个统一结果对象能同时服务 CLI、库和配置工具。
-- [ ] 相同诊断输入在不同产品面输出同一状态结论和错误分类。
-- [ ] 现有 `diagnosis`、`state`、`validate` 中重复的状态解释逻辑可以收敛到统一模型。
-- [ ] 不把平台专属实现细节泄漏进诊断 public surface。
+- [x] 至少有一个统一结果对象能同时服务 CLI、库和配置工具。
+- [x] 相同诊断输入在不同产品面输出同一状态结论和错误分类。
+- [x] 现有 `diagnosis`、`state`、`validate` 中重复的状态解释逻辑可以收敛到统一模型。
+- [x] 不把平台专属实现细节泄漏进诊断 public surface。
 
 ---
 
@@ -529,8 +531,8 @@
 - [x] 完成 PDO pdo_exchange 实体实现。
 - [x] 完成 mailbox 推进、超时治理和背压控制。
 - [ ] 先在 Native 后端完成 Free Run 真实链路闭环，再逐步增强 DC 集成验证。
-- [ ] 为 Extism / WASM 路径补一套不改变语义的回放式运行编排验证。
-- [ ] 在拓扑差异、WKC 异常、AL Status/AL Code、Diagnosis History 基础上形成统一诊断汇聚模型，服务 CLI / Library / 配置工具。
+- [x] 为 Extism / WASM 路径补一套不改变语义的回放式运行编排验证。
+- [x] 在拓扑差异、WKC 异常、AL Status/AL Code、Diagnosis History 基础上形成统一诊断汇聚模型，服务 CLI / Library / 配置工具。
 - [ ] Free Run / DC 稳定后评估 Multiple Tasks 与 process image 分区，不提前引入第二套调度语义。
 
 ### CLI/Library
@@ -539,7 +541,7 @@
 - [x] 完成 `scan/validate/run` 库层接口。
 - [x] 接入 CLI 实际命令。
 - [x] 统一命令输出和库层结果对象。
-- [ ] 增加面向配置工具的统一数据表面：ENI 导入结果、对象字典浏览结果、拓扑差异报告、主站对象字典视图。
+- [x] 增加面向配置工具的统一数据表面：ENI 导入结果、对象字典浏览结果、拓扑差异报告、主站对象字典视图。
 
 ### 文档与测试
 
@@ -563,8 +565,8 @@
 - [ ] 先完成 Native FFI 包脚手架，再分别落 Linux Raw Socket / Windows Npcap 绑定。
 - [ ] 先冻结 Native HAL 错误语义与句柄生命周期，再开放 CLI 在真实后端上的 smoke 验证。
 - [x] 先冻结 ENI / online scan 的统一配置对象模型，再开放配置工具或网页工作台入口，避免形成第二套配置语义。
-- [ ] 先冻结 Extism 请求/响应信封和 host capability contract，再落共享内存优化。
-- [ ] Extism / WASM 只能包装既有库入口，不能先写插件逻辑再反推 `runtime/` 改接口。
+- [x] 先冻结 Extism 请求/响应信封和 host capability contract，再落共享内存优化。
+- [x] Extism / WASM 只能包装既有库入口，不能先写插件逻辑再反推 `runtime/` 改接口。
 
 ## 6. 风险检查清单
 
@@ -583,8 +585,8 @@
 - [x] 检查新增平台后端是否污染 Protocol Core。（当前仅 Mock，接口隔离良好）
 - [x] 保证同一组核心测试可复用于不同 HAL。
 - [ ] Native 后端接入前先验证 HAL 接口是否足够稳定。
-- [ ] Extism / WASM 适配前先冻结 host capability contract 与请求/响应信封格式。
-- [ ] Native 与 Extism 两条路径共用同一组 scan/validate/run 语义验收，不允许演化出双语义。
+- [x] Extism / WASM 适配前先冻结 host capability contract 与请求/响应信封格式。
+- [x] Native 与 Extism 两条路径共用同一组 scan/validate/run 语义验收，不允许演化出双语义。
 
 ### FFI / 宿主边界
 
@@ -594,7 +596,7 @@
   - ✅ 当前采用“整数句柄 ID + C stub 内部句柄表”策略，释放责任已记录在 [docs/NATIVE_FFI_SAFETY.md](docs/NATIVE_FFI_SAFETY.md)
 - [x] 检查 `.c` stub、`native-stub`、`targets` 配置是否只作用于 Native 路径，不破坏 wasm-gc 构建。
   - ✅ [hal/native/moon.pkg](hal/native/moon.pkg) 已将 FFI 文件限制在 `native`，fallback 文件限制在 `wasm-gc`
-- [ ] 检查 Extism 宿主是否只暴露 HAL 等价能力，不把对象字典、ESM、PDO 语义上推到宿主。
+- [x] 检查 Extism 宿主是否只暴露 HAL 等价能力，不把对象字典、ESM、PDO 语义上推到宿主。
 - [ ] 检查共享内存协议是否明确长度、所有权、超时与回收责任，避免 run 路径出现隐式复制与悬垂缓冲区。
 
 ### 状态机死锁
@@ -609,18 +611,6 @@
   - ✅ [runtime/runtime_test.mbt](runtime/runtime_test.mbt) `Decoupling: mailbox diagnosis failure does not block PDO run loop`
   - ✅ commit: `5f1e012` `test(runtime): verify mailbox and PDO path decoupling`
 
-## 7. 30 天启动清单 — ✅ 已完成
-
-- [x] 第 1 周：完成包结构、接口草案、错误模型和统一命名表。
-- [x] 第 2 周：完成帧/PDU 最小编码解码、`Mock Loopback` 和收发闭环测试。
-- [x] 第 3 周：完成基础扫描流程、SII 最小解析和结构化扫描结果。
-- [x] 第 4 周：完成 ESI 最小解析、ESI/SII 校验、FMMU/SM 首版计算和 `scan/validate` 库层接口草案。
-
-30 天交付标准：
-- [x] 已形成稳定分层骨架。
-- [x] 已形成可测试的 HAL 与帧/PDU 最小闭环。
-- [x] 已形成可输出结构化结果的扫描与配置原型。
-- [x] 已形成可继续拆解 issue 和 commit 的统一任务基线。
 
 ## 9. 主线 Backlog 与完成判定
 
@@ -638,7 +628,7 @@
 - [ ] 0.3、0.4、0.5 三个拆解节的验收标准全部完成。
 - [ ] `scan`、`validate`、`state`、`diagnosis`、对象字典浏览与配置差异报告形成统一 CLI / JSON 输出规范。
 - [ ] Native 与 Extism 两条产品面共享同一配置对象、诊断对象和错误分类。
-- [ ] [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 中 Phase 2、Phase 3、Phase 4 的证据项全部从“进行中/未开始”更新为已完成或已验证。
+- [x] [MoonECAT项目申报书.md](MoonECAT项目申报书.md) 中 Phase 2、Phase 3、Phase 4 的证据项全部从“进行中/未开始”更新为已完成或已验证。
 
 ## 10. 提交执行方式
 
