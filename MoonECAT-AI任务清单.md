@@ -66,12 +66,12 @@
 
 | Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
 |---|---|---|---|
-| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ `validate --eni <path>` 已接入同一配置比较路径，并补上通过/警告/阻塞三级结论、完整差异项 JSON，以及最小 `SM/FMMU/PDO + mailbox/DC` 摘要；配置工具消费模型仍待补齐 | 继续补配置工具统一视图、启动时网络差异细分与更完整 offline 配置模型 |
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 已改成 `cmd/eni_json` 的 XML→JSON 中转 + `validate --eni-json <path>` 统一配置比较路径，并补上通过/警告/阻塞三级结论、完整差异项 JSON，以及最小 `SM/FMMU/PDO + mailbox/DC` 摘要；配置工具消费模型仍待补齐 | 继续补配置工具统一视图、启动时网络差异细分与更完整 offline 配置模型 |
 | CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
 | Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
 | SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
 | Master Object Dictionary | ETG.1500 5.15.1，Class A 更强调统一主站信息表面 | ❌ 未实现 | 设计主站对象字典、配置摘要与诊断状态汇聚模型 |
-| 拓扑变化、显式标识与 Hot Connect | EtherCAT_Compendium 对拓扑比较、Explicit Device Identification、Hot Connect group 的说明 | ⚠️ 已有显式标识读取与 4-tuple 校验 | 补拓扑差异、Hot Connect 分组、启动时更细粒度告警 |
+| 拓扑变化、显式标识与 Hot Connect | EtherCAT_Compendium 对拓扑比较、Explicit Device Identification、Hot Connect group 的说明；GatorCAT / ethercrab / SOEM 对从站顺序、别名、链路位置和可选从站处理的共同做法 | ⚠️ 已有显式标识读取、别名读取与 4-tuple 校验，但尚未冻结“拓扑指纹 / 可选组 / 启动告警”统一模型 | 继续补拓扑指纹、Hot Connect group/optional segment、启动期缺失从站分级和实机/回放证据 |
 | Multiple Tasks / Process Image 分区 | ETG.1500 5.4.2；EtherCrab/Gatorcat 展示了更细粒度 process image 与任务切分 | ➖ 目前以单任务 Free Run 优先 | 在 Free Run/DC 基线稳定后，再设计多任务调度与 process image 切片 |
 | EoE/FoE/SoE 等 feature pack | ETG.1500 5.8~5.10；CherryECAT/SOEM 提供协议面参考 | ➖ 当前不阻塞主线 | 在 Class A 主站基线完成后，按 feature pack 独立评估与落地 |
 
@@ -105,7 +105,7 @@
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
-最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；随后又在 [runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 新增基于 `Milky2018/xml` 的 ENI XML 解析/投影，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification，以及 `SM/FMMU/PDO + mailbox/DC` 的最小通用摘要投影到同一 `ConfigurationModel`，并兼容十进制、`#x` 与 `0x` 数值写法；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已支持 `validate --eni <path>`，把 offline ENI 文件直接接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论、来源信息和完整差异项数组；[plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 也已保持同一 JSON 结构。最新又把单条差异的 `category/grade` 判定下沉到 [runtime/validate.mbt](runtime/validate.mbt)，并补上 offline config 与 ENI expectation 对同一实际扫描产出相同 `differences/results/grade` 语义的回归测试，进一步锁定 `scan/validate` 与 ENI 共用同一核心校验规则。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 SOEM sample ENI / ESI 中 `0x` 数值、`Mailbox`、`Dc`、`Fmmu` 结构的共同结论：XML 解析 DTO 与 runtime 配置对象必须隔离，避免形成第二套校验语义。
+最新回填：已新增 [runtime/configuration.mbt](runtime/configuration.mbt)，引入 `ConfigurationModel` / `ConfigurationSlave` / `ConfigurationComparisonReport` 统一配置对象，并让 [runtime/validate.mbt](runtime/validate.mbt) 改走 `configuration_from_scan` / `configuration_from_expected` / `compare_configurations` / `validate_configuration` 同一路径；ENI 工作流现已进一步收口为“[cmd/eni_json/main.mbt](cmd/eni_json/main.mbt) 基于 `Milky2018/xml` 做 XML→JSON 中转，[runtime/configuration_eni.mbt](runtime/configuration_eni.mbt) 只接收 ENI JSON 中间格式并投影到同一 `ConfigurationModel`”，把 `Slave/Info` 下的从站顺序、站地址、Identity、Identification，以及 `SM/FMMU/PDO + mailbox/DC` 的最小通用摘要接入统一模型，并兼容十进制、`#x` 与 `0x` 数值写法；同时 [cmd/main/main.mbt](cmd/main/main.mbt) 已改为 `validate --eni-json <path>`，把离线 ENI 中转结果接入同一启动比对路径，并在文本/JSON 输出中暴露 `Pass/Warn/Block` 三级结论、来源信息和完整差异项数组；[plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) 也已保持同一 JSON 结构。最新又把单条差异的 `category/grade` 判定下沉到 [runtime/validate.mbt](runtime/validate.mbt)，并补上 offline config 与 ENI expectation 对同一实际扫描产出相同 `differences/results/grade` 语义的回归测试，进一步锁定 `scan/validate` 与 ENI 共用同一核心校验规则。设计依据与参考实现映射延续 EtherCAT_Compendium 的 “Configuration Tool + ESI/ENI + startup comparison” 工程流，以及 CherryECAT 脚本式 ENI 字段提取与 SOEM sample ENI / ESI 中 `0x` 数值、`Mailbox`、`Dc`、`Fmmu` 结构的共同结论：XML 解析 DTO 必须物理隔离在独立工具中，runtime 仅消费规范化 JSON 中间格式，避免形成第二套校验语义。代码提交：`0d96a43` `feat(config): isolate eni xml behind json bridge`。
 
 - [x] 定义统一配置对象模型：当前已承载 online scan 结果、离线期望配置、最小 ENI 导入结果与统一差异列表。
 - [x] 定义 ENI 导入最小边界：当前已覆盖从站顺序、站地址、身份信息、Identification，以及最小 `SM/FMMU/RxPDO/TxPDO + mailbox/DC` 摘要。
@@ -140,6 +140,41 @@
 - [x] 相同诊断输入在不同产品面输出同一状态结论和错误分类。
 - [x] 现有 `diagnosis`、`state`、`validate` 中重复的状态解释逻辑可以收敛到统一模型。
 - [x] 不把平台专属实现细节泄漏进诊断 public surface。
+
+## 0.6 拓扑变化 / Hot Connect 主线拆解
+
+> 目标是把“显式标识校验”扩展成稳定的启动期拓扑比较与 Hot Connect 能力，而不是继续停留在 4-tuple 单点校验。设计依据以 EtherCAT_Compendium 对 topology comparison / Hot Connect group 的描述为主，并参考 GatorCAT、ethercrab、SOEM 在从站顺序、站地址、别名地址、链路位置恢复上的共同做法。
+
+建议参考实现锚点：
+
+- GatorCAT：扫描期保留从站顺序、地址与 identity，用于启动时确定 group/position 预期。
+- ethercrab：以稳定 `SubDevice`/identity 视图承接扫描与后续运行，不为 Hot Connect 单独复制第二套状态对象。
+- SOEM：在配置初始化与状态检查路径里，把“发现到的从站拓扑”与“预期配置”持续绑定，而不是只做一次松散匹配。
+- EtherCAT_Compendium：Hot Connect group、Explicit Device Identification、拓扑变化告警必须服务启动判断和后续运维诊断，而不只是导入时字段保存。
+
+- [ ] 定义拓扑指纹对象：至少覆盖 `position / configured_address / alias_address? / identity / identification / process_data_summary 摘要`，作为 scan、offline config、ENI JSON 共用的最小比较单元。
+- [ ] 定义 Hot Connect group / optional segment 模型：允许把“必须存在”和“允许缺失”的从站集合显式编码进统一配置对象，避免把可选组逻辑散落到 CLI。
+- [ ] 扩展差异分类：把当前 `Extra/Missing/IdentityMismatch/AddressMismatch/IdentificationMismatch` 进一步细分为 `topology-change / hot-connect-missing / optional-segment-skipped / configuration-drift`，保持 `Pass/Warn/Block` 仍由 runtime 统一裁定。
+- [ ] 定义启动期告警策略：参考 Compendium 的启动比较语义，把“可选组缺失”默认降为 `Warn`，把主链路断裂、顺序漂移、身份冲突保持为 `Block`。
+- [ ] 设计最小证据链：先补 replay/fixture 级拓扑变化回放，再补一条 Native 实机 smoke，覆盖“缺少 optional slave 仍可启动”和“mandatory slave 缺失阻塞启动”两条路径。
+
+拓扑变化 / Hot Connect 验收标准：
+
+- [ ] online scan、offline config、ENI JSON 对同一拓扑指纹使用同一对象模型，不引入新的 Hot Connect 专用比较路径。
+- [ ] `validate` 与后续配置工具可稳定区分“阻塞型拓扑异常”和“可降级 optional group 缺失”。
+- [ ] 统一差异输出既能服务 CLI 文本，也能直接供配置工具/Extism JSON 复用。
+- [ ] 至少有一条回放测试与一条 Native smoke 证明 Hot Connect 分级不是纸面模型。
+
+## 0.7 Native / Extism 后续收口补充
+
+> 目标不是继续扩展命令数量，而是把已有 Native/Extism 表面收敛成可发布、可验证、可维护的后端产品面。参考依据以 Npcap SDK、IGH Raw Socket 路径、GatorCAT NIC 封装，以及 Extism Host boundary 设计文档为主。
+
+- [ ] Native：补“真实链路持续运行”证据，把 `scan -> validate -> state -> diagnosis -> run` 串成同一网卡会话下的最小长链 smoke，并记录空总线/单从站两类基线。
+- [ ] Native：补 SII 完整类别深读计划，按 siitool / SOEM `readeepromAP/FP` 经验继续完善 category 深度解码，避免 `read-sii` 长期停留在 header/general 级别。
+- [ ] Native：把 AddressSanitizer/等价内存安全检查固定成文档化命令，覆盖句柄泄漏、重复 close、错误 ownership 标注三类风险。
+- [ ] Extism：补 host capability adapter 的最小闭环，优先打通 `nic_open/send/recv/close + clock_now/sleep`，共享内存优化保持第二阶段，不让能力边界长期停在 contract 文档。
+- [ ] Extism：增加“无文件系统宿主”回放，验证 `scan/validate/run` 的 bytes 输入路径，确保插件产品面不依赖本地路径语义。
+- [ ] Extism：补 shared-memory transport 的长度/所有权/回收责任回放测试，确保 run 路径不会因为隐式复制或悬垂缓冲区形成宿主侧事故。
 
 ---
 
@@ -494,6 +529,9 @@
 | Emergency 消息 | [SOEM-callflow-analysis.md:378](src/SOEM-callflow-analysis.md#L378) [IGH-callflow-analysis.md:741](src/igh-callflow-analysis.md#L741) | IGH: [coe_emerg_ring.c:105](Reference_Project/ethercat/master/coe_emerg_ring.c#L105) (`ec_coe_emerg_ring_push`)；SOEM: [ec_main.c:194](Reference_Project/SOEM/src/ec_main.c#L194) (`ecx_mbxemergencyerror`) | [mailbox/emergency.mbt](mailbox/emergency.mbt) | 已对齐（环形缓冲增强待做） |
 | EEPROM/SII 读取 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [ethercrab-callflow-analysis.md:440](src/ethercrab-callflow-analysis.md#L440) | SOEM: [ec_main.c:1880](Reference_Project/SOEM/src/ec_main.c#L1880) (`ecx_readeeprom`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；Cherry: [ec_sii.c:118](Reference_Project/CherryECAT/src/ec_sii.c#L118) (`ec_sii_read`)；ethercrab: [eeprom.rs:47](Reference_Project/ethercrab/src/subdevice/eeprom.rs#L47) (`read_chunk`) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) | 已对齐 |
 | DC 初始化与运行补偿 | [SOEM-callflow-analysis.md:443](src/SOEM-callflow-analysis.md#L443) [CherryECAT-callflow-analysis.md:225](src/CherryECAT-callflow-analysis.md#L225) [ethercrab-callflow-analysis.md:333](src/ethercrab-callflow-analysis.md#L333) [EtherCAT.net-callflow-analysis.md:125](src/EtherCAT.net-callflow-analysis.md#L125) | SOEM: [ec_dc.c:250](Reference_Project/SOEM/src/ec_dc.c#L250) (`ecx_configdc`) + [ec_dc.c:33](Reference_Project/SOEM/src/ec_dc.c#L33) (`ecx_dcsync0`)；Cherry: [ec_master.c:752](Reference_Project/CherryECAT/src/ec_master.c#L752) (`ec_master_dc_sync_with_pi`)；ethercrab: [dc.rs:424](Reference_Project/ethercrab/src/dc.rs#L424) (`configure_dc`) + [dc.rs:469](Reference_Project/ethercrab/src/dc.rs#L469) (`run_dc_static_sync`)；EtherCAT.NET: [EcMaster.cs:277](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L277) (`ConfigureDc`) + [EcMaster.cs:457](Reference_Project/EtherCAT.NET/src/EtherCAT.NET/EcMaster.cs#L457) (`CompensateDcDrift`) | [protocol/dc.mbt](protocol/dc.mbt) [runtime/runtime.mbt](runtime/runtime.mbt) [runtime/run.mbt](runtime/run.mbt) | 已对齐 |
+| 拓扑变化 / Hot Connect / optional slave 语义 | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) | GatorCAT: [Scanner.zig:230](Reference_Project/gatorcat/src/module/Scanner.zig#L230) (`identity` + position/address snapshot)；ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [subdevice_group/mod.rs:49](Reference_Project/ethercrab/src/subdevice_group/mod.rs#L49)（稳定分组视图）；SOEM: [ec_config.c:172](Reference_Project/SOEM/src/ec_config.c#L172) (`ecx_config_init`) + sample ENI/ESI 工作流 | [runtime/configuration.mbt](runtime/configuration.mbt) [runtime/validate.mbt](runtime/validate.mbt) [hal/config.mbt](hal/config.mbt) | 已具备 identity/address 基础；待补拓扑指纹、Hot Connect group/optional segment、启动分级与实机证据 |
+| SII category 深度解码 / 全量 read-sii 产品面 | [SOEM-callflow-analysis.md:157](src/SOEM-callflow-analysis.md#L157) [EtherCAT.net-callflow-analysis.md:143](src/EtherCAT.net-callflow-analysis.md#L143) | SOEM: [ec_main.c:1995](Reference_Project/SOEM/src/ec_main.c#L1995) (`ecx_readeepromAP`) + [ec_main.c:2157](Reference_Project/SOEM/src/ec_main.c#L2157) (`ecx_readeepromFP`)；siitool: [sii.c:1](Reference_Project/siitool/sii.c#L1)；EtherCAT.NET UI SII tooling: [EsiSiiHandler.cs:1](Reference_Project/EtherCAT.net.ui_sii/EsiSiiHandler.cs#L1) | [protocol/eeprom.mbt](protocol/eeprom.mbt) [mailbox/sii_parser.mbt](mailbox/sii_parser.mbt) [cmd/main/main.mbt](cmd/main/main.mbt) | 已有最小在线读取；待补 category 深读、稳定 JSON 结构与与配置工具复用 |
+| Extism host capability / shared-memory transport | [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md) [docs/EXTISM_WASM_BACKEND_PLAN.md](docs/EXTISM_WASM_BACKEND_PLAN.md) | Extism 无直接对标参考仓，但设计方式对齐“宿主仅提供 HAL 等价能力，不复制协议层”原则；共享内存边界参考本仓规划文档 | [plugin/extism/entrypoints.mbt](plugin/extism/entrypoints.mbt) [plugin/extism/mock_host.mbt](plugin/extism/mock_host.mbt) [runtime/run.mbt](runtime/run.mbt) | 已完成 envelope + Mock 回放；待补 host adapter、bytes-only 输入与 shared-memory 回放 |
 | Alias Addressing | [gatorcat-callflow-analysis.md:90](src/gatorcat-callflow-analysis.md#L90) | gatorcat: [MainDevice.zig:259](Reference_Project/gatorcat/src/module/MainDevice.zig#L259) + [esc.zig:20](Reference_Project/gatorcat/src/module/esc.zig#L20) (`dl_control_enable_alias_address`) | [protocol/discovery.mbt](protocol/discovery.mbt) (`read_station_alias` / `enable_alias_addressing`) | 已对齐 |
 | Explicit Device ID | [gatorcat-callflow-analysis.md:60](src/gatorcat-callflow-analysis.md#L60) [ethercrab-callflow-analysis.md:191](src/ethercrab-callflow-analysis.md#L191) | gatorcat: [Scanner.zig:230](Reference_Project/gatorcat/src/module/Scanner.zig#L230) (`identity.vendor_id/product_code/revision_number/serial_number`)；ethercrab: [maindevice.rs:263](Reference_Project/ethercrab/src/maindevice.rs#L263) (`SubDevice::new`) + [mod.rs:160](Reference_Project/ethercrab/src/subdevice/mod.rs#L160) (`eeprom.identity`) + [mod.rs:184](Reference_Project/ethercrab/src/subdevice/mod.rs#L184) (`alias_address`) | [runtime/scan.mbt](runtime/scan.mbt) + [runtime/validate.mbt](runtime/validate.mbt) + [hal/config.mbt](hal/config.mbt) | 已对齐 |
 
@@ -524,6 +562,8 @@
 - [x] 完成 Emergency Message 接收。
 - [ ] 继续补 ENI 导入的配置工具数据模型，使 online/offline 两条配置来源在共享校验路径之外，进一步共享 SM/FMMU/PDO/诊断摘要等更完整配置语义。
 - [ ] 把已完成的 SDO Info / Complete Access / segmented 能力上浮到 CLI / 配置工具表面，形成稳定的对象字典浏览输出。
+- [ ] 补拓扑指纹与 Hot Connect group/optional segment 配置模型，使配置工具可表达“必选链路”与“可选链路”而不新增第二套校验语义。
+- [ ] 补 SII category 深度解码与稳定 JSON 结构，支撑 `read-sii`、offline config 和配置工具共用更完整的 EEPROM/ESI 语义。
 
 ### Runtime
 
@@ -534,6 +574,8 @@
 - [x] 为 Extism / WASM 路径补一套不改变语义的回放式运行编排验证。
 - [x] 在拓扑差异、WKC 异常、AL Status/AL Code、Diagnosis History 基础上形成统一诊断汇聚模型，服务 CLI / Library / 配置工具。
 - [ ] Free Run / DC 稳定后评估 Multiple Tasks 与 process image 分区，不提前引入第二套调度语义。
+- [ ] 把拓扑差异分级扩展到 Hot Connect / optional segment，保证 runtime 继续独占 `Pass/Warn/Block` 与 difference category 的裁定逻辑。
+- [ ] 为 Native 长链 smoke 固化启动前后状态、诊断 surface 与运行时 telemetry 的联合回归，避免后端验证长期停留在单命令 smoke。
 
 ### CLI/Library
 
@@ -622,6 +664,7 @@
 4. **拓扑变化 / Hot Connect**：把显式设备标识扩展成稳定的拓扑差异与 Hot Connect 分组能力。
 5. **Native 后端首版收口**：真实网卡恢复可用后，补齐 Native `scan/validate/run` 闭环、错误语义冻结与内存安全检查。
 6. **Extism / WASM 产品化**：在前述模型稳定后，补宿主入口、共享内存路径与最小集成回放。
+7. **SII 全量产品面**：把 `read-sii` 从最小在线诊断入口扩展到稳定 category 深读与配置工具可复用 JSON。
 
 主线完成判定：
 
