@@ -18,6 +18,14 @@ pub fn configuration_from_scan(ScanReport) -> ConfigurationModel
 
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
+pub fn diagnostic_surface_from_run(RunReport) -> DiagnosticSurface
+
+pub fn diagnostic_surface_from_slave_diagnosis(ScanReport, SlaveDiagnosis) -> DiagnosticSurface
+
+pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @protocol.EsmState?, @protocol.EsmState?, UInt?, UInt?) -> DiagnosticSurface
+
+pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
+
 pub fn parse_error_register_payload(Bytes) -> Byte raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
@@ -53,6 +61,10 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> Sca
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
 pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> ValidateReport
+
+pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
+
+pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
 
 // Errors
 
@@ -128,6 +140,17 @@ pub(all) enum ConfigurationSource {
 pub impl Eq for ConfigurationSource
 pub impl Show for ConfigurationSource
 
+pub(all) struct ConfigurationSurfaceSummary {
+  slave_count : Int
+  station_addresses : Array[UInt]
+  expected_source : ConfigurationSource?
+  actual_source : ConfigurationSource?
+  validation_grade : ValidateGrade?
+  difference_count : Int
+}
+pub impl Eq for ConfigurationSurfaceSummary
+pub impl Show for ConfigurationSurfaceSummary
+
 pub(all) struct CycleResult {
   wkc : UInt
   expected_wkc : UInt
@@ -151,6 +174,60 @@ pub(all) struct DiagnosisSession {
   observed_status_code : UInt?
   mailbox_config : @mailbox.MailboxConfig
 }
+
+pub(all) enum DiagnosticCategory {
+  AlStatus
+  ErrorRegister
+  DiagnosisHistory
+  Topology
+  Identity
+  Configuration
+  RuntimeMetrics
+  StateTransition
+}
+pub impl Eq for DiagnosticCategory
+pub impl Show for DiagnosticCategory
+
+pub(all) struct DiagnosticIssue {
+  source : DiagnosticSourceLayer
+  category : DiagnosticCategory
+  level : DiagnosticLevel
+  detail : String
+}
+pub impl Eq for DiagnosticIssue
+pub impl Show for DiagnosticIssue
+
+pub(all) enum DiagnosticLevel {
+  Block
+  Degrade
+  Info
+}
+pub impl Eq for DiagnosticLevel
+pub impl Show for DiagnosticLevel
+
+pub(all) enum DiagnosticSourceLayer {
+  Registers
+  Mailbox
+  Topology
+  Configuration
+  RuntimeTelemetry
+  StateTransition
+}
+pub impl Eq for DiagnosticSourceLayer
+pub impl Show for DiagnosticSourceLayer
+
+pub(all) struct DiagnosticSurface {
+  station_address : UInt?
+  state_summary : StateSurfaceSummary
+  configuration_summary : ConfigurationSurfaceSummary?
+  error_register : Byte?
+  diagnosis_counter : UInt?
+  runtime_metrics : RuntimeMetricsSummary?
+  issues : Array[DiagnosticIssue]
+  overall_level : DiagnosticLevel
+}
+pub impl Eq for DiagnosticSurface
+pub impl Show for DiagnosticSurface
 
 pub(all) struct MailboxSession {
   original_state : @protocol.EsmState
@@ -212,6 +289,19 @@ pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int rai
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
 pub impl Show for Runtime
 
+pub(all) struct RuntimeMetricsSummary {
+  cycles : Int64
+  tx_frames : Int64
+  rx_frames : Int64
+  timeouts : Int64
+  retries : Int64
+  wkc_errors : Int64
+  irq_events : Int64
+  dc_delay_updates : Int64
+}
+pub impl Eq for RuntimeMetricsSummary
+pub impl Show for RuntimeMetricsSummary
+
 pub(all) enum RuntimeState {
   Idle
   Scanning
@@ -253,6 +343,18 @@ pub(all) struct SlaveReport {
 pub impl Eq for SlaveReport
 pub impl Show for SlaveReport
 
+pub(all) struct StateSurfaceSummary {
+  target_state : @protocol.EsmState?
+  current_state : @protocol.EsmState?
+  final_state : @protocol.EsmState?
+  al_state : @protocol.EsmState?
+  al_error_flag : Bool?
+  al_status_code : UInt?
+  wkc : UInt?
+}
+pub impl Eq for StateSurfaceSummary
+pub impl Show for StateSurfaceSummary
+
 pub(all) struct Telemetry {
   mut cycles : Int64
   mut tx_frames : Int64
@@ -267,6 +369,15 @@ pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
 pub impl Eq for Telemetry
 pub impl Show for Telemetry
+
+pub(all) enum ValidateDifferenceCategory {
+  Topology
+  Identity
+  Configuration
+  Informational
+}
+pub impl Eq for ValidateDifferenceCategory
+pub impl Show for ValidateDifferenceCategory
 
 pub(all) enum ValidateGrade {
   Pass

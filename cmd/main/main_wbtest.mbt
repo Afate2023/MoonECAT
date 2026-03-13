@@ -295,22 +295,64 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
 }
 
 ///|
-test "cli diagnosis report json includes nullable counter" {
-  let json = diagnosis_report_json({
+test "cli diagnosis output json includes nullable counter" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let text = diagnosis_output_json(scan, {
     station_address: 0x1001U,
     al_state: Some(@protocol.SafeOp),
     al_error_flag: Some(true),
     al_status_code: Some(0x0016U),
     error_register: b'\x0A',
     diagnosis_counter: None,
-  })
-  let text = json.stringify(indent=2)
+  }).stringify(indent=2)
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"al_state\": \"SafeOp\""))
   assert_true(text.contains("\"al_error_flag\": true"))
   assert_true(text.contains("\"al_status_code\": 22"))
   assert_true(text.contains("\"error_register\": 10"))
   assert_true(text.contains("\"diagnosis_counter\": null"))
+}
+
+///|
+test "cli diagnosis output json includes shared surface" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let text = diagnosis_output_json(scan, {
+    station_address: 0x1001U,
+    al_state: Some(@protocol.SafeOp),
+    al_error_flag: Some(true),
+    al_status_code: Some(0x0011U),
+    error_register: b'\x04',
+    diagnosis_counter: Some(2U),
+  }).stringify(indent=2)
+  assert_true(text.contains("\"surface\""))
+  assert_true(text.contains("\"overall_level\": \"Block\""))
+  assert_true(text.contains("\"source\": \"Registers\""))
 }
 
 ///|
@@ -347,6 +389,38 @@ test "cli validate report json includes grade and sources" {
   assert_true(text.contains("\"grade\": \"Warn\""))
   assert_true(text.contains("\"difference_count\": 1"))
   assert_true(text.contains("\"type\": \"extra\""))
+  assert_true(text.contains("\"category\": \"Topology\""))
+}
+
+///|
+test "cli validate output json includes shared surface" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let text = validate_output_json(scan, {
+    expected_source: @runtime.EniImport,
+    actual_source: @runtime.OnlineScan,
+    total_expected: 1,
+    total_found: 2,
+    results: [@runtime.Ok, @runtime.Extra(position=1)],
+    differences: [@runtime.ConfigurationDifference::Extra(position=1)],
+    all_ok: false,
+    grade: @runtime.Warn,
+  }).stringify(indent=2)
+  assert_true(text.contains("\"surface\""))
+  assert_true(text.contains("\"overall_level\": \"Degrade\""))
+  assert_true(text.contains("\"validation_grade\": \"Warn\""))
 }
 
 ///|
@@ -512,6 +586,42 @@ test "cli state transition report json includes station mode fields" {
   assert_true(text.contains("\"target_state\": \"SafeOp\""))
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"final_state\": \"SafeOp\""))
+  assert_true(text.contains("\"surface\""))
+  assert_true(text.contains("\"overall_level\": \"Info\""))
+}
+
+///|
+test "cli run report json includes shared surface telemetry" {
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 0, slaves: [] },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
+    cycles_requested: 10,
+    cycles_ok: 10,
+    telemetry: {
+      cycles: 10L,
+      tx_frames: 10L,
+      rx_frames: 10L,
+      timeouts: 0L,
+      retries: 0L,
+      wkc_errors: 0L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    final_phase: @runtime.Done,
+  }
+  let text = run_report_json(report).stringify(indent=2)
+  assert_true(text.contains("\"surface\""))
+  assert_true(text.contains("\"runtime_metrics\""))
+  assert_true(text.contains("\"overall_level\": \"Info\""))
 }
 
 ///|

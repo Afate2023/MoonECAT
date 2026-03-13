@@ -1768,6 +1768,192 @@ test "validate_configuration emits process-data summary mismatch when both sides
 }
 
 ///|
+test "diagnostic surface from validate carries configuration summary and topology issue" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let report : @runtime.ValidateReport = {
+    expected_source: @runtime.OfflineConfig,
+    actual_source: @runtime.OnlineScan,
+    total_expected: 1,
+    total_found: 2,
+    results: [@runtime.Ok, @runtime.Extra(position=1)],
+    differences: [@runtime.Extra(position=1)],
+    all_ok: false,
+    grade: @runtime.Warn,
+  }
+  let surface = @runtime.diagnostic_surface_from_validate(scan, report)
+  assert_eq(surface.overall_level, @runtime.Degrade)
+  assert_eq(surface.issues.length(), 1)
+  assert_eq(surface.issues[0].source, @runtime.Topology)
+  assert_eq(surface.issues[0].category, @runtime.Topology)
+  guard surface.configuration_summary is Some(summary) else {
+    fail("expected configuration summary")
+  }
+  assert_eq(summary.slave_count, 1)
+  assert_eq(summary.station_addresses, [0x1001U])
+}
+
+///|
+test "diagnostic surface from slave diagnosis classifies register and mailbox issues" {
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+        identification: 5U,
+      },
+    ],
+  }
+  let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, {
+    station_address: 0x1001U,
+    al_state: Some(@protocol.SafeOp),
+    al_error_flag: Some(true),
+    al_status_code: Some(0x0011U),
+    error_register: b'\x04',
+    diagnosis_counter: Some(2U),
+  })
+  assert_eq(surface.overall_level, @runtime.Block)
+  assert_eq(surface.issues.length(), 4)
+  assert_eq(surface.issues[0].source, @runtime.Registers)
+  assert_eq(surface.issues[1].source, @runtime.Registers)
+  assert_eq(surface.issues[2].source, @runtime.Mailbox)
+  assert_eq(surface.issues[3].category, @runtime.DiagnosisHistory)
+}
+
+///|
+test "validation difference category and grade classify topology identity and configuration" {
+  assert_eq(
+    @runtime.validation_difference_category(@runtime.Missing(position=0)),
+    @runtime.Topology,
+  )
+  assert_eq(
+    @runtime.validation_difference_grade(@runtime.Extra(position=1)),
+    @runtime.Warn,
+  )
+  assert_eq(
+    @runtime.validation_difference_category(
+      @runtime.IdentityMismatch(
+        position=0,
+        expected=Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        actual=Some({
+          vendor_id: 5U,
+          product_code: 6U,
+          revision: 7U,
+          serial: 8U,
+        }),
+      ),
+    ),
+    @runtime.Identity,
+  )
+  assert_eq(
+    @runtime.validation_difference_category(
+      @runtime.IdentificationMismatch(
+        position=0,
+        expected=Some(1U),
+        actual=Some(2U),
+      ),
+    ),
+    @runtime.Configuration,
+  )
+}
+
+///|
+test "offline config and ENI expectations share the same validation semantics" {
+  let expected_eni_xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATConfig>
+    #|  <Config>
+    #|    <Slave>
+    #|      <Info>
+    #|        <PhysAddr>0x1002</PhysAddr>
+    #|        <Identification Value="0x20" />
+    #|        <VendorId>0x2</VendorId>
+    #|        <ProductCode>0x04D2</ProductCode>
+    #|        <RevisionNo>1</RevisionNo>
+    #|        <SerialNo>0x1234</SerialNo>
+    #|      </Info>
+    #|    </Slave>
+    #|  </Config>
+    #|</EtherCATConfig>
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+        identification: 0x20U,
+      },
+    ],
+  }
+  let expected_offline = @runtime.configuration_from_expected([
+    {
+      position: 0U,
+      configured_address: 0x1002U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x04D2U,
+        revision: 0x0001U,
+        serial: 0x1234U,
+      }),
+      expected_identification: Some(0x20U),
+    },
+  ])
+  let expected_eni = @runtime.configuration_from_eni_xml(expected_eni_xml)
+  let actual = @runtime.configuration_from_scan(scan)
+  let offline_report = @runtime.validate_configuration(actual, expected_offline)
+  let eni_report = @runtime.validate_configuration(actual, expected_eni)
+  assert_eq(offline_report.results.length(), 1)
+  assert_eq(eni_report.results.length(), 1)
+  assert_true(
+    offline_report.results[0]
+    is @runtime.StationAddressMismatch(
+      position=0,
+      expected=0x1002U,
+      actual=0x1001U
+    ),
+  )
+  assert_true(
+    eni_report.results[0]
+    is @runtime.StationAddressMismatch(
+      position=0,
+      expected=0x1002U,
+      actual=0x1001U
+    ),
+  )
+  assert_eq(offline_report.differences, eni_report.differences)
+  assert_eq(offline_report.grade, eni_report.grade)
+  assert_eq(offline_report.all_ok, eni_report.all_ok)
+  assert_eq(offline_report.expected_source, @runtime.OfflineConfig)
+  assert_eq(eni_report.expected_source, @runtime.EniImport)
+}
+
+///|
 test "RunPhase equality" {
   assert_eq(@runtime.RunPhase::Scanning, @runtime.RunPhase::Scanning)
   assert_eq(@runtime.RunPhase::Done, @runtime.RunPhase::Done)

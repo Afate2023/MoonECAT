@@ -19,6 +19,88 @@ pub(all) struct SlaveDiagnosis {
 } derive(Eq, Show)
 
 ///|
+pub(all) enum DiagnosticLevel {
+  Block
+  Degrade
+  Info
+} derive(Eq, Show)
+
+///|
+pub(all) enum DiagnosticSourceLayer {
+  Registers
+  Mailbox
+  Topology
+  Configuration
+  RuntimeTelemetry
+  StateTransition
+} derive(Eq, Show)
+
+///|
+pub(all) enum DiagnosticCategory {
+  AlStatus
+  ErrorRegister
+  DiagnosisHistory
+  Topology
+  Identity
+  Configuration
+  RuntimeMetrics
+  StateTransition
+} derive(Eq, Show)
+
+///|
+pub(all) struct StateSurfaceSummary {
+  target_state : @protocol.EsmState?
+  current_state : @protocol.EsmState?
+  final_state : @protocol.EsmState?
+  al_state : @protocol.EsmState?
+  al_error_flag : Bool?
+  al_status_code : UInt?
+  wkc : UInt?
+} derive(Eq, Show)
+
+///|
+pub(all) struct ConfigurationSurfaceSummary {
+  slave_count : Int
+  station_addresses : Array[UInt]
+  expected_source : ConfigurationSource?
+  actual_source : ConfigurationSource?
+  validation_grade : ValidateGrade?
+  difference_count : Int
+} derive(Eq, Show)
+
+///|
+pub(all) struct RuntimeMetricsSummary {
+  cycles : Int64
+  tx_frames : Int64
+  rx_frames : Int64
+  timeouts : Int64
+  retries : Int64
+  wkc_errors : Int64
+  irq_events : Int64
+  dc_delay_updates : Int64
+} derive(Eq, Show)
+
+///|
+pub(all) struct DiagnosticIssue {
+  source : DiagnosticSourceLayer
+  category : DiagnosticCategory
+  level : DiagnosticLevel
+  detail : String
+} derive(Eq, Show)
+
+///|
+pub(all) struct DiagnosticSurface {
+  station_address : UInt?
+  state_summary : StateSurfaceSummary
+  configuration_summary : ConfigurationSurfaceSummary?
+  error_register : Byte?
+  diagnosis_counter : UInt?
+  runtime_metrics : RuntimeMetricsSummary?
+  issues : Array[DiagnosticIssue]
+  overall_level : DiagnosticLevel
+} derive(Eq, Show)
+
+///|
 /// DiagnosisSession captures the state needed around a diagnosis run.
 pub(all) struct DiagnosisSession {
   original_state : @protocol.EsmState
@@ -221,6 +303,335 @@ pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
     },
     error_register: err,
     diagnosis_counter: diag,
+  }
+}
+
+///|
+pub fn diagnostic_surface_from_slave_diagnosis(
+  scan : ScanReport,
+  report : SlaveDiagnosis,
+) -> DiagnosticSurface {
+  let issues : Array[DiagnosticIssue] = []
+  match report.al_error_flag {
+    Some(true) =>
+      issues.push({
+        source: Registers,
+        category: AlStatus,
+        level: Block,
+        detail: "AL error flag set",
+      })
+    _ => ()
+  }
+  match report.al_status_code {
+    Some(code) if code != 0U =>
+      issues.push({
+        source: Registers,
+        category: AlStatus,
+        level: Block,
+        detail: "AL status code " + code.to_string(),
+      })
+    _ => ()
+  }
+  if report.error_register != b'\x00' {
+    issues.push({
+      source: Mailbox,
+      category: ErrorRegister,
+      level: Degrade,
+      detail: "Error register " + report.error_register.to_uint().to_string(),
+    })
+  }
+  match report.diagnosis_counter {
+    Some(value) if value > 0U =>
+      issues.push({
+        source: Mailbox,
+        category: DiagnosisHistory,
+        level: Info,
+        detail: "Diagnosis history count " + value.to_string(),
+      })
+    _ => ()
+  }
+  {
+    station_address: Some(report.station_address),
+    state_summary: {
+      target_state: None,
+      current_state: None,
+      final_state: None,
+      al_state: report.al_state,
+      al_error_flag: report.al_error_flag,
+      al_status_code: report.al_status_code,
+      wkc: None,
+    },
+    configuration_summary: Some(
+      configuration_surface_summary(scan, None, Some(OnlineScan), None, 0),
+    ),
+    error_register: Some(report.error_register),
+    diagnosis_counter: report.diagnosis_counter,
+    runtime_metrics: None,
+    issues,
+    overall_level: highest_diagnostic_level(issues, Info),
+  }
+}
+
+///|
+pub fn diagnostic_surface_from_validate(
+  scan : ScanReport,
+  report : ValidateReport,
+) -> DiagnosticSurface {
+  let issues = report.differences.map(fn(diff) {
+    validation_difference_issue(diff)
+  })
+  let baseline = diagnostic_level_from_validate_grade(report.grade)
+  {
+    station_address: None,
+    state_summary: empty_state_surface_summary(),
+    configuration_summary: Some(
+      configuration_surface_summary(
+        scan,
+        Some(report.expected_source),
+        Some(report.actual_source),
+        Some(report.grade),
+        report.differences.length(),
+      ),
+    ),
+    error_register: None,
+    diagnosis_counter: None,
+    runtime_metrics: None,
+    issues,
+    overall_level: highest_diagnostic_level(issues, baseline),
+  }
+}
+
+///|
+pub fn diagnostic_surface_from_run(report : RunReport) -> DiagnosticSurface {
+  let base = diagnostic_surface_from_validate(report.scan, report.validation)
+  let issues = base.issues
+  let telemetry_issues = runtime_metrics_issues(
+    report.telemetry,
+    report.cycles_requested,
+    report.cycles_ok,
+  )
+  for issue in telemetry_issues {
+    issues.push(issue)
+  }
+  {
+    ..base,
+    runtime_metrics: Some(runtime_metrics_summary(report.telemetry)),
+    issues,
+    overall_level: highest_diagnostic_level(
+      issues,
+      highest_diagnostic_level(base.issues, base.overall_level),
+    ),
+  }
+}
+
+///|
+pub fn diagnostic_surface_from_state_transition(
+  station : UInt?,
+  target : @protocol.EsmState,
+  current : @protocol.EsmState?,
+  final_state : @protocol.EsmState?,
+  status_code : UInt?,
+  wkc : UInt?,
+) -> DiagnosticSurface {
+  let issues : Array[DiagnosticIssue] = []
+  match final_state {
+    Some(state) if state != target =>
+      issues.push({
+        source: StateTransition,
+        category: StateTransition,
+        level: Block,
+        detail: "Final state " +
+        state.to_string() +
+        " does not match target " +
+        target.to_string(),
+      })
+    _ => ()
+  }
+  match status_code {
+    Some(code) if code != 0U =>
+      issues.push({
+        source: Registers,
+        category: AlStatus,
+        level: Block,
+        detail: "AL status code " + code.to_string(),
+      })
+    _ => ()
+  }
+  match wkc {
+    Some(value) if value == 0U =>
+      issues.push({
+        source: StateTransition,
+        category: StateTransition,
+        level: Degrade,
+        detail: "WKC is zero during state transition",
+      })
+    _ => ()
+  }
+  {
+    station_address: station,
+    state_summary: {
+      target_state: Some(target),
+      current_state: current,
+      final_state,
+      al_state: None,
+      al_error_flag: None,
+      al_status_code: status_code,
+      wkc,
+    },
+    configuration_summary: None,
+    error_register: None,
+    diagnosis_counter: None,
+    runtime_metrics: None,
+    issues,
+    overall_level: highest_diagnostic_level(issues, Info),
+  }
+}
+
+///|
+fn empty_state_surface_summary() -> StateSurfaceSummary {
+  {
+    target_state: None,
+    current_state: None,
+    final_state: None,
+    al_state: None,
+    al_error_flag: None,
+    al_status_code: None,
+    wkc: None,
+  }
+}
+
+///|
+fn configuration_surface_summary(
+  scan : ScanReport,
+  expected_source : ConfigurationSource?,
+  actual_source : ConfigurationSource?,
+  validation_grade : ValidateGrade?,
+  difference_count : Int,
+) -> ConfigurationSurfaceSummary {
+  {
+    slave_count: scan.slave_count,
+    station_addresses: scan.slaves.map(fn(slave) { slave.station_address }),
+    expected_source,
+    actual_source,
+    validation_grade,
+    difference_count,
+  }
+}
+
+///|
+fn runtime_metrics_summary(telemetry : Telemetry) -> RuntimeMetricsSummary {
+  {
+    cycles: telemetry.cycles,
+    tx_frames: telemetry.tx_frames,
+    rx_frames: telemetry.rx_frames,
+    timeouts: telemetry.timeouts,
+    retries: telemetry.retries,
+    wkc_errors: telemetry.wkc_errors,
+    irq_events: telemetry.irq_events,
+    dc_delay_updates: telemetry.dc_delay_updates,
+  }
+}
+
+///|
+fn validation_difference_issue(
+  diff : ConfigurationDifference,
+) -> DiagnosticIssue {
+  let (source, category) = match validation_difference_category(diff) {
+    ValidateDifferenceCategory::Topology =>
+      (DiagnosticSourceLayer::Topology, DiagnosticCategory::Topology)
+    ValidateDifferenceCategory::Identity =>
+      (DiagnosticSourceLayer::Configuration, DiagnosticCategory::Identity)
+    ValidateDifferenceCategory::Configuration =>
+      (DiagnosticSourceLayer::Configuration, DiagnosticCategory::Configuration)
+    ValidateDifferenceCategory::Informational =>
+      (DiagnosticSourceLayer::Configuration, DiagnosticCategory::Configuration)
+  }
+  {
+    source,
+    category,
+    level: diagnostic_level_from_validate_grade(
+      validation_difference_grade(diff),
+    ),
+    detail: diff.to_string(),
+  }
+}
+
+///|
+fn diagnostic_level_from_validate_grade(
+  grade : ValidateGrade,
+) -> DiagnosticLevel {
+  match grade {
+    Pass => Info
+    Warn => Degrade
+    Block => Block
+  }
+}
+
+///|
+fn runtime_metrics_issues(
+  telemetry : Telemetry,
+  cycles_requested : Int,
+  cycles_ok : Int,
+) -> Array[DiagnosticIssue] {
+  let issues : Array[DiagnosticIssue] = []
+  if telemetry.timeouts > 0L {
+    issues.push({
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Degrade,
+      detail: "Timeout count " + telemetry.timeouts.to_string(),
+    })
+  }
+  if telemetry.wkc_errors > 0L {
+    issues.push({
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Degrade,
+      detail: "WKC error count " + telemetry.wkc_errors.to_string(),
+    })
+  }
+  if telemetry.retries > 0L {
+    issues.push({
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Info,
+      detail: "Retry count " + telemetry.retries.to_string(),
+    })
+  }
+  if cycles_ok < cycles_requested {
+    issues.push({
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Degrade,
+      detail: "Cycle completion " +
+      cycles_ok.to_string() +
+      "/" +
+      cycles_requested.to_string(),
+    })
+  }
+  issues
+}
+
+///|
+fn highest_diagnostic_level(
+  issues : Array[DiagnosticIssue],
+  fallback : DiagnosticLevel,
+) -> DiagnosticLevel {
+  let mut level = fallback
+  for issue in issues {
+    if diagnostic_level_rank(issue.level) > diagnostic_level_rank(level) {
+      level = issue.level
+    }
+  }
+  level
+}
+
+///|
+fn diagnostic_level_rank(level : DiagnosticLevel) -> Int {
+  match level {
+    Info => 0
+    Degrade => 1
+    Block => 2
   }
 }
 

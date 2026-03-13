@@ -29,6 +29,14 @@ pub(all) enum ValidateGrade {
 } derive(Eq, Show)
 
 ///|
+pub(all) enum ValidateDifferenceCategory {
+  Topology
+  Identity
+  Configuration
+  Informational
+} derive(Eq, Show)
+
+///|
 /// ValidateReport holds the full validation result.
 pub(all) struct ValidateReport {
   expected_source : ConfigurationSource
@@ -114,6 +122,29 @@ fn validation_grade_from_differences(
     }
   }
   Warn
+}
+
+///|
+pub fn validation_difference_category(
+  difference : ConfigurationDifference,
+) -> ValidateDifferenceCategory {
+  match difference {
+    Missing(..) | Extra(..) => Topology
+    IdentityMismatch(..) => Identity
+    StationAddressMismatch(..)
+    | IdentificationMismatch(..)
+    | ProcessDataSummaryMismatch(..) => Configuration
+  }
+}
+
+///|
+pub fn validation_difference_grade(
+  difference : ConfigurationDifference,
+) -> ValidateGrade {
+  match difference {
+    Extra(..) => Warn
+    _ => Block
+  }
 }
 
 ///|
