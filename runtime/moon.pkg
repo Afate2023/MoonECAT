@@ -2,9 +2,9 @@ import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/mailbox",
-  "Milky2018/xml",
   "moonbitlang/core/buffer",
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
 }
 
 import {

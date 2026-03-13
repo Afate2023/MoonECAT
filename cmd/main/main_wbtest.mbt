@@ -87,6 +87,19 @@ test "cli resolve validate expected configuration defaults to scan projection" {
 }
 
 ///|
+test "cli resolve validate expected configuration rejects XML ENI input" {
+  let scan_report : @runtime.ScanReport = { slave_count: 0, slaves: [] }
+  let result : Result[@runtime.ConfigurationModel, Error] = try? resolve_validate_expected_configuration(
+    scan_report,
+    ["moonecat", "validate", "--eni", "config.xml"],
+  )
+  guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
+    fail("expected XML ENI validation path to be rejected")
+  }
+  assert_true(message.contains("--eni-json"))
+}
+
+///|
 test "cli esm state parser accepts canonical names" {
   assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
   assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)

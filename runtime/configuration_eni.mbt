@@ -1,272 +1,283 @@
 ///|
-/// ENI-specific XML projection kept separate from the runtime-facing
-/// ConfigurationModel. The parser extracts only the fields needed for
-/// comparison and leaves process-data details for later phases.
+/// ENI JSON interchange kept separate from the runtime-facing
+/// ConfigurationModel. Runtime accepts only this normalized JSON surface,
+/// while XML parsing lives in a standalone conversion tool.
 
 ///|
-priv struct EniSlaveProjection {
-  position : Int
-  configured_address : UInt?
-  vendor_id : UInt?
-  product_code : UInt?
-  revision : UInt?
-  serial : UInt?
-  identification : UInt?
-  sync_manager_count : Int
-  fmmu_count : Int
-  rx_pdo_count : Int
-  tx_pdo_count : Int
-  mailbox_protocols : ConfigurationMailboxProtocols?
-  dc_op_mode_count : Int
-  dc_assign_activate_count : Int
-}
+priv struct EniJsonIdentity {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+} derive(ToJson)
 
 ///|
-priv struct EniCurrentValues {
-  configured_address : UInt?
-  vendor_id : UInt?
-  product_code : UInt?
-  revision : UInt?
-  serial : UInt?
-}
-
-///|
-priv struct EniMailboxProtocols {
+priv struct EniJsonMailboxProtocols {
   aoe : Bool
   coe : Bool
   eoe : Bool
   foe : Bool
   soe : Bool
   voe : Bool
+} derive(ToJson)
+
+///|
+priv struct EniJsonProcessDataSummary {
+  sync_manager_count : Int
+  fmmu_count : Int
+  rx_pdo_count : Int
+  tx_pdo_count : Int
+  mailbox_protocols : EniJsonMailboxProtocols?
+  dc_op_mode_count : Int
+  dc_assign_activate_count : Int
+} derive(ToJson)
+
+///|
+priv struct EniJsonSlave {
+  position : Int
+  configured_address : UInt?
+  identity : EniJsonIdentity?
+  identification : UInt?
+  process_data_summary : EniJsonProcessDataSummary?
+} derive(ToJson)
+
+///|
+priv struct EniJsonDocument {
+  slaves : Array[EniJsonSlave]
+} derive(ToJson)
+
+///|
+fn parse_eni_json_document(
+  json_content : String,
+) -> EniJsonDocument raise @hal.EcError {
+  let parsed = @json.parse(json_content[:]) catch {
+    err =>
+      raise @hal.EcError::EsiParseFailed(
+        "ENI JSON parse failed: " + err.to_string(),
+      )
+  }
+  parse_eni_json_document_value(parsed)
 }
 
 ///|
-fn parse_eni_slave_projection(
-  xml_content : String,
-) -> Array[EniSlaveProjection] raise @hal.EcError {
-  let reader = @xml.Reader::from_string(xml_content)
-  let slaves : Array[EniSlaveProjection] = []
-
-  let mut in_slave = false
-  let mut in_info = false
-  let mut in_mailbox = false
-  let mut in_dc = false
-  let mut current_field : String? = None
-  let mut current_mailbox_field : String? = None
-  let mut current_dc_field : String? = None
-  let mut current_position = 0
-  let mut current_values : EniCurrentValues = {
-    configured_address: None,
-    vendor_id: None,
-    product_code: None,
-    revision: None,
-    serial: None,
+fn parse_eni_json_document_value(
+  json : Json,
+) -> EniJsonDocument raise @hal.EcError {
+  guard json is { "slaves": Array(slaves_json), .. } else {
+    raise @hal.EcError::EsiParseFailed(
+      "ENI JSON decode failed: missing slaves array",
+    )
   }
-  let mut current_identification : UInt? = None
-  let mut current_sync_manager_count = 0
-  let mut current_fmmu_count = 0
-  let mut current_rx_pdo_count = 0
-  let mut current_tx_pdo_count = 0
-  let mut current_mailbox_protocols : EniMailboxProtocols? = None
-  let mut current_dc_op_mode_count = 0
-  let mut current_dc_assign_activate_count = 0
+  { slaves: slaves_json.map(slave_json => parse_eni_json_slave(slave_json)) }
+}
 
-  while true {
-    let event = reader.read_event() catch {
-      err =>
+///|
+fn parse_eni_json_slave(json : Json) -> EniJsonSlave raise @hal.EcError {
+  guard json
+    is {
+      "position": position_json,
+      "configured_address"? : configured_address_json,
+      "identity"? : identity_json,
+      "identification"? : identification_json,
+      "process_data_summary"? : process_data_summary_json,
+      ..
+    } else {
+    raise @hal.EcError::EsiParseFailed(
+      "ENI JSON decode failed: invalid slave entry",
+    )
+  }
+  {
+    position: decode_eni_json_int(position_json),
+    configured_address: decode_optional_eni_json_value_uint(
+      configured_address_json,
+    ),
+    identity: decode_optional_eni_json_identity(identity_json),
+    identification: decode_optional_eni_json_value_uint(identification_json),
+    process_data_summary: decode_optional_eni_json_process_data_summary(
+      process_data_summary_json,
+    ),
+  }
+}
+
+///|
+fn decode_optional_eni_json_identity(
+  json : Json?,
+) -> EniJsonIdentity? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) => {
+      guard value
+        is {
+          "vendor_id": vendor_id_json,
+          "product_code": product_code_json,
+          "revision": revision_json,
+          "serial": serial_json,
+          ..
+        } else {
         raise @hal.EcError::EsiParseFailed(
-          "ENI XML parse failed: " + err.to_string(),
+          "ENI JSON decode failed: invalid identity entry",
         )
+      }
+      Some({
+        vendor_id: decode_eni_json_uint(vendor_id_json),
+        product_code: decode_eni_json_uint(product_code_json),
+        revision: decode_eni_json_uint(revision_json),
+        serial: decode_eni_json_uint(serial_json),
+      })
     }
-    match event {
-      @xml.Start(elem) => {
-        if elem.name == "Slave" {
-          in_slave = true
-          in_info = false
-          in_mailbox = false
-          in_dc = false
-          current_field = None
-          current_mailbox_field = None
-          current_dc_field = None
-          current_values = {
-            configured_address: None,
-            vendor_id: None,
-            product_code: None,
-            revision: None,
-            serial: None,
-          }
-          current_identification = None
-          current_sync_manager_count = 0
-          current_fmmu_count = 0
-          current_rx_pdo_count = 0
-          current_tx_pdo_count = 0
-          current_mailbox_protocols = None
-          current_dc_op_mode_count = 0
-          current_dc_assign_activate_count = 0
-          continue
-        }
+  }
+}
 
-        if not(in_slave) {
-          continue
-        }
-
-        if is_eni_sync_manager_tag(elem.name) {
-          current_sync_manager_count = current_sync_manager_count + 1
-        }
-        if elem.name == "Fmmu" {
-          current_fmmu_count = current_fmmu_count + 1
-        }
-        if elem.name == "RxPdo" {
-          current_rx_pdo_count = current_rx_pdo_count + 1
-        }
-        if elem.name == "TxPdo" {
-          current_tx_pdo_count = current_tx_pdo_count + 1
-        }
-
-        if elem.name == "Mailbox" {
-          in_mailbox = true
-          current_mailbox_field = None
-          continue
-        }
-
-        if elem.name == "Dc" {
-          in_dc = true
-          current_dc_field = None
-          continue
-        }
-
-        if in_mailbox {
-          if is_eni_mailbox_protocol_tag(elem.name) {
-            current_mailbox_protocols = Some(
-              enable_mailbox_protocol(current_mailbox_protocols, elem.name),
-            )
-            current_mailbox_field = None
-          } else if elem.name == "Protocol" {
-            current_mailbox_field = Some(elem.name)
-          } else {
-            current_mailbox_field = None
-          }
-        }
-
-        if in_dc {
-          if elem.name == "OpMode" {
-            current_dc_op_mode_count = current_dc_op_mode_count + 1
-            current_dc_field = None
-          } else if elem.name == "AssignActivate" {
-            current_dc_field = Some(elem.name)
-          } else {
-            current_dc_field = None
-          }
-        }
-
-        if elem.name == "Info" {
-          in_info = true
-          current_field = None
-          continue
-        }
-
-        if in_info {
-          if elem.name == "Identification" {
-            current_identification = parse_optional_numeric_attribute(
-              elem, "Value", "Slave/Info/Identification@Value",
-            )
-            current_field = None
-          } else if is_eni_info_field(elem.name) {
-            current_field = Some(elem.name)
-          } else {
-            current_field = None
-          }
-        }
-      }
-      @xml.Empty(elem) =>
-        if in_slave {
-          if is_eni_sync_manager_tag(elem.name) {
-            current_sync_manager_count = current_sync_manager_count + 1
-          }
-          if elem.name == "Fmmu" {
-            current_fmmu_count = current_fmmu_count + 1
-          }
-          if elem.name == "RxPdo" {
-            current_rx_pdo_count = current_rx_pdo_count + 1
-          }
-          if elem.name == "TxPdo" {
-            current_tx_pdo_count = current_tx_pdo_count + 1
-          }
-          if in_mailbox && is_eni_mailbox_protocol_tag(elem.name) {
-            current_mailbox_protocols = Some(
-              enable_mailbox_protocol(current_mailbox_protocols, elem.name),
-            )
-          }
-          if in_dc && elem.name == "OpMode" {
-            current_dc_op_mode_count = current_dc_op_mode_count + 1
-          }
-          if in_info && elem.name == "Identification" {
-            current_identification = parse_optional_numeric_attribute(
-              elem, "Value", "Slave/Info/Identification@Value",
-            )
-          }
-        }
-      @xml.Text(content) => {
-        current_values = update_eni_field(
-          content, current_field, current_values,
-        )
-        current_mailbox_protocols = update_mailbox_protocol_text(
-          content, current_mailbox_field, current_mailbox_protocols,
-        )
-        current_dc_assign_activate_count = update_dc_assign_activate_count(
-          content, current_dc_field, current_dc_assign_activate_count,
+///|
+fn decode_optional_eni_json_process_data_summary(
+  json : Json?,
+) -> EniJsonProcessDataSummary? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) => {
+      guard value
+        is {
+          "sync_manager_count": sync_manager_count_json,
+          "fmmu_count": fmmu_count_json,
+          "rx_pdo_count": rx_pdo_count_json,
+          "tx_pdo_count": tx_pdo_count_json,
+          "mailbox_protocols"? : mailbox_protocols_json,
+          "dc_op_mode_count": dc_op_mode_count_json,
+          "dc_assign_activate_count": dc_assign_activate_count_json,
+          ..
+        } else {
+        raise @hal.EcError::EsiParseFailed(
+          "ENI JSON decode failed: invalid process_data_summary entry",
         )
       }
-      @xml.CData(content) => {
-        current_values = update_eni_field(
-          content, current_field, current_values,
-        )
-        current_mailbox_protocols = update_mailbox_protocol_text(
-          content, current_mailbox_field, current_mailbox_protocols,
-        )
-        current_dc_assign_activate_count = update_dc_assign_activate_count(
-          content, current_dc_field, current_dc_assign_activate_count,
+      Some({
+        sync_manager_count: decode_eni_json_int(sync_manager_count_json),
+        fmmu_count: decode_eni_json_int(fmmu_count_json),
+        rx_pdo_count: decode_eni_json_int(rx_pdo_count_json),
+        tx_pdo_count: decode_eni_json_int(tx_pdo_count_json),
+        mailbox_protocols: decode_optional_eni_json_mailbox_protocols(
+          mailbox_protocols_json,
+        ),
+        dc_op_mode_count: decode_eni_json_int(dc_op_mode_count_json),
+        dc_assign_activate_count: decode_eni_json_int(
+          dc_assign_activate_count_json,
+        ),
+      })
+    }
+  }
+}
+
+///|
+fn decode_optional_eni_json_mailbox_protocols(
+  json : Json?,
+) -> EniJsonMailboxProtocols? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) => {
+      guard value
+        is {
+          "aoe": aoe_json,
+          "coe": coe_json,
+          "eoe": eoe_json,
+          "foe": foe_json,
+          "soe": soe_json,
+          "voe": voe_json,
+          ..
+        } else {
+        raise @hal.EcError::EsiParseFailed(
+          "ENI JSON decode failed: invalid mailbox_protocols entry",
         )
       }
-      @xml.End(name) => {
-        if in_info && current_field == Some(name) {
-          current_field = None
-        }
-        if in_mailbox && current_mailbox_field == Some(name) {
-          current_mailbox_field = None
-        }
-        if in_dc && current_dc_field == Some(name) {
-          current_dc_field = None
-        }
-        if name == "Info" {
-          in_info = false
-          current_field = None
-          continue
-        }
-        if name == "Mailbox" {
-          in_mailbox = false
-          current_mailbox_field = None
-          continue
-        }
-        if name == "Dc" {
-          in_dc = false
-          current_dc_field = None
-          continue
-        }
-        if name == "Slave" && in_slave {
-          slaves.push({
-            position: current_position,
-            configured_address: current_values.configured_address,
-            vendor_id: current_values.vendor_id,
-            product_code: current_values.product_code,
-            revision: current_values.revision,
-            serial: current_values.serial,
-            identification: current_identification,
-            sync_manager_count: current_sync_manager_count,
-            fmmu_count: current_fmmu_count,
-            rx_pdo_count: current_rx_pdo_count,
-            tx_pdo_count: current_tx_pdo_count,
-            mailbox_protocols: current_mailbox_protocols.map(fn(protocols) {
+      Some({
+        aoe: decode_eni_json_bool(aoe_json),
+        coe: decode_eni_json_bool(coe_json),
+        eoe: decode_eni_json_bool(eoe_json),
+        foe: decode_eni_json_bool(foe_json),
+        soe: decode_eni_json_bool(soe_json),
+        voe: decode_eni_json_bool(voe_json),
+      })
+    }
+  }
+}
+
+///|
+fn decode_optional_eni_json_value_uint(
+  json : Json?,
+) -> UInt? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) => Some(decode_eni_json_uint(value))
+  }
+}
+
+///|
+fn decode_eni_json_int(json : Json) -> Int raise @hal.EcError {
+  @json.from_json(json) catch {
+    err =>
+      raise @hal.EcError::EsiParseFailed(
+        "ENI JSON decode failed: " + err.to_string(),
+      )
+  }
+}
+
+///|
+fn decode_eni_json_uint(json : Json) -> UInt raise @hal.EcError {
+  @json.from_json(json) catch {
+    err =>
+      raise @hal.EcError::EsiParseFailed(
+        "ENI JSON decode failed: " + err.to_string(),
+      )
+  }
+}
+
+///|
+fn decode_eni_json_bool(json : Json) -> Bool raise @hal.EcError {
+  @json.from_json(json) catch {
+    err =>
+      raise @hal.EcError::EsiParseFailed(
+        "ENI JSON decode failed: " + err.to_string(),
+      )
+  }
+}
+
+///|
+pub fn configuration_to_eni_json(model : ConfigurationModel) -> Json {
+  eni_json_document_from_configuration(model).to_json()
+}
+
+///|
+pub fn configuration_to_eni_json_string(
+  model : ConfigurationModel,
+  indent? : Int = 2,
+) -> String {
+  configuration_to_eni_json(model).stringify(indent~)
+}
+
+///|
+fn project_eni_json_document(document : EniJsonDocument) -> ConfigurationModel {
+  {
+    source: EniImport,
+    total_slaves: document.slaves.length(),
+    slaves: document.slaves.map(fn(slave) {
+      {
+        position: slave.position,
+        configured_address: slave.configured_address,
+        identity: slave.identity.map(fn(identity) {
+          {
+            vendor_id: identity.vendor_id,
+            product_code: identity.product_code,
+            revision: identity.revision,
+            serial: identity.serial,
+          }
+        }),
+        identification: slave.identification,
+        process_data_summary: slave.process_data_summary.map(fn(summary) {
+          {
+            sync_manager_count: summary.sync_manager_count,
+            fmmu_count: summary.fmmu_count,
+            rx_pdo_count: summary.rx_pdo_count,
+            tx_pdo_count: summary.tx_pdo_count,
+            mailbox_protocols: summary.mailbox_protocols.map(fn(protocols) {
               {
                 aoe: protocols.aoe,
                 coe: protocols.coe,
@@ -276,264 +287,9 @@ fn parse_eni_slave_projection(
                 voe: protocols.voe,
               }
             }),
-            dc_op_mode_count: current_dc_op_mode_count,
-            dc_assign_activate_count: current_dc_assign_activate_count,
-          })
-          current_position = current_position + 1
-          in_slave = false
-          in_info = false
-          in_mailbox = false
-          in_dc = false
-          current_field = None
-          current_mailbox_field = None
-          current_dc_field = None
-        }
-      }
-      @xml.Eof => break
-      _ => ()
-    }
-  }
-
-  slaves
-}
-
-///|
-fn is_eni_info_field(name : String) -> Bool {
-  name == "PhysAddr" ||
-  name == "VendorId" ||
-  name == "ProductCode" ||
-  name == "RevisionNo" ||
-  name == "SerialNo"
-}
-
-///|
-fn is_eni_sync_manager_tag(name : String) -> Bool {
-  name == "Sm" ||
-  name == "Sm0" ||
-  name == "Sm1" ||
-  name == "Sm2" ||
-  name == "Sm3"
-}
-
-///|
-fn is_eni_mailbox_protocol_tag(name : String) -> Bool {
-  name == "AoE" ||
-  name == "CoE" ||
-  name == "EoE" ||
-  name == "FoE" ||
-  name == "SoE" ||
-  name == "VoE"
-}
-
-///|
-fn empty_mailbox_protocols() -> EniMailboxProtocols {
-  { aoe: false, coe: false, eoe: false, foe: false, soe: false, voe: false }
-}
-
-///|
-fn enable_mailbox_protocol(
-  protocols : EniMailboxProtocols?,
-  protocol_name : String,
-) -> EniMailboxProtocols {
-  let current = match protocols {
-    Some(value) => value
-    None => empty_mailbox_protocols()
-  }
-  match protocol_name {
-    "AoE" => { ..current, aoe: true }
-    "CoE" => { ..current, coe: true }
-    "EoE" => { ..current, eoe: true }
-    "FoE" => { ..current, foe: true }
-    "SoE" => { ..current, soe: true }
-    "VoE" => { ..current, voe: true }
-    _ => current
-  }
-}
-
-///|
-fn compact_xml_text(content : String) -> String {
-  let bytes = @utf8.encode(content)
-  let filtered : Array[Byte] = []
-  for ch in bytes {
-    if ch == b'\x00' || ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
-      continue
-    }
-    filtered.push(ch)
-  }
-  @utf8.decode(Bytes::from_array(filtered)) catch {
-    _ => ""
-  }
-}
-
-///|
-fn update_mailbox_protocol_text(
-  content : String,
-  current_mailbox_field : String?,
-  current_protocols : EniMailboxProtocols?,
-) -> EniMailboxProtocols? {
-  if current_mailbox_field != Some("Protocol") {
-    return current_protocols
-  }
-  let protocol_name = compact_xml_text(content)
-  if protocol_name == "" {
-    return current_protocols
-  }
-  Some(enable_mailbox_protocol(current_protocols, protocol_name))
-}
-
-///|
-fn update_dc_assign_activate_count(
-  content : String,
-  current_dc_field : String?,
-  current_count : Int,
-) -> Int raise @hal.EcError {
-  if current_dc_field != Some("AssignActivate") || is_blank_xml_text(content) {
-    return current_count
-  }
-  if parse_eni_numeric(content, "Slave/Dc/OpMode/AssignActivate") == 0U {
-    return current_count
-  }
-  current_count + 1
-}
-
-///|
-fn update_eni_field(
-  content : String,
-  current_field : String?,
-  current_values : EniCurrentValues,
-) -> EniCurrentValues raise @hal.EcError {
-  let field = match current_field {
-    Some(field) => field
-    None => return current_values
-  }
-  if is_blank_xml_text(content) {
-    return current_values
-  }
-  let value = parse_eni_numeric(content, "Slave/Info/" + field)
-  match field {
-    "PhysAddr" => { ..current_values, configured_address: Some(value) }
-    "VendorId" => { ..current_values, vendor_id: Some(value) }
-    "ProductCode" => { ..current_values, product_code: Some(value) }
-    "RevisionNo" => { ..current_values, revision: Some(value) }
-    "SerialNo" => { ..current_values, serial: Some(value) }
-    _ => current_values
-  }
-}
-
-///|
-fn is_blank_xml_text(content : String) -> Bool {
-  let bytes = @utf8.encode(content)
-  for ch in bytes {
-    if ch == b'\x00' {
-      continue
-    }
-    if ch != b' ' && ch != b'\t' && ch != b'\r' && ch != b'\n' {
-      return false
-    }
-  }
-  true
-}
-
-///|
-fn parse_optional_numeric_attribute(
-  elem : @xml.XmlElement,
-  attr_name : String,
-  field_name : String,
-) -> UInt? raise @hal.EcError {
-  match elem.get(attr_name) {
-    Some(value) => Some(parse_eni_numeric(value, field_name))
-    None => None
-  }
-}
-
-///|
-fn parse_eni_numeric(
-  text : String,
-  field_name : String,
-) -> UInt raise @hal.EcError {
-  let bytes = @utf8.encode(text)
-  let filtered : Array[Byte] = []
-  for ch in bytes {
-    if ch == b'\x00' || ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
-      continue
-    }
-    filtered.push(ch)
-  }
-
-  if filtered.length() == 0 {
-    raise @hal.EcError::EsiParseFailed(
-      "missing numeric ENI field at " + field_name,
-    )
-  }
-
-  let mut index = 0
-  let mut base = 10U
-  if filtered.length() >= 2 &&
-    filtered[0] == b'#' &&
-    (filtered[1] == b'x' || filtered[1] == b'X') {
-    base = 16U
-    index = 2
-  } else if filtered.length() >= 2 &&
-    filtered[0] == b'0' &&
-    (filtered[1] == b'x' || filtered[1] == b'X') {
-    base = 16U
-    index = 2
-  }
-
-  if index >= filtered.length() {
-    raise @hal.EcError::EsiParseFailed(
-      "invalid numeric ENI field at " + field_name + ": " + text,
-    )
-  }
-
-  let mut value = 0U
-  for i = index; i < filtered.length(); i = i + 1 {
-    let digit = eni_digit_value(filtered[i])
-    if digit >= base {
-      raise @hal.EcError::EsiParseFailed(
-        "invalid numeric ENI field at " + field_name + ": " + text,
-      )
-    }
-    value = value * base + digit
-  }
-  value
-}
-
-///|
-fn eni_digit_value(ch : Byte) -> UInt raise @hal.EcError {
-  if ch >= b'0' && ch <= b'9' {
-    return ch.to_uint() - b'0'.to_uint()
-  }
-  if ch >= b'a' && ch <= b'f' {
-    return 10U + (ch.to_uint() - b'a'.to_uint())
-  }
-  if ch >= b'A' && ch <= b'F' {
-    return 10U + (ch.to_uint() - b'A'.to_uint())
-  }
-  raise @hal.EcError::EsiParseFailed(
-    "invalid hexadecimal digit in ENI numeric field",
-  )
-}
-
-///|
-fn project_eni_slaves(slaves : Array[EniSlaveProjection]) -> ConfigurationModel {
-  {
-    source: EniImport,
-    total_slaves: slaves.length(),
-    slaves: slaves.map(fn(slave) {
-      {
-        position: slave.position,
-        configured_address: slave.configured_address,
-        identity: build_eni_identity(slave),
-        identification: slave.identification,
-        process_data_summary: Some({
-          sync_manager_count: slave.sync_manager_count,
-          fmmu_count: slave.fmmu_count,
-          rx_pdo_count: slave.rx_pdo_count,
-          tx_pdo_count: slave.tx_pdo_count,
-          mailbox_protocols: slave.mailbox_protocols,
-          dc_op_mode_count: slave.dc_op_mode_count,
-          dc_assign_activate_count: slave.dc_assign_activate_count,
+            dc_op_mode_count: summary.dc_op_mode_count,
+            dc_assign_activate_count: summary.dc_assign_activate_count,
+          }
         }),
       }
     }),
@@ -541,22 +297,44 @@ fn project_eni_slaves(slaves : Array[EniSlaveProjection]) -> ConfigurationModel 
 }
 
 ///|
-fn build_eni_identity(slave : EniSlaveProjection) -> @hal.SlaveIdentity? {
-  match slave.vendor_id {
-    Some(vendor_id) =>
-      match slave.product_code {
-        Some(product_code) =>
-          match slave.revision {
-            Some(revision) =>
-              match slave.serial {
-                Some(serial) =>
-                  Some({ vendor_id, product_code, revision, serial })
-                None => None
-              }
-            None => None
+fn eni_json_document_from_configuration(
+  model : ConfigurationModel,
+) -> EniJsonDocument {
+  {
+    slaves: model.slaves.map(fn(slave) {
+      {
+        position: slave.position,
+        configured_address: slave.configured_address,
+        identity: slave.identity.map(fn(identity) {
+          {
+            vendor_id: identity.vendor_id,
+            product_code: identity.product_code,
+            revision: identity.revision,
+            serial: identity.serial,
           }
-        None => None
+        }),
+        identification: slave.identification,
+        process_data_summary: slave.process_data_summary.map(fn(summary) {
+          {
+            sync_manager_count: summary.sync_manager_count,
+            fmmu_count: summary.fmmu_count,
+            rx_pdo_count: summary.rx_pdo_count,
+            tx_pdo_count: summary.tx_pdo_count,
+            mailbox_protocols: summary.mailbox_protocols.map(fn(protocols) {
+              {
+                aoe: protocols.aoe,
+                coe: protocols.coe,
+                eoe: protocols.eoe,
+                foe: protocols.foe,
+                soe: protocols.soe,
+                voe: protocols.voe,
+              }
+            }),
+            dc_op_mode_count: summary.dc_op_mode_count,
+            dc_assign_activate_count: summary.dc_assign_activate_count,
+          }
+        }),
       }
-    None => None
+    }),
   }
 }

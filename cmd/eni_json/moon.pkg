@@ -1,0 +1,13 @@
+import {
+  "afate/MoonECAT/hal",
+  "afate/MoonECAT/runtime",
+  "Milky2018/xml",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x/fs" @fs,
+}
+
+options(
+  "is-main": true,
+)

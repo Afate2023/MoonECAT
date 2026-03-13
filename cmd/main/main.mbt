@@ -334,15 +334,16 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--eni <path>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--eni-json <path>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
   println("  moon run cmd/main scan -- --backend native --if <interface>")
+  println("  moon run cmd/eni_json -- --input config.xml --output config.json")
   println(
-    "  moon run cmd/main validate -- --backend native --if <interface> --eni config.xml --json",
+    "  moon run cmd/main validate -- --backend native --if <interface> --eni-json config.json --json",
   )
   println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
@@ -780,22 +781,29 @@ fn resolve_validate_expected_configuration(
   scan_report : @runtime.ScanReport,
   args : Array[String],
 ) -> @runtime.ConfigurationModel raise @hal.EcError {
-  match flag_value(args, "--eni") {
+  match flag_value(args, "--eni-json") {
     Some(path) => {
       let content_result : Result[String, Error] = try? @fs.read_file_to_string(
         path,
       )
-      let xml_content = match content_result {
+      let json_content = match content_result {
         Ok(content) => content
         Err(err) =>
           raise @hal.EcError::ConfigMismatch(
-            "failed to read ENI file " + path + ": " + err.to_string(),
+            "failed to read ENI JSON file " + path + ": " + err.to_string(),
           )
       }
-      @runtime.configuration_from_eni_xml(xml_content)
+      @runtime.configuration_from_eni_json(json_content)
     }
     None =>
-      @runtime.configuration_from_expected(expected_from_scan(scan_report))
+      match flag_value(args, "--eni") {
+        Some(_) =>
+          raise @hal.EcError::ConfigMismatch(
+            "XML ENI import has been isolated from moonecat validate; run moon run cmd/eni_json -- --input <eni.xml> --output <eni.json> and then pass --eni-json <eni.json>",
+          )
+        None =>
+          @runtime.configuration_from_expected(expected_from_scan(scan_report))
+      }
   }
 }
 

@@ -1337,74 +1337,67 @@ test "compare_configurations reports topology and identity differences" {
 }
 
 ///|
-test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified model" {
-  let xml =
-    #|<?xml version="1.0"?>
-    #|<EtherCATConfig>
-    #|  <Config>
-    #|    <Slave>
-    #|      <Info>
-    #|        <Name><![CDATA[Drive 1]]></Name>
-    #|        <PhysAddr>1001</PhysAddr>
-    #|        <AutoIncAddr>0</AutoIncAddr>
-    #|        <Identification Value="0">
-    #|          <Ado>#x0134</Ado>
-    #|        </Identification>
-    #|        <VendorId>4739149</VendorId>
-    #|        <ProductCode>0x3</ProductCode>
-    #|        <RevisionNo>1</RevisionNo>
-    #|        <SerialNo>0</SerialNo>
-    #|      </Info>
-    #|      <ProcessData>
-    #|        <Sm No="2" />
-    #|        <Sm No="3" />
-    #|        <RxPdo Fixed="1" />
-    #|        <TxPdo Fixed="1" />
-    #|      </ProcessData>
-    #|      <Fmmu>Outputs</Fmmu>
-    #|      <Fmmu>Inputs</Fmmu>
-    #|      <Mailbox>
-    #|        <Protocol>CoE</Protocol>
-    #|      </Mailbox>
-    #|      <Dc>
-    #|        <OpMode>
-    #|          <AssignActivate>#x0300</AssignActivate>
-    #|        </OpMode>
-    #|        <OpMode>
-    #|          <AssignActivate>#x0000</AssignActivate>
-    #|        </OpMode>
-    #|      </Dc>
-    #|    </Slave>
-    #|    <Slave>
-    #|      <Info>
-    #|        <PhysAddr>1002</PhysAddr>
-    #|        <AutoIncAddr>1</AutoIncAddr>
-    #|        <Identification Value="#x20" />
-    #|        <VendorId>2</VendorId>
-    #|        <ProductCode>#x04D2</ProductCode>
-    #|        <RevisionNo>1</RevisionNo>
-    #|        <SerialNo>4660</SerialNo>
-    #|      </Info>
-    #|      <ProcessData>
-    #|        <Sm No="2" />
-    #|        <RxPdo Fixed="1" />
-    #|        <RxPdo Fixed="1" />
-    #|      </ProcessData>
-    #|      <Fmmu>Outputs</Fmmu>
-    #|      <Mailbox>
-    #|        <EoE />
-    #|        <CoE />
-    #|        <FoE />
-    #|      </Mailbox>
-    #|      <Dc>
-    #|        <OpMode>
-    #|          <AssignActivate>0x300</AssignActivate>
-    #|        </OpMode>
-    #|      </Dc>
-    #|    </Slave>
-    #|  </Config>
-    #|</EtherCATConfig>
-  let model = @runtime.configuration_from_eni_xml(xml)
+test "configuration_from_eni_json projects ENI interchange into unified model" {
+  let json =
+    #|{
+    #|  "slaves": [
+    #|    {
+    #|      "position": 0,
+    #|      "configured_address": 1001,
+    #|      "identity": {
+    #|        "vendor_id": 4739149,
+    #|        "product_code": 3,
+    #|        "revision": 1,
+    #|        "serial": 0
+    #|      },
+    #|      "identification": 0,
+    #|      "process_data_summary": {
+    #|        "sync_manager_count": 2,
+    #|        "fmmu_count": 2,
+    #|        "rx_pdo_count": 1,
+    #|        "tx_pdo_count": 1,
+    #|        "mailbox_protocols": {
+    #|          "aoe": false,
+    #|          "coe": true,
+    #|          "eoe": false,
+    #|          "foe": false,
+    #|          "soe": false,
+    #|          "voe": false
+    #|        },
+    #|        "dc_op_mode_count": 2,
+    #|        "dc_assign_activate_count": 1
+    #|      }
+    #|    },
+    #|    {
+    #|      "position": 1,
+    #|      "configured_address": 1002,
+    #|      "identity": {
+    #|        "vendor_id": 2,
+    #|        "product_code": 1234,
+    #|        "revision": 1,
+    #|        "serial": 4660
+    #|      },
+    #|      "identification": 32,
+    #|      "process_data_summary": {
+    #|        "sync_manager_count": 1,
+    #|        "fmmu_count": 1,
+    #|        "rx_pdo_count": 2,
+    #|        "tx_pdo_count": 0,
+    #|        "mailbox_protocols": {
+    #|          "aoe": false,
+    #|          "coe": true,
+    #|          "eoe": true,
+    #|          "foe": true,
+    #|          "soe": false,
+    #|          "voe": false
+    #|        },
+    #|        "dc_op_mode_count": 1,
+    #|        "dc_assign_activate_count": 1
+    #|      }
+    #|    }
+    #|  ]
+    #|}
+  let model = @runtime.configuration_from_eni_json(json)
   assert_eq(model.source, @runtime.EniImport)
   assert_eq(model.total_slaves, 2)
   assert_eq(model.slaves.length(), 2)
@@ -1463,28 +1456,23 @@ test "configuration_from_eni_xml projects CherryECAT-style ENI info into unified
 }
 
 ///|
-test "configuration_from_eni_xml raises parse error for invalid numeric field" {
-  let xml =
-    #|<?xml version="1.0"?>
-    #|<EtherCATConfig>
-    #|  <Config>
-    #|    <Slave>
-    #|      <Info>
-    #|        <PhysAddr>bad-address</PhysAddr>
-    #|      </Info>
-    #|    </Slave>
-    #|  </Config>
-    #|</EtherCATConfig>
-  let result : Result[@runtime.ConfigurationModel, Error] = try? @runtime.configuration_from_eni_xml(
-    xml,
+test "configuration_from_eni_json raises parse error for invalid shape" {
+  let json =
+    #|{
+    #|  "slaves": [
+    #|    {
+    #|      "position": 0,
+    #|      "configured_address": "bad-address"
+    #|    }
+    #|  ]
+    #|}
+  let result : Result[@runtime.ConfigurationModel, Error] = try? @runtime.configuration_from_eni_json(
+    json,
   )
   guard result is Err(@hal.EcError::EsiParseFailed(message)) else {
-    fail("expected invalid ENI numeric field to raise EsiParseFailed")
+    fail("expected invalid ENI JSON shape to raise EsiParseFailed")
   }
-  assert_true(
-    message.contains("invalid numeric ENI field at Slave/Info/PhysAddr") &&
-    message.contains("bad-address"),
-  )
+  assert_true(message.contains("ENI JSON decode failed"))
 }
 
 ///|
@@ -1881,22 +1869,31 @@ test "validation difference category and grade classify topology identity and co
 
 ///|
 test "offline config and ENI expectations share the same validation semantics" {
-  let expected_eni_xml =
-    #|<?xml version="1.0"?>
-    #|<EtherCATConfig>
-    #|  <Config>
-    #|    <Slave>
-    #|      <Info>
-    #|        <PhysAddr>0x1002</PhysAddr>
-    #|        <Identification Value="0x20" />
-    #|        <VendorId>0x2</VendorId>
-    #|        <ProductCode>0x04D2</ProductCode>
-    #|        <RevisionNo>1</RevisionNo>
-    #|        <SerialNo>0x1234</SerialNo>
-    #|      </Info>
-    #|    </Slave>
-    #|  </Config>
-    #|</EtherCATConfig>
+  let expected_eni_json =
+    #|{
+    #|  "slaves": [
+    #|    {
+    #|      "position": 0,
+    #|      "configured_address": 4098,
+    #|      "identity": {
+    #|        "vendor_id": 2,
+    #|        "product_code": 1234,
+    #|        "revision": 1,
+    #|        "serial": 4660
+    #|      },
+    #|      "identification": 32,
+    #|      "process_data_summary": {
+    #|        "sync_manager_count": 0,
+    #|        "fmmu_count": 0,
+    #|        "rx_pdo_count": 0,
+    #|        "tx_pdo_count": 0,
+    #|        "mailbox_protocols": null,
+    #|        "dc_op_mode_count": 0,
+    #|        "dc_assign_activate_count": 0
+    #|      }
+    #|    }
+    #|  ]
+    #|}
   let scan : @runtime.ScanReport = {
     slave_count: 1,
     slaves: [
@@ -1924,7 +1921,7 @@ test "offline config and ENI expectations share the same validation semantics" {
       expected_identification: Some(0x20U),
     },
   ])
-  let expected_eni = @runtime.configuration_from_eni_xml(expected_eni_xml)
+  let expected_eni = @runtime.configuration_from_eni_json(expected_eni_json)
   let actual = @runtime.configuration_from_scan(scan)
   let offline_report = @runtime.validate_configuration(actual, expected_offline)
   let eni_report = @runtime.validate_configuration(actual, expected_eni)

@@ -10,11 +10,15 @@ import {
 // Values
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
 
-pub fn configuration_from_eni_xml(String) -> ConfigurationModel raise @hal.EcError
+pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
 
 pub fn configuration_from_expected(Array[@hal.SlaveConfig]) -> ConfigurationModel
 
 pub fn configuration_from_scan(ScanReport) -> ConfigurationModel
+
+pub fn configuration_to_eni_json(ConfigurationModel) -> Json
+
+pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> String
 
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 

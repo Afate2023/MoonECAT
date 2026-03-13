@@ -1,5 +1,5 @@
 ///|
-/// Unified configuration model for online scan, offline config, and future ENI import.
+/// Unified configuration model for online scan, offline config, and ENI JSON import.
 
 ///|
 pub(all) enum ConfigurationSource {
@@ -115,11 +115,11 @@ pub fn configuration_from_expected(
 }
 
 ///|
-/// Parse ENI XML and project slave info into the unified configuration model.
-pub fn configuration_from_eni_xml(
-  xml_content : String,
+/// Parse ENI JSON interchange and project slave info into the unified configuration model.
+pub fn configuration_from_eni_json(
+  json_content : String,
 ) -> ConfigurationModel raise @hal.EcError {
-  project_eni_slaves(parse_eni_slave_projection(xml_content))
+  project_eni_json_document(parse_eni_json_document(json_content))
 }
 
 ///|
