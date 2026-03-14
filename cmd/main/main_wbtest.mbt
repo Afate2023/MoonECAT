@@ -752,6 +752,127 @@ test "cli od report text includes uploaded value" {
 }
 
 ///|
+test "cli esi-sii projection renders json from ESI XML" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor>
+    #|    <Id>#x0766</Id>
+    #|  </Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000910" RevisionNo="#x00000200">Renesas EtherCAT RZ/N2 CoE 2port</Type>
+    #|        <Name LcId="1033">Renesas EtherCAT RZ/N2 CoE 2port</Name>
+    #|        <Fmmu>Outputs</Fmmu>
+    #|        <Fmmu>Inputs</Fmmu>
+    #|        <Fmmu>MBoxState</Fmmu>
+    #|        <Sm DefaultSize="256" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+    #|        <Sm DefaultSize="256" StartAddress="#x1400" ControlByte="#x22" Enable="1">MBoxIn</Sm>
+    #|        <Sm DefaultSize="28" StartAddress="#x1800" ControlByte="#x64" Enable="1">Outputs</Sm>
+    #|        <Sm DefaultSize="32" StartAddress="#x1c00" ControlByte="#x20" Enable="1">Inputs</Sm>
+    #|        <Mailbox DataLinkLayer="1">
+    #|          <CoE SdoInfo="1" PdoAssign="1" PdoConfig="1" CompleteAccess="1" />
+    #|        </Mailbox>
+    #|        <Dc>
+    #|          <OpMode>
+    #|            <Name>DC</Name>
+    #|            <Desc>DC-Synchron</Desc>
+    #|            <AssignActivate>#x0300</AssignActivate>
+    #|            <CycleTimeSync0 Factor="1">0</CycleTimeSync0>
+    #|            <CycleTimeSync1 Factor="1">0</CycleTimeSync1>
+    #|          </OpMode>
+    #|        </Dc>
+    #|        <Slots SlotIndexIncrement="#x800" SlotPdoIncrement="16">
+    #|          <Slot MinInstances="1" MaxInstances="1">
+    #|            <ModuleIdent Default="1">#x219800</ModuleIdent>
+    #|          </Slot>
+    #|        </Slots>
+    #|        <Eeprom>
+    #|          <ByteSize>2048</ByteSize>
+    #|          <ConfigData>800E44EE10000000</ConfigData>
+    #|          <BootStrap>0010800080108000</BootStrap>
+    #|        </Eeprom>
+    #|      </Device>
+    #|    </Devices>
+    #|    <Modules>
+    #|      <Module>
+    #|        <Type ModuleIdent="#x219800">axis</Type>
+    #|        <Name LcId="1033">axis</Name>
+    #|        <RxPdo Fixed="1" Sm="2">
+    #|          <Index DependOnSlot="true">#x1600</Index>
+    #|          <Name>Outputs</Name>
+    #|          <Entry>
+    #|            <Index DependOnSlot="true">#x6040</Index>
+    #|            <SubIndex>0</SubIndex>
+    #|            <BitLen>16</BitLen>
+    #|            <Name>ControlWord</Name>
+    #|            <DataType>UINT</DataType>
+    #|          </Entry>
+    #|        </RxPdo>
+    #|        <TxPdo Fixed="1" Sm="3">
+    #|          <Index DependOnSlot="true">#x1A00</Index>
+    #|          <Name>Inputs</Name>
+    #|          <Entry>
+    #|            <Index DependOnSlot="true">#x6041</Index>
+    #|            <SubIndex>0</SubIndex>
+    #|            <BitLen>16</BitLen>
+    #|            <Name>StatusWord</Name>
+    #|            <DataType>UINT</DataType>
+    #|          </Entry>
+    #|        </TxPdo>
+    #|      </Module>
+    #|    </Modules>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let report = project_esi_xml_to_sii_report(xml, 0)
+  let text = offline_sii_json(report).stringify(indent=2)
+  assert_true(text.contains("\"vendor_id\": 1894"))
+  assert_true(text.contains("\"product_code\": 2320"))
+  assert_true(text.contains("\"mailbox_protocols\": 4"))
+  assert_true(text.contains("\"assign_activate\": 768"))
+  assert_true(text.contains("ControlWord"))
+  assert_true(text.contains("StatusWord"))
+}
+
+///|
+test "cli esi-sii projection renders siitool-like text sections" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0001</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000002" RevisionNo="#x00000003">demo</Type>
+    #|        <Name>demo</Name>
+    #|        <Fmmu>Outputs</Fmmu>
+    #|        <Sm DefaultSize="64" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+    #|        <Sm DefaultSize="64" StartAddress="#x1400" ControlByte="#x22" Enable="1">MBoxIn</Sm>
+    #|        <Mailbox><CoE SdoInfo="1" /></Mailbox>
+    #|        <Dc><OpMode><Name>DC</Name><Desc>Demo</Desc><AssignActivate>#x0300</AssignActivate></OpMode></Dc>
+    #|        <Slots SlotIndexIncrement="#x800" SlotPdoIncrement="16"><Slot><ModuleIdent Default="1">#x00000010</ModuleIdent></Slot></Slots>
+    #|        <Eeprom><ByteSize>512</ByteSize><ConfigData>0100020003000400</ConfigData><BootStrap>0010200020102000</BootStrap></Eeprom>
+    #|      </Device>
+    #|    </Devices>
+    #|    <Modules>
+    #|      <Module>
+    #|        <Type ModuleIdent="#x00000010">demo-module</Type>
+    #|        <RxPdo Sm="2"><Index>#x1600</Index><Name>Outputs</Name><Entry><Index>#x7000</Index><SubIndex>1</SubIndex><BitLen>16</BitLen><Name>Out</Name><DataType>UINT</DataType></Entry></RxPdo>
+    #|      </Module>
+    #|    </Modules>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let report = project_esi_xml_to_sii_report(xml, 0)
+  let text = offline_sii_text(report)
+  assert_true(text.contains("Print Categorie: FMMU"))
+  assert_true(text.contains("Print Categorie: SyncManager"))
+  assert_true(text.contains("Print Categorie: RX PDO"))
+  assert_true(text.contains("Print Categorie: DC CLOCK"))
+  assert_true(text.contains("Out"))
+}
+
+///|
 test "cli od stage preserves mailbox protocol classification" {
   let result : Result[Int, Error] = try? od_stage(
     Err(@hal.EcError::MailboxProtocol("payload too short")),
