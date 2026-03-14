@@ -13,6 +13,19 @@ let pdo_logical_base : UInt = 0x1000U
 let process_data_eeprom_word_count : Int = 128
 
 ///|
+priv struct SlaveStartupPreparation {
+  mapping : @mailbox.SlaveMapping
+  dc_cycle_period_ns : Int64?
+}
+
+///|
+priv struct RunStartupPreparation {
+  pdo_ctx : @protocol.PdoContext
+  expected_wkc : UInt
+  dc_cycle_period_ns : Int64?
+}
+
+///|
 /// MoonECAT CLI entry point.
 /// Commands: list-if, scan, validate, run, read-sii, state, diagnosis, od.
 fn main {
@@ -280,19 +293,22 @@ fn run_native_command_with_fresh_nic(
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
   let run_nic = @native.NativeNic::open_with_config(config)
-  let (pdo_ctx, expected_wkc) = if target_requires_process_data_configuration(
-      startup_state,
-    ) {
+  let preparation = if target_requires_process_data_configuration(startup_state) {
     build_pdo_preparation_from_scan(run_nic, scan_report, timeout)
   } else {
-    (@protocol.PdoContext::build([], 0U), 0U)
+    {
+      pdo_ctx: @protocol.PdoContext::build([], 0U),
+      expected_wkc: 0U,
+      dc_cycle_period_ns: None,
+    }
   }
+  let run_config = master_config_with_dc(preparation.dc_cycle_period_ns)
   let run_report = @runtime.run_with_states(
     run_nic,
-    @hal.MasterConfig::default(),
+    run_config,
     expected,
-    pdo_ctx,
-    expected_wkc,
+    preparation.pdo_ctx,
+    preparation.expected_wkc,
     10,
     startup_state,
     shutdown_state,
@@ -318,25 +334,31 @@ fn[N : @hal.Nic] build_pdo_preparation_from_scan(
   nic : N,
   scan_report : @runtime.ScanReport,
   timeout : @hal.Duration,
-) -> (@protocol.PdoContext, UInt) raise @hal.EcError {
+) -> RunStartupPreparation raise @hal.EcError {
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
   let mut logical_base = pdo_logical_base
+  let mut dc_cycle_period_ns : Int64? = None
   for slave in scan_report.slaves {
-    let mapping = configure_process_data_from_eeprom(
+    let preparation = prepare_slave_startup(
       nic,
       slave.station_address,
       logical_base,
       timeout,
     )
-    slave_mappings.push((mapping, slave.station_address))
+    slave_mappings.push((preparation.mapping, slave.station_address))
+    dc_cycle_period_ns = prefer_dc_cycle_period(
+      dc_cycle_period_ns,
+      preparation.dc_cycle_period_ns,
+    )
     logical_base = logical_base +
-      mapping.output_bytes.reinterpret_as_uint() +
-      mapping.input_bytes.reinterpret_as_uint()
+      preparation.mapping.output_bytes.reinterpret_as_uint() +
+      preparation.mapping.input_bytes.reinterpret_as_uint()
   }
-  (
-    @protocol.PdoContext::build(slave_mappings, pdo_logical_base),
-    expected_wkc_from_slave_mappings(slave_mappings),
-  )
+  {
+    pdo_ctx: @protocol.PdoContext::build(slave_mappings, pdo_logical_base),
+    expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
+    dc_cycle_period_ns,
+  }
 }
 
 ///|
@@ -346,12 +368,77 @@ fn[N : @hal.Nic] configure_process_data_from_eeprom(
   logical_base : UInt,
   timeout : @hal.Duration,
 ) -> @mailbox.SlaveMapping raise @hal.EcError {
+  prepare_slave_startup(nic, station, logical_base, timeout).mapping
+}
+
+///|
+fn[N : @hal.Nic] prepare_slave_startup(
+  nic : N,
+  station : UInt,
+  logical_base : UInt,
+  timeout : @hal.Duration,
+) -> SlaveStartupPreparation raise @hal.EcError {
   let eeprom = @protocol.eeprom_read(
     nic, station, 0U, process_data_eeprom_word_count, timeout,
   )
   let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
   write_process_data_mapping(nic, station, mapping, timeout)
-  mapping
+  let categories = @mailbox.parse_sii_categories(eeprom)
+  {
+    mapping,
+    dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
+  }
+}
+
+///|
+fn master_config_with_dc(dc_cycle_period_ns : Int64?) -> @hal.MasterConfig {
+  match dc_cycle_period_ns {
+    Some(cycle_period_ns) =>
+      { ..@hal.MasterConfig::default(), dc_enabled: true, cycle_period_ns }
+    None => @hal.MasterConfig::default()
+  }
+}
+
+///|
+fn prefer_dc_cycle_period(current : Int64?, candidate : Int64?) -> Int64? {
+  match current {
+    Some(_) => current
+    None => candidate
+  }
+}
+
+///|
+fn preferred_dc_cycle_period_from_categories(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Int64? {
+  match preferred_sii_dc_clock(collect_sii_dc(categories)) {
+    Some(clock) => dc_cycle_period_ns(clock)
+    None => None
+  }
+}
+
+///|
+fn preferred_sii_dc_clock(
+  dc_clocks : Array[@mailbox.SiiDcClock],
+) -> @mailbox.SiiDcClock? {
+  for clock in dc_clocks {
+    if clock.assign_activate != 0U {
+      return Some(clock)
+    }
+  }
+  if dc_clocks.is_empty() {
+    None
+  } else {
+    Some(dc_clocks[0])
+  }
+}
+
+///|
+fn dc_cycle_period_ns(clock : @mailbox.SiiDcClock) -> Int64? {
+  if clock.cycle_time_0 == 0U {
+    return None
+  }
+  Some(clock.cycle_time_0.reinterpret_as_int().to_int64())
 }
 
 ///|
@@ -517,41 +604,10 @@ fn[N : @hal.Nic] compute_state_transition_report(
   timeout : @hal.Duration,
 ) -> StateTransitionReport raise @hal.EcError {
   match station {
-    Some(configured_station) => {
-      let current = @protocol.read_al_status(nic, configured_station, timeout)
-      if target_requires_process_data_configuration(target) {
-        ignore(
-          configure_process_data_from_eeprom(
-            nic, configured_station, pdo_logical_base, timeout,
-          ),
-        )
-      }
-      let final_state = if use_path {
-        let path = build_cli_transition_path(current, target)
-        @protocol.transition_through(nic, configured_station, path, timeout)
-      } else {
-        @protocol.request_state(nic, configured_station, target, timeout)
-      }
-      let status_code = try? @protocol.read_al_status_code(
-        nic, configured_station, timeout,
+    Some(configured_station) =>
+      compute_station_transition_report(
+        nic, target, configured_station, use_path, timeout,
       )
-      {
-        mode: if use_path {
-          "station-path"
-        } else {
-          "station-direct"
-        },
-        target,
-        station: Some(configured_station),
-        current: Some(current),
-        final_state: Some(final_state),
-        status_code: match status_code {
-          Ok(code) => Some(code)
-          Err(_) => None
-        },
-        wkc: None,
-      }
-    }
     None => {
       let wkc = @protocol.broadcast_state(nic, target, timeout)
       {
@@ -565,6 +621,125 @@ fn[N : @hal.Nic] compute_state_transition_report(
       }
     }
   }
+}
+
+///|
+fn[N : @hal.Nic] compute_station_transition_report(
+  nic : N,
+  target : @protocol.EsmState,
+  station : UInt,
+  use_path : Bool,
+  timeout : @hal.Duration,
+) -> StateTransitionReport raise @hal.EcError {
+  let current = @protocol.read_al_status(nic, station, timeout)
+  if use_path && target == @protocol.Op && current != @protocol.Op {
+    let (final_state, kick_wkc) = transition_station_to_op(
+      nic, station, current, timeout,
+    )
+    let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
+    return {
+      mode: "station-path",
+      target,
+      station: Some(station),
+      current: Some(current),
+      final_state: Some(final_state),
+      status_code: match status_code {
+        Ok(code) => Some(code)
+        Err(_) => None
+      },
+      wkc: kick_wkc,
+    }
+  }
+  if target_requires_process_data_configuration(target) {
+    ignore(
+      configure_process_data_from_eeprom(
+        nic, station, pdo_logical_base, timeout,
+      ),
+    )
+  }
+  let final_state = if use_path {
+    let path = build_cli_transition_path(current, target)
+    @protocol.transition_through(nic, station, path, timeout)
+  } else {
+    @protocol.request_state(nic, station, target, timeout)
+  }
+  let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
+  {
+    mode: if use_path {
+      "station-path"
+    } else {
+      "station-direct"
+    },
+    target,
+    station: Some(station),
+    current: Some(current),
+    final_state: Some(final_state),
+    status_code: match status_code {
+      Ok(code) => Some(code)
+      Err(_) => None
+    },
+    wkc: None,
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_op(
+  nic : N,
+  station : UInt,
+  current : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> (@protocol.EsmState, UInt?) raise @hal.EcError {
+  let path = build_cli_transition_path(current, @protocol.Op)
+  let safeop_path : Array[@protocol.EsmState] = []
+  for state in path {
+    safeop_path.push(state)
+    if state == @protocol.SafeOp {
+      break
+    }
+  }
+  let state_before_op = if safeop_path.length() > 1 {
+    @protocol.transition_through(nic, station, safeop_path, timeout)
+  } else {
+    current
+  }
+  let preparation = prepare_slave_startup(
+    nic, station, pdo_logical_base, timeout,
+  )
+  match preparation.dc_cycle_period_ns {
+    Some(cycle_period_ns) =>
+      ignore(
+        @protocol.dc_configure_linear(
+          nic,
+          [station],
+          cycle_period_ns.to_int().reinterpret_as_uint(),
+          timeout,
+          static_sync_iterations=32,
+        ),
+      )
+    None => ()
+  }
+  let pdo_ctx = @protocol.PdoContext::build(
+    [(preparation.mapping, station)],
+    pdo_logical_base,
+  )
+  let has_process_data = preparation.mapping.output_bytes > 0 ||
+    preparation.mapping.input_bytes > 0
+  let kick_before_op = if has_process_data {
+    Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
+  } else {
+    None
+  }
+  let final_state = if state_before_op == @protocol.Op {
+    state_before_op
+  } else {
+    @protocol.request_state(nic, station, @protocol.Op, timeout)
+  }
+  let final_wkc = if final_state == @protocol.Op && has_process_data {
+    Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
+  } else {
+    kick_before_op
+  }
+  (final_state, final_wkc)
 }
 
 ///|

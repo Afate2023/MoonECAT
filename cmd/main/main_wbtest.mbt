@@ -160,6 +160,72 @@ test "cli optional shutdown state flag supports default and none" {
 }
 
 ///|
+test "cli preferred sii dc clock favors assign activate" {
+  let selected = preferred_sii_dc_clock([
+    {
+      cycle_time_0: 500_000U,
+      shift_time_0: 0U,
+      shift_time_1: 0U,
+      sync1_cycle_factor: 0,
+      assign_activate: 0U,
+      sync0_cycle_factor: 0,
+      name_idx: b'\x00',
+      description_idx: b'\x00',
+    },
+    {
+      cycle_time_0: 1_000_000U,
+      shift_time_0: 0U,
+      shift_time_1: 0U,
+      sync1_cycle_factor: 0,
+      assign_activate: 0x0300U,
+      sync0_cycle_factor: 0,
+      name_idx: b'\x01',
+      description_idx: b'\x01',
+    },
+  ])
+  guard selected is Some(clock) else { fail("expected a preferred DC clock") }
+  assert_eq(clock.assign_activate, 0x0300U)
+  assert_eq(clock.cycle_time_0, 1_000_000U)
+}
+
+///|
+test "cli dc cycle period helper maps nonzero cycle" {
+  let result = dc_cycle_period_ns({
+    cycle_time_0: 1_000_000U,
+    shift_time_0: 0U,
+    shift_time_1: 0U,
+    sync1_cycle_factor: 0,
+    assign_activate: 0x0300U,
+    sync0_cycle_factor: 0,
+    name_idx: b'\x00',
+    description_idx: b'\x00',
+  })
+  assert_eq(result, Some(1_000_000L))
+  let none_result = dc_cycle_period_ns({
+    cycle_time_0: 0U,
+    shift_time_0: 0U,
+    shift_time_1: 0U,
+    sync1_cycle_factor: 0,
+    assign_activate: 0U,
+    sync0_cycle_factor: 0,
+    name_idx: b'\x00',
+    description_idx: b'\x00',
+  })
+  assert_eq(none_result, None)
+}
+
+///|
+test "cli master config helper enables dc when cycle is present" {
+  let dc_config = master_config_with_dc(Some(250_000L))
+  assert_true(dc_config.dc_enabled)
+  assert_eq(dc_config.cycle_period_ns, 250_000L)
+
+  let default_config = master_config_with_dc(None)
+  assert_true(not(default_config.dc_enabled))
+  assert_eq(default_config.cycle_period_ns, 1_000_000L)
+}
+
+///|
 test "cli optional byte flag parses values and defaults" {
   assert_eq(optional_byte_flag(["moonecat", "od"], "--subindex"), None)
   assert_eq(
