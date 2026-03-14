@@ -27,6 +27,8 @@ pub fn build_shutdown_path(EsmState) -> Array[EsmState]
 
 pub fn build_transition_path(EsmState) -> Array[EsmState]
 
+pub fn build_transition_route(EsmState, EsmState) -> Array[EsmState]
+
 pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError

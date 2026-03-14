@@ -161,7 +161,7 @@ test "cli optional shutdown state flag supports default and none" {
 
 ///|
 test "cli preferred sii dc clock favors assign activate" {
-  let selected = preferred_sii_dc_clock([
+  let selected = @runtime.preferred_sii_dc_clock([
     {
       cycle_time_0: 500_000U,
       shift_time_0: 0U,
@@ -190,7 +190,7 @@ test "cli preferred sii dc clock favors assign activate" {
 
 ///|
 test "cli dc cycle period helper maps nonzero cycle" {
-  let result = dc_cycle_period_ns({
+  let result = @runtime.dc_cycle_period_ns({
     cycle_time_0: 1_000_000U,
     shift_time_0: 0U,
     shift_time_1: 0U,
@@ -201,7 +201,7 @@ test "cli dc cycle period helper maps nonzero cycle" {
     description_idx: b'\x00',
   })
   assert_eq(result, Some(1_000_000L))
-  let none_result = dc_cycle_period_ns({
+  let none_result = @runtime.dc_cycle_period_ns({
     cycle_time_0: 0U,
     shift_time_0: 0U,
     shift_time_1: 0U,
@@ -216,11 +216,11 @@ test "cli dc cycle period helper maps nonzero cycle" {
 
 ///|
 test "cli master config helper enables dc when cycle is present" {
-  let dc_config = master_config_with_dc(Some(250_000L))
+  let dc_config = @runtime.master_config_with_optional_dc(Some(250_000L))
   assert_true(dc_config.dc_enabled)
   assert_eq(dc_config.cycle_period_ns, 250_000L)
 
-  let default_config = master_config_with_dc(None)
+  let default_config = @runtime.master_config_with_optional_dc(None)
   assert_true(not(default_config.dc_enabled))
   assert_eq(default_config.cycle_period_ns, 1_000_000L)
 }
@@ -886,7 +886,7 @@ test "cli od stage preserves mailbox protocol classification" {
 
 ///|
 test "cli transition path falls back through init when needed" {
-  let path = build_cli_transition_path(@protocol.Op, @protocol.Boot)
+  let path = @protocol.build_transition_route(@protocol.Op, @protocol.Boot)
   assert_eq(path.length(), 5)
   assert_eq(path[0], @protocol.Op)
   assert_eq(path[1], @protocol.SafeOp)

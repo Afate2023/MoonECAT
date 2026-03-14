@@ -320,6 +320,42 @@ pub fn build_shutdown_path(current : EsmState) -> Array[EsmState] {
 }
 
 ///|
+/// Build a complete transition route from the current state to a target state.
+///
+/// This reuses direct transitions when possible and otherwise falls back through
+/// the standard shutdown and forward startup paths.
+pub fn build_transition_route(
+  current : EsmState,
+  target : EsmState,
+) -> Array[EsmState] {
+  if current == target {
+    return [current]
+  }
+  if target == Init {
+    return build_shutdown_path(current)
+  }
+  if current == Init {
+    return build_transition_path(target)
+  }
+  if current.can_transition(target) {
+    return [current, target]
+  }
+  let shutdown_path = build_shutdown_path(current)
+  let startup_path = build_transition_path(target)
+  if shutdown_path.is_empty() {
+    return startup_path
+  }
+  if startup_path.is_empty() {
+    return shutdown_path
+  }
+  let result = shutdown_path
+  for i = 1; i < startup_path.length(); i = i + 1 {
+    result.push(startup_path[i])
+  }
+  result
+}
+
+///|
 /// Read the current ESM state from a slave.
 pub fn[N : @hal.Nic] read_al_status(
   nic : N,

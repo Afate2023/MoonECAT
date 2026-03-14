@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
+
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
 
 pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
@@ -20,6 +22,8 @@ pub fn configuration_to_eni_json(ConfigurationModel) -> Json
 
 pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> String
 
+pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
+
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
 pub fn diagnostic_surface_from_run(RunReport) -> DiagnosticSurface
@@ -30,13 +34,21 @@ pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @prot
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
+pub fn master_config_with_optional_dc(Int64?) -> @hal.MasterConfig
+
 pub fn parse_error_register_payload(Bytes) -> Byte raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
+pub fn preferred_dc_cycle_period_from_categories(Array[@mailbox.SiiCategoryEntry]) -> Int64?
+
+pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
+
 pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) -> DiagnosisSession raise @hal.EcError
 
 pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(N, UInt, UInt, @hal.Duration) -> MailboxSession raise @hal.EcError
+
+pub fn[N : @hal.Nic] prepare_slave_startup(N, UInt, UInt, Int, @hal.Duration) -> SlaveStartupPreparation raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
@@ -69,6 +81,8 @@ pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> Validat
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
 pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
+
+pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
 // Errors
 
@@ -271,6 +285,12 @@ pub(all) struct RunReport {
 pub fn RunReport::format(Self) -> String
 pub impl Show for RunReport
 
+pub(all) struct RunStartupPreparation {
+  pdo_ctx : @protocol.PdoContext
+  expected_wkc : UInt
+  dc_cycle_period_ns : Int64?
+}
+
 pub(all) struct Runtime {
   mut state : RuntimeState
   telemetry : Telemetry
@@ -351,6 +371,11 @@ pub(all) struct SlaveReport {
 }
 pub impl Eq for SlaveReport
 pub impl Show for SlaveReport
+
+pub(all) struct SlaveStartupPreparation {
+  mapping : @mailbox.SlaveMapping
+  dc_cycle_period_ns : Int64?
+}
 
 pub(all) struct StateSurfaceSummary {
   target_state : @protocol.EsmState?

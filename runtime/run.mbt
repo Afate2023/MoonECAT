@@ -25,6 +25,201 @@ pub(all) struct RunReport {
 } derive(Show)
 
 ///|
+pub(all) struct SlaveStartupPreparation {
+  mapping : @mailbox.SlaveMapping
+  dc_cycle_period_ns : Int64?
+}
+
+///|
+pub(all) struct RunStartupPreparation {
+  pdo_ctx : @protocol.PdoContext
+  expected_wkc : UInt
+  dc_cycle_period_ns : Int64?
+}
+
+///|
+pub fn master_config_with_optional_dc(
+  dc_cycle_period_ns : Int64?,
+) -> @hal.MasterConfig {
+  match dc_cycle_period_ns {
+    Some(cycle_period_ns) =>
+      { ..@hal.MasterConfig::default(), dc_enabled: true, cycle_period_ns }
+    None => @hal.MasterConfig::default()
+  }
+}
+
+///|
+pub fn[N : @hal.Nic] build_run_startup_preparation(
+  nic : N,
+  scan_report : ScanReport,
+  logical_base : UInt,
+  eeprom_word_count : Int,
+  timeout : @hal.Duration,
+) -> RunStartupPreparation raise @hal.EcError {
+  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  let mut current_logical_base = logical_base
+  let mut dc_cycle_period_ns : Int64? = None
+  for slave in scan_report.slaves {
+    let preparation = prepare_slave_startup(
+      nic,
+      slave.station_address,
+      current_logical_base,
+      eeprom_word_count,
+      timeout,
+    )
+    slave_mappings.push((preparation.mapping, slave.station_address))
+    dc_cycle_period_ns = prefer_dc_cycle_period(
+      dc_cycle_period_ns,
+      preparation.dc_cycle_period_ns,
+    )
+    current_logical_base = current_logical_base +
+      preparation.mapping.output_bytes.reinterpret_as_uint() +
+      preparation.mapping.input_bytes.reinterpret_as_uint()
+  }
+  {
+    pdo_ctx: @protocol.PdoContext::build(slave_mappings, logical_base),
+    expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
+    dc_cycle_period_ns,
+  }
+}
+
+///|
+pub fn[N : @hal.Nic] prepare_slave_startup(
+  nic : N,
+  station : UInt,
+  logical_base : UInt,
+  eeprom_word_count : Int,
+  timeout : @hal.Duration,
+) -> SlaveStartupPreparation raise @hal.EcError {
+  let eeprom = @protocol.eeprom_read(
+    nic, station, 0U, eeprom_word_count, timeout,
+  )
+  let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
+  write_process_data_mapping(nic, station, mapping, timeout)
+  let categories = @mailbox.parse_sii_categories(eeprom)
+  {
+    mapping,
+    dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
+  }
+}
+
+///|
+pub fn preferred_dc_cycle_period_from_categories(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Int64? {
+  match preferred_sii_dc_clock(collect_sii_dc(categories)) {
+    Some(clock) => dc_cycle_period_ns(clock)
+    None => None
+  }
+}
+
+///|
+fn collect_sii_dc(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[@mailbox.SiiDcClock] {
+  let dc_clocks : Array[@mailbox.SiiDcClock] = []
+  for category in categories {
+    if category.category == @mailbox.Dc {
+      let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
+        category.data,
+      )
+      match parsed {
+        Ok(clock) => dc_clocks.push(clock)
+        Err(_) => ()
+      }
+    }
+  }
+  dc_clocks
+}
+
+///|
+pub fn preferred_sii_dc_clock(
+  dc_clocks : Array[@mailbox.SiiDcClock],
+) -> @mailbox.SiiDcClock? {
+  for clock in dc_clocks {
+    if clock.assign_activate != 0U {
+      return Some(clock)
+    }
+  }
+  if dc_clocks.is_empty() {
+    None
+  } else {
+    Some(dc_clocks[0])
+  }
+}
+
+///|
+pub fn dc_cycle_period_ns(clock : @mailbox.SiiDcClock) -> Int64? {
+  if clock.cycle_time_0 == 0U {
+    return None
+  }
+  Some(clock.cycle_time_0.reinterpret_as_int().to_int64())
+}
+
+///|
+pub fn[N : @hal.Nic] write_process_data_mapping(
+  nic : N,
+  station : UInt,
+  mapping : @mailbox.SlaveMapping,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
+    let sm = mapping.sm_configs[i]
+    match sm.sm_type {
+      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
+        let sm_addr = @protocol.reg_sm_base +
+          i.reinterpret_as_uint() *
+          @protocol.sm_entry_size.reinterpret_as_uint()
+        let _ = @protocol.write_register_fp(
+          nic,
+          station,
+          sm_addr,
+          sm.to_bytes(),
+          timeout,
+        )
+      }
+      _ => ()
+    }
+  }
+  for i = 0; i < mapping.fmmu_configs.length(); i = i + 1 {
+    let fmmu_addr = @protocol.reg_fmmu_base +
+      i.reinterpret_as_uint() * @protocol.fmmu_entry_size.reinterpret_as_uint()
+    let _ = @protocol.write_register_fp(
+      nic,
+      station,
+      fmmu_addr,
+      mapping.fmmu_configs[i].to_bytes(),
+      timeout,
+    )
+  }
+}
+
+///|
+fn prefer_dc_cycle_period(current : Int64?, candidate : Int64?) -> Int64? {
+  match current {
+    Some(_) => current
+    None => candidate
+  }
+}
+
+///|
+fn expected_wkc_from_slave_mappings(
+  slave_mappings : Array[(@mailbox.SlaveMapping, UInt)],
+) -> UInt {
+  let mut total = 0U
+  for i = 0; i < slave_mappings.length(); i = i + 1 {
+    let (mapping, _) = slave_mappings[i]
+    if mapping.output_bytes > 0 {
+      total = total + 1U
+    }
+    if mapping.input_bytes > 0 {
+      total = total + 1U
+    }
+  }
+  total
+}
+
+///|
 /// Execute a full EtherCAT run workflow:
 /// 1. Scan the bus to discover slaves.
 /// 2. Validate discovered slaves against expected configuration.

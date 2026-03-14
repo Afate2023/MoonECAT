@@ -13,19 +13,6 @@ let pdo_logical_base : UInt = 0x1000U
 let process_data_eeprom_word_count : Int = 128
 
 ///|
-priv struct SlaveStartupPreparation {
-  mapping : @mailbox.SlaveMapping
-  dc_cycle_period_ns : Int64?
-}
-
-///|
-priv struct RunStartupPreparation {
-  pdo_ctx : @protocol.PdoContext
-  expected_wkc : UInt
-  dc_cycle_period_ns : Int64?
-}
-
-///|
 /// MoonECAT CLI entry point.
 /// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od.
 fn main {
@@ -299,7 +286,9 @@ fn run_native_command_with_fresh_nic(
   probe_nic.close()
   let run_nic = @native.NativeNic::open_with_config(config)
   let preparation = if target_requires_process_data_configuration(startup_state) {
-    build_pdo_preparation_from_scan(run_nic, scan_report, timeout)
+    @runtime.build_run_startup_preparation(
+      run_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count, timeout,
+    )
   } else {
     {
       pdo_ctx: @protocol.PdoContext::build([], 0U),
@@ -307,7 +296,9 @@ fn run_native_command_with_fresh_nic(
       dc_cycle_period_ns: None,
     }
   }
-  let run_config = master_config_with_dc(preparation.dc_cycle_period_ns)
+  let run_config = @runtime.master_config_with_optional_dc(
+    preparation.dc_cycle_period_ns,
+  )
   let run_report = @runtime.run_with_states(
     run_nic,
     run_config,
@@ -335,170 +326,15 @@ fn target_requires_process_data_configuration(
 }
 
 ///|
-fn[N : @hal.Nic] build_pdo_preparation_from_scan(
-  nic : N,
-  scan_report : @runtime.ScanReport,
-  timeout : @hal.Duration,
-) -> RunStartupPreparation raise @hal.EcError {
-  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
-  let mut logical_base = pdo_logical_base
-  let mut dc_cycle_period_ns : Int64? = None
-  for slave in scan_report.slaves {
-    let preparation = prepare_slave_startup(
-      nic,
-      slave.station_address,
-      logical_base,
-      timeout,
-    )
-    slave_mappings.push((preparation.mapping, slave.station_address))
-    dc_cycle_period_ns = prefer_dc_cycle_period(
-      dc_cycle_period_ns,
-      preparation.dc_cycle_period_ns,
-    )
-    logical_base = logical_base +
-      preparation.mapping.output_bytes.reinterpret_as_uint() +
-      preparation.mapping.input_bytes.reinterpret_as_uint()
-  }
-  {
-    pdo_ctx: @protocol.PdoContext::build(slave_mappings, pdo_logical_base),
-    expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
-    dc_cycle_period_ns,
-  }
-}
-
-///|
 fn[N : @hal.Nic] configure_process_data_from_eeprom(
   nic : N,
   station : UInt,
   logical_base : UInt,
   timeout : @hal.Duration,
 ) -> @mailbox.SlaveMapping raise @hal.EcError {
-  prepare_slave_startup(nic, station, logical_base, timeout).mapping
-}
-
-///|
-fn[N : @hal.Nic] prepare_slave_startup(
-  nic : N,
-  station : UInt,
-  logical_base : UInt,
-  timeout : @hal.Duration,
-) -> SlaveStartupPreparation raise @hal.EcError {
-  let eeprom = @protocol.eeprom_read(
-    nic, station, 0U, process_data_eeprom_word_count, timeout,
-  )
-  let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
-  write_process_data_mapping(nic, station, mapping, timeout)
-  let categories = @mailbox.parse_sii_categories(eeprom)
-  {
-    mapping,
-    dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
-  }
-}
-
-///|
-fn master_config_with_dc(dc_cycle_period_ns : Int64?) -> @hal.MasterConfig {
-  match dc_cycle_period_ns {
-    Some(cycle_period_ns) =>
-      { ..@hal.MasterConfig::default(), dc_enabled: true, cycle_period_ns }
-    None => @hal.MasterConfig::default()
-  }
-}
-
-///|
-fn prefer_dc_cycle_period(current : Int64?, candidate : Int64?) -> Int64? {
-  match current {
-    Some(_) => current
-    None => candidate
-  }
-}
-
-///|
-fn preferred_dc_cycle_period_from_categories(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Int64? {
-  match preferred_sii_dc_clock(collect_sii_dc(categories)) {
-    Some(clock) => dc_cycle_period_ns(clock)
-    None => None
-  }
-}
-
-///|
-fn preferred_sii_dc_clock(
-  dc_clocks : Array[@mailbox.SiiDcClock],
-) -> @mailbox.SiiDcClock? {
-  for clock in dc_clocks {
-    if clock.assign_activate != 0U {
-      return Some(clock)
-    }
-  }
-  if dc_clocks.is_empty() {
-    None
-  } else {
-    Some(dc_clocks[0])
-  }
-}
-
-///|
-fn dc_cycle_period_ns(clock : @mailbox.SiiDcClock) -> Int64? {
-  if clock.cycle_time_0 == 0U {
-    return None
-  }
-  Some(clock.cycle_time_0.reinterpret_as_int().to_int64())
-}
-
-///|
-fn[N : @hal.Nic] write_process_data_mapping(
-  nic : N,
-  station : UInt,
-  mapping : @mailbox.SlaveMapping,
-  timeout : @hal.Duration,
-) -> Unit raise @hal.EcError {
-  for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
-    let sm = mapping.sm_configs[i]
-    match sm.sm_type {
-      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
-        let sm_addr = @protocol.reg_sm_base +
-          i.reinterpret_as_uint() *
-          @protocol.sm_entry_size.reinterpret_as_uint()
-        let _ = @protocol.write_register_fp(
-          nic,
-          station,
-          sm_addr,
-          sm.to_bytes(),
-          timeout,
-        )
-      }
-      _ => ()
-    }
-  }
-  for i = 0; i < mapping.fmmu_configs.length(); i = i + 1 {
-    let fmmu_addr = @protocol.reg_fmmu_base +
-      i.reinterpret_as_uint() * @protocol.fmmu_entry_size.reinterpret_as_uint()
-    let _ = @protocol.write_register_fp(
-      nic,
-      station,
-      fmmu_addr,
-      mapping.fmmu_configs[i].to_bytes(),
-      timeout,
-    )
-  }
-}
-
-///|
-fn expected_wkc_from_slave_mappings(
-  slave_mappings : Array[(@mailbox.SlaveMapping, UInt)],
-) -> UInt {
-  let mut total = 0U
-  for i = 0; i < slave_mappings.length(); i = i + 1 {
-    let (mapping, _) = slave_mappings[i]
-    if mapping.output_bytes > 0 {
-      total = total + 1U
-    }
-    if mapping.input_bytes > 0 {
-      total = total + 1U
-    }
-  }
-  total
+  @runtime.prepare_slave_startup(
+    nic, station, logical_base, process_data_eeprom_word_count, timeout,
+  ).mapping
 }
 
 ///|
@@ -666,7 +502,7 @@ fn[N : @hal.Nic] compute_station_transition_report(
     )
   }
   let final_state = if use_path {
-    let path = build_cli_transition_path(current, target)
+    let path = @protocol.build_transition_route(current, target)
     @protocol.transition_through(nic, station, path, timeout)
   } else {
     @protocol.request_state(nic, station, target, timeout)
@@ -697,7 +533,7 @@ fn[N : @hal.Nic] transition_station_to_op(
   current : @protocol.EsmState,
   timeout : @hal.Duration,
 ) -> (@protocol.EsmState, UInt?) raise @hal.EcError {
-  let path = build_cli_transition_path(current, @protocol.Op)
+  let path = @protocol.build_transition_route(current, @protocol.Op)
   let safeop_path : Array[@protocol.EsmState] = []
   for state in path {
     safeop_path.push(state)
@@ -710,8 +546,8 @@ fn[N : @hal.Nic] transition_station_to_op(
   } else {
     current
   }
-  let preparation = prepare_slave_startup(
-    nic, station, pdo_logical_base, timeout,
+  let preparation = @runtime.prepare_slave_startup(
+    nic, station, pdo_logical_base, process_data_eeprom_word_count, timeout,
   )
   match preparation.dc_cycle_period_ns {
     Some(cycle_period_ns) =>
@@ -1351,47 +1187,6 @@ fn parse_esm_state_flag(
         "invalid ESM state for " + flag + ": " + text,
       )
   }
-}
-
-///|
-fn concat_state_paths(
-  left : Array[@protocol.EsmState],
-  right : Array[@protocol.EsmState],
-) -> Array[@protocol.EsmState] {
-  if left.is_empty() {
-    return right
-  }
-  if right.is_empty() {
-    return left
-  }
-  let result = left
-  for i = 1; i < right.length(); i = i + 1 {
-    result.push(right[i])
-  }
-  result
-}
-
-///|
-fn build_cli_transition_path(
-  current : @protocol.EsmState,
-  target : @protocol.EsmState,
-) -> Array[@protocol.EsmState] {
-  if current == target {
-    return [current]
-  }
-  if target == @protocol.Init {
-    return @protocol.build_shutdown_path(current)
-  }
-  if current == @protocol.Init {
-    return @protocol.build_transition_path(target)
-  }
-  if current.can_transition(target) {
-    return [current, target]
-  }
-  concat_state_paths(
-    @protocol.build_shutdown_path(current),
-    @protocol.build_transition_path(target),
-  )
 }
 
 ///|
