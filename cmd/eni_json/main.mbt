@@ -14,11 +14,27 @@ fn cli_main() -> Unit raise @hal.EcError {
   let args = @env.args()
   let input_path = require_flag(args, "--input")
   let output_path = flag_value(args, "--output")
+  let input_kind = optional_kind_flag(args)
   let xml_content = read_text_file(input_path, "ENI XML")
-  let json_text = convert_eni_xml_to_json_string(xml_content)
+  let json_text = convert_xml_to_json_string(xml_content, input_kind)
   match output_path {
     Some(path) => write_text_file(path, json_text, "ENI JSON")
     None => println(json_text)
+  }
+}
+
+///|
+fn convert_xml_to_json_string(
+  xml_content : String,
+  input_kind : String,
+) -> String raise @hal.EcError {
+  match input_kind {
+    "eni" => convert_eni_xml_to_json_string(xml_content)
+    "esi" => convert_esi_xml_to_json_string(xml_content)
+    _ =>
+      raise @hal.EcError::ConfigMismatch(
+        "unsupported --kind value: " + input_kind + " (expected eni or esi)",
+      )
   }
 }
 
@@ -29,6 +45,14 @@ fn convert_eni_xml_to_json_string(
   @runtime.configuration_to_eni_json_string(
     configuration_from_eni_xml(xml_content),
   )
+}
+
+///|
+fn optional_kind_flag(args : Array[String]) -> String {
+  match flag_value(args, "--kind") {
+    Some(value) => value
+    None => "eni"
+  }
 }
 
 ///|
@@ -74,7 +98,7 @@ fn require_flag(
       raise @hal.EcError::ConfigMismatch(
         "missing required flag: " +
         flag +
-        "\nusage: moon run cmd/eni_json -- --input <eni.xml> [--output <eni.json>]",
+        "\nusage: moon run cmd/eni_json -- --input <eni-or-esi.xml> [--kind <eni|esi>] [--output <bridge.json>]",
       )
   }
 }

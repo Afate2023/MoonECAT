@@ -34,9 +34,17 @@ pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @prot
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
+pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
+
 pub fn master_config_with_optional_dc(Int64?) -> @hal.MasterConfig
 
+pub fn offline_sii_report_from_esi_document(EsiJsonDocument, Int) -> EsiOfflineSiiReport raise @hal.EcError
+
+pub fn offline_sii_report_from_esi_json(String, Int) -> EsiOfflineSiiReport raise @hal.EcError
+
 pub fn parse_error_register_payload(Bytes) -> Byte raise @hal.EcError
+
+pub fn parse_esi_json_document(String) -> EsiJsonDocument raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
@@ -250,6 +258,138 @@ pub(all) struct DiagnosticSurface {
 }
 pub impl Eq for DiagnosticSurface
 pub impl Show for DiagnosticSurface
+
+pub(all) struct EsiJsonDcMode {
+  name : String
+  description : String
+  assign_activate : UInt
+  cycle_time_sync0 : UInt
+  sync0_factor : Int
+  sync1_factor : Int
+}
+pub impl Eq for EsiJsonDcMode
+pub impl Show for EsiJsonDcMode
+pub impl ToJson for EsiJsonDcMode
+
+pub(all) struct EsiJsonDevice {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+  physics : String
+  device_name : String
+  type_name : String
+  slot_index_increment : UInt
+  slot_pdo_increment : UInt
+  mailbox : EsiJsonMailbox
+  fmmu : Array[String]
+  sync_managers : Array[EsiJsonSmEntry]
+  dc_modes : Array[EsiJsonDcMode]
+  eeprom_byte_size : UInt
+  config_data : Bytes
+  bootstrap : Bytes
+  default_modules : Array[EsiJsonSelectedModule]
+  rx_pdos : Array[EsiJsonPdo]
+  tx_pdos : Array[EsiJsonPdo]
+}
+pub impl Eq for EsiJsonDevice
+pub impl Show for EsiJsonDevice
+pub impl ToJson for EsiJsonDevice
+
+pub(all) struct EsiJsonDocument {
+  devices : Array[EsiJsonDevice]
+  modules : Array[EsiJsonModule]
+}
+pub impl Eq for EsiJsonDocument
+pub impl Show for EsiJsonDocument
+pub impl ToJson for EsiJsonDocument
+
+pub(all) struct EsiJsonMailbox {
+  data_link_layer : Bool
+  coe_present : Bool
+  coe_sdo_info : Bool
+  coe_pdo_assign : Bool
+  coe_pdo_config : Bool
+  coe_complete_access : Bool
+  eoe : Bool
+  foe : Bool
+  soe : Bool
+  voe : Bool
+}
+pub impl Eq for EsiJsonMailbox
+pub impl Show for EsiJsonMailbox
+pub impl ToJson for EsiJsonMailbox
+
+pub(all) struct EsiJsonModule {
+  module_ident : UInt
+  module_name : String
+  rx_pdos : Array[EsiJsonPdo]
+  tx_pdos : Array[EsiJsonPdo]
+}
+pub impl Eq for EsiJsonModule
+pub impl Show for EsiJsonModule
+pub impl ToJson for EsiJsonModule
+
+pub(all) struct EsiJsonPdo {
+  direction : String
+  base_index : UInt
+  depend_on_slot_pdo : Bool
+  sync_manager : Byte
+  name : String
+  entries : Array[EsiJsonPdoEntry]
+}
+pub impl Eq for EsiJsonPdo
+pub impl Show for EsiJsonPdo
+pub impl ToJson for EsiJsonPdo
+
+pub(all) struct EsiJsonPdoEntry {
+  base_index : UInt
+  depend_on_slot_index : Bool
+  subindex : Byte
+  bit_length : Byte
+  name : String
+  data_type_name : String
+}
+pub impl Eq for EsiJsonPdoEntry
+pub impl Show for EsiJsonPdoEntry
+pub impl ToJson for EsiJsonPdoEntry
+
+pub(all) struct EsiJsonSelectedModule {
+  module_ident : UInt
+  slot_index : Int
+}
+pub impl Eq for EsiJsonSelectedModule
+pub impl Show for EsiJsonSelectedModule
+pub impl ToJson for EsiJsonSelectedModule
+
+pub(all) struct EsiJsonSmEntry {
+  physical_start : UInt
+  length : UInt
+  control : Byte
+  status : Byte
+  enable : Bool
+  sm_type : String
+}
+pub impl Eq for EsiJsonSmEntry
+pub impl Show for EsiJsonSmEntry
+pub impl ToJson for EsiJsonSmEntry
+
+pub(all) struct EsiOfflineSiiReport {
+  position : UInt
+  word_count : Int
+  eeprom : Bytes
+  preamble : @mailbox.SiiPreamble
+  standard : @mailbox.SiiStandardMetadata
+  header : @mailbox.SiiData
+  general : @mailbox.SiiGeneral?
+  strings : Array[String]
+  fmmu : Array[@mailbox.FmmuDirection]
+  sync_managers : Array[@mailbox.SiiSmEntry]
+  dc_clocks : Array[@mailbox.SiiDcClock]
+  tx_pdo : Array[@mailbox.SiiPdo]
+  rx_pdo : Array[@mailbox.SiiPdo]
+  categories : Array[@mailbox.SiiCategoryEntry]
+}
 
 pub(all) struct MailboxSession {
   original_state : @protocol.EsmState

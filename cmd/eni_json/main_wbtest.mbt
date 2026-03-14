@@ -85,3 +85,43 @@ test "eni-json converter rejects invalid XML numeric fields" {
     message.contains("invalid numeric ENI field at Slave/Info/PhysAddr"),
   )
 }
+
+///|
+test "eni-json converter projects ESI XML into shared ESI JSON interchange" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0001</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000002" RevisionNo="#x00000003">demo</Type>
+    #|        <Name>demo</Name>
+    #|        <Fmmu>Outputs</Fmmu>
+    #|        <Sm DefaultSize="64" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+    #|        <Sm DefaultSize="64" StartAddress="#x1400" ControlByte="#x22" Enable="1">MBoxIn</Sm>
+    #|        <Mailbox><CoE SdoInfo="1" /></Mailbox>
+    #|        <Dc><OpMode><Name>DC</Name><Desc>Demo</Desc><AssignActivate>#x0300</AssignActivate></OpMode></Dc>
+    #|        <Slots SlotIndexIncrement="#x800" SlotPdoIncrement="16"><Slot><ModuleIdent Default="1">#x00000010</ModuleIdent></Slot></Slots>
+    #|        <Eeprom><ByteSize>512</ByteSize><ConfigData>0100020003000400</ConfigData><BootStrap>0010200020102000</BootStrap></Eeprom>
+    #|      </Device>
+    #|    </Devices>
+    #|    <Modules>
+    #|      <Module>
+    #|        <Type ModuleIdent="#x00000010">demo-module</Type>
+    #|        <RxPdo Sm="2"><Index>#x1600</Index><Name>Outputs</Name><Entry><Index>#x7000</Index><SubIndex>1</SubIndex><BitLen>16</BitLen><Name>Out</Name><DataType>UINT</DataType></Entry></RxPdo>
+    #|      </Module>
+    #|    </Modules>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.devices.length(), 1)
+  assert_eq(document.devices[0].vendor_id, 1U)
+  assert_eq(document.devices[0].product_code, 2U)
+  assert_eq(document.devices[0].mailbox.coe_present, true)
+  let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
+  assert_eq(report.header.vendor_id, 1U)
+  assert_eq(report.header.product_code, 2U)
+  assert_eq(report.categories.length() > 0, true)
+}

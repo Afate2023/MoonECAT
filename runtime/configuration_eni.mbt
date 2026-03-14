@@ -114,13 +114,15 @@ fn parse_eni_json_slave(json : Json) -> EniJsonSlave raise @hal.EcError {
 fn decode_optional_eni_json_string(json : Json?) -> String? raise @hal.EcError {
   match json {
     None | Some(Null) => None
-    Some(value) =>
-      @json.from_json(value) catch {
+    Some(value) => {
+      let decoded : String = @json.from_json(value) catch {
         err =>
           raise @hal.EcError::EsiParseFailed(
             "ENI JSON decode failed: " + err.to_string(),
           )
       }
+      Some(decoded)
+    }
   }
 }
 

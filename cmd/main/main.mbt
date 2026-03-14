@@ -377,7 +377,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--xml <path>] [--device-index <n>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -386,13 +386,16 @@ fn print_usage() -> Unit {
   println("  moon run cmd/main scan -- --backend native --if <interface>")
   println("  moon run cmd/eni_json -- --input config.xml --output config.json")
   println(
+    "  moon run cmd/eni_json -- --input References/sample.xml --kind esi --output sample.esi.json",
+  )
+  println(
     "  moon run cmd/main validate -- --backend native --if <interface> --eni-json config.json --json",
   )
   println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
   )
   println(
-    "  moon run cmd/main esi-sii -- --xml References/sample.xml --device-index 0 --json",
+    "  moon run cmd/main esi-sii -- --esi-json sample.esi.json --device-index 0 --json",
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path",
