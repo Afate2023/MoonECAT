@@ -66,10 +66,11 @@ as `description`, `loopback`, or `index`.
 Socket when available. Use the explicit backend names when you need predictable
 cross-machine scripts.
 
-`read-sii` currently performs a minimal online SII read for one slave position
-via the native backend and reports the parsed header, General category, string
-table, and discovered category list. Use `--position` to select the slave index
-and `--words` to control the EEPROM word window to read.
+`read-sii` currently reads one slave EEPROM window through the native backend
+and reports parsed preamble, standard metadata, header, strings, General,
+FMMU, SyncManager, DC, PDO, and raw category inventory. Use `--position` to
+select the slave index and `--words` to control the EEPROM word window to
+read.
 
 `state` exposes EtherCAT AL state changes over the native backend. Use it
 without `--station` for a bus-wide broadcast transition, or add `--station`
@@ -95,3 +96,9 @@ environment requirements, and smoke commands. See
 ownership notes, handle lifetime rules, and sanitizer validation guidance. See
 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
 for the current raw socket completion plan and Npcap real-NIC ESM transition design.
+
+Current Native smoke evidence is split into two layers: Windows Npcap already
+has a verified empty-bus `list-if -> scan -> validate -> run` chain plus a real
+`state` execution baseline, while the next backlog item is a longer single-link
+chain covering `scan -> validate -> state -> diagnosis -> run` on the same NIC
+session and recording both empty-bus and single-slave baselines.

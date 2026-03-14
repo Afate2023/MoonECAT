@@ -819,6 +819,7 @@ test "ScanReport format with slaves" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -837,6 +838,7 @@ test "SlaveReport equality" {
   let r1 : @runtime.SlaveReport = {
     position: 0,
     station_address: 0x1001U,
+    alias_address: None,
     vendor_id: 0x0002U,
     product_code: 0x04D2U,
     revision: 0x0001U,
@@ -846,6 +848,7 @@ test "SlaveReport equality" {
   let r2 : @runtime.SlaveReport = {
     position: 0,
     station_address: 0x1001U,
+    alias_address: None,
     vendor_id: 0x0002U,
     product_code: 0x04D2U,
     revision: 0x0001U,
@@ -863,6 +866,7 @@ test "validate: all slaves match" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -872,6 +876,7 @@ test "validate: all slaves match" {
       {
         position: 1,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 0x0003U,
         product_code: 0x0064U,
         revision: 0x0002U,
@@ -890,7 +895,9 @@ test "validate: all slaves match" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
     {
       position: 1U,
@@ -901,7 +908,9 @@ test "validate: all slaves match" {
         serial: 0x5678U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1002U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -919,6 +928,7 @@ test "validate: identity mismatch detected" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0009U,
         product_code: 0x0099U,
         revision: 0x0001U,
@@ -937,7 +947,9 @@ test "validate: identity mismatch detected" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -953,6 +965,7 @@ test "validate: station address mismatch detected" {
       {
         position: 0,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -971,7 +984,9 @@ test "validate: station address mismatch detected" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -987,6 +1002,7 @@ test "validate: explicit identification mismatch detected" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1005,7 +1021,9 @@ test "validate: explicit identification mismatch detected" {
         serial: 0x1234U,
       }),
       expected_identification: Some(0x22222222U),
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1022,6 +1040,7 @@ test "validate: revision mismatch detected" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x9999U,
@@ -1040,7 +1059,9 @@ test "validate: revision mismatch detected" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1056,6 +1077,7 @@ test "validate: serial mismatch detected" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1074,7 +1096,9 @@ test "validate: serial mismatch detected" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1095,7 +1119,9 @@ test "validate: missing slave" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1112,6 +1138,7 @@ test "validate: extra slave detected" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1121,6 +1148,7 @@ test "validate: extra slave detected" {
       {
         position: 1,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 0x0005U,
         product_code: 0x0010U,
         revision: 0x0001U,
@@ -1139,7 +1167,9 @@ test "validate: extra slave detected" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1157,6 +1187,7 @@ test "validate: no identity constraint accepts any slave" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0xFFFFU,
         product_code: 0xFFFFU,
         revision: 0xFFFFU,
@@ -1170,7 +1201,9 @@ test "validate: no identity constraint accepts any slave" {
       position: 0U,
       expected_identity: None,
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1196,6 +1229,7 @@ test "configuration_from_scan projects scan into unified model" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1235,7 +1269,9 @@ test "configuration_from_expected projects offline config into unified model" {
         serial: 0x5678U,
       }),
       expected_identification: Some(0x0042U),
+      expected_alias_address: None,
       configured_address: 0x1002U,
+      presence: @hal.Mandatory,
     },
   ]
   let model = @runtime.configuration_from_expected(expected)
@@ -1256,6 +1292,7 @@ test "compare_configurations reports topology and identity differences" {
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 0x0002U,
           product_code: 0x04D2U,
@@ -1264,10 +1301,12 @@ test "compare_configurations reports topology and identity differences" {
         }),
         identification: Some(0x0020U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
       {
         position: 1,
         configured_address: Some(0x1002U),
+        alias_address: None,
         identity: Some({
           vendor_id: 0x0003U,
           product_code: 0x0064U,
@@ -1276,6 +1315,7 @@ test "compare_configurations reports topology and identity differences" {
         }),
         identification: Some(0x0042U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1286,6 +1326,7 @@ test "compare_configurations reports topology and identity differences" {
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 0x0002U,
           product_code: 0x9999U,
@@ -1294,10 +1335,12 @@ test "compare_configurations reports topology and identity differences" {
         }),
         identification: Some(0x0020U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
       {
         position: 2,
         configured_address: Some(0x1003U),
+        alias_address: None,
         identity: Some({
           vendor_id: 0x0004U,
           product_code: 0x0001U,
@@ -1306,6 +1349,7 @@ test "compare_configurations reports topology and identity differences" {
         }),
         identification: Some(0x0055U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1483,6 +1527,7 @@ test "validate: matches by position even when expected order differs" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1492,6 +1537,7 @@ test "validate: matches by position even when expected order differs" {
       {
         position: 1,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 0x0003U,
         product_code: 0x0064U,
         revision: 0x0002U,
@@ -1510,7 +1556,9 @@ test "validate: matches by position even when expected order differs" {
         serial: 0x5678U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1002U,
+      presence: @hal.Mandatory,
     },
     {
       position: 0U,
@@ -1521,7 +1569,9 @@ test "validate: matches by position even when expected order differs" {
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1537,6 +1587,7 @@ test "validate: reports missing and extra by position" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1555,7 +1606,9 @@ test "validate: reports missing and extra by position" {
         serial: 0x5678U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1002U,
+      presence: @hal.Mandatory,
     },
   ]
   let report = @runtime.validate(scan, expected)
@@ -1608,6 +1661,7 @@ test "validate_configuration grades extra-only topology as warn" {
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 1U,
           product_code: 2U,
@@ -1631,6 +1685,7 @@ test "validate_configuration grades extra-only topology as warn" {
           dc_op_mode_count: 1,
           dc_assign_activate_count: 1,
         }),
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1641,6 +1696,7 @@ test "validate_configuration grades extra-only topology as warn" {
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 1U,
           product_code: 2U,
@@ -1649,10 +1705,12 @@ test "validate_configuration grades extra-only topology as warn" {
         }),
         identification: Some(5U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
       {
         position: 1,
         configured_address: Some(0x1002U),
+        alias_address: None,
         identity: Some({
           vendor_id: 6U,
           product_code: 7U,
@@ -1661,6 +1719,7 @@ test "validate_configuration grades extra-only topology as warn" {
         }),
         identification: Some(10U),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1711,6 +1770,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 1U,
           product_code: 2U,
@@ -1719,6 +1779,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
         }),
         identification: Some(5U),
         process_data_summary: Some(summary_expected),
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1729,6 +1790,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
       {
         position: 0,
         configured_address: Some(0x1001U),
+        alias_address: None,
         identity: Some({
           vendor_id: 1U,
           product_code: 2U,
@@ -1737,6 +1799,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
         }),
         identification: Some(5U),
         process_data_summary: Some(summary_actual),
+        presence: @hal.Mandatory,
       },
     ],
   }
@@ -1763,6 +1826,7 @@ test "diagnostic surface from validate carries configuration summary and topolog
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -1801,6 +1865,7 @@ test "diagnostic surface from slave diagnosis classifies register and mailbox is
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -1832,7 +1897,19 @@ test "validation difference category and grade classify topology identity and co
     @runtime.Topology,
   )
   assert_eq(
+    @runtime.validation_difference_category(
+      @runtime.OptionalMissing(position=1, group_id=Some(7U)),
+    ),
+    @runtime.Topology,
+  )
+  assert_eq(
     @runtime.validation_difference_grade(@runtime.Extra(position=1)),
+    @runtime.Warn,
+  )
+  assert_eq(
+    @runtime.validation_difference_grade(
+      @runtime.OptionalMissing(position=1, group_id=Some(7U)),
+    ),
     @runtime.Warn,
   )
   assert_eq(
@@ -1864,6 +1941,110 @@ test "validation difference category and grade classify topology identity and co
       ),
     ),
     @runtime.Configuration,
+  )
+  assert_eq(
+    @runtime.validation_difference_category(
+      @runtime.AliasAddressMismatch(
+        position=0,
+        expected=Some(0x20U),
+        actual=Some(0x30U),
+      ),
+    ),
+    @runtime.Topology,
+  )
+}
+
+///|
+test "validate_configuration grades optional missing hot-connect member as warn" {
+  let expected : @runtime.ConfigurationModel = {
+    source: @runtime.OfflineConfig,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 3,
+        configured_address: Some(0x1004U),
+        alias_address: Some(0x20U),
+        identity: Some({
+          vendor_id: 0x0002U,
+          product_code: 0x04D2U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        identification: Some(0x0020U),
+        process_data_summary: None,
+        presence: @hal.Optional(group_id=Some(7U)),
+      },
+    ],
+  }
+  let actual : @runtime.ConfigurationModel = {
+    source: @runtime.OnlineScan,
+    total_slaves: 0,
+    slaves: [],
+  }
+  let report = @runtime.validate_configuration(actual, expected)
+  assert_eq(report.grade, @runtime.Warn)
+  assert_true(
+    report.differences.contains(
+      @runtime.OptionalMissing(position=3, group_id=Some(7U)),
+    ),
+  )
+  assert_true(
+    report.results[0] is @runtime.OptionalMissing(position=3, group_id=Some(7U)),
+  )
+}
+
+///|
+test "validate_configuration treats alias mismatch as topology block" {
+  let expected : @runtime.ConfigurationModel = {
+    source: @runtime.OfflineConfig,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        alias_address: Some(0x20U),
+        identity: Some({
+          vendor_id: 0x0002U,
+          product_code: 0x04D2U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        identification: Some(0x0020U),
+        process_data_summary: None,
+        presence: @hal.Mandatory,
+      },
+    ],
+  }
+  let actual : @runtime.ConfigurationModel = {
+    source: @runtime.OnlineScan,
+    total_slaves: 1,
+    slaves: [
+      {
+        position: 0,
+        configured_address: Some(0x1001U),
+        alias_address: Some(0x21U),
+        identity: Some({
+          vendor_id: 0x0002U,
+          product_code: 0x04D2U,
+          revision: 0x0001U,
+          serial: 0x1234U,
+        }),
+        identification: Some(0x0020U),
+        process_data_summary: None,
+        presence: @hal.Mandatory,
+      },
+    ],
+  }
+  let report = @runtime.validate_configuration(actual, expected)
+  assert_eq(report.grade, @runtime.Block)
+  assert_true(
+    report.differences.contains(
+      @runtime.AliasAddressMismatch(
+        position=0,
+        expected=Some(0x20U),
+        actual=Some(0x21U),
+      ),
+    ),
   )
 }
 
@@ -1900,6 +2081,7 @@ test "offline config and ENI expectations share the same validation semantics" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
         revision: 0x0001U,
@@ -1911,7 +2093,6 @@ test "offline config and ENI expectations share the same validation semantics" {
   let expected_offline = @runtime.configuration_from_expected([
     {
       position: 0U,
-      configured_address: 0x1002U,
       expected_identity: Some({
         vendor_id: 0x0002U,
         product_code: 0x04D2U,
@@ -1919,6 +2100,9 @@ test "offline config and ENI expectations share the same validation semantics" {
         serial: 0x1234U,
       }),
       expected_identification: Some(0x20U),
+      expected_alias_address: None,
+      configured_address: 0x1002U,
+      presence: @hal.Mandatory,
     },
   ])
   let expected_eni = @runtime.configuration_from_eni_json(expected_eni_json)
@@ -2120,7 +2304,9 @@ test "run with mock loopback: validation fails when slaves expected but not foun
         serial: 0x1234U,
       }),
       expected_identification: None,
+      expected_alias_address: None,
       configured_address: 0x1001U,
+      presence: @hal.Mandatory,
     },
   ]
   let ctx : @protocol.PdoContext = {

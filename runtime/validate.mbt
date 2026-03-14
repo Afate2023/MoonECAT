@@ -9,6 +9,8 @@ pub(all) enum ValidationResult {
   Ok
   /// Slave station address mismatch.
   StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
+  /// Slave alias address mismatch.
+  AliasAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   /// Slave identity mismatch.
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   /// Slave explicit identification mismatch.
@@ -17,6 +19,8 @@ pub(all) enum ValidationResult {
   ProcessDataMismatch(position~ : Int)
   /// Slave not found at expected position.
   Missing(position~ : Int)
+  /// Optional slave group member is absent.
+  OptionalMissing(position~ : Int, group_id~ : UInt?)
   /// Extra slave found that was not expected.
   Extra(position~ : Int)
 } derive(Show)
@@ -117,7 +121,7 @@ fn validation_grade_from_differences(
   }
   for diff in differences {
     match diff {
-      Extra(..) => ()
+      Extra(..) | OptionalMissing(..) => ()
       _ => return Block
     }
   }
@@ -129,11 +133,13 @@ pub fn validation_difference_category(
   difference : ConfigurationDifference,
 ) -> ValidateDifferenceCategory {
   match difference {
-    Missing(..) | Extra(..) => Topology
+    Missing(..)
+    | OptionalMissing(..)
+    | Extra(..)
+    | StationAddressMismatch(..)
+    | AliasAddressMismatch(..) => Topology
     IdentityMismatch(..) => Identity
-    StationAddressMismatch(..)
-    | IdentificationMismatch(..)
-    | ProcessDataSummaryMismatch(..) => Configuration
+    IdentificationMismatch(..) | ProcessDataSummaryMismatch(..) => Configuration
   }
 }
 
@@ -142,7 +148,7 @@ pub fn validation_difference_grade(
   difference : ConfigurationDifference,
 ) -> ValidateGrade {
   match difference {
-    Extra(..) => Warn
+    Extra(..) | OptionalMissing(..) => Warn
     _ => Block
   }
 }
@@ -156,7 +162,11 @@ fn differences_for_position(
   for diff in differences {
     match diff {
       Missing(position~) if position == wanted_position => matches.push(diff)
+      OptionalMissing(position~, ..) if position == wanted_position =>
+        matches.push(diff)
       StationAddressMismatch(position~, ..) if position == wanted_position =>
+        matches.push(diff)
+      AliasAddressMismatch(position~, ..) if position == wanted_position =>
         matches.push(diff)
       IdentityMismatch(position~, ..) if position == wanted_position =>
         matches.push(diff)
@@ -176,7 +186,10 @@ fn first_missing_or_address_diff(
 ) -> ConfigurationDifference? {
   for diff in differences {
     match diff {
-      Missing(..) | StationAddressMismatch(..) => return Some(diff)
+      Missing(..)
+      | OptionalMissing(..)
+      | StationAddressMismatch(..)
+      | AliasAddressMismatch(..) => return Some(diff)
       _ => ()
     }
   }
@@ -202,9 +215,17 @@ fn configuration_difference_to_validation(
 ) -> ValidationResult {
   match difference {
     Missing(position~) => Missing(position~)
+    OptionalMissing(position~, group_id~) =>
+      OptionalMissing(position~, group_id~)
     Extra(position~) => Extra(position~)
     StationAddressMismatch(position~, expected~, actual~) =>
       StationAddressMismatch(
+        position~,
+        expected=option_uint_or_zero(expected),
+        actual=option_uint_or_zero(actual),
+      )
+    AliasAddressMismatch(position~, expected~, actual~) =>
+      AliasAddressMismatch(
         position~,
         expected=option_uint_or_zero(expected),
         actual=option_uint_or_zero(actual),
@@ -289,6 +310,16 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
           actual.reinterpret_as_int().to_string() +
           "\n",
         )
+      AliasAddressMismatch(position~, expected~, actual~) =>
+        buf.write_string(
+          "  [ALIAS-MISMATCH] Slave #" +
+          position.to_string() +
+          ": expected 0x" +
+          expected.reinterpret_as_int().to_string() +
+          " actual 0x" +
+          actual.reinterpret_as_int().to_string() +
+          "\n",
+        )
       IdentityMismatch(..) =>
         buf.write_string(
           "  [MISMATCH] Slave #" + i.to_string() + ": identity mismatch\n",
@@ -313,6 +344,14 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
         buf.write_string(
           "  [MISSING] Slave #" + position.to_string() + ": not found\n",
         )
+      OptionalMissing(position~, group_id~) =>
+        buf.write_string(
+          "  [OPTIONAL-MISSING] Slave #" +
+          position.to_string() +
+          ": optional hot-connect member absent" +
+          optional_group_suffix(group_id) +
+          "\n",
+        )
       Extra(position~) =>
         buf.write_string(
           "  [EXTRA] Slave #" + position.to_string() + ": unexpected\n",
@@ -320,4 +359,12 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
     }
   }
   buf.to_string()
+}
+
+///|
+fn optional_group_suffix(group_id : UInt?) -> String {
+  match group_id {
+    Some(group) => " (group=" + group.to_string() + ")"
+    None => ""
+  }
 }

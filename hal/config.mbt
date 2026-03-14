@@ -34,6 +34,12 @@ pub(all) struct SlaveIdentity {
 } derive(Eq, Show)
 
 ///|
+pub(all) enum SlavePresence {
+  Mandatory
+  Optional(group_id~ : UInt?)
+} derive(Eq, Show)
+
+///|
 /// SlaveConfig holds per-slave configuration parameters.
 pub(all) struct SlaveConfig {
   /// Position in the EtherCAT ring (0-based).
@@ -42,6 +48,10 @@ pub(all) struct SlaveConfig {
   expected_identity : SlaveIdentity?
   /// Expected explicit device identification value (IdentificationAdo).
   expected_identification : UInt?
+  /// Expected station alias address when topology rules require it.
+  expected_alias_address : UInt?
   /// Configured station address.
   configured_address : UInt
+  /// Whether this slave is mandatory or may be absent as part of a Hot Connect segment.
+  presence : SlavePresence
 } derive(Eq, Show)

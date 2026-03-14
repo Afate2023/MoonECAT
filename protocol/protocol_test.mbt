@@ -791,7 +791,9 @@ test "SlaveConfig construction" {
     position: 0U,
     expected_identity: Some(@fixtures.sample_ek1100_identity()),
     expected_identification: None,
+    expected_alias_address: None,
     configured_address: 0x1001U,
+    presence: @hal.Mandatory,
   }
   assert_eq(cfg.position, 0U)
   assert_eq(cfg.configured_address, 0x1001U)

@@ -152,10 +152,10 @@
 - SOEM：在配置初始化与状态检查路径里，把“发现到的从站拓扑”与“预期配置”持续绑定，而不是只做一次松散匹配。
 - EtherCAT_Compendium：Hot Connect group、Explicit Device Identification、拓扑变化告警必须服务启动判断和后续运维诊断，而不只是导入时字段保存。
 
-- [ ] 定义拓扑指纹对象：至少覆盖 `position / configured_address / alias_address? / identity / identification / process_data_summary 摘要`，作为 scan、offline config、ENI JSON 共用的最小比较单元。
-- [ ] 定义 Hot Connect group / optional segment 模型：允许把“必须存在”和“允许缺失”的从站集合显式编码进统一配置对象，避免把可选组逻辑散落到 CLI。
-- [ ] 扩展差异分类：把当前 `Extra/Missing/IdentityMismatch/AddressMismatch/IdentificationMismatch` 进一步细分为 `topology-change / hot-connect-missing / optional-segment-skipped / configuration-drift`，保持 `Pass/Warn/Block` 仍由 runtime 统一裁定。
-- [ ] 定义启动期告警策略：参考 Compendium 的启动比较语义，把“可选组缺失”默认降为 `Warn`，把主链路断裂、顺序漂移、身份冲突保持为 `Block`。
+- [x] 定义拓扑指纹对象：当前统一配置对象已覆盖 `position / configured_address / alias_address? / identity / identification / process_data_summary 摘要`，作为 scan、offline config、ENI JSON 共用的最小比较单元。
+- [x] 定义 Hot Connect group / optional segment 模型：当前已通过 `SlavePresence::{Mandatory, Optional(group_id)}` 把“必须存在”和“允许缺失”的从站集合编码进统一配置对象，避免把可选组逻辑散落到 CLI。
+- [x] 扩展差异分类：当前已补 `OptionalMissing` 与 `AliasAddressMismatch`，并让 `category/grade` 继续由 runtime 统一裁定；后续如需更细标签，在同一差异模型内扩展。
+- [x] 定义启动期告警策略：当前已把“可选组缺失”降为 `Warn`，并保持主链路缺失、站地址/别名漂移、身份冲突为 `Block`。
 - [ ] 设计最小证据链：先补 replay/fixture 级拓扑变化回放，再补一条 Native 实机 smoke，覆盖“缺少 optional slave 仍可启动”和“mandatory slave 缺失阻塞启动”两条路径。
 
 拓扑变化 / Hot Connect 验收标准：
@@ -169,8 +169,8 @@
 
 > 目标不是继续扩展命令数量，而是把已有 Native/Extism 表面收敛成可发布、可验证、可维护的后端产品面。参考依据以 Npcap SDK、IGH Raw Socket 路径、GatorCAT NIC 封装，以及 Extism Host boundary 设计文档为主。
 
-- [ ] Native：补“真实链路持续运行”证据，把 `scan -> validate -> state -> diagnosis -> run` 串成同一网卡会话下的最小长链 smoke，并记录空总线/单从站两类基线。
-- [ ] Native：补 SII 完整类别深读计划，按 siitool / SOEM `readeepromAP/FP` 经验继续完善 category 深度解码，避免 `read-sii` 长期停留在 header/general 级别。
+- [ ] Native：补“真实链路持续运行”证据，把 `scan -> validate -> state -> diagnosis -> run` 串成同一网卡会话下的最小长链 smoke，并记录空总线/单从站两类基线。当前 Windows Npcap 已有空总线 `list-if -> scan -> validate -> run` 与单独 `state` 成功证据，但尚未把长链合并成一次会话记录。
+- [ ] Native：补 SII 完整类别深读计划，按 siitool / SOEM `readeepromAP/FP` 经验继续完善 category 深度解码。当前 `read-sii` 已输出 preamble/standard/header/strings/general/FMMU/SM/DC/PDO/categories，不再是仅 header/general 的最小形态；后续重点转为稳定 JSON 结构、全量类别覆盖与配置工具复用。
 - [ ] Native：把 AddressSanitizer/等价内存安全检查固定成文档化命令，覆盖句柄泄漏、重复 close、错误 ownership 标注三类风险。
 - [ ] Extism：补 host capability adapter 的最小闭环，优先打通 `nic_open/send/recv/close + clock_now/sleep`，共享内存优化保持第二阶段，不让能力边界长期停在 contract 文档。
 - [ ] Extism：增加“无文件系统宿主”回放，验证 `scan/validate/run` 的 bytes 输入路径，确保插件产品面不依赖本地路径语义。

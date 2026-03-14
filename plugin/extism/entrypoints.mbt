@@ -135,7 +135,9 @@ fn expected_from_scan(scan : @runtime.ScanReport) -> Array[@hal.SlaveConfig] {
         serial: s.serial,
       }),
       expected_identification: Some(s.identification),
+      expected_alias_address: s.alias_address,
       configured_address: s.station_address,
+      presence: @hal.Mandatory,
     }
   })
 }
@@ -146,6 +148,7 @@ fn scan_report_json(report : @runtime.ScanReport) -> Json {
     Json::object({
       "position": Json::number(s.position.to_double()),
       "station_address": Json::number(s.station_address.to_double()),
+      "alias_address": option_uint_json(s.alias_address),
       "vendor_id": Json::number(s.vendor_id.to_double()),
       "product_code": Json::number(s.product_code.to_double()),
       "revision": Json::number(s.revision.to_double()),
@@ -235,6 +238,18 @@ fn configuration_difference_json(
         "type": Json::string("missing"),
         "position": Json::number(position.to_double()),
       })
+    @runtime.OptionalMissing(position~, group_id~) =>
+      Json::object({
+        "category": Json::string(
+          @runtime.validation_difference_category(diff).to_string(),
+        ),
+        "grade": Json::string(
+          @runtime.validation_difference_grade(diff).to_string(),
+        ),
+        "type": Json::string("optional-missing"),
+        "position": Json::number(position.to_double()),
+        "group_id": option_uint_json(group_id),
+      })
     @runtime.Extra(position~) =>
       Json::object({
         "category": Json::string(
@@ -255,6 +270,19 @@ fn configuration_difference_json(
           @runtime.validation_difference_grade(diff).to_string(),
         ),
         "type": Json::string("station-address-mismatch"),
+        "position": Json::number(position.to_double()),
+        "expected": option_uint_json(expected),
+        "actual": option_uint_json(actual),
+      })
+    @runtime.AliasAddressMismatch(position~, expected~, actual~) =>
+      Json::object({
+        "category": Json::string(
+          @runtime.validation_difference_category(diff).to_string(),
+        ),
+        "grade": Json::string(
+          @runtime.validation_difference_grade(diff).to_string(),
+        ),
+        "type": Json::string("alias-address-mismatch"),
         "position": Json::number(position.to_double()),
         "expected": option_uint_json(expected),
         "actual": option_uint_json(actual),

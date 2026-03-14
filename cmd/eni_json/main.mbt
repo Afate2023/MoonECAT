@@ -619,6 +619,7 @@ fn project_eni_slaves(
       {
         position: slave.position,
         configured_address: slave.configured_address,
+        alias_address: None,
         identity: build_eni_identity(slave),
         identification: slave.identification,
         process_data_summary: Some({
@@ -630,6 +631,7 @@ fn project_eni_slaves(
           dc_op_mode_count: slave.dc_op_mode_count,
           dc_assign_activate_count: slave.dc_assign_activate_count,
         }),
+        presence: @hal.Mandatory,
       }
     }),
   }

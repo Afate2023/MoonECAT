@@ -86,8 +86,10 @@ pub impl Show for ConfigurationComparisonReport
 
 pub(all) enum ConfigurationDifference {
   Missing(position~ : Int)
+  OptionalMissing(position~ : Int, group_id~ : UInt?)
   Extra(position~ : Int)
   StationAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+  AliasAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   IdentityMismatch(position~ : Int, expected~ : @hal.SlaveIdentity?, actual~ : @hal.SlaveIdentity?)
   IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   ProcessDataSummaryMismatch(position~ : Int, expected~ : ConfigurationProcessDataSummary, actual~ : ConfigurationProcessDataSummary)
@@ -129,9 +131,11 @@ pub impl Show for ConfigurationProcessDataSummary
 pub(all) struct ConfigurationSlave {
   position : Int
   configured_address : UInt?
+  alias_address : UInt?
   identity : @hal.SlaveIdentity?
   identification : UInt?
   process_data_summary : ConfigurationProcessDataSummary?
+  presence : @hal.SlavePresence
 }
 pub impl Eq for ConfigurationSlave
 pub impl Show for ConfigurationSlave
@@ -338,6 +342,7 @@ pub impl Show for SlaveDiagnosis
 pub(all) struct SlaveReport {
   position : Int
   station_address : UInt
+  alias_address : UInt?
   vendor_id : UInt
   product_code : UInt
   revision : UInt
@@ -407,10 +412,12 @@ pub impl Show for ValidateReport
 pub(all) enum ValidationResult {
   Ok
   StationAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
+  AliasAddressMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   IdentityMismatch(expected~ : @hal.SlaveIdentity, actual~ : @hal.SlaveIdentity)
   IdentificationMismatch(position~ : Int, expected~ : UInt, actual~ : UInt)
   ProcessDataMismatch(position~ : Int)
   Missing(position~ : Int)
+  OptionalMissing(position~ : Int, group_id~ : UInt?)
   Extra(position~ : Int)
 }
 pub impl Show for ValidationResult

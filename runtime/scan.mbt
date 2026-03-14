@@ -17,6 +17,7 @@ pub(all) struct ScanReport {
 pub(all) struct SlaveReport {
   position : Int
   station_address : UInt
+  alias_address : UInt?
   vendor_id : UInt
   product_code : UInt
   revision : UInt
@@ -56,6 +57,13 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
     let position = i.reinterpret_as_uint()
     let station = 0x1001U + position
     @protocol.assign_station_address(nic, position, station, timeout)
+    let alias_address = try
+      @protocol.read_station_alias(nic, station, timeout)
+    catch {
+      _ => None
+    } noraise {
+      value => Some(value)
+    }
     let identity = read_best_identity(nic, position, station, timeout)
     let identification_pdu = @protocol.read_register_ap(
       nic, position, identification_ado, 4, timeout,
@@ -64,6 +72,7 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
     slaves.push({
       position: i,
       station_address: station,
+      alias_address,
       vendor_id: identity.vendor_id,
       product_code: identity.product_code,
       revision: identity.revision,
@@ -221,6 +230,11 @@ pub fn ScanReport::format(self : ScanReport) -> String {
     let s = self.slaves[i]
     buf.write_string("Slave #" + s.position.to_string() + "\n")
     buf.write_string("  Station: " + s.station_address.to_string() + "\n")
+    match s.alias_address {
+      Some(alias_value) =>
+        buf.write_string("  Alias:   " + alias_value.to_string() + "\n")
+      None => ()
+    }
     buf.write_string("  Vendor:  " + s.vendor_id.to_string() + "\n")
     buf.write_string("  Product: " + s.product_code.to_string() + "\n")
     buf.write_string("  Revision: " + s.revision.to_string() + "\n")

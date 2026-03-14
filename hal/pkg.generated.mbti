@@ -75,7 +75,9 @@ pub(all) struct SlaveConfig {
   position : UInt
   expected_identity : SlaveIdentity?
   expected_identification : UInt?
+  expected_alias_address : UInt?
   configured_address : UInt
+  presence : SlavePresence
 }
 pub impl Eq for SlaveConfig
 pub impl Show for SlaveConfig
@@ -88,6 +90,13 @@ pub(all) struct SlaveIdentity {
 }
 pub impl Eq for SlaveIdentity
 pub impl Show for SlaveIdentity
+
+pub(all) enum SlavePresence {
+  Mandatory
+  Optional(group_id~ : UInt?)
+}
+pub impl Eq for SlavePresence
+pub impl Show for SlavePresence
 
 pub(all) struct Timestamp(Int64)
 #deprecated

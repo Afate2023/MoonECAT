@@ -70,6 +70,7 @@ test "cli resolve validate expected configuration defaults to scan projection" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -210,6 +211,7 @@ test "cli resolve diagnosis station uses explicit or single slave" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -230,6 +232,7 @@ test "cli resolve diagnosis slave finds explicit station" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -239,6 +242,7 @@ test "cli resolve diagnosis slave finds explicit station" {
       {
         position: 1,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 6U,
         product_code: 7U,
         revision: 8U,
@@ -260,6 +264,7 @@ test "cli resolve diagnosis slave rejects missing explicit station" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -283,6 +288,7 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -292,6 +298,7 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
       {
         position: 1,
         station_address: 0x1002U,
+        alias_address: None,
         vendor_id: 6U,
         product_code: 7U,
         revision: 8U,
@@ -315,6 +322,7 @@ test "cli diagnosis output json includes nullable counter" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -347,6 +355,7 @@ test "cli diagnosis output json includes shared surface" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,
@@ -406,6 +415,55 @@ test "cli validate report json includes grade and sources" {
 }
 
 ///|
+test "cli validate report json includes optional missing topology detail" {
+  let json = validate_report_json({
+    expected_source: @runtime.OfflineConfig,
+    actual_source: @runtime.OnlineScan,
+    total_expected: 1,
+    total_found: 0,
+    results: [@runtime.OptionalMissing(position=3, group_id=Some(7U))],
+    differences: [
+      @runtime.ConfigurationDifference::OptionalMissing(
+        position=3,
+        group_id=Some(7U),
+      ),
+    ],
+    all_ok: false,
+    grade: @runtime.Warn,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"type\": \"optional-missing\""))
+  assert_true(text.contains("\"group_id\": 7"))
+  assert_true(text.contains("\"grade\": \"Warn\""))
+}
+
+///|
+test "cli validate report json includes alias mismatch as block" {
+  let json = validate_report_json({
+    expected_source: @runtime.OfflineConfig,
+    actual_source: @runtime.OnlineScan,
+    total_expected: 1,
+    total_found: 1,
+    results: [
+      @runtime.AliasAddressMismatch(position=0, expected=0x20U, actual=0x21U),
+    ],
+    differences: [
+      @runtime.ConfigurationDifference::AliasAddressMismatch(
+        position=0,
+        expected=Some(0x20U),
+        actual=Some(0x21U),
+      ),
+    ],
+    all_ok: false,
+    grade: @runtime.Block,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"type\": \"alias-address-mismatch\""))
+  assert_true(text.contains("\"category\": \"Topology\""))
+  assert_true(text.contains("\"grade\": \"Block\""))
+}
+
+///|
 test "cli validate output json includes shared surface" {
   let scan : @runtime.ScanReport = {
     slave_count: 1,
@@ -413,6 +471,7 @@ test "cli validate output json includes shared surface" {
       {
         position: 0,
         station_address: 0x1001U,
+        alias_address: None,
         vendor_id: 1U,
         product_code: 2U,
         revision: 3U,

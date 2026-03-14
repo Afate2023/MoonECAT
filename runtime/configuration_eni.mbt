@@ -36,9 +36,12 @@ priv struct EniJsonProcessDataSummary {
 priv struct EniJsonSlave {
   position : Int
   configured_address : UInt?
+  alias_address : UInt?
   identity : EniJsonIdentity?
   identification : UInt?
   process_data_summary : EniJsonProcessDataSummary?
+  presence : String?
+  hot_connect_group : UInt?
 } derive(ToJson)
 
 ///|
@@ -77,9 +80,12 @@ fn parse_eni_json_slave(json : Json) -> EniJsonSlave raise @hal.EcError {
     is {
       "position": position_json,
       "configured_address"? : configured_address_json,
+      "alias_address"? : alias_address_json,
       "identity"? : identity_json,
       "identification"? : identification_json,
       "process_data_summary"? : process_data_summary_json,
+      "presence"? : presence_json,
+      "hot_connect_group"? : hot_connect_group_json,
       ..
     } else {
     raise @hal.EcError::EsiParseFailed(
@@ -91,11 +97,30 @@ fn parse_eni_json_slave(json : Json) -> EniJsonSlave raise @hal.EcError {
     configured_address: decode_optional_eni_json_value_uint(
       configured_address_json,
     ),
+    alias_address: decode_optional_eni_json_value_uint(alias_address_json),
     identity: decode_optional_eni_json_identity(identity_json),
     identification: decode_optional_eni_json_value_uint(identification_json),
     process_data_summary: decode_optional_eni_json_process_data_summary(
       process_data_summary_json,
     ),
+    presence: decode_optional_eni_json_string(presence_json),
+    hot_connect_group: decode_optional_eni_json_value_uint(
+      hot_connect_group_json,
+    ),
+  }
+}
+
+///|
+fn decode_optional_eni_json_string(json : Json?) -> String? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) =>
+      @json.from_json(value) catch {
+        err =>
+          raise @hal.EcError::EsiParseFailed(
+            "ENI JSON decode failed: " + err.to_string(),
+          )
+      }
   }
 }
 
@@ -262,6 +287,7 @@ fn project_eni_json_document(document : EniJsonDocument) -> ConfigurationModel {
       {
         position: slave.position,
         configured_address: slave.configured_address,
+        alias_address: slave.alias_address,
         identity: slave.identity.map(fn(identity) {
           {
             vendor_id: identity.vendor_id,
@@ -291,6 +317,10 @@ fn project_eni_json_document(document : EniJsonDocument) -> ConfigurationModel {
             dc_assign_activate_count: summary.dc_assign_activate_count,
           }
         }),
+        presence: decode_eni_json_presence(
+          slave.presence,
+          slave.hot_connect_group,
+        ),
       }
     }),
   }
@@ -305,6 +335,7 @@ fn eni_json_document_from_configuration(
       {
         position: slave.position,
         configured_address: slave.configured_address,
+        alias_address: slave.alias_address,
         identity: slave.identity.map(fn(identity) {
           {
             vendor_id: identity.vendor_id,
@@ -334,7 +365,26 @@ fn eni_json_document_from_configuration(
             dc_assign_activate_count: summary.dc_assign_activate_count,
           }
         }),
+        presence: match slave.presence {
+          @hal.Mandatory => Some("mandatory")
+          @hal.Optional(..) => Some("optional")
+        },
+        hot_connect_group: match slave.presence {
+          @hal.Mandatory => None
+          @hal.Optional(group_id~) => group_id
+        },
       }
     }),
+  }
+}
+
+///|
+fn decode_eni_json_presence(
+  presence : String?,
+  hot_connect_group : UInt?,
+) -> @hal.SlavePresence {
+  match presence {
+    Some("optional") => @hal.Optional(group_id=hot_connect_group)
+    _ => @hal.Mandatory
   }
 }

@@ -12,9 +12,11 @@ pub(all) enum ConfigurationSource {
 pub(all) struct ConfigurationSlave {
   position : Int
   configured_address : UInt?
+  alias_address : UInt?
   identity : @hal.SlaveIdentity?
   identification : UInt?
   process_data_summary : ConfigurationProcessDataSummary?
+  presence : @hal.SlavePresence
 } derive(Eq, Show)
 
 ///|
@@ -48,8 +50,10 @@ pub(all) struct ConfigurationModel {
 ///|
 pub(all) enum ConfigurationDifference {
   Missing(position~ : Int)
+  OptionalMissing(position~ : Int, group_id~ : UInt?)
   Extra(position~ : Int)
   StationAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
+  AliasAddressMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   IdentityMismatch(
     position~ : Int,
     expected~ : @hal.SlaveIdentity?,
@@ -82,6 +86,7 @@ pub fn configuration_from_scan(scan_report : ScanReport) -> ConfigurationModel {
       {
         position: slave.position,
         configured_address: Some(slave.station_address),
+        alias_address: slave.alias_address,
         identity: Some({
           vendor_id: slave.vendor_id,
           product_code: slave.product_code,
@@ -90,6 +95,7 @@ pub fn configuration_from_scan(scan_report : ScanReport) -> ConfigurationModel {
         }),
         identification: Some(slave.identification),
         process_data_summary: None,
+        presence: @hal.Mandatory,
       }
     }),
   }
@@ -106,9 +112,11 @@ pub fn configuration_from_expected(
       {
         position: slave.position.reinterpret_as_int(),
         configured_address: Some(slave.configured_address),
+        alias_address: slave.expected_alias_address,
         identity: slave.expected_identity,
         identification: slave.expected_identification,
         process_data_summary: None,
+        presence: slave.presence,
       }
     }),
   }
@@ -162,6 +170,32 @@ pub fn compare_configurations(
           }
         }
 
+        if exp.alias_address is Some(expected_alias) {
+          match found.alias_address {
+            Some(actual_alias) =>
+              if actual_alias != expected_alias {
+                differences.push(
+                  AliasAddressMismatch(
+                    position=pos,
+                    expected=Some(expected_alias),
+                    actual=Some(actual_alias),
+                  ),
+                )
+                all_ok = false
+              }
+            None => {
+              differences.push(
+                AliasAddressMismatch(
+                  position=pos,
+                  expected=Some(expected_alias),
+                  actual=None,
+                ),
+              )
+              all_ok = false
+            }
+          }
+        }
+
         if exp.identity is Some(expected_identity) {
           if found.identity != Some(expected_identity) {
             differences.push(
@@ -204,7 +238,11 @@ pub fn compare_configurations(
         }
       }
       None => {
-        differences.push(Missing(position=pos))
+        match exp.presence {
+          @hal.Mandatory => differences.push(Missing(position=pos))
+          @hal.Optional(group_id~) =>
+            differences.push(OptionalMissing(position=pos, group_id~))
+        }
         all_ok = false
       }
     }
