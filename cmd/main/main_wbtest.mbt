@@ -183,16 +183,26 @@ test "cli resolve od query supports list object and entry modes" {
   assert_eq(list_query.list_type, 0U)
   assert_eq(list_query.index, None)
   assert_eq(list_query.subindex, None)
+  assert_eq(list_query.read_value, false)
 
   let object_query = resolve_od_query(["moonecat", "od", "--index", "7187"])
   assert_eq(object_query.index, Some(7187U))
   assert_eq(object_query.subindex, None)
+  assert_eq(object_query.read_value, false)
 
   let entry_query = resolve_od_query([
     "moonecat", "od", "--index", "6656", "--subindex", "1",
   ])
   assert_eq(entry_query.index, Some(6656U))
   assert_eq(entry_query.subindex, Some(b'\x01'))
+  assert_eq(entry_query.read_value, false)
+
+  let value_query = resolve_od_query([
+    "moonecat", "od", "--index", "7186", "--read-value",
+  ])
+  assert_eq(value_query.index, Some(7186U))
+  assert_eq(value_query.subindex, Some(b'\x00'))
+  assert_eq(value_query.read_value, true)
 }
 
 ///|
@@ -506,6 +516,8 @@ test "cli od report json includes list indices" {
     indices: Some([0x1000U, 0x1C13U]),
     object_description: None,
     entry_description: None,
+    value_hex: None,
+    value_u32: None,
     error_category: None,
     error_detail: None,
     abort_code: None,
@@ -535,6 +547,8 @@ test "cli od report text includes object description fields" {
       name: "MapPDO",
     }),
     entry_description: None,
+    value_hex: None,
+    value_u32: None,
     error_category: None,
     error_detail: None,
     abort_code: None,
@@ -564,6 +578,8 @@ test "cli od report text includes entry description fields" {
       access: 0x003FU,
       name: "Entry2",
     }),
+    value_hex: None,
+    value_u32: None,
     error_category: None,
     error_detail: None,
     abort_code: None,
@@ -595,7 +611,12 @@ test "cli od failure report json includes structured error" {
   let json = od_report_json(
     od_failure_report(
       Some(0x1001U),
-      { list_type: 0U, index: Some(0x2000U), subindex: Some(b'\x01') },
+      {
+        list_type: 0U,
+        index: Some(0x2000U),
+        subindex: Some(b'\x01'),
+        read_value: false,
+      },
       @hal.EcError::SdoAbort(0x06020000U),
     ),
   )
@@ -610,13 +631,58 @@ test "cli od failure text includes error summary" {
   let text = od_report_text(
     od_failure_report(
       None,
-      { list_type: 0U, index: None, subindex: None },
+      { list_type: 0U, index: None, subindex: None, read_value: false },
       @hal.EcError::MailboxTimeout,
     ),
   )
   assert_true(text.contains("Station: unknown"))
   assert_true(text.contains("Error Category: transport-failure"))
   assert_true(text.contains("Error Detail: MailboxTimeout"))
+}
+
+///|
+test "cli od report json includes uploaded value" {
+  let json = od_report_json({
+    station_address: Some(0x1001U),
+    mode: "od-value",
+    list_type: 0U,
+    index: Some(0x1C12U),
+    subindex: Some(b'\x01'),
+    indices: None,
+    object_description: None,
+    entry_description: None,
+    value_hex: Some("0x0016"),
+    value_u32: Some(22U),
+    error_category: None,
+    error_detail: None,
+    abort_code: None,
+  })
+  let text = json.stringify(indent=2)
+  assert_true(text.contains("\"mode\": \"od-value\""))
+  assert_true(text.contains("\"hex\": \"0x0016\""))
+  assert_true(text.contains("\"u32_le\": 22"))
+}
+
+///|
+test "cli od report text includes uploaded value" {
+  let text = od_report_text({
+    station_address: Some(0x1001U),
+    mode: "od-value",
+    list_type: 0U,
+    index: Some(0x1C13U),
+    subindex: Some(b'\x00'),
+    indices: None,
+    object_description: None,
+    entry_description: None,
+    value_hex: Some("0x0200"),
+    value_u32: Some(2U),
+    error_category: None,
+    error_detail: None,
+    abort_code: None,
+  })
+  assert_true(text.contains("Mode: od-value"))
+  assert_true(text.contains("Value (hex): 0x0200"))
+  assert_true(text.contains("Value (u32 le): 2"))
 }
 
 ///|

@@ -7,6 +7,12 @@ enum CliBackend {
 } derive(Eq, Show)
 
 ///|
+let pdo_logical_base : UInt = 0x1000U
+
+///|
+let process_data_eeprom_word_count : Int = 128
+
+///|
 /// MoonECAT CLI entry point.
 /// Commands: list-if, scan, validate, run, read-sii, state, diagnosis, od.
 fn main {
@@ -274,13 +280,19 @@ fn run_native_command_with_fresh_nic(
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
   let run_nic = @native.NativeNic::open_with_config(config)
-  let pdo_ctx = @protocol.PdoContext::build([], 0U)
+  let (pdo_ctx, expected_wkc) = if target_requires_process_data_configuration(
+      startup_state,
+    ) {
+    build_pdo_preparation_from_scan(run_nic, scan_report, timeout)
+  } else {
+    (@protocol.PdoContext::build([], 0U), 0U)
+  }
   let run_report = @runtime.run_with_states(
     run_nic,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
-    0U,
+    expected_wkc,
     10,
     startup_state,
     shutdown_state,
@@ -292,6 +304,109 @@ fn run_native_command_with_fresh_nic(
   } else {
     println(run_report.format())
   }
+}
+
+///|
+fn target_requires_process_data_configuration(
+  target : @protocol.EsmState,
+) -> Bool {
+  target is @protocol.SafeOp || target is @protocol.Op
+}
+
+///|
+fn[N : @hal.Nic] build_pdo_preparation_from_scan(
+  nic : N,
+  scan_report : @runtime.ScanReport,
+  timeout : @hal.Duration,
+) -> (@protocol.PdoContext, UInt) raise @hal.EcError {
+  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  let mut logical_base = pdo_logical_base
+  for slave in scan_report.slaves {
+    let mapping = configure_process_data_from_eeprom(
+      nic,
+      slave.station_address,
+      logical_base,
+      timeout,
+    )
+    slave_mappings.push((mapping, slave.station_address))
+    logical_base = logical_base +
+      mapping.output_bytes.reinterpret_as_uint() +
+      mapping.input_bytes.reinterpret_as_uint()
+  }
+  (
+    @protocol.PdoContext::build(slave_mappings, pdo_logical_base),
+    expected_wkc_from_slave_mappings(slave_mappings),
+  )
+}
+
+///|
+fn[N : @hal.Nic] configure_process_data_from_eeprom(
+  nic : N,
+  station : UInt,
+  logical_base : UInt,
+  timeout : @hal.Duration,
+) -> @mailbox.SlaveMapping raise @hal.EcError {
+  let eeprom = @protocol.eeprom_read(
+    nic, station, 0U, process_data_eeprom_word_count, timeout,
+  )
+  let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
+  write_process_data_mapping(nic, station, mapping, timeout)
+  mapping
+}
+
+///|
+fn[N : @hal.Nic] write_process_data_mapping(
+  nic : N,
+  station : UInt,
+  mapping : @mailbox.SlaveMapping,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
+    let sm = mapping.sm_configs[i]
+    match sm.sm_type {
+      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
+        let sm_addr = @protocol.reg_sm_base +
+          i.reinterpret_as_uint() *
+          @protocol.sm_entry_size.reinterpret_as_uint()
+        let _ = @protocol.write_register_fp(
+          nic,
+          station,
+          sm_addr,
+          sm.to_bytes(),
+          timeout,
+        )
+      }
+      _ => ()
+    }
+  }
+  for i = 0; i < mapping.fmmu_configs.length(); i = i + 1 {
+    let fmmu_addr = @protocol.reg_fmmu_base +
+      i.reinterpret_as_uint() * @protocol.fmmu_entry_size.reinterpret_as_uint()
+    let _ = @protocol.write_register_fp(
+      nic,
+      station,
+      fmmu_addr,
+      mapping.fmmu_configs[i].to_bytes(),
+      timeout,
+    )
+  }
+}
+
+///|
+fn expected_wkc_from_slave_mappings(
+  slave_mappings : Array[(@mailbox.SlaveMapping, UInt)],
+) -> UInt {
+  let mut total = 0U
+  for i = 0; i < slave_mappings.length(); i = i + 1 {
+    let (mapping, _) = slave_mappings[i]
+    if mapping.output_bytes > 0 {
+      total = total + 1U
+    }
+    if mapping.input_bytes > 0 {
+      total = total + 1U
+    }
+  }
+  total
 }
 
 ///|
@@ -334,7 +449,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--list-type <n>] [--eni-json <path>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -404,6 +519,13 @@ fn[N : @hal.Nic] compute_state_transition_report(
   match station {
     Some(configured_station) => {
       let current = @protocol.read_al_status(nic, configured_station, timeout)
+      if target_requires_process_data_configuration(target) {
+        ignore(
+          configure_process_data_from_eeprom(
+            nic, configured_station, pdo_logical_base, timeout,
+          ),
+        )
+      }
       let final_state = if use_path {
         let path = build_cli_transition_path(current, target)
         @protocol.transition_through(nic, configured_station, path, timeout)
@@ -521,6 +643,7 @@ struct OdBrowseQuery {
   list_type : UInt
   index : UInt?
   subindex : Byte?
+  read_value : Bool
 }
 
 ///|
@@ -533,6 +656,8 @@ struct OdBrowseReport {
   indices : Array[UInt]?
   object_description : @mailbox.SdoInfoObjectDescription?
   entry_description : @mailbox.SdoInfoEntryDescription?
+  value_hex : String?
+  value_u32 : UInt?
   error_category : String?
   error_detail : String?
   abort_code : UInt?
@@ -541,11 +666,24 @@ struct OdBrowseReport {
 ///|
 fn resolve_od_query(args : Array[String]) -> OdBrowseQuery raise @hal.EcError {
   let index = optional_uint_flag(args, "--index")
-  let subindex = optional_byte_flag(args, "--subindex")
+  let read_value = has_flag(args, "--read-value")
+  let subindex = match optional_byte_flag(args, "--subindex") {
+    Some(value) => Some(value)
+    None if read_value && index is Some(_) => Some(b'\x00')
+    None => None
+  }
   if subindex is Some(_) && index is None {
     raise @hal.EcError::ConfigMismatch("--subindex requires --index")
   }
-  { list_type: require_uint_flag(args, "--list-type", 0U), index, subindex }
+  if read_value && index is None {
+    raise @hal.EcError::ConfigMismatch("--read-value requires --index")
+  }
+  {
+    list_type: require_uint_flag(args, "--list-type", 0U),
+    index,
+    subindex,
+    read_value,
+  }
 }
 
 ///|
@@ -613,6 +751,8 @@ fn[N : @hal.Nic] compute_od_report(
         indices: Some(indices),
         object_description: None,
         entry_description: None,
+        value_hex: None,
+        value_u32: None,
         error_category: None,
         error_detail: None,
         abort_code: None,
@@ -639,39 +779,72 @@ fn[N : @hal.Nic] compute_od_report(
         indices: None,
         object_description: Some(description),
         entry_description: None,
+        value_hex: None,
+        value_u32: None,
         error_category: None,
         error_detail: None,
         abort_code: None,
       }
     }
-    (Some(index), Some(subindex)) => {
-      let description = od_stage(
-        try? @protocol.sdo_info_get_oe_description(
-          nic,
-          station,
-          mailbox_session.mailbox_config,
-          browse_rmsm,
-          index,
-          subindex,
-          0xFF,
-          timeout,
-        ),
-        "od.get_oe_description",
-      )
-      {
-        station_address: Some(station),
-        mode: "od-entry",
-        list_type: query.list_type,
-        index: Some(index),
-        subindex: Some(subindex),
-        indices: None,
-        object_description: None,
-        entry_description: Some(description),
-        error_category: None,
-        error_detail: None,
-        abort_code: None,
+    (Some(index), Some(subindex)) =>
+      if query.read_value {
+        let payload = od_stage(
+          try? @protocol.sdo_upload_retry(
+            nic,
+            station,
+            mailbox_session.mailbox_config,
+            browse_rmsm,
+            index,
+            subindex,
+            timeout,
+          ),
+          "od.sdo_upload",
+        )
+        {
+          station_address: Some(station),
+          mode: "od-value",
+          list_type: query.list_type,
+          index: Some(index),
+          subindex: Some(subindex),
+          indices: None,
+          object_description: None,
+          entry_description: None,
+          value_hex: Some(bytes_hex(payload)),
+          value_u32: decode_payload_u32_le(payload),
+          error_category: None,
+          error_detail: None,
+          abort_code: None,
+        }
+      } else {
+        let description = od_stage(
+          try? @protocol.sdo_info_get_oe_description(
+            nic,
+            station,
+            mailbox_session.mailbox_config,
+            browse_rmsm,
+            index,
+            subindex,
+            0xFF,
+            timeout,
+          ),
+          "od.get_oe_description",
+        )
+        {
+          station_address: Some(station),
+          mode: "od-entry",
+          list_type: query.list_type,
+          index: Some(index),
+          subindex: Some(subindex),
+          indices: None,
+          object_description: None,
+          entry_description: Some(description),
+          value_hex: None,
+          value_u32: None,
+          error_category: None,
+          error_detail: None,
+          abort_code: None,
+        }
       }
-    }
   }
   if mailbox_session.original_state != @protocol.PreOp {
     ignore(
@@ -1164,6 +1337,17 @@ fn od_report_json(report : OdBrowseReport) -> Json {
         })
       None => Json::null()
     },
+    "value": match report.value_hex {
+      Some(value_hex) =>
+        Json::object({
+          "hex": Json::string(value_hex),
+          "u32_le": match report.value_u32 {
+            Some(value) => Json::number(value.to_double())
+            None => Json::null()
+          },
+        })
+      None => Json::null()
+    },
     "error": match report.error_category {
       Some(category) =>
         Json::object({
@@ -1256,6 +1440,27 @@ fn od_report_text(report : OdBrowseReport) -> String {
     }
     None => ()
   }
+  match report.value_hex {
+    Some(value_hex) => {
+      let index = match report.index {
+        Some(index) => index
+        None => 0U
+      }
+      let subindex = match report.subindex {
+        Some(subindex) => subindex
+        None => b'\x00'
+      }
+      buf.write_string("Index: " + format_hex(index, 4) + "\n")
+      buf.write_string("Subindex: " + subindex.to_uint().to_string() + "\n")
+      buf.write_string("Value (hex): " + value_hex + "\n")
+      match report.value_u32 {
+        Some(value) =>
+          buf.write_string("Value (u32 le): " + value.to_string() + "\n")
+        None => ()
+      }
+    }
+    None => ()
+  }
   buf.to_string()
 }
 
@@ -1274,6 +1479,8 @@ fn od_failure_report(
     indices: None,
     object_description: None,
     entry_description: None,
+    value_hex: None,
+    value_u32: None,
     error_category: Some(od_error_category(err)),
     error_detail: Some(err.to_string()),
     abort_code: match err {
@@ -1285,11 +1492,37 @@ fn od_failure_report(
 
 ///|
 fn od_mode_from_query(query : OdBrowseQuery) -> String {
+  if query.read_value {
+    return "od-value"
+  }
   match (query.index, query.subindex) {
     (None, _) => "od-list"
     (Some(_), None) => "od-object"
     (Some(_), Some(_)) => "od-entry"
   }
+}
+
+///|
+fn decode_payload_u32_le(payload : Bytes) -> UInt? {
+  if payload.length() <= 0 || payload.length() > 4 {
+    return None
+  }
+  let mut value = 0U
+  for i = 0; i < payload.length(); i = i + 1 {
+    value = value | (payload[i].to_uint() << (i * 8))
+  }
+  Some(value)
+}
+
+///|
+fn bytes_hex(payload : Bytes) -> String {
+  let buf = @buffer.new(size_hint=payload.length() * 2 + 2)
+  buf.write_string("0x")
+  for i = 0; i < payload.length(); i = i + 1 {
+    buf.write_string(hex_digit((payload[i].to_int() >> 4) & 0x0F))
+    buf.write_string(hex_digit(payload[i].to_int() & 0x0F))
+  }
+  buf.to_string()
 }
 
 ///|
