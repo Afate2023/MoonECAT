@@ -169,7 +169,7 @@
 
 > 目标不是继续扩展命令数量，而是把已有 Native/Extism 表面收敛成可发布、可验证、可维护的后端产品面。参考依据以 Npcap SDK、IGH Raw Socket 路径、GatorCAT NIC 封装，以及 Extism Host boundary 设计文档为主。
 
-- [ ] Native：补“真实链路持续运行”证据，把 `scan -> validate -> state -> diagnosis -> run` 串成同一网卡会话下的最小长链 smoke，并记录空总线/单从站两类基线。当前 Windows Npcap 已有空总线 `list-if -> scan -> validate -> run` 与单独 `state` 成功证据，但尚未把长链合并成一次会话记录。
+- [x] Native：补“真实链路持续运行”证据，把 `scan -> validate -> state -> diagnosis -> run` 串成同一网卡会话下的最小长链 smoke，并记录空总线/单从站两类基线。2026-03-14 已在 `\\Device\\NPF_{21208AED-855D-48E0-B0AF-A5B92C93EEDC}`（Realtek USB GbE）上顺序跑通 `list-if -> scan -> validate -> read-sii -> diagnosis -> state --station 4097 --path --state preop -> od --station 4097 -> run`：扫描到 1 个从站（4097 / alias 0 / vendor 1894 / product 2320），`validate` 为 `Pass`，`diagnosis` 返回 `AL State=Init` 且无错误，`state` 成功将 4097 从 `Init` 迁到 `PreOp`，`od` 成功返回对象索引列表，`run` 返回 `cycles_ok=10`、`final_phase=Done`；与先前空总线基线一起，已形成两类 Native smoke 证据。
 - [ ] Native：补 SII 完整类别深读计划，按 siitool / SOEM `readeepromAP/FP` 经验继续完善 category 深度解码。当前 `read-sii` 已输出 preamble/standard/header/strings/general/FMMU/SM/DC/PDO/categories，不再是仅 header/general 的最小形态；后续重点转为稳定 JSON 结构、全量类别覆盖与配置工具复用。
 - [ ] Native：把 AddressSanitizer/等价内存安全检查固定成文档化命令，覆盖句柄泄漏、重复 close、错误 ownership 标注三类风险。
 - [ ] Extism：补 host capability adapter 的最小闭环，优先打通 `nic_open/send/recv/close + clock_now/sleep`，共享内存优化保持第二阶段，不让能力边界长期停在 contract 文档。

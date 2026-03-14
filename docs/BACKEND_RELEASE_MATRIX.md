@@ -7,7 +7,7 @@
 
 ### 输入
 
-- CLI 子命令：`list-if`、`scan`、`validate`、`run`
+- CLI 子命令：`list-if`、`scan`、`validate`、`run`、`read-sii`、`state`、`diagnosis`、`od`
 - 后端选择：`--backend <mock|native|native-windows-npcap|native-linux-raw>`
 - 真实网卡：`--if <interface>`
 
@@ -28,6 +28,10 @@
 moon run cmd/main list-if -- --backend native --json
 moon run cmd/main scan -- --backend native --if <interface> --json
 moon run cmd/main validate -- --backend native --if <interface> --json
+moon run cmd/main diagnosis -- --backend native --if <interface> --json
+moon run cmd/main state -- --backend native --if <interface> --station <configured-address> --path --state preop --json
+moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --words 128 --json
+moon run cmd/main od -- --backend native --if <interface> --station <configured-address> --json
 moon run cmd/main run -- --backend native --if <interface> --json
 ```
 
@@ -43,6 +47,14 @@ moon run cmd/main run -- --backend native --if <interface> --json
 - 2026-03-11 实测结果：
   `scan` => `{"slave_count":0,"slaves":[]}`；
   `validate` => `{"total_expected":0,"total_found":0,"all_ok":true,"result_count":0}`；
+  `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
+- 2026-03-14 同接口单从站长链实测：
+  `scan` => `slave_count=1`，从站 `position=0 / station=4097 / alias=0 / vendor=1894 / product=2320 / revision=512`；
+  `validate` => `grade=Pass`、`difference_count=0`；
+  `read-sii` => 成功输出 `preamble/standard_metadata/header/strings/general/FMMU/SM/DC/categories`；
+  `diagnosis` => `station=4097`、`AL State=Init`、`AL Error Flag=false`、`AL Status Code=0`；
+  `state --station 4097 --path --state preop` => `current_state=Init`、`final_state=PreOp`、`status_code=0`；
+  `od --station 4097` => 成功返回 `OD List` 索引数组；
   `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
 
 ## 2. Native Library
