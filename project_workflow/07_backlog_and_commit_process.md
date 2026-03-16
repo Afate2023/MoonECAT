@@ -29,3 +29,4 @@
 最近回填：
 
 - `Native run 长跑控制 + 连续超时故障 + CLI 周期参数` → `76db9d4` `feat(runtime): add long-run controls and timeout faults`
+- `Native 自动选卡探测 + scan 站地址策略切面` → `d9dba95` `feat(native): auto-probe interfaces and extract scan strategy`

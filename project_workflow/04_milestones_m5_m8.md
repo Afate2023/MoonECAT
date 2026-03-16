@@ -109,7 +109,7 @@
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](../docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `d9dba95`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
   - ✅ 参考 [References/EtherCAT_Compendium/EtherCAT_Compendium.md](../References/EtherCAT_Compendium/EtherCAT_Compendium.md) §3.9 Working Counter、§7 EtherCAT State Machine、§7.4 AL Status Codes：Native `diagnosis` 现已在进入 PreOp 前抓取单站 `AL Status(0x0130)` / Error Flag / `AL Status Code(0x0134)` 快照，并与 CoE `0x1001` / `0x10F3` 一并输出，便于 WKC 或 ESM 异常后的逐站定位
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
@@ -161,6 +161,7 @@
   - ✅ [docs/BACKEND_RELEASE_MATRIX.md](../docs/BACKEND_RELEASE_MATRIX.md)：已补齐 Native CLI / Native Library / Extism Plugin 的输入、输出、依赖环境与最小验证命令（commit: `8aa93aa`）
   - ✅ 当前 Native CLI smoke 已在 Windows Npcap 1.8.4 上实测跑通：`list-if -> scan -> validate -> run`，其中空总线场景返回 `0 slaves / PASS / Done`
   - ✅ 2026-03-12 再验证：`moon test` = `286/286`、`moon test hal/native` = `5/5`、`moon test plugin/extism` = `5/5`，且 `list-if` 与 Realtek USB GbE 接口上的 `scan` 均成功
+  - ✅ 2026-03-16 再验证：`moon run cmd/main list-if -- --backend native --json` 已能把 Realtek USB GbE 识别为唯一 `connected=true / wireless=false` 候选；随后 `moon run cmd/main scan -- --backend native --json` 在省略 `--if` 时自动选中该口并扫描到 1 个真实从站（station 4097 / vendor 1894 / product 2320）
   - 验收标准：
     - 明确每类产物的输入、输出、依赖环境与最小验证命令
     - 文档区分“后端差异”与“协议语义”，避免把平台问题写进协议清单
@@ -174,6 +175,7 @@
 - `native backend cli smoke path`：CLI 复用 native HAL 跑通 scan/validate/run
 - `native real smoke stability fix`：空总线 `run` 跳过无效 ESM 广播，CLI `run` 采用 probe/run 双实例 NIC 路径
 - `native slave identity recovery`：基于 SII/AP 优先回退链修复真实从站身份读取，并过滤 Native 自发回显帧
+- `native interface auto-probe + scan strategy seam`：基于接口元数据过滤候选网卡、固定超时 BRD 自动探测，并把 scan 站地址规划抽成可替换策略接口
 - `minimal read-sii cli command`：新增 Native CLI 在线 SII 读取入口与最小 JSON/文本输出
 - `native state transition cli command`：新增 Native CLI 广播/定点 EtherCAT ESM 状态迁移入口与设计文档
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
@@ -194,6 +196,7 @@
 - `Native CLI smoke regression + release matrix docs` → `8aa93aa` `test(cli): add native smoke regression and release matrix docs`
 - `Native real smoke stability fix` → `8ac4ce6` `fix(native): stabilize real smoke run path`
 - `Native slave identity recovery` → `f691f91` `fix(native): recover slave identity from real scans`
+- `Native interface auto-probe + scan strategy seam` → `d9dba95` `feat(native): auto-probe interfaces and extract scan strategy`
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
