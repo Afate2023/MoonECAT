@@ -134,7 +134,67 @@ moon run cmd/main state -- --backend native-windows-npcap --if <interface> --sta
 - 若当前状态无法直接到目标状态，则先回退到 `Init` 再前进
 - 示例：`Op -> SafeOp -> PreOp -> Init -> Boot`
 
-## 5. 后续实现顺序
+## 5. Native `run --until-fault` 实机长跑验证
+
+该验证面向真实网卡和真实从站，不是空总线 smoke。目标是确认以下三点：
+
+- Native 后端在长时间 PDO 循环下持续输出稳定的结构化进度
+- 运行时在超时/WKC/DC 漂移等恢复条件出现时能以 `fault + surface` 收敛
+- CLI 与库层职责保持分离：库层只产出结构化进度，CLI 负责文本或 NDJSON 渲染
+
+### 5.1 前置条件
+
+- 已完成 `list-if -> scan -> validate` 基线确认
+- Windows 使用 `native-windows-npcap`，Linux 使用 `native-linux-raw`
+- 若总线上有真实从站，建议先记录至少一个 configured station 地址，便于需要时用 `state --station ... --path` 回到 `PreOp`
+
+### 5.2 推荐命令
+
+```powershell
+moon run cmd/main run -- --backend native-windows-npcap --if <interface> --json --progress-ndjson --until-fault --cycle-period-us 1000 --output-period-ms 1000 --max-consecutive-timeouts 5 --startup-state op --shutdown-state init
+```
+
+说明：
+
+- `--json --progress-ndjson` 让进度与最终总结共用 NDJSON，不会破坏 JSON 消费方
+- `--output-period-ms` 控制 `run-progress` 行输出周期
+- `--until-fault` 只会在运行时故障时自然退出；人工 `Ctrl+C` 停止不会生成最终 `run-summary`
+- `--startup-state op` 维持当前实机 `run` 的默认目标语义；若只想验证到 `SafeOp`，可显式改成 `--startup-state safeop`
+
+### 5.3 产物与通过标准
+
+- 正常长跑过程中，日志应持续出现 `{"kind":"run-progress", ...}` 行
+- 若由运行时故障退出，最后应出现 `{"kind":"run-summary", ...}` 行
+- `run-summary.summary.fault` 与 `run-summary.summary.surface` 应能说明故障类别，而不是只给出裸字符串错误
+- 若人工 `Ctrl+C` 停止，只要求保留连续 `run-progress` 行；此时没有 `run-summary` 属于当前设计预期
+
+### 5.4 建议执行顺序
+
+1. `list-if --json` 确认接口名稳定且后端选择正确。
+2. `scan --json` 记录从站数量、station address 和身份。
+3. `validate --json` 确认在线拓扑与当前预期一致。
+4. 若此前链路存在状态残留，先执行一次 `state --station <configured-address> --path --state preop`。
+5. 再执行 `run --json --progress-ndjson --until-fault ...`，观察 NDJSON 进度流与最终 fault 收敛。
+
+### 5.5 批处理脚本
+
+仓库提供了可直接复用的 PowerShell 脚本 [scripts/validate-native-until-fault.ps1](scripts/validate-native-until-fault.ps1)。示例：
+
+```powershell
+pwsh -File scripts/validate-native-until-fault.ps1 -Interface "\\Device\\NPF_{GUID}" -Backend native-windows-npcap -Station 4097
+```
+
+脚本会依次产出：
+
+- `01-list-if.json`
+- `02-scan.json`
+- `03-validate.json`
+- `04-state-preop.json`（仅在提供 `-Station` 时）
+- `05-run.ndjson`
+
+`05-run.ndjson` 适合后续做事件回放、故障归档或外部日志采集。
+
+## 6. 后续实现顺序
 
 建议按以下顺序继续：
 
@@ -143,7 +203,7 @@ moon run cmd/main state -- --backend native-windows-npcap --if <interface> --sta
 3. 为 `state` 命令增加实机回归脚本和文档示例
 4. 评估是否要把 `run` 的启动/收尾状态改成可配置项；若改，只允许在保留默认 `Op -> Init` 语义的前提下扩展
 
-## 6. 非目标
+## 7. 非目标
 
 - 当前阶段不在 `run` 中引入每站逐步确认的复杂 ESM 编排
 - 不在 Native HAL 里加入平台专属 Runtime 分叉

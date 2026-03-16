@@ -665,6 +665,14 @@ test "discovery - assign_station_address via mock" {
 }
 
 ///|
+test "discovery - read_station_address_ap via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let station_address = @protocol.read_station_address_ap(nic, 0U, timeout)
+  assert_eq(station_address, 0U)
+}
+
+///|
 test "discovery - read_register_fp command type" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)

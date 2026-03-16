@@ -56,6 +56,9 @@ moon run cmd/main state -- --backend native --if <interface> --state op --statio
 
 # Run cyclic exchange but stop at SafeOp first and skip shutdown rollback
 moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state none
+
+# Run a real-device until-fault loop with NDJSON progress output
+moon run cmd/main run -- --backend native --if <interface> --json --progress-ndjson --until-fault --output-period-ms 1000
 ```
 
 `list-if --json` returns a structured object with `backend` and `interfaces`.
@@ -79,7 +82,9 @@ stepwise path via `Init` when the requested target is not directly reachable.
 
 `run` now accepts `--startup-state` and `--shutdown-state` so Native and Mock
 smoke runs can stop at `Init|PreOp|SafeOp|Op|Boot` on entry, and optionally
-leave the bus in place by using `--shutdown-state none`.
+leave the bus in place by using `--shutdown-state none`. For long-running JSON
+consumers, combine `--json --progress-ndjson --until-fault --output-period-ms <n>`
+to receive NDJSON progress snapshots without corrupting the final JSON summary.
 
 MoonBit CLI flags belong to `moon run`, so MoonECAT parameters must be placed
 after `--`, otherwise flags like `--backend` and `--if` will be consumed by

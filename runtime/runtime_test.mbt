@@ -234,6 +234,118 @@ pub impl @hal.Nic for SiiIdentityNic with close(self) {
 }
 
 ///|
+/// ScanStationNic simulates slaves with pre-existing CSAs so scan can verify
+/// preservation and reassignment policy independently from runtime loop logic.
+pub struct ScanStationNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut sii_word_address : UInt
+  station_addresses : Array[UInt]
+}
+
+///|
+fn ScanStationNic::new(station_addresses : Array[UInt]) -> ScanStationNic {
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    sii_word_address: 0U,
+    station_addresses,
+  }
+}
+
+///|
+fn read_station_address_bytes(data : Bytes) -> UInt {
+  data[0].to_uint() | (data[1].to_uint() << 8)
+}
+
+///|
+pub impl @hal.Nic for ScanStationNic with open_(name) {
+  ignore(name)
+  ScanStationNic::new([])
+}
+
+///|
+pub impl @hal.Nic for ScanStationNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  let position = @protocol.address_station(pdu.header.address).reinterpret_as_int()
+  self.next_response = match pdu.header.command {
+    @protocol.BRD =>
+      build_response_frame(
+        request,
+        Bytes::new(pdu.data.length()),
+        self.station_addresses.length().reinterpret_as_uint(),
+      )
+    @protocol.APRD => {
+      let response_data = if offset == @protocol.reg_station_address {
+        let station = self.station_addresses[position]
+        Bytes::from_array([
+          (station & 0xFFU).reinterpret_as_int().to_byte(),
+          ((station >> 8) & 0xFFU).reinterpret_as_int().to_byte(),
+        ])
+      } else if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else if offset == 0x0014U {
+        Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.APWR => {
+      if offset == @protocol.reg_station_address && pdu.data.length() >= 2 {
+        self.station_addresses[position] = read_station_address_bytes(pdu.data)
+      } else if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPRD => {
+      let response_data = if offset == @protocol.reg_station_alias {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.FPWR => {
+      if offset == @protocol.reg_sii_address && pdu.data.length() >= 2 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 0)
+      } else if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    _ => build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for ScanStationNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for ScanStationNic with close(self) {
+  self.is_open = false
+}
+
+///|
 /// TimeoutNic is a deterministic test double that always times out on recv.
 pub struct TimeoutNic {
   mut is_open : Bool
@@ -2498,6 +2610,26 @@ test "scan reads slave identity from sii header" {
   assert_eq(report.slaves[0].product_code, 0x044C2C52U)
   assert_eq(report.slaves[0].revision, 0x00110000U)
   assert_eq(report.slaves[0].serial, 0U)
+}
+
+///|
+test "scan preserves unique pre-existing station addresses" {
+  let nic = ScanStationNic::new([0x2001U, 0x2002U])
+  let report = @runtime.scan(nic, @hal.Duration(1000L))
+  assert_eq(report.slave_count, 2)
+  assert_eq(report.slaves[0].station_address, 0x2001U)
+  assert_eq(report.slaves[1].station_address, 0x2002U)
+}
+
+///|
+test "scan reassigns duplicate or zero station addresses into scan pool" {
+  let nic = ScanStationNic::new([0U, 0U, 0x2001U, 0x2001U])
+  let report = @runtime.scan(nic, @hal.Duration(1000L))
+  assert_eq(report.slave_count, 4)
+  assert_eq(report.slaves[0].station_address, 0x1001U)
+  assert_eq(report.slaves[1].station_address, 0x1002U)
+  assert_eq(report.slaves[2].station_address, 0x1003U)
+  assert_eq(report.slaves[3].station_address, 0x1004U)
 }
 
 ///|

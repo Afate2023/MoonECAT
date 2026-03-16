@@ -268,12 +268,41 @@ pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(
   timeout : @hal.Duration,
   progress_every_cycles : Int?,
 ) -> Int raise @hal.EcError {
+  self.run_cycles_with_reporting_to(
+    nic,
+    count,
+    timeout,
+    progress_every_cycles,
+    None,
+    NullRunProgressSink::new(),
+  )
+}
+
+///|
+/// Run N PDO cycles and emit structured progress snapshots to the provided sink.
+pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(
+  self : Runtime,
+  nic : N,
+  count : Int,
+  timeout : @hal.Duration,
+  progress_every_cycles : Int?,
+  output_period_ns : Int?,
+  sink : S,
+) -> Int raise @hal.EcError {
   let mut success = 0
   for _i = 0; _i < count; _i = _i + 1 {
     let result = self.run_cycle(nic, timeout) catch {
       @hal.EcError::RecvTimeout => {
         self.record_timeout()
-        emit_runtime_progress(self, success, progress_every_cycles)
+        emit_runtime_progress(
+          self,
+          success,
+          progress_every_cycles,
+          output_period_ns,
+          Some(count),
+          false,
+          sink,
+        )
         if self.needs_recovery() {
           self.set_state(Error(@hal.EcError::RecvTimeout))
           break
@@ -285,7 +314,15 @@ pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(
     if result.ok {
       success = success + 1
     }
-    emit_runtime_progress(self, success, progress_every_cycles)
+    emit_runtime_progress(
+      self,
+      success,
+      progress_every_cycles,
+      output_period_ns,
+      Some(count),
+      false,
+      sink,
+    )
     if self.needs_recovery() {
       match self.dc_state {
         Drifting(delta_ns) =>
@@ -335,12 +372,40 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
   timeout : @hal.Duration,
   progress_every_cycles : Int?,
 ) -> Int raise @hal.EcError {
+  self.run_until_fault_with_reporting_to(
+    nic,
+    timeout,
+    progress_every_cycles,
+    None,
+    NullRunProgressSink::new(),
+  )
+}
+
+///|
+/// Run PDO cycles until a runtime recovery condition occurs and emit
+/// structured progress snapshots to the provided sink.
+pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(
+  self : Runtime,
+  nic : N,
+  timeout : @hal.Duration,
+  progress_every_cycles : Int?,
+  output_period_ns : Int?,
+  sink : S,
+) -> Int raise @hal.EcError {
   let mut success = 0
   while true {
     let result = self.run_cycle(nic, timeout) catch {
       @hal.EcError::RecvTimeout => {
         self.record_timeout()
-        emit_runtime_progress(self, success, progress_every_cycles)
+        emit_runtime_progress(
+          self,
+          success,
+          progress_every_cycles,
+          output_period_ns,
+          None,
+          true,
+          sink,
+        )
         if self.needs_recovery() {
           self.set_state(Error(@hal.EcError::RecvTimeout))
           break
@@ -352,7 +417,15 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
     if result.ok {
       success = success + 1
     }
-    emit_runtime_progress(self, success, progress_every_cycles)
+    emit_runtime_progress(
+      self,
+      success,
+      progress_every_cycles,
+      output_period_ns,
+      None,
+      true,
+      sink,
+    )
     if self.needs_recovery() {
       match self.dc_state {
         Drifting(delta_ns) =>
@@ -384,26 +457,32 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
 }
 
 ///|
-fn emit_runtime_progress(
+fn[S : RunProgressSink] emit_runtime_progress(
   runtime : Runtime,
   success : Int,
   progress_every_cycles : Int?,
+  output_period_ns : Int?,
+  cycles_requested : Int?,
+  until_fault : Bool,
+  sink : S,
 ) -> Unit {
   match progress_every_cycles {
     Some(every) =>
       if every > 0 && runtime.telemetry.cycles % every.to_int64() == 0L {
-        println(
-          "run progress: cycles=" +
-          runtime.telemetry.cycles.to_string() +
-          " ok=" +
-          success.to_string() +
-          " timeouts=" +
-          runtime.telemetry.timeouts.to_string() +
-          " consecutive_timeouts=" +
-          runtime.consecutive_timeouts.to_string() +
-          " wkc_errors=" +
-          runtime.telemetry.wkc_errors.to_string(),
-        )
+        match output_period_ns {
+          Some(period_ns) =>
+            sink.emit({
+              cycles_completed: runtime.telemetry.cycles,
+              cycles_ok: success,
+              cycles_requested,
+              until_fault,
+              cycle_period_ns: runtime.config.cycle_period_ns,
+              output_period_ns: period_ns,
+              telemetry: runtime.get_telemetry(),
+              consecutive_timeouts: runtime.consecutive_timeouts,
+            })
+          None => ()
+        }
       }
     _ => ()
   }

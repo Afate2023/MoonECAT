@@ -252,6 +252,20 @@ pub fn[N : @hal.Nic] assign_station_address(
 }
 
 ///|
+/// Read configured station address register (0x0010) using auto-increment addressing.
+pub fn[N : @hal.Nic] read_station_address_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let pdu = read_register_ap(nic, position, reg_station_address, 2, timeout)
+  if pdu.data.length() < 2 {
+    raise @hal.EcError::InvalidPdu("station address response too short")
+  }
+  pdu.data[0].to_uint() | (pdu.data[1].to_uint() << 8)
+}
+
+///|
 /// Read station alias register (0x0012) using configured station addressing.
 pub fn[N : @hal.Nic] read_station_alias(
   nic : N,

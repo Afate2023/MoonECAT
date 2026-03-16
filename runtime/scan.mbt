@@ -30,8 +30,18 @@ pub(all) struct SlaveReport {
 let default_identification_ado : UInt = 0x0014U
 
 ///|
+/// Base of the reserved scan-time station address range.
+let scan_station_address_base : UInt = 0x1001U
+
+///|
 /// Bytes needed to cover the fixed SII header through mailbox protocol word.
 let sii_header_read_dwords : Int = 15
+
+///|
+struct ObservedSlaveAddress {
+  position : UInt
+  current_station_address : UInt
+} derive(Eq, Show)
 
 ///|
 /// Run the scan procedure: count slaves, assign addresses, read identity
@@ -52,11 +62,15 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
   identification_ado : UInt,
 ) -> ScanReport raise @hal.EcError {
   let count = @protocol.count_slaves(nic, timeout)
+  let observed_addresses = observe_slave_station_addresses(nic, count, timeout)
+  let planned_addresses = plan_scan_station_addresses(observed_addresses)
+  apply_scan_station_addresses(
+    nic, observed_addresses, planned_addresses, timeout,
+  )
   let slaves : Array[SlaveReport] = []
   for i = 0; i < count; i = i + 1 {
     let position = i.reinterpret_as_uint()
-    let station = 0x1001U + position
-    @protocol.assign_station_address(nic, position, station, timeout)
+    let station = planned_addresses[i]
     let alias_address = try
       @protocol.read_station_alias(nic, station, timeout)
     catch {
@@ -81,6 +95,112 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
     })
   }
   { slave_count: count, slaves }
+}
+
+///|
+fn[N : @hal.Nic] observe_slave_station_addresses(
+  nic : N,
+  count : Int,
+  timeout : @hal.Duration,
+) -> Array[ObservedSlaveAddress] raise @hal.EcError {
+  let observed : Array[ObservedSlaveAddress] = []
+  for i = 0; i < count; i = i + 1 {
+    let position = i.reinterpret_as_uint()
+    observed.push({
+      position,
+      current_station_address: @protocol.read_station_address_ap(
+        nic, position, timeout,
+      ),
+    })
+  }
+  observed
+}
+
+///|
+fn plan_scan_station_addresses(
+  observed : Array[ObservedSlaveAddress],
+) -> Array[UInt] raise @hal.EcError {
+  let planned : Array[UInt] = []
+  let used : Array[UInt] = []
+  for item in observed {
+    let current_station_address = item.current_station_address
+    if should_preserve_scan_station_address(current_station_address, observed) &&
+      not(array_contains_uint(used, current_station_address)) {
+      planned.push(current_station_address)
+      used.push(current_station_address)
+    } else {
+      let reassigned = next_scan_station_address(used)
+      planned.push(reassigned)
+      used.push(reassigned)
+    }
+  }
+  planned
+}
+
+///|
+fn should_preserve_scan_station_address(
+  station_address : UInt,
+  observed : Array[ObservedSlaveAddress],
+) -> Bool {
+  station_address != 0U &&
+  scan_station_address_occurs_once(station_address, observed)
+}
+
+///|
+fn scan_station_address_occurs_once(
+  station_address : UInt,
+  observed : Array[ObservedSlaveAddress],
+) -> Bool {
+  let mut matches = 0
+  for item in observed {
+    if item.current_station_address == station_address {
+      matches = matches + 1
+    }
+  }
+  matches == 1
+}
+
+///|
+fn next_scan_station_address(used : Array[UInt]) -> UInt raise @hal.EcError {
+  let mut candidate = scan_station_address_base
+  while array_contains_uint(used, candidate) {
+    if candidate == 0xFFFFU {
+      raise @hal.EcError::ConfigMismatch("scan station address pool exhausted")
+    }
+    candidate = candidate + 1U
+  }
+  candidate
+}
+
+///|
+fn array_contains_uint(values : Array[UInt], target : UInt) -> Bool {
+  for value in values {
+    if value == target {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn[N : @hal.Nic] apply_scan_station_addresses(
+  nic : N,
+  observed : Array[ObservedSlaveAddress],
+  planned : Array[UInt],
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  for i = 0; i < observed.length(); i = i + 1 {
+    let item = observed[i]
+    let station_address = planned[i]
+    if item.current_station_address != station_address {
+      @protocol.assign_station_address(
+        nic,
+        item.position,
+        station_address,
+        timeout,
+      )
+    }
+  }
 }
 
 ///|

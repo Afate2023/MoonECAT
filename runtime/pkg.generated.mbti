@@ -80,9 +80,13 @@ pub fn[N : @hal.Nic] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfi
 
 pub fn[N : @hal.Nic] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration, S) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] run_with_states_and_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration, S) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] run_with_states_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
@@ -404,6 +408,16 @@ pub(all) struct MailboxSession {
   mailbox_config : @mailbox.MailboxConfig
 }
 
+pub struct NullRunProgressSink {
+  _unused : Unit
+}
+pub fn NullRunProgressSink::new() -> Self
+pub impl RunProgressSink for NullRunProgressSink
+
+type ObservedSlaveAddress
+pub impl Eq for ObservedSlaveAddress
+pub impl Show for ObservedSlaveAddress
+
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, status_code~ : UInt?)
   TimeoutRecoveryRequired(observed_timeouts~ : Int64, consecutive_timeouts~ : Int)
@@ -442,6 +456,18 @@ pub(all) enum RunPhase {
 }
 pub impl Eq for RunPhase
 pub impl Show for RunPhase
+
+pub(all) struct RunProgress {
+  cycles_completed : Int64
+  cycles_ok : Int
+  cycles_requested : Int?
+  until_fault : Bool
+  cycle_period_ns : Int64
+  output_period_ns : Int
+  telemetry : Telemetry
+  consecutive_timeouts : Int
+}
+pub impl Show for RunProgress
 
 pub(all) struct RunReport {
   scan : ScanReport
@@ -490,8 +516,10 @@ pub fn Runtime::reset_error_counter(Self) -> Unit
 pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> CycleResult raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(Self, N, Int, @hal.Duration, Int?) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(Self, N, Int, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_until_fault(Self, N, @hal.Duration) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(Self, N, @hal.Duration, Int?) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(Self, N, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
 pub fn Runtime::set_timeout_threshold(Self, Int) -> Unit
 pub impl Show for Runtime
@@ -629,4 +657,7 @@ pub impl Show for ValidationResult
 // Type aliases
 
 // Traits
+pub(open) trait RunProgressSink {
+  emit(Self, RunProgress) -> Unit
+}
 

@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "afate/MoonECAT/cmd/main"
 
+import {
+  "afate/MoonECAT/runtime",
+}
+
 // Values
 
 // Errors
@@ -10,9 +14,19 @@ type CliBackend
 pub impl Eq for CliBackend
 pub impl Show for CliBackend
 
+type CliNdjsonRunProgressSink
+pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
+
+type CliTextRunProgressSink
+pub impl @runtime.RunProgressSink for CliTextRunProgressSink
+
 type OdBrowseQuery
 
 type OdBrowseReport
+
+type RunProgressOutput
+pub impl Eq for RunProgressOutput
+pub impl Show for RunProgressOutput
 
 type StateTransitionReport
 

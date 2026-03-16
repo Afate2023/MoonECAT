@@ -98,6 +98,7 @@ test "cli run loop settings parse timing and timeout controls" {
     ],
     false,
     true,
+    false,
   )
   assert_eq(settings.until_fault, true)
   assert_eq(settings.cycles, 0)
@@ -112,8 +113,42 @@ test "cli run loop settings reject progress output with json" {
     ["moonecat", "run", "--output-period-ms", "1000"],
     true,
     false,
+    false,
   )
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli run loop settings allow ndjson progress with json" {
+  let settings = resolve_run_loop_settings(
+    [
+      "moonecat", "run", "--json", "--progress-ndjson", "--until-fault", "--output-period-ms",
+      "1000",
+    ],
+    true,
+    true,
+    true,
+  )
+  assert_eq(settings.until_fault, true)
+  assert_eq(settings.output_period_ns, Some(1_000_000_000L))
+}
+
+///|
+test "cli run loop settings reject ndjson progress without output period" {
+  let result : Result[@runtime.RunLoopSettings, Error] = try? resolve_run_loop_settings(
+    ["moonecat", "run", "--json", "--progress-ndjson", "--until-fault"],
+    true,
+    true,
+    true,
+  )
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli resolve run progress output selects silent text and ndjson" {
+  assert_eq(resolve_run_progress_output(false, false, None), Silent)
+  assert_eq(resolve_run_progress_output(false, false, Some(1_000_000L)), Text)
+  assert_eq(resolve_run_progress_output(true, true, Some(1_000_000L)), Ndjson)
 }
 
 ///|
@@ -1046,6 +1081,125 @@ test "cli run report json includes shared surface telemetry" {
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"runtime_metrics\""))
   assert_true(text.contains("\"overall_level\": \"Block\""))
+}
+
+///|
+test "cli run report ndjson wraps summary payload" {
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 0, slaves: [] },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
+    cycles_requested: 4,
+    cycles_ok: 3,
+    until_fault: false,
+    cycle_period_ns: 500_000L,
+    output_period_ns: Some(2_000_000L),
+    telemetry: {
+      cycles: 4L,
+      tx_frames: 4L,
+      rx_frames: 4L,
+      timeouts: 1L,
+      retries: 0L,
+      wkc_errors: 1L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    final_phase: @runtime.Done,
+    fault: None,
+  }
+  let text = run_report_ndjson(report).stringify()
+  assert_true(text.contains("\"kind\":\"run-summary\""))
+  assert_true(text.contains("\"summary\""))
+  assert_true(text.contains("\"cycles_ok\":3"))
+  assert_true(text.contains("\"until_fault\":false"))
+}
+
+///|
+test "cli run progress json includes telemetry snapshot" {
+  let text = run_progress_json({
+    cycles_completed: 42L,
+    cycles_ok: 40,
+    cycles_requested: Some(100),
+    until_fault: true,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: 5_000_000,
+    telemetry: {
+      cycles: 42L,
+      tx_frames: 42L,
+      rx_frames: 41L,
+      timeouts: 2L,
+      retries: 1L,
+      wkc_errors: 3L,
+      irq_events: 4L,
+      dc_delay_updates: 5L,
+    },
+    consecutive_timeouts: 2,
+  }).stringify()
+  assert_true(text.contains("\"kind\":\"run-progress\""))
+  assert_true(text.contains("\"cycles_completed\":42"))
+  assert_true(text.contains("\"cycles_requested\":100"))
+  assert_true(text.contains("\"timeouts\":2"))
+  assert_true(text.contains("\"consecutive_timeouts\":2"))
+}
+
+///|
+test "cli run progress json emits null requested cycles for until-fault mode" {
+  let text = run_progress_json({
+    cycles_completed: 7L,
+    cycles_ok: 7,
+    cycles_requested: None,
+    until_fault: true,
+    cycle_period_ns: 250_000L,
+    output_period_ns: 1_000_000,
+    telemetry: {
+      cycles: 7L,
+      tx_frames: 7L,
+      rx_frames: 7L,
+      timeouts: 0L,
+      retries: 0L,
+      wkc_errors: 0L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    consecutive_timeouts: 0,
+  }).stringify()
+  assert_true(text.contains("\"cycles_requested\":null"))
+  assert_true(text.contains("\"until_fault\":true"))
+}
+
+///|
+test "cli run progress text formats key counters" {
+  let text = run_progress_text({
+    cycles_completed: 9L,
+    cycles_ok: 8,
+    cycles_requested: Some(10),
+    until_fault: false,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: 2_000_000,
+    telemetry: {
+      cycles: 9L,
+      tx_frames: 9L,
+      rx_frames: 9L,
+      timeouts: 1L,
+      retries: 0L,
+      wkc_errors: 2L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    consecutive_timeouts: 1,
+  })
+  assert_true(text.contains("cycles=9"))
+  assert_true(text.contains("ok=8"))
+  assert_true(text.contains("timeouts=1"))
+  assert_true(text.contains("wkc_errors=2"))
 }
 
 ///|

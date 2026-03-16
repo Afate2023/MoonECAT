@@ -326,6 +326,31 @@ pub fn[N : @hal.Nic] run_with_settings(
 }
 
 ///|
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  timeout : @hal.Duration,
+  sink : S,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings_reporting_to(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    settings,
+    @protocol.Op,
+    Some(@protocol.Init),
+    timeout,
+    sink,
+  )
+}
+
+///|
 pub fn[N : @hal.Nic] run_until_fault(
   nic : N,
   config : @hal.MasterConfig,
@@ -407,6 +432,33 @@ pub fn[N : @hal.Nic] run_with_states_and_settings(
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
   timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings_reporting_to(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    settings,
+    startup_state,
+    shutdown_state,
+    timeout,
+    NullRunProgressSink::new(),
+  )
+}
+
+///|
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting_to(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  timeout : @hal.Duration,
+  sink : S,
 ) -> RunReport raise @hal.EcError {
   let run_config = resolve_run_loop_config(config, settings)
   let progress_every_cycles = resolve_progress_every_cycles(
@@ -513,13 +565,21 @@ pub fn[N : @hal.Nic] run_with_states_and_settings(
   rt.set_timeout_threshold(settings.max_consecutive_timeouts)
   rt.set_state(Running(if dc_ok { DcSync } else { FreeRun }))
   let ok_count = if settings.until_fault {
-    rt.run_until_fault_with_reporting(nic, timeout, progress_every_cycles)
+    rt.run_until_fault_with_reporting_to(
+      nic,
+      timeout,
+      progress_every_cycles,
+      settings.output_period_ns.map(fn(period_ns) { period_ns.to_int() }),
+      sink,
+    )
   } else {
-    rt.run_cycles_with_reporting(
+    rt.run_cycles_with_reporting_to(
       nic,
       settings.cycles,
       timeout,
       progress_every_cycles,
+      settings.output_period_ns.map(fn(period_ns) { period_ns.to_int() }),
+      sink,
     )
   }
   let telemetry = rt.get_telemetry()

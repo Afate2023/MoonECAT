@@ -7,6 +7,13 @@ enum CliBackend {
 } derive(Eq, Show)
 
 ///|
+enum RunProgressOutput {
+  Silent
+  Text
+  Ndjson
+} derive(Eq, Show)
+
+///|
 let pdo_logical_base : UInt = 0x1000U
 
 ///|
@@ -163,7 +170,15 @@ fn cli_main() -> Unit raise @hal.EcError {
 
   if command == "run" {
     let until_fault = has_flag(args, "--until-fault")
-    let settings = resolve_run_loop_settings(args, as_json, until_fault)
+    let progress_ndjson = has_flag(args, "--progress-ndjson")
+    let settings = resolve_run_loop_settings(
+      args, as_json, until_fault, progress_ndjson,
+    )
+    let progress_output = resolve_run_progress_output(
+      as_json,
+      progress_ndjson,
+      settings.output_period_ns,
+    )
     let startup_state = optional_esm_state_flag(
       args,
       "--startup-state",
@@ -173,7 +188,7 @@ fn cli_main() -> Unit raise @hal.EcError {
     match backend {
       Mock =>
         run_mock_command_with_fresh_nic(
-          as_json, startup_state, shutdown_state, settings, timeout,
+          as_json, startup_state, shutdown_state, settings, progress_output, timeout,
         )
       NativeAuto => {
         let interface_name = require_interface_name(args)
@@ -183,6 +198,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           startup_state,
           shutdown_state,
           settings,
+          progress_output,
           timeout,
         )
       }
@@ -194,6 +210,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           startup_state,
           shutdown_state,
           settings,
+          progress_output,
           timeout,
         )
       }
@@ -205,6 +222,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           startup_state,
           shutdown_state,
           settings,
+          progress_output,
           timeout,
         )
       }
@@ -251,6 +269,7 @@ fn run_mock_command_with_fresh_nic(
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
   settings : @runtime.RunLoopSettings,
+  progress_output : RunProgressOutput,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @mock.MockNic::new()
@@ -259,7 +278,7 @@ fn run_mock_command_with_fresh_nic(
   probe_nic.close()
   let run_nic = @mock.MockNic::new()
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let run_report = @runtime.run_with_states_and_settings(
+  let run_report = run_with_progress_output(
     run_nic,
     @hal.MasterConfig::default(),
     expected,
@@ -268,11 +287,14 @@ fn run_mock_command_with_fresh_nic(
     settings,
     startup_state,
     shutdown_state,
+    progress_output,
     timeout,
   )
   run_nic.close()
-  if as_json {
+  if as_json && progress_output != Ndjson {
     println(run_report_json(run_report).stringify(indent=2))
+  } else if as_json {
+    println(run_report_ndjson(run_report).stringify())
   } else {
     println(run_report.format())
   }
@@ -285,6 +307,7 @@ fn run_native_command_with_fresh_nic(
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
   settings : @runtime.RunLoopSettings,
+  progress_output : RunProgressOutput,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @native.NativeNic::open_with_config(config)
@@ -306,7 +329,7 @@ fn run_native_command_with_fresh_nic(
   let run_config = @runtime.master_config_with_optional_dc(
     preparation.dc_cycle_period_ns,
   )
-  let run_report = @runtime.run_with_states_and_settings(
+  let run_report = run_with_progress_output(
     run_nic,
     run_config,
     expected,
@@ -315,13 +338,50 @@ fn run_native_command_with_fresh_nic(
     settings,
     startup_state,
     shutdown_state,
+    progress_output,
     timeout,
   )
   run_nic.close()
-  if as_json {
+  if as_json && progress_output != Ndjson {
     println(run_report_json(run_report).stringify(indent=2))
+  } else if as_json {
+    println(run_report_ndjson(run_report).stringify())
   } else {
     println(run_report.format())
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_with_progress_output(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : @runtime.RunLoopSettings,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  progress_output : RunProgressOutput,
+  timeout : @hal.Duration,
+) -> @runtime.RunReport raise @hal.EcError {
+  let text_sink = CliTextRunProgressSink::new()
+  let ndjson_sink = CliNdjsonRunProgressSink::new()
+  match progress_output {
+    Silent =>
+      @runtime.run_with_states_and_settings(
+        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
+        timeout,
+      )
+    Text =>
+      @runtime.run_with_states_and_settings_reporting_to(
+        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
+        timeout, text_sink,
+      )
+    Ndjson =>
+      @runtime.run_with_states_and_settings_reporting_to(
+        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
+        timeout, ndjson_sink,
+      )
   }
 }
 
@@ -384,7 +444,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -400,6 +460,9 @@ fn print_usage() -> Unit {
   )
   println(
     "  moon run cmd/main run -- --backend native --if <interface> --until-fault --cycle-period-us 1000 --output-period-ms 1000",
+  )
+  println(
+    "  moon run cmd/main run -- --json --progress-ndjson --backend native --if <interface> --until-fault --output-period-ms 1000",
   )
   println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
@@ -1575,6 +1638,7 @@ fn resolve_run_loop_settings(
   args : Array[String],
   as_json : Bool,
   until_fault : Bool,
+  progress_ndjson : Bool,
 ) -> @runtime.RunLoopSettings raise @hal.EcError {
   let cycles = resolve_run_cycles(args, until_fault)
   let cycle_period_ns = optional_duration_flag_ns(
@@ -1583,14 +1647,22 @@ fn resolve_run_loop_settings(
   let output_period_ns = optional_duration_flag_ns(
     args, "--output-period-ms", 1_000_000L,
   )
-  if as_json {
+  if progress_ndjson && not(as_json) {
+    raise @hal.EcError::ConfigMismatch("--progress-ndjson requires --json")
+  }
+  if as_json && not(progress_ndjson) {
     match output_period_ns {
       Some(_) =>
         raise @hal.EcError::ConfigMismatch(
-          "--output-period-ms cannot be combined with --json",
+          "--output-period-ms cannot be combined with --json unless --progress-ndjson is enabled",
         )
       None => ()
     }
+  }
+  if progress_ndjson && output_period_ns is None {
+    raise @hal.EcError::ConfigMismatch(
+      "--progress-ndjson requires --output-period-ms",
+    )
   }
   let max_consecutive_timeouts = require_int_flag(
     args, "--max-consecutive-timeouts", 5,
@@ -1606,6 +1678,18 @@ fn resolve_run_loop_settings(
     @runtime.RunLoopSettings::fixed_cycles(cycles)
   }
   { ..base, cycle_period_ns, output_period_ns, max_consecutive_timeouts }
+}
+
+///|
+fn resolve_run_progress_output(
+  as_json : Bool,
+  progress_ndjson : Bool,
+  output_period_ns : Int64?,
+) -> RunProgressOutput {
+  match output_period_ns {
+    Some(_) => if as_json && progress_ndjson { Ndjson } else { Text }
+    None => Silent
+  }
 }
 
 ///|
@@ -3004,6 +3088,97 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       @runtime.diagnostic_surface_from_run(report),
     ),
   })
+}
+
+///|
+fn run_report_ndjson(report : @runtime.RunReport) -> Json {
+  Json::object({
+    "kind": Json::string("run-summary"),
+    "summary": run_report_json(report),
+  })
+}
+
+///|
+fn run_progress_json(progress : @runtime.RunProgress) -> Json {
+  Json::object({
+    "kind": Json::string("run-progress"),
+    "cycles_completed": Json::number(progress.cycles_completed.to_double()),
+    "cycles_ok": Json::number(progress.cycles_ok.to_double()),
+    "cycles_requested": match progress.cycles_requested {
+      Some(cycles_requested) => Json::number(cycles_requested.to_double())
+      None => Json::null()
+    },
+    "until_fault": Json::boolean(progress.until_fault),
+    "cycle_period_ns": Json::number(progress.cycle_period_ns.to_double()),
+    "output_period_ns": Json::number(progress.output_period_ns.to_double()),
+    "telemetry": Json::object({
+      "cycles": Json::number(progress.telemetry.cycles.to_double()),
+      "tx_frames": Json::number(progress.telemetry.tx_frames.to_double()),
+      "rx_frames": Json::number(progress.telemetry.rx_frames.to_double()),
+      "timeouts": Json::number(progress.telemetry.timeouts.to_double()),
+      "retries": Json::number(progress.telemetry.retries.to_double()),
+      "wkc_errors": Json::number(progress.telemetry.wkc_errors.to_double()),
+      "irq_events": Json::number(progress.telemetry.irq_events.to_double()),
+      "dc_delay_updates": Json::number(
+        progress.telemetry.dc_delay_updates.to_double(),
+      ),
+    }),
+    "consecutive_timeouts": Json::number(
+      progress.consecutive_timeouts.to_double(),
+    ),
+  })
+}
+
+///|
+fn run_progress_text(progress : @runtime.RunProgress) -> String {
+  "run progress: cycles=" +
+  progress.cycles_completed.to_string() +
+  " ok=" +
+  progress.cycles_ok.to_string() +
+  " timeouts=" +
+  progress.telemetry.timeouts.to_string() +
+  " consecutive_timeouts=" +
+  progress.consecutive_timeouts.to_string() +
+  " wkc_errors=" +
+  progress.telemetry.wkc_errors.to_string()
+}
+
+///|
+struct CliTextRunProgressSink {
+  _unused : Unit
+}
+
+///|
+fn CliTextRunProgressSink::new() -> CliTextRunProgressSink {
+  { _unused: () }
+}
+
+///|
+pub impl @runtime.RunProgressSink for CliTextRunProgressSink with emit(
+  self,
+  progress,
+) {
+  ignore(self)
+  println(run_progress_text(progress))
+}
+
+///|
+struct CliNdjsonRunProgressSink {
+  _unused : Unit
+}
+
+///|
+fn CliNdjsonRunProgressSink::new() -> CliNdjsonRunProgressSink {
+  { _unused: () }
+}
+
+///|
+pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink with emit(
+  self,
+  progress,
+) {
+  ignore(self)
+  println(run_progress_json(progress).stringify())
 }
 
 ///|
