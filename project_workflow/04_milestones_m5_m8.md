@@ -208,3 +208,4 @@
 - `Extism host capability contract` → `f9c7131` `feat(extism): describe required host capabilities`
 - `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
 - `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
+- `Native run 长跑控制、连续超时故障与 CLI 周期参数` → `76db9d4` `feat(runtime): add long-run controls and timeout faults`

@@ -24,3 +24,8 @@
 - 新增能力先补 Section 8 的“参考实现（本地代码）/ MoonECAT 对应实现”，再落测试与实现；缺少映射时不直接编码。
 - 提交前先运行本次改动对应的最小验证；文档改动至少检查链接、标题和任务编号是否一致。
 - 完成后更新本文档对应条目的 `[ ]` → `[x]` 并注明 commit hash。
+- 代码提交完成后，如影响 `project_workflow` 中的“建议提交拆分/提交映射/验收证据”，需在同一轮工作内回填对应 commit hash；只有文档必须引用代码提交号且需要单独评审时，才拆成后续 docs commit。
+
+最近回填：
+
+- `Native run 长跑控制 + 连续超时故障 + CLI 周期参数` → `76db9d4` `feat(runtime): add long-run controls and timeout faults`
