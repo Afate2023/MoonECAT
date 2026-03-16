@@ -317,6 +317,174 @@ pub impl @hal.Nic for RejectEmptyBusTransitionNic with close(self) {
 }
 
 ///|
+/// ConfirmedRunNic simulates one configured slave that supports per-station ESM
+/// transitions and deterministic PDO/DC behavior for run-path tests.
+pub struct ConfirmedRunNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut sii_word_address : UInt
+  mut current_state : Byte
+  mut al_control_broadcast_attempts : Int
+  lrw_wkc : UInt
+  reject_broadcast_al_control : Bool
+  fail_frmw : Bool
+}
+
+///|
+fn ConfirmedRunNic::new(
+  lrw_wkc : UInt,
+  reject_broadcast_al_control : Bool,
+  fail_frmw : Bool,
+) -> ConfirmedRunNic {
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    sii_word_address: 0U,
+    current_state: @protocol.Init.to_byte(),
+    al_control_broadcast_attempts: 0,
+    lrw_wkc,
+    reject_broadcast_al_control,
+    fail_frmw,
+  }
+}
+
+///|
+fn confirmed_run_expected() -> Array[@hal.SlaveConfig] {
+  [
+    {
+      position: 0U,
+      expected_identity: Some({
+        vendor_id: 0x0002U,
+        product_code: 0x044C2C52U,
+        revision: 0x00110000U,
+        serial: 0U,
+      }),
+      expected_identification: None,
+      expected_alias_address: None,
+      configured_address: 0x1001U,
+      presence: @hal.Mandatory,
+    },
+  ]
+}
+
+///|
+fn single_slave_pdo_context() -> @protocol.PdoContext {
+  @protocol.PdoContext::build(
+    [
+      (
+        { sm_configs: [], fmmu_configs: [], output_bytes: 1, input_bytes: 0 },
+        0x1001U,
+      ),
+    ],
+    0x1000U,
+  )
+}
+
+///|
+pub impl @hal.Nic for ConfirmedRunNic with open_(name) {
+  ignore(name)
+  ConfirmedRunNic::new(1U, true, false)
+}
+
+///|
+pub impl @hal.Nic for ConfirmedRunNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  self.next_response = match pdu.header.command {
+    @protocol.BRD =>
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    @protocol.BWR => {
+      if offset == @protocol.reg_al_control {
+        self.al_control_broadcast_attempts = self.al_control_broadcast_attempts +
+          1
+        if self.reject_broadcast_al_control {
+          raise @hal.EcError::SendFailed(
+            "unexpected AL control broadcast in confirmed run test",
+          )
+        }
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.APWR => {
+      if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPWR => {
+      if offset == @protocol.reg_sii_address && pdu.data.length() >= 2 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 0)
+      } else if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
+        self.sii_word_address = read_u16_from_bytes(pdu.data, 2)
+      } else if offset == @protocol.reg_al_control && pdu.data.length() >= 1 {
+        self.current_state = pdu.data[0] & b'\x0F'
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.FPRD => {
+      let response_data = if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else if offset == @protocol.reg_al_status {
+        Bytes::from_array([self.current_state, b'\x00'])
+      } else if offset == @protocol.reg_al_status_code {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == 0x0014U ||
+        offset == @protocol.reg_dc_time0 ||
+        offset == @protocol.reg_dc_system_time ||
+        offset == @protocol.reg_dc_system_diff {
+        Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.APRD => {
+      let response_data = if offset == @protocol.reg_sii_control {
+        Bytes::from_array([b'\x00', b'\x00'])
+      } else if offset == @protocol.reg_sii_data {
+        sii_window_bytes(self.sii_word_address)
+      } else if offset == @protocol.reg_al_status {
+        Bytes::from_array([self.current_state, b'\x00'])
+      } else if offset == 0x0014U {
+        Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.FRMW => {
+      if self.fail_frmw {
+        raise @hal.EcError::SendFailed("forced FRMW failure")
+      }
+      build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    @protocol.LRW => build_response_frame(request, pdu.data, self.lrw_wkc)
+    _ => build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for ConfirmedRunNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for ConfirmedRunNic with close(self) {
+  self.is_open = false
+}
+
+///|
 test "Runtime init_dc disabled keeps state Disabled" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
@@ -336,6 +504,56 @@ test "Runtime init_dc enabled sets Locked" {
   assert_eq(ok, true)
   assert_true(rt.dc_state is Locked)
   assert_true(rt.dc_reference_station is Some(_))
+}
+
+///|
+test "Runtime run_cycles stops on dc drift" {
+  let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
+  let rt = @runtime.Runtime::new(config)
+  let nic = ConfirmedRunNic::new(1U, true, true)
+  rt.configure_pdo(single_slave_pdo_context(), 1U)
+  rt.dc_reference_station = Some(0x1001U)
+  rt.dc_stations = [0x1001U]
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
+  let ok = rt.run_cycles(nic, 3, @hal.Duration(1000L))
+  assert_eq(ok, 1)
+  assert_true(rt.dc_state is Drifting(_))
+  assert_true(rt.state is Error(_))
+}
+
+///|
+test "Runtime run_until_fault stops on repeated wkc mismatch" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let nic = ConfirmedRunNic::new(0U, true, false)
+  rt.configure_pdo(single_slave_pdo_context(), 1U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let ok = rt.run_until_fault(nic, @hal.Duration(1000L))
+  assert_eq(ok, 0)
+  assert_eq(rt.telemetry.wkc_errors, 5L)
+  assert_true(rt.state is Error(_))
+}
+
+///|
+test "Runtime run_until_fault stops on repeated recv timeout" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let nic = TimeoutNic::new()
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_timeout_threshold(3)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let ok = rt.run_until_fault(nic, @hal.Duration(1000L))
+  assert_eq(ok, 0)
+  assert_eq(rt.telemetry.timeouts, 3L)
+  assert_eq(rt.consecutive_timeouts, 3)
+  assert_true(rt.state is Error(_))
 }
 
 ///|
@@ -497,6 +715,7 @@ test "Pressure: timeout-heavy loop keeps accounting consistent" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = TimeoutNic::new()
   let cycles = 1000
+  rt.set_timeout_threshold(cycles + 1)
   let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
   assert_eq(success, 0)
   let t = rt.get_telemetry()
@@ -2157,15 +2376,23 @@ test "RunReport format with zero cycles" {
     },
     cycles_requested: 0,
     cycles_ok: 0,
+    until_fault: false,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: None,
     telemetry: @runtime.Telemetry::new(),
     final_phase: @runtime.Done,
+    fault: None,
   }
   let text = report.format()
   assert_true(text.contains("MoonECAT Run Report"))
   assert_true(text.contains("Slaves found: 0"))
   assert_true(text.contains("Validation: PASS"))
   assert_true(text.contains("0/0 OK"))
+  assert_true(text.contains("Mode: FixedCycles"))
+  assert_true(text.contains("CyclePeriodNs: 1000000"))
+  assert_true(text.contains("OutputPeriodNs: none"))
   assert_true(text.contains("Phase: Done"))
+  assert_true(text.contains("Fault: none"))
 }
 
 ///|
@@ -2194,17 +2421,27 @@ test "RunReport format with cycles and telemetry" {
     },
     cycles_requested: 100,
     cycles_ok: 97,
+    until_fault: true,
+    cycle_period_ns: 500_000L,
+    output_period_ns: Some(10_000_000L),
     telemetry: tel,
     final_phase: @runtime.Done,
+    fault: Some(
+      @runtime.RuntimeRecoveryRequired(expected_wkc=2U, observed_wkc_errors=3L),
+    ),
   }
   let text = report.format()
   assert_true(text.contains("Slaves found: 2"))
   assert_true(text.contains("97/100 OK"))
+  assert_true(text.contains("Mode: UntilFault"))
+  assert_true(text.contains("CyclePeriodNs: 500000"))
+  assert_true(text.contains("OutputPeriodNs: 10000000"))
   assert_true(text.contains("tx=100"))
   assert_true(text.contains("timeouts=2"))
   assert_true(text.contains("irq_events=4"))
   assert_true(text.contains("dc_delay_updates=2"))
   assert_true(text.contains("wkc_errors=3"))
+  assert_true(text.contains("runtime recovery required"))
 }
 
 ///|
@@ -2287,7 +2524,144 @@ test "run with empty bus skips ESM broadcasts" {
   assert_eq(report.validation.all_ok, true)
   assert_eq(report.cycles_ok, 3)
   assert_true(report.final_phase is @runtime.Done)
+  assert_true(report.fault is None)
   assert_eq(nic.state_transition_attempts, 0)
+}
+
+///|
+test "run confirms op via per-station transition without broadcast" {
+  let nic = ConfirmedRunNic::new(1U, true, false)
+  let config = @hal.MasterConfig::default()
+  let report = @runtime.run(
+    nic,
+    config,
+    confirmed_run_expected(),
+    {
+      image: @protocol.ProcessImage::new(0, 0),
+      mappings: [],
+      logical_base: 0U,
+      logical_size: 0,
+    },
+    0U,
+    1,
+    @hal.Duration(1000L),
+  )
+  assert_true(report.final_phase is @runtime.Done)
+  assert_true(report.fault is None)
+  assert_eq(report.cycles_ok, 1)
+  assert_eq(nic.al_control_broadcast_attempts, 0)
+  assert_eq(nic.current_state, @protocol.Init.to_byte())
+}
+
+///|
+test "run reports runtime recovery fault after repeated wkc mismatch" {
+  let nic = ConfirmedRunNic::new(0U, true, false)
+  let config = @hal.MasterConfig::default()
+  let report = @runtime.run(
+    nic,
+    config,
+    confirmed_run_expected(),
+    single_slave_pdo_context(),
+    1U,
+    10,
+    @hal.Duration(1000L),
+  )
+  assert_true(report.final_phase is @runtime.Operational)
+  assert_eq(report.cycles_ok, 0)
+  assert_eq(report.telemetry.wkc_errors, 5L)
+  match report.fault {
+    Some(@runtime.RuntimeRecoveryRequired(expected_wkc~, observed_wkc_errors~)) => {
+      assert_eq(expected_wkc, 1U)
+      assert_eq(observed_wkc_errors, 5L)
+    }
+    _ => fail("expected runtime recovery fault")
+  }
+}
+
+///|
+test "RunReport format includes timeout recovery fault" {
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 0, slaves: [] },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
+    cycles_requested: 3,
+    cycles_ok: 0,
+    until_fault: true,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: None,
+    telemetry: {
+      cycles: 3L,
+      tx_frames: 3L,
+      rx_frames: 0L,
+      timeouts: 3L,
+      retries: 0L,
+      wkc_errors: 0L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    final_phase: @runtime.Operational,
+    fault: Some(
+      @runtime.TimeoutRecoveryRequired(
+        observed_timeouts=3L,
+        consecutive_timeouts=3,
+      ),
+    ),
+  }
+  let text = report.format()
+  assert_true(text.contains("timeout recovery required"))
+  assert_true(text.contains("consecutive_timeouts=3"))
+}
+
+///|
+test "diagnostic surface from run includes runtime fault issues" {
+  let report : @runtime.RunReport = {
+    scan: { slave_count: 1, slaves: [] },
+    validation: {
+      expected_source: @runtime.OfflineConfig,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 1,
+      total_found: 1,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
+    cycles_requested: 10,
+    cycles_ok: 0,
+    until_fault: true,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: None,
+    telemetry: {
+      cycles: 5L,
+      tx_frames: 5L,
+      rx_frames: 5L,
+      timeouts: 0L,
+      retries: 0L,
+      wkc_errors: 5L,
+      irq_events: 0L,
+      dc_delay_updates: 0L,
+    },
+    final_phase: @runtime.Operational,
+    fault: Some(
+      @runtime.RuntimeRecoveryRequired(expected_wkc=1U, observed_wkc_errors=5L),
+    ),
+  }
+  let surface = @runtime.diagnostic_surface_from_run(report)
+  assert_eq(surface.overall_level, @runtime.Block)
+  assert_true(
+    surface.issues.any(fn(issue) {
+      issue.category == @runtime.RuntimeMetrics &&
+      issue.detail.contains("Runtime recovery required")
+    }),
+  )
 }
 
 ///|

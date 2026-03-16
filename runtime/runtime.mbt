@@ -43,6 +43,10 @@ pub(all) struct Runtime {
   max_wkc_errors : Int
   /// Current consecutive WKC error count.
   mut consecutive_wkc_errors : Int
+  /// Number of consecutive receive timeouts before triggering recovery.
+  mut max_consecutive_timeouts : Int
+  /// Current consecutive receive timeout count.
+  mut consecutive_timeouts : Int
   /// DC synchronization state.
   mut dc_state : DcState
   /// Reference station for FRMW drift compensation.
@@ -63,11 +67,19 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     expected_wkc: 0U,
     max_wkc_errors: 5,
     consecutive_wkc_errors: 0,
+    max_consecutive_timeouts: 5,
+    consecutive_timeouts: 0,
     dc_state: Disabled,
     dc_reference_station: None,
     dc_stations: [],
     dc_cycle_counter: 0,
   }
+}
+
+///|
+/// Configure the threshold for consecutive receive timeouts.
+pub fn Runtime::set_timeout_threshold(self : Runtime, threshold : Int) -> Unit {
+  self.max_consecutive_timeouts = if threshold > 0 { threshold } else { 1 }
 }
 
 ///|
@@ -182,6 +194,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
   if pdo_result.irq != 0U {
     self.telemetry.irq_events = self.telemetry.irq_events + 1L
   }
+  self.consecutive_timeouts = 0
   let ok = wkc >= self.expected_wkc
   if ok {
     self.consecutive_wkc_errors = 0
@@ -195,19 +208,23 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
 ///|
 /// Check if the runtime needs recovery due to excessive WKC errors.
 pub fn Runtime::needs_recovery(self : Runtime) -> Bool {
-  self.consecutive_wkc_errors >= self.max_wkc_errors
+  self.consecutive_wkc_errors >= self.max_wkc_errors ||
+  self.consecutive_timeouts >= self.max_consecutive_timeouts ||
+  self.dc_state is Drifting(_)
 }
 
 ///|
 /// Reset the WKC error counter after recovery.
 pub fn Runtime::reset_error_counter(self : Runtime) -> Unit {
   self.consecutive_wkc_errors = 0
+  self.consecutive_timeouts = 0
 }
 
 ///|
 /// Record a timeout event in telemetry.
 pub fn Runtime::record_timeout(self : Runtime) -> Unit {
   self.telemetry.timeouts = self.telemetry.timeouts + 1L
+  self.consecutive_timeouts = self.consecutive_timeouts + 1
 }
 
 ///|
@@ -239,11 +256,28 @@ pub fn[N : @hal.Nic] Runtime::run_cycles(
   count : Int,
   timeout : @hal.Duration,
 ) -> Int raise @hal.EcError {
+  self.run_cycles_with_reporting(nic, count, timeout, None)
+}
+
+///|
+/// Run N PDO cycles and optionally emit progress snapshots.
+pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(
+  self : Runtime,
+  nic : N,
+  count : Int,
+  timeout : @hal.Duration,
+  progress_every_cycles : Int?,
+) -> Int raise @hal.EcError {
   let mut success = 0
   for _i = 0; _i < count; _i = _i + 1 {
     let result = self.run_cycle(nic, timeout) catch {
       @hal.EcError::RecvTimeout => {
         self.record_timeout()
+        emit_runtime_progress(self, success, progress_every_cycles)
+        if self.needs_recovery() {
+          self.set_state(Error(@hal.EcError::RecvTimeout))
+          break
+        }
         continue
       }
       err => raise err
@@ -251,17 +285,126 @@ pub fn[N : @hal.Nic] Runtime::run_cycles(
     if result.ok {
       success = success + 1
     }
+    emit_runtime_progress(self, success, progress_every_cycles)
     if self.needs_recovery() {
-      self.set_state(
-        Error(
-          @hal.EcError::UnexpectedWkc(
-            expected=self.expected_wkc.reinterpret_as_int(),
-            actual=0,
-          ),
-        ),
-      )
+      match self.dc_state {
+        Drifting(delta_ns) =>
+          self.set_state(
+            Error(
+              @hal.EcError::Internal(
+                "dc drift detected: " + delta_ns.to_string(),
+              ),
+            ),
+          )
+        _ =>
+          if self.consecutive_timeouts >= self.max_consecutive_timeouts {
+            self.set_state(Error(@hal.EcError::RecvTimeout))
+          } else {
+            self.set_state(
+              Error(
+                @hal.EcError::UnexpectedWkc(
+                  expected=self.expected_wkc.reinterpret_as_int(),
+                  actual=0,
+                ),
+              ),
+            )
+          }
+      }
       break
     }
   }
   success
+}
+
+///|
+/// Run PDO cycles until a runtime recovery condition occurs.
+pub fn[N : @hal.Nic] Runtime::run_until_fault(
+  self : Runtime,
+  nic : N,
+  timeout : @hal.Duration,
+) -> Int raise @hal.EcError {
+  self.run_until_fault_with_reporting(nic, timeout, None)
+}
+
+///|
+/// Run PDO cycles until a runtime recovery condition occurs and optionally
+/// emit progress snapshots.
+pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
+  self : Runtime,
+  nic : N,
+  timeout : @hal.Duration,
+  progress_every_cycles : Int?,
+) -> Int raise @hal.EcError {
+  let mut success = 0
+  while true {
+    let result = self.run_cycle(nic, timeout) catch {
+      @hal.EcError::RecvTimeout => {
+        self.record_timeout()
+        emit_runtime_progress(self, success, progress_every_cycles)
+        if self.needs_recovery() {
+          self.set_state(Error(@hal.EcError::RecvTimeout))
+          break
+        }
+        continue
+      }
+      err => raise err
+    }
+    if result.ok {
+      success = success + 1
+    }
+    emit_runtime_progress(self, success, progress_every_cycles)
+    if self.needs_recovery() {
+      match self.dc_state {
+        Drifting(delta_ns) =>
+          self.set_state(
+            Error(
+              @hal.EcError::Internal(
+                "dc drift detected: " + delta_ns.to_string(),
+              ),
+            ),
+          )
+        _ =>
+          if self.consecutive_timeouts >= self.max_consecutive_timeouts {
+            self.set_state(Error(@hal.EcError::RecvTimeout))
+          } else {
+            self.set_state(
+              Error(
+                @hal.EcError::UnexpectedWkc(
+                  expected=self.expected_wkc.reinterpret_as_int(),
+                  actual=0,
+                ),
+              ),
+            )
+          }
+      }
+      break
+    }
+  }
+  success
+}
+
+///|
+fn emit_runtime_progress(
+  runtime : Runtime,
+  success : Int,
+  progress_every_cycles : Int?,
+) -> Unit {
+  match progress_every_cycles {
+    Some(every) =>
+      if every > 0 && runtime.telemetry.cycles % every.to_int64() == 0L {
+        println(
+          "run progress: cycles=" +
+          runtime.telemetry.cycles.to_string() +
+          " ok=" +
+          success.to_string() +
+          " timeouts=" +
+          runtime.telemetry.timeouts.to_string() +
+          " consecutive_timeouts=" +
+          runtime.consecutive_timeouts.to_string() +
+          " wkc_errors=" +
+          runtime.telemetry.wkc_errors.to_string(),
+        )
+      }
+    _ => ()
+  }
 }

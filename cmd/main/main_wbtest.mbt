@@ -63,6 +63,60 @@ test "cli timeout flag rejects non-positive values" {
 }
 
 ///|
+test "cli run cycles default and parse explicit values" {
+  assert_eq(resolve_run_cycles(["moonecat", "run"], false), 10)
+  assert_eq(
+    resolve_run_cycles(["moonecat", "run", "--cycles", "250"], false),
+    250,
+  )
+}
+
+///|
+test "cli run cycles rejects non-positive values" {
+  let zero : Result[Int, Error] = try? resolve_run_cycles(
+    ["moonecat", "run", "--cycles", "0"],
+    false,
+  )
+  assert_true(zero is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli until-fault mode rejects explicit cycles" {
+  let bad : Result[Int, Error] = try? resolve_run_cycles(
+    ["moonecat", "run", "--until-fault", "--cycles", "10"],
+    true,
+  )
+  assert_true(bad is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli run loop settings parse timing and timeout controls" {
+  let settings = resolve_run_loop_settings(
+    [
+      "moonecat", "run", "--until-fault", "--cycle-period-us", "500", "--output-period-ms",
+      "20", "--max-consecutive-timeouts", "7",
+    ],
+    false,
+    true,
+  )
+  assert_eq(settings.until_fault, true)
+  assert_eq(settings.cycles, 0)
+  assert_eq(settings.cycle_period_ns, Some(500_000L))
+  assert_eq(settings.output_period_ns, Some(20_000_000L))
+  assert_eq(settings.max_consecutive_timeouts, 7)
+}
+
+///|
+test "cli run loop settings reject progress output with json" {
+  let result : Result[@runtime.RunLoopSettings, Error] = try? resolve_run_loop_settings(
+    ["moonecat", "run", "--output-period-ms", "1000"],
+    true,
+    false,
+  )
+  assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
 test "cli resolve validate expected configuration defaults to scan projection" {
   let scan_report : @runtime.ScanReport = {
     slave_count: 1,
@@ -965,6 +1019,9 @@ test "cli run report json includes shared surface telemetry" {
     },
     cycles_requested: 10,
     cycles_ok: 10,
+    until_fault: true,
+    cycle_period_ns: 1_000_000L,
+    output_period_ns: Some(5_000_000L),
     telemetry: {
       cycles: 10L,
       tx_frames: 10L,
@@ -976,11 +1033,19 @@ test "cli run report json includes shared surface telemetry" {
       dc_delay_updates: 0L,
     },
     final_phase: @runtime.Done,
+    fault: Some(
+      @runtime.RuntimeRecoveryRequired(expected_wkc=1U, observed_wkc_errors=2L),
+    ),
   }
   let text = run_report_json(report).stringify(indent=2)
+  assert_true(text.contains("\"until_fault\": true"))
+  assert_true(text.contains("\"cycle_period_ns\": 1000000"))
+  assert_true(text.contains("\"output_period_ns\": 5000000"))
+  assert_true(text.contains("\"fault\""))
+  assert_true(text.contains("\"runtime-recovery-required\""))
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"runtime_metrics\""))
-  assert_true(text.contains("\"overall_level\": \"Info\""))
+  assert_true(text.contains("\"overall_level\": \"Block\""))
 }
 
 ///|

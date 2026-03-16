@@ -162,6 +162,8 @@ fn cli_main() -> Unit raise @hal.EcError {
   }
 
   if command == "run" {
+    let until_fault = has_flag(args, "--until-fault")
+    let settings = resolve_run_loop_settings(args, as_json, until_fault)
     let startup_state = optional_esm_state_flag(
       args,
       "--startup-state",
@@ -171,7 +173,7 @@ fn cli_main() -> Unit raise @hal.EcError {
     match backend {
       Mock =>
         run_mock_command_with_fresh_nic(
-          as_json, startup_state, shutdown_state, timeout,
+          as_json, startup_state, shutdown_state, settings, timeout,
         )
       NativeAuto => {
         let interface_name = require_interface_name(args)
@@ -180,6 +182,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           as_json,
           startup_state,
           shutdown_state,
+          settings,
           timeout,
         )
       }
@@ -190,6 +193,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           as_json,
           startup_state,
           shutdown_state,
+          settings,
           timeout,
         )
       }
@@ -200,6 +204,7 @@ fn cli_main() -> Unit raise @hal.EcError {
           as_json,
           startup_state,
           shutdown_state,
+          settings,
           timeout,
         )
       }
@@ -245,6 +250,7 @@ fn run_mock_command_with_fresh_nic(
   as_json : Bool,
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
+  settings : @runtime.RunLoopSettings,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @mock.MockNic::new()
@@ -253,13 +259,13 @@ fn run_mock_command_with_fresh_nic(
   probe_nic.close()
   let run_nic = @mock.MockNic::new()
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let run_report = @runtime.run_with_states(
+  let run_report = @runtime.run_with_states_and_settings(
     run_nic,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
     0U,
-    10,
+    settings,
     startup_state,
     shutdown_state,
     timeout,
@@ -278,6 +284,7 @@ fn run_native_command_with_fresh_nic(
   as_json : Bool,
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
+  settings : @runtime.RunLoopSettings,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @native.NativeNic::open_with_config(config)
@@ -299,13 +306,13 @@ fn run_native_command_with_fresh_nic(
   let run_config = @runtime.master_config_with_optional_dc(
     preparation.dc_cycle_period_ns,
   )
-  let run_report = @runtime.run_with_states(
+  let run_report = @runtime.run_with_states_and_settings(
     run_nic,
     run_config,
     expected,
     preparation.pdo_ctx,
     preparation.expected_wkc,
-    10,
+    settings,
     startup_state,
     shutdown_state,
     timeout,
@@ -377,7 +384,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od> [--json] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -392,6 +399,9 @@ fn print_usage() -> Unit {
     "  moon run cmd/main validate -- --backend native --if <interface> --eni-json config.json --json",
   )
   println(
+    "  moon run cmd/main run -- --backend native --if <interface> --until-fault --cycle-period-us 1000 --output-period-ms 1000",
+  )
+  println(
     "  moon run cmd/main read-sii -- --backend native --if <interface> --position 0 --json",
   )
   println(
@@ -401,7 +411,10 @@ fn print_usage() -> Unit {
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path",
   )
   println(
-    "  moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state init",
+    "  moon run cmd/main run -- --backend native --if <interface> --startup-state safeop --shutdown-state init --cycles 1000",
+  )
+  println(
+    "  moon run cmd/main run -- --backend native --if <interface> --until-fault --startup-state op",
   )
   println(
     "  moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 --timeout-ms 50 --json",
@@ -536,6 +549,15 @@ fn[N : @hal.Nic] transition_station_to_op(
   current : @protocol.EsmState,
   timeout : @hal.Duration,
 ) -> (@protocol.EsmState, UInt?) raise @hal.EcError {
+  let preparation = @runtime.prepare_slave_startup(
+    nic, station, pdo_logical_base, process_data_eeprom_word_count, timeout,
+  )
+  let pdo_ctx = @protocol.PdoContext::build(
+    [(preparation.mapping, station)],
+    pdo_logical_base,
+  )
+  let has_process_data = preparation.mapping.output_bytes > 0 ||
+    preparation.mapping.input_bytes > 0
   let path = @protocol.build_transition_route(current, @protocol.Op)
   let safeop_path : Array[@protocol.EsmState] = []
   for state in path {
@@ -549,9 +571,6 @@ fn[N : @hal.Nic] transition_station_to_op(
   } else {
     current
   }
-  let preparation = @runtime.prepare_slave_startup(
-    nic, station, pdo_logical_base, process_data_eeprom_word_count, timeout,
-  )
   match preparation.dc_cycle_period_ns {
     Some(cycle_period_ns) =>
       ignore(
@@ -565,12 +584,6 @@ fn[N : @hal.Nic] transition_station_to_op(
       )
     None => ()
   }
-  let pdo_ctx = @protocol.PdoContext::build(
-    [(preparation.mapping, station)],
-    pdo_logical_base,
-  )
-  let has_process_data = preparation.mapping.output_bytes > 0 ||
-    preparation.mapping.input_bytes > 0
   let kick_before_op = if has_process_data {
     Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
   } else {
@@ -1533,6 +1546,86 @@ fn resolve_timeout(args : Array[String]) -> @hal.Duration raise @hal.EcError {
     )
   }
   @hal.Duration(timeout_ms.to_int64() * 1_000_000L)
+}
+
+///|
+fn resolve_run_cycles(
+  args : Array[String],
+  until_fault : Bool,
+) -> Int raise @hal.EcError {
+  if until_fault {
+    match flag_value(args, "--cycles") {
+      Some(_) =>
+        raise @hal.EcError::ConfigMismatch(
+          "--cycles cannot be combined with --until-fault",
+        )
+      None => ()
+    }
+    return 0
+  }
+  let cycles = require_int_flag(args, "--cycles", 10)
+  if cycles <= 0 {
+    raise @hal.EcError::ConfigMismatch("cycle value for --cycles must be > 0")
+  }
+  cycles
+}
+
+///|
+fn resolve_run_loop_settings(
+  args : Array[String],
+  as_json : Bool,
+  until_fault : Bool,
+) -> @runtime.RunLoopSettings raise @hal.EcError {
+  let cycles = resolve_run_cycles(args, until_fault)
+  let cycle_period_ns = optional_duration_flag_ns(
+    args, "--cycle-period-us", 1_000L,
+  )
+  let output_period_ns = optional_duration_flag_ns(
+    args, "--output-period-ms", 1_000_000L,
+  )
+  if as_json {
+    match output_period_ns {
+      Some(_) =>
+        raise @hal.EcError::ConfigMismatch(
+          "--output-period-ms cannot be combined with --json",
+        )
+      None => ()
+    }
+  }
+  let max_consecutive_timeouts = require_int_flag(
+    args, "--max-consecutive-timeouts", 5,
+  )
+  if max_consecutive_timeouts <= 0 {
+    raise @hal.EcError::ConfigMismatch(
+      "timeout value for --max-consecutive-timeouts must be > 0",
+    )
+  }
+  let base = if until_fault {
+    @runtime.RunLoopSettings::until_fault()
+  } else {
+    @runtime.RunLoopSettings::fixed_cycles(cycles)
+  }
+  { ..base, cycle_period_ns, output_period_ns, max_consecutive_timeouts }
+}
+
+///|
+fn optional_duration_flag_ns(
+  args : Array[String],
+  flag : String,
+  unit_ns : Int64,
+) -> Int64? raise @hal.EcError {
+  match flag_value(args, flag) {
+    Some(text) => {
+      let value = parse_int_flag(flag, text)
+      if value <= 0 {
+        raise @hal.EcError::ConfigMismatch(
+          "numeric value for " + flag + " must be > 0",
+        )
+      }
+      Some(value.to_int64() * unit_ns)
+    }
+    None => None
+  }
 }
 
 ///|
@@ -2886,7 +2979,17 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
     "validation": validate_report_json(report.validation),
     "cycles_requested": Json::number(report.cycles_requested.to_double()),
     "cycles_ok": Json::number(report.cycles_ok.to_double()),
+    "until_fault": Json::boolean(report.until_fault),
+    "cycle_period_ns": Json::number(report.cycle_period_ns.to_double()),
+    "output_period_ns": match report.output_period_ns {
+      Some(output_period_ns) => Json::number(output_period_ns.to_double())
+      None => Json::null()
+    },
     "final_phase": Json::string(report.final_phase.to_string()),
+    "fault": match report.fault {
+      Some(fault) => run_fault_json(fault)
+      None => Json::null()
+    },
     "telemetry": Json::object({
       "cycles": Json::number(tel.cycles.to_double()),
       "tx_frames": Json::number(tel.tx_frames.to_double()),
@@ -2901,6 +3004,43 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       @runtime.diagnostic_surface_from_run(report),
     ),
   })
+}
+
+///|
+fn run_fault_json(fault : @runtime.RunFault) -> Json {
+  match fault {
+    StartupTransitionFailed(station~, target~, current~, status_code~) =>
+      Json::object({
+        "kind": Json::string("startup-transition-failed"),
+        "station": Json::number(station.to_double()),
+        "target": Json::string(target.to_string()),
+        "current": match current {
+          Some(state) => Json::string(state.to_string())
+          None => Json::null()
+        },
+        "status_code": match status_code {
+          Some(code) => Json::number(code.to_double())
+          None => Json::null()
+        },
+      })
+    TimeoutRecoveryRequired(observed_timeouts~, consecutive_timeouts~) =>
+      Json::object({
+        "kind": Json::string("timeout-recovery-required"),
+        "observed_timeouts": Json::number(observed_timeouts.to_double()),
+        "consecutive_timeouts": Json::number(consecutive_timeouts.to_double()),
+      })
+    RuntimeRecoveryRequired(expected_wkc~, observed_wkc_errors~) =>
+      Json::object({
+        "kind": Json::string("runtime-recovery-required"),
+        "expected_wkc": Json::number(expected_wkc.to_double()),
+        "observed_wkc_errors": Json::number(observed_wkc_errors.to_double()),
+      })
+    DcDrift(delta_ns~) =>
+      Json::object({
+        "kind": Json::string("dc-drift"),
+        "delta_ns": Json::number(delta_ns.to_double()),
+      })
+  }
 }
 
 ///|

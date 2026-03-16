@@ -14,14 +14,67 @@ pub(all) enum RunPhase {
 } derive(Eq, Show)
 
 ///|
+pub(all) enum RunFault {
+  StartupTransitionFailed(
+    station~ : UInt,
+    target~ : @protocol.EsmState,
+    current~ : @protocol.EsmState?,
+    status_code~ : UInt?
+  )
+  TimeoutRecoveryRequired(
+    observed_timeouts~ : Int64,
+    consecutive_timeouts~ : Int
+  )
+  RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
+  DcDrift(delta_ns~ : Int64)
+} derive(Eq, Show)
+
+///|
+/// RunLoopSettings controls runtime loop behavior beyond startup/shutdown
+/// state sequencing.
+pub(all) struct RunLoopSettings {
+  cycles : Int
+  until_fault : Bool
+  cycle_period_ns : Int64?
+  output_period_ns : Int64?
+  max_consecutive_timeouts : Int
+} derive(Eq, Show)
+
+///|
+pub fn RunLoopSettings::fixed_cycles(cycles : Int) -> RunLoopSettings {
+  {
+    cycles,
+    until_fault: false,
+    cycle_period_ns: None,
+    output_period_ns: None,
+    max_consecutive_timeouts: 5,
+  }
+}
+
+///|
+pub fn RunLoopSettings::until_fault() -> RunLoopSettings {
+  {
+    cycles: 0,
+    until_fault: true,
+    cycle_period_ns: None,
+    output_period_ns: None,
+    max_consecutive_timeouts: 5,
+  }
+}
+
+///|
 /// RunReport summarizes the outcome of a full run cycle.
 pub(all) struct RunReport {
   scan : ScanReport
   validation : ValidateReport
   cycles_requested : Int
   cycles_ok : Int
+  until_fault : Bool
+  cycle_period_ns : Int64
+  output_period_ns : Int64?
   telemetry : Telemetry
   final_phase : RunPhase
+  fault : RunFault?
 } derive(Show)
 
 ///|
@@ -223,8 +276,8 @@ fn expected_wkc_from_slave_mappings(
 /// Execute a full EtherCAT run workflow:
 /// 1. Scan the bus to discover slaves.
 /// 2. Validate discovered slaves against expected configuration.
-/// 3. Transition all slaves to Operational via ESM broadcast.
-/// 4. Run the requested number of PDO cycles.
+/// 3. Transition all slaves to Operational.
+/// 4. Run PDO cycles.
 /// 5. Transition slaves back to Init.
 /// 6. Return a summary report.
 pub fn[N : @hal.Nic] run(
@@ -236,13 +289,13 @@ pub fn[N : @hal.Nic] run(
   cycles : Int,
   timeout : @hal.Duration,
 ) -> RunReport raise @hal.EcError {
-  run_with_states(
+  run_with_states_and_settings(
     nic,
     config,
     expected,
     pdo_ctx,
     expected_wkc,
-    cycles,
+    RunLoopSettings::fixed_cycles(cycles),
     @protocol.Op,
     Some(@protocol.Init),
     timeout,
@@ -250,8 +303,51 @@ pub fn[N : @hal.Nic] run(
 }
 
 ///|
-/// Execute a full EtherCAT run workflow with configurable startup and shutdown
-/// broadcast states.
+pub fn[N : @hal.Nic] run_with_settings(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    settings,
+    @protocol.Op,
+    Some(@protocol.Init),
+    timeout,
+  )
+}
+
+///|
+pub fn[N : @hal.Nic] run_until_fault(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    RunLoopSettings::until_fault(),
+    @protocol.Op,
+    Some(@protocol.Init),
+    timeout,
+  )
+}
+
+///|
 pub fn[N : @hal.Nic] run_with_states(
   nic : N,
   config : @hal.MasterConfig,
@@ -263,45 +359,185 @@ pub fn[N : @hal.Nic] run_with_states(
   shutdown_state : @protocol.EsmState?,
   timeout : @hal.Duration,
 ) -> RunReport raise @hal.EcError {
-  // Phase 1: Scan
+  run_with_states_and_settings(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    RunLoopSettings::fixed_cycles(cycles),
+    startup_state,
+    shutdown_state,
+    timeout,
+  )
+}
+
+///|
+pub fn[N : @hal.Nic] run_with_states_until_fault(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    RunLoopSettings::until_fault(),
+    startup_state,
+    shutdown_state,
+    timeout,
+  )
+}
+
+///|
+pub fn[N : @hal.Nic] run_with_states_and_settings(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  timeout : @hal.Duration,
+) -> RunReport raise @hal.EcError {
+  let run_config = resolve_run_loop_config(config, settings)
+  let progress_every_cycles = resolve_progress_every_cycles(
+    run_config, settings,
+  )
   let scan_report = scan(nic, timeout)
   let has_discovered_slaves = scan_report.slave_count > 0
 
-  // Phase 2: Validate
   let validate_report = validate(scan_report, expected)
   if not(validate_report.all_ok) {
     return {
       scan: scan_report,
       validation: validate_report,
-      cycles_requested: cycles,
+      cycles_requested: settings.cycles,
       cycles_ok: 0,
+      until_fault: settings.until_fault,
+      cycle_period_ns: run_config.cycle_period_ns,
+      output_period_ns: settings.output_period_ns,
       telemetry: Telemetry::new(),
       final_phase: Validating,
+      fault: None,
     }
   }
 
-  // Phase 3: Configure — transition slaves to Operational
+  let pre_run_state = if startup_state == @protocol.Op {
+    @protocol.SafeOp
+  } else {
+    startup_state
+  }
   if has_discovered_slaves {
-    ignore(@protocol.broadcast_state(nic, startup_state, timeout))
+    for slave in scan_report.slaves {
+      let startup_fault = transition_slave_to_target(
+        nic,
+        slave.station_address,
+        pre_run_state,
+        timeout,
+      )
+      match startup_fault {
+        Some(fault) =>
+          return {
+            scan: scan_report,
+            validation: validate_report,
+            cycles_requested: settings.cycles,
+            cycles_ok: 0,
+            until_fault: settings.until_fault,
+            cycle_period_ns: run_config.cycle_period_ns,
+            output_period_ns: settings.output_period_ns,
+            telemetry: Telemetry::new(),
+            final_phase: Configuring,
+            fault: Some(fault),
+          }
+        None => ()
+      }
+    }
   }
 
-  // Phase 4: Run PDO cycles
-  let rt = Runtime::new(config)
+  if has_discovered_slaves && startup_state == @protocol.Op {
+    warmup_process_data_for_op(nic, pdo_ctx, timeout)
+    for slave in scan_report.slaves {
+      let startup_fault = transition_slave_to_target(
+        nic,
+        slave.station_address,
+        startup_state,
+        timeout,
+      )
+      match startup_fault {
+        Some(fault) =>
+          return {
+            scan: scan_report,
+            validation: validate_report,
+            cycles_requested: settings.cycles,
+            cycles_ok: 0,
+            until_fault: settings.until_fault,
+            cycle_period_ns: run_config.cycle_period_ns,
+            output_period_ns: settings.output_period_ns,
+            telemetry: Telemetry::new(),
+            final_phase: Configuring,
+            fault: Some(fault),
+          }
+        None => ()
+      }
+    }
+  }
+
+  let rt = Runtime::new(run_config)
   rt.configure_pdo(pdo_ctx, expected_wkc)
   let stations = expected.map(fn(s) { s.configured_address })
-  let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
-  rt.set_state(Running(if dc_ok { DcSync } else { FreeRun }))
-  let ok_count = rt.run_cycles(nic, cycles, timeout)
 
-  // Phase 5: Shutdown — transition slaves back to Init
+  if has_discovered_slaves &&
+    startup_state == @protocol.Op &&
+    run_config.dc_enabled {
+    ignore(
+      try? @protocol.dc_configure_linear(
+        nic,
+        stations,
+        run_config.cycle_period_ns.to_int().reinterpret_as_uint(),
+        timeout,
+        static_sync_iterations=32,
+      ),
+    )
+  }
+
+  let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
+  rt.set_timeout_threshold(settings.max_consecutive_timeouts)
+  rt.set_state(Running(if dc_ok { DcSync } else { FreeRun }))
+  let ok_count = if settings.until_fault {
+    rt.run_until_fault_with_reporting(nic, timeout, progress_every_cycles)
+  } else {
+    rt.run_cycles_with_reporting(
+      nic,
+      settings.cycles,
+      timeout,
+      progress_every_cycles,
+    )
+  }
+  let telemetry = rt.get_telemetry()
+  let runtime_fault = runtime_fault_from_runtime(rt)
+
   if has_discovered_slaves {
     match shutdown_state {
       Some(target) =>
-        ignore(
-          @protocol.broadcast_state(nic, target, timeout) catch {
-            _ => 0U // Best-effort shutdown; report already captured
-          },
-        )
+        for slave in scan_report.slaves {
+          ignore(
+            transition_slave_to_target(
+              nic,
+              slave.station_address,
+              target,
+              timeout,
+            ),
+          )
+        }
       None => ()
     }
   }
@@ -310,10 +546,174 @@ pub fn[N : @hal.Nic] run_with_states(
   {
     scan: scan_report,
     validation: validate_report,
-    cycles_requested: cycles,
+    cycles_requested: if settings.until_fault {
+      telemetry.cycles.to_int()
+    } else {
+      settings.cycles
+    },
     cycles_ok: ok_count,
-    telemetry: rt.get_telemetry(),
-    final_phase: Done,
+    until_fault: settings.until_fault,
+    cycle_period_ns: run_config.cycle_period_ns,
+    output_period_ns: settings.output_period_ns,
+    telemetry,
+    final_phase: match runtime_fault {
+      Some(_) => Operational
+      None => Done
+    },
+    fault: runtime_fault,
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_slave_to_target(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  if attempt_transition_slave_to_target(nic, station, target, timeout) {
+    None
+  } else {
+    ignore(try? @protocol.broadcast_state(nic, target, timeout))
+    if attempt_transition_slave_to_target(nic, station, target, timeout) {
+      None
+    } else {
+      Some(startup_transition_fault(nic, station, target, timeout))
+    }
+  }
+}
+
+///|
+fn[N : @hal.Nic] attempt_transition_slave_to_target(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> Bool {
+  let current = @protocol.read_al_status(nic, station, timeout) catch {
+    _ => return false
+  }
+  let path = @protocol.build_transition_route(current, target)
+  let final_state = @protocol.transition_through(nic, station, path, timeout) catch {
+    _ => return false
+  }
+  final_state == target
+}
+
+///|
+fn[N : @hal.Nic] warmup_process_data_for_op(
+  nic : N,
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> Unit {
+  if pdo_ctx.logical_size > 0 {
+    ignore(try? @protocol.pdo_exchange_result(nic, pdo_ctx, timeout))
+  }
+}
+
+///|
+fn[N : @hal.Nic] startup_transition_fault(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> RunFault {
+  let current = Some(@protocol.read_al_status(nic, station, timeout)) catch {
+    _ => None
+  }
+  let status_code = Some(@protocol.read_al_status_code(nic, station, timeout)) catch {
+    _ => None
+  }
+  RunFault::StartupTransitionFailed(station~, target~, current~, status_code~)
+}
+
+///|
+fn runtime_fault_from_runtime(rt : Runtime) -> RunFault? {
+  match rt.dc_state {
+    Drifting(delta_ns) => Some(DcDrift(delta_ns~))
+    _ =>
+      if rt.consecutive_timeouts >= rt.max_consecutive_timeouts {
+        Some(
+          TimeoutRecoveryRequired(
+            observed_timeouts=rt.telemetry.timeouts,
+            consecutive_timeouts=rt.consecutive_timeouts,
+          ),
+        )
+      } else if rt.needs_recovery() || rt.state is Error(_) {
+        Some(
+          RuntimeRecoveryRequired(
+            expected_wkc=rt.expected_wkc,
+            observed_wkc_errors=rt.telemetry.wkc_errors,
+          ),
+        )
+      } else {
+        None
+      }
+  }
+}
+
+///|
+fn resolve_run_loop_config(
+  config : @hal.MasterConfig,
+  settings : RunLoopSettings,
+) -> @hal.MasterConfig {
+  match settings.cycle_period_ns {
+    Some(cycle_period_ns) => { ..config, cycle_period_ns, }
+    None => config
+  }
+}
+
+///|
+fn resolve_progress_every_cycles(
+  config : @hal.MasterConfig,
+  settings : RunLoopSettings,
+) -> Int? {
+  match settings.output_period_ns {
+    Some(output_period_ns) =>
+      if output_period_ns > 0L {
+        Some(
+          ((output_period_ns + config.cycle_period_ns - 1L) /
+          config.cycle_period_ns).to_int(),
+        )
+      } else {
+        None
+      }
+    _ => None
+  }
+}
+
+///|
+fn run_fault_text(fault : RunFault) -> String {
+  match fault {
+    StartupTransitionFailed(station~, target~, current~, status_code~) => {
+      let current_text = match current {
+        Some(state) => state.to_string()
+        None => "unknown"
+      }
+      let status_text = match status_code {
+        Some(code) => code.to_string()
+        None => "unknown"
+      }
+      "startup transition failed: station=" +
+      station.to_string() +
+      " target=" +
+      target.to_string() +
+      " current=" +
+      current_text +
+      " status_code=" +
+      status_text
+    }
+    TimeoutRecoveryRequired(observed_timeouts~, consecutive_timeouts~) =>
+      "timeout recovery required: timeouts=" +
+      observed_timeouts.to_string() +
+      " consecutive_timeouts=" +
+      consecutive_timeouts.to_string()
+    RuntimeRecoveryRequired(expected_wkc~, observed_wkc_errors~) =>
+      "runtime recovery required: expected_wkc=" +
+      expected_wkc.to_string() +
+      " wkc_errors=" +
+      observed_wkc_errors.to_string()
+    DcDrift(delta_ns~) => "dc drift detected: delta_ns=" + delta_ns.to_string()
   }
 }
 
@@ -321,6 +721,14 @@ pub fn[N : @hal.Nic] run_with_states(
 /// Format a RunReport as a human-readable summary.
 pub fn RunReport::format(self : RunReport) -> String {
   let buf = @buffer.new(size_hint=512)
+  let fault_text = match self.fault {
+    Some(fault) => run_fault_text(fault)
+    None => "none"
+  }
+  let output_period_text = match self.output_period_ns {
+    Some(output_period_ns) => output_period_ns.to_string()
+    None => "none"
+  }
   buf.write_string("MoonECAT Run Report\n")
   buf.write_string("===================\n")
   buf.write_string("Slaves found: " + self.scan.slave_count.to_string() + "\n")
@@ -329,6 +737,13 @@ pub fn RunReport::format(self : RunReport) -> String {
     (if self.validation.all_ok { "PASS" } else { "FAIL" }) +
     "\n",
   )
+  buf.write_string(
+    "Mode: " +
+    (if self.until_fault { "UntilFault" } else { "FixedCycles" }) +
+    "\n",
+  )
+  buf.write_string("CyclePeriodNs: " + self.cycle_period_ns.to_string() + "\n")
+  buf.write_string("OutputPeriodNs: " + output_period_text + "\n")
   buf.write_string(
     "Cycles: " +
     self.cycles_ok.to_string() +
@@ -353,5 +768,6 @@ pub fn RunReport::format(self : RunReport) -> String {
     tel.wkc_errors.to_string() +
     "\n",
   )
+  buf.write_string("Fault: " + fault_text + "\n")
   buf.to_string()
 }

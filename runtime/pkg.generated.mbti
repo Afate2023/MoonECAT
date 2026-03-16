@@ -76,7 +76,15 @@ pub fn[N : @hal.Nic] restore_slave_mailbox_state(N, UInt, @protocol.EsmState, @h
 
 pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn[N : @hal.Nic] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @hal.Duration) -> RunReport raise @hal.EcError
+
+pub fn[N : @hal.Nic] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+
+pub fn[N : @hal.Nic] run_with_states_and_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+
+pub fn[N : @hal.Nic] run_with_states_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
@@ -396,6 +404,27 @@ pub(all) struct MailboxSession {
   mailbox_config : @mailbox.MailboxConfig
 }
 
+pub(all) enum RunFault {
+  StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, status_code~ : UInt?)
+  TimeoutRecoveryRequired(observed_timeouts~ : Int64, consecutive_timeouts~ : Int)
+  RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
+  DcDrift(delta_ns~ : Int64)
+}
+pub impl Eq for RunFault
+pub impl Show for RunFault
+
+pub(all) struct RunLoopSettings {
+  cycles : Int
+  until_fault : Bool
+  cycle_period_ns : Int64?
+  output_period_ns : Int64?
+  max_consecutive_timeouts : Int
+}
+pub fn RunLoopSettings::fixed_cycles(Int) -> Self
+pub fn RunLoopSettings::until_fault() -> Self
+pub impl Eq for RunLoopSettings
+pub impl Show for RunLoopSettings
+
 pub(all) enum RunMode {
   FreeRun
   DcSync
@@ -419,8 +448,12 @@ pub(all) struct RunReport {
   validation : ValidateReport
   cycles_requested : Int
   cycles_ok : Int
+  until_fault : Bool
+  cycle_period_ns : Int64
+  output_period_ns : Int64?
   telemetry : Telemetry
   final_phase : RunPhase
+  fault : RunFault?
 }
 pub fn RunReport::format(Self) -> String
 pub impl Show for RunReport
@@ -439,6 +472,8 @@ pub(all) struct Runtime {
   mut expected_wkc : UInt
   max_wkc_errors : Int
   mut consecutive_wkc_errors : Int
+  mut max_consecutive_timeouts : Int
+  mut consecutive_timeouts : Int
   mut dc_state : DcState
   mut dc_reference_station : UInt?
   mut dc_stations : Array[UInt]
@@ -454,7 +489,11 @@ pub fn Runtime::record_timeout(Self) -> Unit
 pub fn Runtime::reset_error_counter(Self) -> Unit
 pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> CycleResult raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(Self, N, Int, @hal.Duration, Int?) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic] Runtime::run_until_fault(Self, N, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(Self, N, @hal.Duration, Int?) -> Int raise @hal.EcError
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
+pub fn Runtime::set_timeout_threshold(Self, Int) -> Unit
 pub impl Show for Runtime
 
 pub(all) struct RuntimeMetricsSummary {

@@ -413,6 +413,13 @@ pub fn diagnostic_surface_from_run(report : RunReport) -> DiagnosticSurface {
   for issue in telemetry_issues {
     issues.push(issue)
   }
+  match report.fault {
+    Some(fault) =>
+      for issue in run_fault_issues(fault) {
+        issues.push(issue)
+      }
+    None => ()
+  }
   {
     ..base,
     runtime_metrics: Some(runtime_metrics_summary(report.telemetry)),
@@ -421,6 +428,70 @@ pub fn diagnostic_surface_from_run(report : RunReport) -> DiagnosticSurface {
       issues,
       highest_diagnostic_level(base.issues, base.overall_level),
     ),
+  }
+}
+
+///|
+fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
+  match fault {
+    StartupTransitionFailed(station~, target~, current~, status_code~) => {
+      let current_text = match current {
+        Some(state) => state.to_string()
+        None => "unknown"
+      }
+      let status_text = match status_code {
+        Some(code) => code.to_string()
+        None => "unknown"
+      }
+      [
+        {
+          source: StateTransition,
+          category: StateTransition,
+          level: Block,
+          detail: "Startup transition failed for station " +
+          station.to_string() +
+          ": target=" +
+          target.to_string() +
+          " current=" +
+          current_text +
+          " status_code=" +
+          status_text,
+        },
+      ]
+    }
+    TimeoutRecoveryRequired(observed_timeouts~, consecutive_timeouts~) =>
+      [
+        {
+          source: RuntimeTelemetry,
+          category: RuntimeMetrics,
+          level: Block,
+          detail: "Timeout recovery required: timeouts=" +
+          observed_timeouts.to_string() +
+          " consecutive_timeouts=" +
+          consecutive_timeouts.to_string(),
+        },
+      ]
+    RuntimeRecoveryRequired(expected_wkc~, observed_wkc_errors~) =>
+      [
+        {
+          source: RuntimeTelemetry,
+          category: RuntimeMetrics,
+          level: Block,
+          detail: "Runtime recovery required: expected_wkc=" +
+          expected_wkc.to_string() +
+          " wkc_errors=" +
+          observed_wkc_errors.to_string(),
+        },
+      ]
+    DcDrift(delta_ns~) =>
+      [
+        {
+          source: RuntimeTelemetry,
+          category: RuntimeMetrics,
+          level: Block,
+          detail: "DC drift detected: delta_ns=" + delta_ns.to_string(),
+        },
+      ]
   }
 }
 
