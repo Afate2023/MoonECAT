@@ -1,5 +1,6 @@
 import {
   "afate/MoonECAT/hal",
+  "moonbitlang/core/json",
   "moonbitlang/core/encoding/utf8",
 }
 

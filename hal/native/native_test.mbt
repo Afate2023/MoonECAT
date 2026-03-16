@@ -25,6 +25,45 @@ test "native scaffold exposes interface listing entry" {
 }
 
 ///|
+test "native interface listing parses metadata and probe candidates" {
+  let listing = parse_native_interface_listing(
+    Json::object({
+      "backend": Json::string("native-windows-npcap"),
+      "interfaces": Json::array([
+        Json::object({
+          "name": Json::string("ethercat0"),
+          "description": Json::string("Ethernet"),
+          "loopback": Json::boolean(false),
+          "up": Json::boolean(true),
+          "connected": Json::boolean(true),
+          "wireless": Json::boolean(false),
+        }),
+        Json::object({
+          "name": Json::string("wifi0"),
+          "description": Json::string("Wi-Fi"),
+          "loopback": Json::boolean(false),
+          "up": Json::boolean(true),
+          "connected": Json::boolean(true),
+          "wireless": Json::boolean(true),
+        }),
+        Json::object({
+          "name": Json::string("loop"),
+          "loopback": Json::boolean(true),
+          "up": Json::boolean(true),
+          "connected": Json::boolean(true),
+          "wireless": Json::boolean(false),
+        }),
+      ]),
+    }),
+  )
+  assert_eq(listing.backend, WindowsNpcap)
+  assert_eq(listing.interfaces.length(), 3)
+  let candidates = native_interface_probe_candidates(listing)
+  assert_eq(candidates.length(), 1)
+  assert_eq(candidates[0].name, "ethercat0")
+}
+
+///|
 test "native scaffold keeps unavailable linux backend explicit" {
   if linux_raw_socket_runtime_available() {
     assert_true(native_backend_available(LinuxRawSocket))

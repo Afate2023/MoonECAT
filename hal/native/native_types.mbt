@@ -15,6 +15,23 @@ pub(all) struct NativeNicConfig {
 } derive(Eq, Show)
 
 ///|
+pub(all) struct NativeInterfaceInfo {
+  name : String
+  description : String
+  loopback : Bool
+  up : Bool
+  connected : Bool
+  wireless : Bool
+  index : Int?
+} derive(Eq, Show)
+
+///|
+pub(all) struct NativeInterfaceListing {
+  backend : NativeBackendKind
+  interfaces : Array[NativeInterfaceInfo]
+} derive(Eq, Show)
+
+///|
 pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int

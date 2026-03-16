@@ -48,6 +48,8 @@ pub fn parse_esi_json_document(String) -> EsiJsonDocument raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
+pub fn plan_scan_station_addresses_with_strategy(Array[ObservedSlaveAddress], ScanStationAddressStrategy) -> Array[UInt] raise @hal.EcError
+
 pub fn preferred_dc_cycle_period_from_categories(Array[@mailbox.SiiCategoryEntry]) -> Int64?
 
 pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
@@ -93,6 +95,8 @@ pub fn[N : @hal.Nic] run_with_states_until_fault(N, @hal.MasterConfig, Array[@ha
 pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
+
+pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
 
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
@@ -414,7 +418,10 @@ pub struct NullRunProgressSink {
 pub fn NullRunProgressSink::new() -> Self
 pub impl RunProgressSink for NullRunProgressSink
 
-type ObservedSlaveAddress
+pub(all) struct ObservedSlaveAddress {
+  position : UInt
+  current_station_address : UInt
+}
 pub impl Eq for ObservedSlaveAddress
 pub impl Show for ObservedSlaveAddress
 
@@ -554,6 +561,13 @@ pub(all) struct ScanReport {
 pub fn ScanReport::format(Self) -> String
 pub impl Eq for ScanReport
 pub impl Show for ScanReport
+
+pub(all) enum ScanStationAddressStrategy {
+  PreserveExistingUniqueNonZero
+  TwinCATCompatible
+}
+pub impl Eq for ScanStationAddressStrategy
+pub impl Show for ScanStationAddressStrategy
 
 pub(all) struct SlaveDiagnosis {
   station_address : UInt

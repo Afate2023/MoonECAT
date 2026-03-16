@@ -30,11 +30,19 @@ pub fn linux_raw_socket_send(Int, Bytes) -> Int raise @hal.EcError
 
 pub fn native_backend_available(NativeBackendKind) -> Bool
 
+pub fn native_interface_is_probe_candidate(NativeInterfaceInfo) -> Bool
+
+pub fn native_interface_probe_candidates(NativeInterfaceListing) -> Array[NativeInterfaceInfo]
+
+pub fn native_list_interfaces(NativeBackendKind) -> NativeInterfaceListing raise @hal.EcError
+
 pub fn native_list_interfaces_json(NativeBackendKind) -> String raise @hal.EcError
 
 pub fn native_list_interfaces_text(NativeBackendKind) -> String raise @hal.EcError
 
 pub fn native_stub_version() -> Int
+
+pub fn parse_native_interface_listing(Json) -> NativeInterfaceListing raise @hal.EcError
 
 pub let windows_npcap_backend_label : String
 
@@ -62,6 +70,25 @@ pub(all) enum NativeBackendKind {
 }
 pub impl Eq for NativeBackendKind
 pub impl Show for NativeBackendKind
+
+pub(all) struct NativeInterfaceInfo {
+  name : String
+  description : String
+  loopback : Bool
+  up : Bool
+  connected : Bool
+  wireless : Bool
+  index : Int?
+}
+pub impl Eq for NativeInterfaceInfo
+pub impl Show for NativeInterfaceInfo
+
+pub(all) struct NativeInterfaceListing {
+  backend : NativeBackendKind
+  interfaces : Array[NativeInterfaceInfo]
+}
+pub impl Eq for NativeInterfaceListing
+pub impl Show for NativeInterfaceListing
 
 pub(all) struct NativeNic {
   config : NativeNicConfig

@@ -57,24 +57,9 @@ fn cli_main() -> Unit raise @hal.EcError {
     match backend {
       Mock =>
         raise @hal.EcError::NotSupported("read-sii requires a native backend")
-      NativeAuto => {
-        let interface_name = require_interface_name(args)
+      _ => {
         let nic = @native.NativeNic::open_with_config(
-          @native.default_native_config(interface_name),
-        )
-        run_read_sii_command(nic, args, as_json, timeout)
-      }
-      NativeWindowsNpcap => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_windows_npcap_config(interface_name),
-        )
-        run_read_sii_command(nic, args, as_json, timeout)
-      }
-      NativeLinuxRaw => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_linux_config(interface_name),
+          resolve_native_cli_config(args, backend, timeout),
         )
         run_read_sii_command(nic, args, as_json, timeout)
       }
@@ -86,24 +71,9 @@ fn cli_main() -> Unit raise @hal.EcError {
     match backend {
       Mock =>
         raise @hal.EcError::NotSupported("diagnosis requires a native backend")
-      NativeAuto => {
-        let interface_name = require_interface_name(args)
+      _ => {
         let nic = @native.NativeNic::open_with_config(
-          @native.default_native_config(interface_name),
-        )
-        run_diagnosis_command(nic, args, as_json, timeout)
-      }
-      NativeWindowsNpcap => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_windows_npcap_config(interface_name),
-        )
-        run_diagnosis_command(nic, args, as_json, timeout)
-      }
-      NativeLinuxRaw => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_linux_config(interface_name),
+          resolve_native_cli_config(args, backend, timeout),
         )
         run_diagnosis_command(nic, args, as_json, timeout)
       }
@@ -114,24 +84,9 @@ fn cli_main() -> Unit raise @hal.EcError {
   if command == "od" {
     match backend {
       Mock => raise @hal.EcError::NotSupported("od requires a native backend")
-      NativeAuto => {
-        let interface_name = require_interface_name(args)
+      _ => {
         let nic = @native.NativeNic::open_with_config(
-          @native.default_native_config(interface_name),
-        )
-        run_od_command(nic, args, as_json, timeout)
-      }
-      NativeWindowsNpcap => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_windows_npcap_config(interface_name),
-        )
-        run_od_command(nic, args, as_json, timeout)
-      }
-      NativeLinuxRaw => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_linux_config(interface_name),
+          resolve_native_cli_config(args, backend, timeout),
         )
         run_od_command(nic, args, as_json, timeout)
       }
@@ -143,24 +98,9 @@ fn cli_main() -> Unit raise @hal.EcError {
     match backend {
       Mock =>
         raise @hal.EcError::NotSupported("state requires a native backend")
-      NativeAuto => {
-        let interface_name = require_interface_name(args)
+      _ => {
         let nic = @native.NativeNic::open_with_config(
-          @native.default_native_config(interface_name),
-        )
-        run_state_command(nic, args, as_json, timeout)
-      }
-      NativeWindowsNpcap => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_windows_npcap_config(interface_name),
-        )
-        run_state_command(nic, args, as_json, timeout)
-      }
-      NativeLinuxRaw => {
-        let interface_name = require_interface_name(args)
-        let nic = @native.NativeNic::open_with_config(
-          @native.default_linux_config(interface_name),
+          resolve_native_cli_config(args, backend, timeout),
         )
         run_state_command(nic, args, as_json, timeout)
       }
@@ -190,10 +130,9 @@ fn cli_main() -> Unit raise @hal.EcError {
         run_mock_command_with_fresh_nic(
           as_json, startup_state, shutdown_state, settings, progress_output, timeout,
         )
-      NativeAuto => {
-        let interface_name = require_interface_name(args)
+      _ =>
         run_native_command_with_fresh_nic(
-          @native.default_native_config(interface_name),
+          resolve_native_cli_config(args, backend, timeout),
           as_json,
           startup_state,
           shutdown_state,
@@ -201,31 +140,6 @@ fn cli_main() -> Unit raise @hal.EcError {
           progress_output,
           timeout,
         )
-      }
-      NativeWindowsNpcap => {
-        let interface_name = require_interface_name(args)
-        run_native_command_with_fresh_nic(
-          @native.default_windows_npcap_config(interface_name),
-          as_json,
-          startup_state,
-          shutdown_state,
-          settings,
-          progress_output,
-          timeout,
-        )
-      }
-      NativeLinuxRaw => {
-        let interface_name = require_interface_name(args)
-        run_native_command_with_fresh_nic(
-          @native.default_linux_config(interface_name),
-          as_json,
-          startup_state,
-          shutdown_state,
-          settings,
-          progress_output,
-          timeout,
-        )
-      }
     }
     return
   }
@@ -239,24 +153,9 @@ fn cli_main() -> Unit raise @hal.EcError {
         as_json,
         timeout,
       )
-    NativeAuto => {
-      let interface_name = require_interface_name(args)
+    _ => {
       let nic = @native.NativeNic::open_with_config(
-        @native.default_native_config(interface_name),
-      )
-      run_command_with_nic(command, nic, args, as_json, timeout)
-    }
-    NativeWindowsNpcap => {
-      let interface_name = require_interface_name(args)
-      let nic = @native.NativeNic::open_with_config(
-        @native.default_windows_npcap_config(interface_name),
-      )
-      run_command_with_nic(command, nic, args, as_json, timeout)
-    }
-    NativeLinuxRaw => {
-      let interface_name = require_interface_name(args)
-      let nic = @native.NativeNic::open_with_config(
-        @native.default_linux_config(interface_name),
+        resolve_native_cli_config(args, backend, timeout),
       )
       run_command_with_nic(command, nic, args, as_json, timeout)
     }
@@ -448,6 +347,9 @@ fn print_usage() -> Unit {
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
+  println(
+    "Native commands auto-probe connected non-wireless interfaces with BRD when --if is omitted",
+  )
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
   println("  moon run cmd/main scan -- --backend native --if <interface>")
@@ -1190,6 +1092,127 @@ fn require_interface_name(args : Array[String]) -> String raise @hal.EcError {
         "native backend requires --if <interface>",
       )
   }
+}
+
+///|
+fn resolve_native_cli_config(
+  args : Array[String],
+  backend : CliBackend,
+  timeout : @hal.Duration,
+) -> @native.NativeNicConfig raise @hal.EcError {
+  let requested_backend = cli_backend_to_native_backend(backend)
+  match flag_value(args, "--if") {
+    Some(_) =>
+      native_config_for_backend(requested_backend, require_interface_name(args))
+    None => auto_select_native_cli_config(requested_backend, timeout)
+  }
+}
+
+///|
+fn native_config_for_backend(
+  backend : @native.NativeBackendKind,
+  interface_name : String,
+) -> @native.NativeNicConfig {
+  match backend {
+    @native.Auto => @native.default_native_config(interface_name)
+    @native.WindowsNpcap => @native.default_windows_npcap_config(interface_name)
+    @native.LinuxRawSocket => @native.default_linux_config(interface_name)
+  }
+}
+
+///|
+fn auto_select_native_cli_config(
+  backend : @native.NativeBackendKind,
+  timeout : @hal.Duration,
+) -> @native.NativeNicConfig raise @hal.EcError {
+  let listing = @native.native_list_interfaces(backend)
+  let candidates = @native.native_interface_probe_candidates(listing)
+  if candidates.is_empty() {
+    raise @hal.EcError::ConfigMismatch(
+      "automatic native interface selection found no connected non-wireless candidates; pass --if <interface> or inspect list-if --json",
+    )
+  }
+  let notes : Array[String] = []
+  for interface in listing.interfaces {
+    if not(@native.native_interface_is_probe_candidate(interface)) {
+      notes.push(
+        interface.name + "(" + skipped_native_interface_reason(interface) + ")",
+      )
+    }
+  }
+  for candidate in candidates {
+    let config = native_config_for_backend(listing.backend, candidate.name)
+    let open_result : Result[@native.NativeNic, Error] = try? @native.NativeNic::open_with_config(
+      config,
+    )
+    match open_result {
+      Ok(nic) => {
+        let probe_result : Result[Int, Error] = try? @protocol.count_slaves(
+          nic, timeout,
+        )
+        nic.close()
+        match probe_result {
+          Ok(slave_count) if slave_count > 0 => return config
+          Ok(_) => notes.push(candidate.name + "(no-response)")
+          Err(err) =>
+            notes.push(
+              candidate.name + "(" + native_probe_error_label(err) + ")",
+            )
+        }
+      }
+      Err(err) =>
+        notes.push(candidate.name + "(" + native_probe_error_label(err) + ")")
+    }
+  }
+  raise @hal.EcError::ConfigMismatch(
+    "automatic native interface selection found no EtherCAT BRD response: " +
+    join_cli_notes(notes),
+  )
+}
+
+///|
+fn skipped_native_interface_reason(
+  interface : @native.NativeInterfaceInfo,
+) -> String {
+  if interface.loopback {
+    return "loopback"
+  }
+  if interface.wireless {
+    return "wireless"
+  }
+  if not(interface.up) {
+    return "down"
+  }
+  if not(interface.connected) {
+    return "disconnected"
+  }
+  "filtered"
+}
+
+///|
+fn native_probe_error_label(err : Error) -> String {
+  match err {
+    @hal.EcError::LinkDown => "link-down"
+    @hal.EcError::RecvTimeout => "recv-timeout"
+    @hal.EcError::ConfigMismatch(message) => "config:" + message
+    @hal.EcError::NotSupported(message) => "unsupported:" + message
+    @hal.EcError::SendFailed(message) => "send:" + message
+    @hal.EcError::RecvFailed(message) => "recv:" + message
+    @hal.EcError::Internal(message) => "internal:" + message
+    other => other.to_string()
+  }
+}
+
+///|
+fn join_cli_notes(values : Array[String]) -> String {
+  let mut text = ""
+  for i = 0; i < values.length(); i = i + 1 {
+    if i > 0 {
+      text = text + ", "
+    }
+    text = text + values[i]
+  }
+  text
 }
 
 ///|

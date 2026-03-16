@@ -141,6 +141,36 @@ static int moonecat_find_free_handle_slot(void) {
   return -1;
 }
 
+static int moonecat_windows_interface_wireless(unsigned int flags) {
+#ifdef PCAP_IF_WIRELESS
+  return (flags & PCAP_IF_WIRELESS) != 0;
+#else
+  (void)flags;
+  return 0;
+#endif
+}
+
+static int moonecat_windows_interface_connected(unsigned int flags) {
+#ifdef PCAP_IF_CONNECTION_STATUS
+  switch (flags & PCAP_IF_CONNECTION_STATUS) {
+  case PCAP_IF_CONNECTION_STATUS_DISCONNECTED:
+    return 0;
+  case PCAP_IF_CONNECTION_STATUS_CONNECTED:
+  case PCAP_IF_CONNECTION_STATUS_UNKNOWN:
+  case PCAP_IF_CONNECTION_STATUS_NOT_APPLICABLE:
+  default:
+    return 1;
+  }
+#else
+  (void)flags;
+  return 1;
+#endif
+}
+
+static int moonecat_windows_interface_up(unsigned int flags) {
+  return moonecat_windows_interface_connected(flags);
+}
+
 static int moonecat_load_npcap_dlls(void) {
   _TCHAR npcap_dir[512];
   UINT len = GetSystemDirectory(npcap_dir, 480);
@@ -291,6 +321,20 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_json(void) {
     used = moonecat_append_text(listing, sizeof(listing), used,
                                 (dev->flags & PCAP_IF_LOOPBACK) ? "true"
                                                                 : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used, ",\"up\":");
+    used = moonecat_append_text(
+      listing, sizeof(listing), used,
+      moonecat_windows_interface_up(dev->flags) ? "true" : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  ",\"connected\":");
+    used = moonecat_append_text(
+      listing, sizeof(listing), used,
+      moonecat_windows_interface_connected(dev->flags) ? "true" : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  ",\"wireless\":");
+    used = moonecat_append_text(
+      listing, sizeof(listing), used,
+      moonecat_windows_interface_wireless(dev->flags) ? "true" : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
       break;
@@ -472,6 +516,7 @@ void moonecat_windows_npcap_close(int32_t handle_id) {
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -534,6 +579,31 @@ static int moonecat_linux_find_free_handle_slot(void) {
   return -1;
 }
 
+static int moonecat_linux_get_interface_flags(const char *name, short *flags) {
+  int fd;
+  struct ifreq ifr;
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    return 0;
+  }
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, name, IFNAMSIZ - 1);
+  ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+  if (ioctl(fd, SIOCGIFFLAGS, &ifr) != 0) {
+    close(fd);
+    return 0;
+  }
+  close(fd);
+  *flags = ifr.ifr_flags;
+  return 1;
+}
+
+static int moonecat_linux_interface_wireless(const char *name) {
+  char path[512];
+  _snprintf(path, sizeof(path), "/sys/class/net/%s/wireless", name);
+  return access(path, F_OK) == 0;
+}
+
 MOONBIT_FFI_EXPORT
 int32_t moonecat_linux_raw_socket_available(void) {
   moonecat_set_error(1, "ok");
@@ -587,6 +657,14 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
   for (cursor = interfaces; cursor->if_index != 0 || cursor->if_name != NULL;
        cursor++) {
     char index_text[32];
+    short if_flags = 0;
+    int has_flags = moonecat_linux_get_interface_flags(cursor->if_name, &if_flags);
+    int loopback = has_flags ? ((if_flags & IFF_LOOPBACK) != 0) : 0;
+    int up = has_flags ? ((if_flags & IFF_UP) != 0) : 1;
+    int connected =
+        has_flags ? (((if_flags & IFF_UP) != 0) && ((if_flags & IFF_RUNNING) != 0))
+                  : 1;
+    int wireless = moonecat_linux_interface_wireless(cursor->if_name);
     if (!first) {
       used = moonecat_append_text(listing, sizeof(listing), used, ",");
     }
@@ -599,6 +677,21 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
         listing, sizeof(listing), used,
         ",\"description\":\"linux raw socket\",\"index\":");
     used = moonecat_append_text(listing, sizeof(listing), used, index_text);
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  ",\"loopback\":");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  loopback ? "true" : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used, ",\"up\":");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  up ? "true" : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  ",\"connected\":");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  connected ? "true" : "false");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  ",\"wireless\":");
+    used = moonecat_append_text(listing, sizeof(listing), used,
+                  wireless ? "true" : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
       break;

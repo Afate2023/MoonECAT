@@ -34,11 +34,20 @@ let default_identification_ado : UInt = 0x0014U
 let scan_station_address_base : UInt = 0x1001U
 
 ///|
+pub(all) enum ScanStationAddressStrategy {
+  PreserveExistingUniqueNonZero
+  TwinCATCompatible
+} derive(Eq, Show)
+
+///|
+let default_scan_station_address_strategy : ScanStationAddressStrategy = TwinCATCompatible
+
+///|
 /// Bytes needed to cover the fixed SII header through mailbox protocol word.
 let sii_header_read_dwords : Int = 15
 
 ///|
-struct ObservedSlaveAddress {
+pub(all) struct ObservedSlaveAddress {
   position : UInt
   current_station_address : UInt
 } derive(Eq, Show)
@@ -61,9 +70,25 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
   timeout : @hal.Duration,
   identification_ado : UInt,
 ) -> ScanReport raise @hal.EcError {
+  scan_with_identification_ado_and_station_address_strategy(
+    nic, timeout, identification_ado, default_scan_station_address_strategy,
+  )
+}
+
+///|
+pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(
+  nic : N,
+  timeout : @hal.Duration,
+  identification_ado : UInt,
+  strategy : ScanStationAddressStrategy,
+) -> ScanReport raise @hal.EcError {
   let count = @protocol.count_slaves(nic, timeout)
   let observed_addresses = observe_slave_station_addresses(nic, count, timeout)
-  let planned_addresses = plan_scan_station_addresses(observed_addresses)
+  let planned_addresses = if strategy == default_scan_station_address_strategy {
+    plan_scan_station_addresses(observed_addresses)
+  } else {
+    plan_scan_station_addresses_with_strategy(observed_addresses, strategy)
+  }
   apply_scan_station_addresses(
     nic, observed_addresses, planned_addresses, timeout,
   )
@@ -118,6 +143,28 @@ fn[N : @hal.Nic] observe_slave_station_addresses(
 
 ///|
 fn plan_scan_station_addresses(
+  observed : Array[ObservedSlaveAddress],
+) -> Array[UInt] raise @hal.EcError {
+  plan_scan_station_addresses_with_strategy(
+    observed, default_scan_station_address_strategy,
+  )
+}
+
+///|
+pub fn plan_scan_station_addresses_with_strategy(
+  observed : Array[ObservedSlaveAddress],
+  strategy : ScanStationAddressStrategy,
+) -> Array[UInt] raise @hal.EcError {
+  match strategy {
+    PreserveExistingUniqueNonZero =>
+      plan_scan_station_addresses_preserve_existing_unique_non_zero(observed)
+    TwinCATCompatible =>
+      plan_scan_station_addresses_preserve_existing_unique_non_zero(observed)
+  }
+}
+
+///|
+fn plan_scan_station_addresses_preserve_existing_unique_non_zero(
   observed : Array[ObservedSlaveAddress],
 ) -> Array[UInt] raise @hal.EcError {
   let planned : Array[UInt] = []

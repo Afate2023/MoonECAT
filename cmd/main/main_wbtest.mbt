@@ -32,6 +32,50 @@ test "cli require_interface_name validates flag presence" {
 }
 
 ///|
+test "cli native config helper maps explicit backends" {
+  assert_eq(
+    native_config_for_backend(@native.WindowsNpcap, "npcap0").backend,
+    @native.WindowsNpcap,
+  )
+  assert_eq(
+    native_config_for_backend(@native.LinuxRawSocket, "eth0").backend,
+    @native.LinuxRawSocket,
+  )
+  assert_eq(
+    native_config_for_backend(@native.Auto, "eth0").backend,
+    @native.Auto,
+  )
+}
+
+///|
+test "cli skipped interface reason is stable" {
+  assert_eq(
+    skipped_native_interface_reason({
+      name: "loop",
+      description: "",
+      loopback: true,
+      up: true,
+      connected: true,
+      wireless: false,
+      index: None,
+    }),
+    "loopback",
+  )
+  assert_eq(
+    skipped_native_interface_reason({
+      name: "wifi",
+      description: "",
+      loopback: false,
+      up: true,
+      connected: true,
+      wireless: true,
+      index: None,
+    }),
+    "wireless",
+  )
+}
+
+///|
 test "cli numeric flag parsers accept valid integers" {
   assert_eq(parse_uint_flag("--position", "12"), 12U)
   assert_eq(parse_int_flag("--words", "128"), 128)
