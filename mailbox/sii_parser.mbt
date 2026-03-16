@@ -454,7 +454,11 @@ pub fn parse_sii_strings(data : Bytes) -> Array[String] {
       break
     }
     let bytes = Bytes::makei(str_len, fn(j) { data[offset + j] })
-    result.push(bytes.to_unchecked_string())
+    let decoded : Result[String, Error] = try? @utf8.decode(bytes)
+    match decoded {
+      Ok(text) => result.push(text)
+      Err(_) => result.push(bytes.to_unchecked_string())
+    }
     offset = offset + str_len
   }
   result

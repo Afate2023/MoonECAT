@@ -6,18 +6,15 @@
 
 当前主线 backlog（按依赖顺序）：
 
-1. **配置工具 / ENI 主线**：完成 [02_productization_tracks.md](./02_productization_tracks.md) 中的统一配置对象、差异报告与 ENI 导入边界。
-2. **对象字典浏览产品化**：完成 [02_productization_tracks.md](./02_productization_tracks.md) 中的 CLI / JSON 浏览表面与错误分类。
-3. **主站对象字典与统一诊断表面**：完成 [02_productization_tracks.md](./02_productization_tracks.md) 中的统一结果对象、分层诊断汇聚与告警等级。
-4. **拓扑变化 / Hot Connect**：把显式设备标识扩展成稳定的拓扑差异与 Hot Connect 分组能力。
-5. **Native 后端首版收口**：真实网卡恢复可用后，补齐 Native `scan/validate/run` 闭环、错误语义冻结与内存安全检查。
-6. **Extism / WASM 产品化**：在前述模型稳定后，补宿主入口、共享内存路径与最小集成回放。
-7. **SII 全量产品面**：把 `read-sii` 从最小在线诊断入口扩展到稳定 category 深读与配置工具可复用 JSON。
+1. **拓扑变化 / Hot Connect**：把显式设备标识扩展成稳定的拓扑差异与 Hot Connect 分组能力，并补 optional/multiple-slave 场景的 Native 实机证据。
+2. **Native 后端首版收口**：在现有真实链路闭环基础上，补齐错误语义冻结与 AddressSanitizer/等价内存安全检查命令。
+3. **Extism / WASM 产品化**：在现有 envelope + Mock 回放基础上，补宿主入口、bytes-only 输入、共享内存路径与最小集成回放。
+4. **SII 全量产品面**：把 `read-sii` 从最小在线诊断入口扩展到稳定 category 深读、字符串解码一致性与配置工具可复用 JSON。
 
 主线完成判定：
 
-- [ ] 0.3、0.4、0.5 三个拆解节的验收标准全部完成。
-- [ ] `scan`、`validate`、`state`、`diagnosis`、对象字典浏览与配置差异报告形成统一 CLI / JSON 输出规范。
+- [x] 0.3、0.4、0.5 三个拆解节的验收标准全部完成。
+- [x] `scan`、`validate`、`state`、`diagnosis`、对象字典浏览与配置差异报告形成统一 CLI / JSON 输出规范。
 - [ ] Native 与 Extism 两条产品面共享同一配置对象、诊断对象和错误分类。
 - [x] [MoonECAT项目申报书.md](../MoonECAT项目申报书.md) 中 Phase 2、Phase 3、Phase 4 的证据项全部从“进行中/未开始”更新为已完成或已验证。
 

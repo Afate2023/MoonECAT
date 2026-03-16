@@ -160,6 +160,25 @@ test "parse_sii_dc decodes siitool layout" {
 }
 
 ///|
+test "parse_sii_strings decodes utf8 text from category payload" {
+  let strings = @mailbox.parse_sii_strings(
+    Bytes::from_array([
+      b'\x02', b'\x07', b'R', b'e', b'n', b'e', b's', b'a', b's', b'\x05', b'G',
+      b'r', b'o', b'u', b'p',
+    ]),
+  )
+  assert_eq(strings, ["Renesas", "Group"])
+}
+
+///|
+test "parse_sii_strings falls back for invalid utf8 payload" {
+  let strings = @mailbox.parse_sii_strings(
+    Bytes::from_array([b'\x01', b'\x02', b'\xFF', b'\xFE']),
+  )
+  assert_eq(strings.length(), 1)
+}
+
+///|
 test "calculate_sm_configs uses sii header for mailbox" {
   let sii_header : @mailbox.SiiData = {
     vendor_id: 2U,
