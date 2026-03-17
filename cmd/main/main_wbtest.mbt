@@ -48,6 +48,109 @@ test "cli native config helper maps explicit backends" {
 }
 
 ///|
+test "cli native auto select picks first probing candidate with slaves" {
+  let listing : @native.NativeInterfaceListing = {
+    backend: @native.WindowsNpcap,
+    interfaces: [
+      {
+        name: "wifi0",
+        description: "Wi-Fi",
+        loopback: false,
+        up: true,
+        connected: true,
+        wireless: true,
+        index: None,
+      },
+      {
+        name: "eth0",
+        description: "EtherCAT uplink",
+        loopback: false,
+        up: true,
+        connected: true,
+        wireless: false,
+        index: None,
+      },
+      {
+        name: "eth1",
+        description: "Secondary uplink",
+        loopback: false,
+        up: true,
+        connected: true,
+        wireless: false,
+        index: None,
+      },
+    ],
+  }
+  let timeout = @hal.Duration(1_000_000L)
+  let config = select_native_cli_config_from_listing(listing, timeout, fn(
+    config,
+    _timeout,
+  ) {
+    match config.interface_name {
+      "eth0" => Ok(0)
+      "eth1" => Ok(2)
+      _ => Err(@hal.EcError::Internal("unexpected candidate"))
+    }
+  })
+  assert_eq(config.backend, @native.WindowsNpcap)
+  assert_eq(config.interface_name, "eth1")
+}
+
+///|
+test "cli native auto select error keeps filtered and probe notes" {
+  let listing : @native.NativeInterfaceListing = {
+    backend: @native.LinuxRawSocket,
+    interfaces: [
+      {
+        name: "lo",
+        description: "Loopback",
+        loopback: true,
+        up: true,
+        connected: true,
+        wireless: false,
+        index: Some(1),
+      },
+      {
+        name: "eth0",
+        description: "Primary",
+        loopback: false,
+        up: true,
+        connected: true,
+        wireless: false,
+        index: Some(2),
+      },
+      {
+        name: "eth1",
+        description: "Secondary",
+        loopback: false,
+        up: true,
+        connected: true,
+        wireless: false,
+        index: Some(3),
+      },
+    ],
+  }
+  let timeout = @hal.Duration(1_000_000L)
+  let result : Result[@native.NativeNicConfig, Error] = try? select_native_cli_config_from_listing(
+    listing,
+    timeout,
+    fn(config, _timeout) {
+      match config.interface_name {
+        "eth0" => Ok(0)
+        "eth1" => Err(@hal.EcError::LinkDown)
+        _ => Err(@hal.EcError::Internal("unexpected candidate"))
+      }
+    },
+  )
+  guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
+    fail("expected native auto select to fail")
+  }
+  assert_true(message.contains("lo(loopback)"))
+  assert_true(message.contains("eth0(no-response)"))
+  assert_true(message.contains("eth1(link-down)"))
+}
+
+///|
 test "cli skipped interface reason is stable" {
   assert_eq(
     skipped_native_interface_reason({
@@ -1063,6 +1166,26 @@ test "cli transition path falls back through init when needed" {
 }
 
 ///|
+test "cli state transition report uses broadcast when station is omitted" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let report = compute_state_transition_report(
+    nic,
+    @protocol.Init,
+    None,
+    false,
+    timeout,
+  )
+  nic.close()
+  assert_eq(report.mode, "broadcast")
+  assert_eq(report.station, None)
+  assert_eq(report.current, None)
+  assert_eq(report.final_state, None)
+  assert_eq(report.status_code, None)
+  assert_eq(report.wkc, Some(0U))
+}
+
+///|
 test "cli state transition report json includes station mode fields" {
   let json = state_transition_report_json({
     mode: "station-path",
@@ -1080,6 +1203,23 @@ test "cli state transition report json includes station mode fields" {
   assert_true(text.contains("\"final_state\": \"SafeOp\""))
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Info\""))
+}
+
+///|
+test "cli state transition report text includes broadcast mode and wkc" {
+  let text = state_transition_report_text({
+    mode: "broadcast",
+    target: @protocol.Init,
+    station: None,
+    current: None,
+    final_state: None,
+    status_code: None,
+    wkc: Some(0U),
+  })
+  assert_true(text.contains("Mode: broadcast"))
+  assert_true(text.contains("Target: Init"))
+  assert_true(text.contains("WKC: 0"))
+  assert_true(not(text.contains("Station:")))
 }
 
 ///|

@@ -1126,6 +1126,17 @@ fn auto_select_native_cli_config(
   timeout : @hal.Duration,
 ) -> @native.NativeNicConfig raise @hal.EcError {
   let listing = @native.native_list_interfaces(backend)
+  select_native_cli_config_from_listing(listing, timeout, fn(config, timeout) {
+    probe_native_cli_config(config, timeout)
+  })
+}
+
+///|
+fn select_native_cli_config_from_listing(
+  listing : @native.NativeInterfaceListing,
+  timeout : @hal.Duration,
+  probe : (@native.NativeNicConfig, @hal.Duration) -> Result[Int, Error],
+) -> @native.NativeNicConfig raise @hal.EcError {
   let candidates = @native.native_interface_probe_candidates(listing)
   if candidates.is_empty() {
     raise @hal.EcError::ConfigMismatch(
@@ -1142,24 +1153,9 @@ fn auto_select_native_cli_config(
   }
   for candidate in candidates {
     let config = native_config_for_backend(listing.backend, candidate.name)
-    let open_result : Result[@native.NativeNic, Error] = try? @native.NativeNic::open_with_config(
-      config,
-    )
-    match open_result {
-      Ok(nic) => {
-        let probe_result : Result[Int, Error] = try? @protocol.count_slaves(
-          nic, timeout,
-        )
-        nic.close()
-        match probe_result {
-          Ok(slave_count) if slave_count > 0 => return config
-          Ok(_) => notes.push(candidate.name + "(no-response)")
-          Err(err) =>
-            notes.push(
-              candidate.name + "(" + native_probe_error_label(err) + ")",
-            )
-        }
-      }
+    match probe(config, timeout) {
+      Ok(slave_count) if slave_count > 0 => return config
+      Ok(_) => notes.push(candidate.name + "(no-response)")
       Err(err) =>
         notes.push(candidate.name + "(" + native_probe_error_label(err) + ")")
     }
@@ -1168,6 +1164,26 @@ fn auto_select_native_cli_config(
     "automatic native interface selection found no EtherCAT BRD response: " +
     join_cli_notes(notes),
   )
+}
+
+///|
+fn probe_native_cli_config(
+  config : @native.NativeNicConfig,
+  timeout : @hal.Duration,
+) -> Result[Int, Error] {
+  let open_result : Result[@native.NativeNic, Error] = try? @native.NativeNic::open_with_config(
+    config,
+  )
+  match open_result {
+    Ok(nic) => {
+      let probe_result : Result[Int, Error] = try? @protocol.count_slaves(
+        nic, timeout,
+      )
+      nic.close()
+      probe_result
+    }
+    Err(err) => Err(err)
+  }
 }
 
 ///|
