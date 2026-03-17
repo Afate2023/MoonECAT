@@ -650,11 +650,17 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
   target : @protocol.EsmState,
   timeout : @hal.Duration,
 ) -> Bool {
-  let current = @protocol.read_al_status(nic, station, timeout) catch {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout) catch {
     _ => return false
   }
-  let path = @protocol.build_transition_route(current, target)
-  let final_state = @protocol.transition_through(nic, station, path, timeout) catch {
+  if snapshot.error_indication {
+    ignore(@protocol.clear_al_error(nic, station, timeout)) catch {
+      _ => return false
+    }
+  }
+  let final_state = @protocol.transition_to_target_strict(
+    nic, station, target, timeout,
+  ) catch {
     _ => return false
   }
   final_state == target

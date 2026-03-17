@@ -6,6 +6,30 @@
 let request_state_max_polls : Int = 32
 
 ///|
+pub(all) struct EsmStatusSnapshot {
+  state : EsmState
+  error_indication : Bool
+  status_code : UInt?
+} derive(Eq, Show)
+
+///|
+fn decode_al_status_snapshot(
+  status : Byte,
+  status_code : UInt?,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let error_indication = (status & b'\x10') != b'\x00'
+  {
+    state: EsmState::from_byte(status),
+    error_indication,
+    status_code: if error_indication {
+      status_code
+    } else {
+      None
+    },
+  }
+}
+
+///|
 /// Request an ESM state transition on a specific slave (by configured address).
 /// Writes AL Control, then reads AL Status to confirm.
 /// Returns the confirmed state or raises an error.
@@ -77,6 +101,110 @@ pub fn[N : @hal.Nic] request_state_ap(
     return EsmState::from_byte(acknowledged)
   }
   actual_state
+}
+
+///|
+pub fn[N : @hal.Nic] read_al_status_snapshot(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let status = read_al_status_raw_fp(nic, station, timeout)
+  let status_code = if (status & b'\x10') != b'\x00' {
+    Some(read_al_status_code(nic, station, timeout))
+  } else {
+    None
+  }
+  decode_al_status_snapshot(status, status_code)
+}
+
+///|
+pub fn[N : @hal.Nic] read_al_status_snapshot_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let status = read_al_status_raw_ap(nic, position, timeout)
+  let status_code = if (status & b'\x10') != b'\x00' {
+    Some(read_al_status_code_ap(nic, position, timeout))
+  } else {
+    None
+  }
+  decode_al_status_snapshot(status, status_code)
+}
+
+///|
+pub fn[N : @hal.Nic] clear_al_error(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, timeout)
+  if not(snapshot.error_indication) {
+    return snapshot
+  }
+  let cleared_status = request_state_control_fp(
+    nic,
+    station,
+    snapshot.state.to_byte() | b'\x10',
+    timeout,
+  )
+  let cleared = decode_al_status_snapshot(cleared_status, None)
+  if cleared.error_indication {
+    let status_code = Some(read_al_status_code(nic, station, timeout)) catch {
+      _ => None
+    }
+    let status_code_text = match status_code {
+      Some(code) => code.to_string()
+      None => "unknown"
+    }
+    raise @hal.EcError::EsmStateError(
+      "failed to clear AL error indication: station=" +
+      station.to_string() +
+      " state=" +
+      cleared.state.to_string() +
+      " status_code=" +
+      status_code_text,
+    )
+  }
+  cleared
+}
+
+///|
+pub fn[N : @hal.Nic] clear_al_error_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let snapshot = read_al_status_snapshot_ap(nic, position, timeout)
+  if not(snapshot.error_indication) {
+    return snapshot
+  }
+  let cleared_status = request_state_control_ap(
+    nic,
+    position,
+    snapshot.state.to_byte() | b'\x10',
+    timeout,
+  )
+  let cleared = decode_al_status_snapshot(cleared_status, None)
+  if cleared.error_indication {
+    let status_code = Some(read_al_status_code_ap(nic, position, timeout)) catch {
+      _ => None
+    }
+    let status_code_text = match status_code {
+      Some(code) => code.to_string()
+      None => "unknown"
+    }
+    raise @hal.EcError::EsmStateError(
+      "failed to clear AP AL error indication: position=" +
+      position.to_string() +
+      " state=" +
+      cleared.state.to_string() +
+      " status_code=" +
+      status_code_text,
+    )
+  }
+  cleared
 }
 
 ///|
@@ -296,6 +424,36 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
 }
 
 ///|
+pub fn[N : @hal.Nic] transition_through_ap(
+  nic : N,
+  position : UInt,
+  path : Array[EsmState],
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  if path.is_empty() {
+    raise @hal.EcError::Internal("empty transition path")
+  }
+  let mut current = path[0]
+  for i = 1; i < path.length(); i = i + 1 {
+    let target = path[i]
+    if not(current.can_transition(target)) {
+      raise @hal.EcError::EsmTransitionFailed(
+        from=current.to_string(),
+        to=target.to_string(),
+      )
+    }
+    let confirmed = request_state_ap(nic, position, target, timeout) catch {
+      err => {
+        let _ = try? request_state_ap(nic, position, current, timeout)
+        raise err
+      }
+    }
+    current = confirmed
+  }
+  current
+}
+
+///|
 /// Build the standard forward transition path from Init to a target state.
 pub fn build_transition_path(target : EsmState) -> Array[EsmState] {
   match target {
@@ -356,6 +514,57 @@ pub fn build_transition_route(
 }
 
 ///|
+/// Build a strict route that respects ETG-defined legal ESM step directions.
+///
+/// Callers should use the returned path together with `transition_through`, or
+/// use `transition_to_target_strict` for a guarded one-shot operation.
+pub fn build_strict_transition_route(
+  current : EsmState,
+  target : EsmState,
+) -> Array[EsmState] {
+  build_transition_route(current, target)
+}
+
+///|
+/// Strict state transition entry point.
+///
+/// If AL Error Indication is currently set, this function refuses to guess the
+/// recovery policy and requires the caller to clear the error first via
+/// `clear_al_error(...)`, then explicitly choose the next target state.
+pub fn[N : @hal.Nic] transition_to_target_strict(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through(nic, station, path, timeout)
+}
+
+///|
+pub fn[N : @hal.Nic] transition_to_target_strict_ap(
+  nic : N,
+  position : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let snapshot = read_al_status_snapshot_ap(nic, position, timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through_ap(nic, position, path, timeout)
+}
+
+///|
 /// Read the current ESM state from a slave.
 pub fn[N : @hal.Nic] read_al_status(
   nic : N,
@@ -391,6 +600,20 @@ pub fn[N : @hal.Nic] read_al_status_code(
   timeout : @hal.Duration,
 ) -> UInt raise @hal.EcError {
   let pdu = read_register_fp(nic, station, reg_al_status_code, 2, timeout)
+  if pdu.data.length() < 2 {
+    return 0U
+  }
+  pdu.data[0].to_int().reinterpret_as_uint() |
+  (pdu.data[1].to_int().reinterpret_as_uint() << 8)
+}
+
+///|
+pub fn[N : @hal.Nic] read_al_status_code_ap(
+  nic : N,
+  position : UInt,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let pdu = read_register_ap(nic, position, reg_al_status_code, 2, timeout)
   if pdu.data.length() < 2 {
     return 0U
   }

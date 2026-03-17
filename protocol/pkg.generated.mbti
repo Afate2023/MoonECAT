@@ -25,9 +25,15 @@ pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration) -> UInt raise @
 
 pub fn build_shutdown_path(EsmState) -> Array[EsmState]
 
+pub fn build_strict_transition_route(EsmState, EsmState) -> Array[EsmState]
+
 pub fn build_transition_path(EsmState) -> Array[EsmState]
 
 pub fn build_transition_route(EsmState, EsmState) -> Array[EsmState]
+
+pub fn[N : @hal.Nic] clear_al_error(N, UInt, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
+
+pub fn[N : @hal.Nic] clear_al_error_ap(N, UInt, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
 
 pub fn configured_address(UInt, UInt) -> UInt
 
@@ -114,6 +120,12 @@ pub fn[N : @hal.Nic] read_al_status(N, UInt, @hal.Duration) -> EsmState raise @h
 pub fn[N : @hal.Nic] read_al_status_ap(N, UInt, @hal.Duration) -> EsmState raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_al_status_code(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_al_status_code_ap(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_al_status_snapshot(N, UInt, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_al_status_snapshot_ap(N, UInt, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
 
 pub fn read_command(AddressType) -> EcCommand
 
@@ -229,7 +241,13 @@ pub fn[N : @hal.Nic] transact_pdu_retry(N, EcCommand, UInt, Bytes, @hal.Duration
 
 pub fn[N : @hal.Nic] transition_through(N, UInt, Array[EsmState], @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] transition_through_ap(N, UInt, Array[EsmState], @hal.Duration) -> EsmState raise @hal.EcError
+
 pub fn[N : @hal.Nic] transition_through_with_timeout_policy(N, UInt, Array[EsmState], EsmTimeoutPolicy) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_to_target_strict(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_to_target_strict_ap(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
 pub let wkc_len : Int
 
@@ -310,6 +328,14 @@ pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
 pub impl Eq for EsmState
 pub impl Show for EsmState
+
+pub(all) struct EsmStatusSnapshot {
+  state : EsmState
+  error_indication : Bool
+  status_code : UInt?
+}
+pub impl Eq for EsmStatusSnapshot
+pub impl Show for EsmStatusSnapshot
 
 pub(all) struct EsmTimeoutPolicy {
   init : @hal.Duration?

@@ -456,7 +456,7 @@ fn[N : @hal.Nic] compute_station_transition_report(
   use_path : Bool,
   timeout : @hal.Duration,
 ) -> StateTransitionReport raise @hal.EcError {
-  let current = @protocol.read_al_status(nic, station, timeout)
+  let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
   if use_path && target == @protocol.Op && current != @protocol.Op {
     let (final_state, kick_wkc) = transition_station_to_op(
       nic, station, current, timeout,
@@ -483,8 +483,9 @@ fn[N : @hal.Nic] compute_station_transition_report(
     )
   }
   let final_state = if use_path {
-    let path = @protocol.build_transition_route(current, target)
-    @protocol.transition_through(nic, station, path, timeout)
+    transition_station_to_target_strict_after_recovery(
+      nic, station, target, timeout,
+    )
   } else {
     @protocol.request_state(nic, station, target, timeout)
   }
@@ -505,6 +506,20 @@ fn[N : @hal.Nic] compute_station_transition_report(
     },
     wkc: None,
   }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> @protocol.EsmState raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.clear_al_error(nic, station, timeout))
+  }
+  @protocol.transition_to_target_strict(nic, station, target, timeout)
 }
 
 ///|
@@ -532,7 +547,12 @@ fn[N : @hal.Nic] transition_station_to_op(
     }
   }
   let state_before_op = if safeop_path.length() > 1 {
-    @protocol.transition_through(nic, station, safeop_path, timeout)
+    transition_station_to_target_strict_after_recovery(
+      nic,
+      station,
+      @protocol.SafeOp,
+      timeout,
+    )
   } else {
     current
   }
@@ -557,7 +577,12 @@ fn[N : @hal.Nic] transition_station_to_op(
   let final_state = if state_before_op == @protocol.Op {
     state_before_op
   } else {
-    @protocol.request_state(nic, station, @protocol.Op, timeout)
+    transition_station_to_target_strict_after_recovery(
+      nic,
+      station,
+      @protocol.Op,
+      timeout,
+    )
   }
   let final_wkc = if final_state == @protocol.Op && has_process_data {
     Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
