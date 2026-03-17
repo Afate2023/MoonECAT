@@ -191,8 +191,10 @@ pwsh -File scripts/validate-native-until-fault.ps1 -Interface "\\Device\\NPF_{GU
 - `03-validate.json`
 - `04-state-preop.json`（仅在提供 `-Station` 时）
 - `05-run.ndjson`
+- `06-fault-summary.json`（当 `05-run.ndjson` 存在时，由 [scripts/summarize-run-ndjson.ps1](../scripts/summarize-run-ndjson.ps1) 自动汇总）
 
 `05-run.ndjson` 适合后续做事件回放、故障归档或外部日志采集。
+`06-fault-summary.json` 则把最后一个 `run-summary`、最近一次 `run-progress`、故障 payload 与 diagnostic surface 收敛成单个 JSON，便于实机验证后快速归档最终故障摘要；若日志只包含 `run-progress` 而没有 `run-summary`，该工具会显式标记为 `no-run-summary`，表示更可能是人工 `Ctrl+C` 停止或采集被截断。
 
 ## 6. 后续实现顺序
 

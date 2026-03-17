@@ -54,12 +54,17 @@ if ($Station -ne "") {
 }
 
 $runOutput = Join-Path $logDir "05-run.ndjson"
+$faultSummaryOutput = Join-Path $logDir "06-fault-summary.json"
 Write-Host "==> run-until-fault"
 Write-Host "moon run cmd/main run -- --backend $Backend --if $Interface --timeout-ms $TimeoutMs --json --progress-ndjson --until-fault --cycle-period-us $CyclePeriodUs --output-period-ms $OutputPeriodMs --max-consecutive-timeouts $MaxConsecutiveTimeouts --startup-state $StartupState --shutdown-state $ShutdownState"
 Write-Host "Streaming NDJSON to $runOutput"
 Write-Host "Use Ctrl+C to stop manually. Manual stop will keep progress lines but will not emit a final run-summary line."
 
 & moon run cmd/main run -- --backend $Backend --if $Interface --timeout-ms $TimeoutMs --json --progress-ndjson --until-fault --cycle-period-us $CyclePeriodUs --output-period-ms $OutputPeriodMs --max-consecutive-timeouts $MaxConsecutiveTimeouts --startup-state $StartupState --shutdown-state $ShutdownState 2>&1 | Tee-Object -FilePath $runOutput
+
+if (Test-Path $runOutput) {
+  & (Join-Path $PSScriptRoot "summarize-run-ndjson.ps1") -InputPath $runOutput -OutputPath $faultSummaryOutput
+}
 
 Write-Host ""
 Write-Host "Validation artifacts:"
@@ -70,8 +75,12 @@ if ($Station -ne "") {
   Write-Host ("  " + (Join-Path $logDir "04-state-preop.json"))
 }
 Write-Host ("  " + $runOutput)
+if (Test-Path $faultSummaryOutput) {
+  Write-Host ("  " + $faultSummaryOutput)
+}
 Write-Host ""
 Write-Host "Suggested checks:"
 Write-Host "  1. scan/validate JSON should describe the expected bus shape before the long run starts."
 Write-Host "  2. 05-run.ndjson should contain repeated kind=run-progress lines."
-Write-Host "  3. If the loop exits on a runtime fault, 05-run.ndjson should end with kind=run-summary."
+Write-Host "  3. If the loop exits on a runtime fault, 06-fault-summary.json should report status=fault-exit and expose the final fault/surface payload."
+Write-Host "  4. If the loop was stopped manually, 06-fault-summary.json should report status=no-run-summary."
