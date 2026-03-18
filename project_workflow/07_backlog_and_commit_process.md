@@ -26,6 +26,18 @@
 - 完成后更新本文档对应条目的 `[ ]` → `[x]` 并注明 commit hash。
 - 代码提交完成后，如影响 `project_workflow` 中的“建议提交拆分/提交映射/验收证据”，需在同一轮工作内回填对应 commit hash；只有文档必须引用代码提交号且需要单独评审时，才拆成后续 docs commit。
 
+提交后固定回填表单：
+
+- `本次代码提交`: `<hash>` `<type(scope): summary>`
+- `对应 workflow 文件`: `<project_workflow/xx_*.md>`
+- `建议提交拆分`: 把对应条目标记为已完成，或在条目后补 `commit: <hash>`
+- `提交映射`: 补一行 `` `能力/条目名` → `<hash>` `<subject>` ``
+- `当前状态/最新回填/验收证据`: 若本次提交改变了阶段状态、实机结论、测试结论或使用方式，同步改写对应段落，不只补 hash
+- `最近回填`: 在本文末尾追加一行，保持最近几次提交可追踪
+- `是否拆 docs commit`: 默认 `否`；只有文档需要独立评审、且必须引用刚产生的代码 hash 时才拆开
+
+执行顺序固定为：最小验证 → 代码提交 → 回填对应 workflow 内容 → 视需要单独提交 docs。不要把“先提交代码，之后有空再补 workflow”当成可接受流程。
+
 最近回填：
 
 - `Native 自动选卡 + 省略站号广播覆盖` → `2e73969` `test(cli): cover native auto-select and broadcast state`
