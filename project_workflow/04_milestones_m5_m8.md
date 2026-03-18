@@ -109,7 +109,7 @@
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](../docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `d9dba95`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `d9dba95`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。随后补齐了 Native 自动选卡 / 省略 `--station` 广播语义的 CLI 覆盖（commit: `2e73969`），并把严格 ESM 路径、AL 错误清除和 state/run 统一状态迁移接到实机路径上（commit: `e0aff06`）；2026-03-18 再按 EtherCAT Compendium 重排 `run --startup-state op` 的启动阶段、补充基于 AL Status Code 的恢复策略，并把 startup mapping 扩展为同时写入 mailbox `SM0/SM1` 与 PDO SyncManager/FMMU，使真实单从站链路重新稳定进入 `Op`（commit: `3a72979`）。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
   - ✅ 参考 [References/EtherCAT_Compendium/EtherCAT_Compendium.md](../References/EtherCAT_Compendium/EtherCAT_Compendium.md) §3.9 Working Counter、§7 EtherCAT State Machine、§7.4 AL Status Codes：Native `diagnosis` 现已在进入 PreOp 前抓取单站 `AL Status(0x0130)` / Error Flag / `AL Status Code(0x0134)` 快照，并与 CoE `0x1001` / `0x10F3` 一并输出，便于 WKC 或 ESM 异常后的逐站定位
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
@@ -200,6 +200,9 @@
 - `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
 - `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
+- `Native 自动选卡 + 省略站号广播覆盖` → `2e73969` `test(cli): cover native auto-select and broadcast state`
+- `严格 ESM 路径接入 state/run` → `e0aff06` `feat(esm): wire strict transitions into state and run`
+- `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `3a72979` `fix(runtime): stabilize native op startup sequencing`
 - `Native mailbox diagnosis CLI 入口` → `d581026` `feat(cli): add native diagnosis command`
 - `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
 - `CLI diagnosis 改为 runtime session helper 薄封装` → `46592ca` `Refactor CLI diagnosis to use runtime session helpers`
