@@ -91,6 +91,21 @@ pub(all) struct RunStartupPreparation {
 }
 
 ///|
+enum OperationalStartupStep {
+  TransitionToSafeOp
+  DcPreconfigure
+  WarmupProcessData
+  TransitionToOp
+} derive(Eq, Show)
+
+///|
+enum StartupRecoveryStrategy {
+  RetryTargetPath
+  RollbackToInit
+  HoldSafeOp
+} derive(Eq, Show)
+
+///|
 pub fn master_config_with_optional_dc(
   dc_cycle_period_ns : Int64?,
 ) -> @hal.MasterConfig {
@@ -210,6 +225,9 @@ pub fn dc_cycle_period_ns(clock : @mailbox.SiiDcClock) -> Int64? {
 }
 
 ///|
+/// Write startup SyncManager and FMMU configuration derived from SII.
+/// This includes mailbox SM0/SM1 when present, followed by process-data SMs
+/// and FMMU windows needed before SafeOp/Op entry.
 pub fn[N : @hal.Nic] write_process_data_mapping(
   nic : N,
   station : UInt,
@@ -219,7 +237,10 @@ pub fn[N : @hal.Nic] write_process_data_mapping(
   for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
     let sm = mapping.sm_configs[i]
     match sm.sm_type {
-      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
+      @mailbox.MailboxOut
+      | @mailbox.MailboxIn
+      | @mailbox.ProcessDataOut
+      | @mailbox.ProcessDataIn => {
         let sm_addr = @protocol.reg_sm_base +
           i.reinterpret_as_uint() *
           @protocol.sm_entry_size.reinterpret_as_uint()
@@ -466,6 +487,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   )
   let scan_report = scan(nic, timeout)
   let has_discovered_slaves = scan_report.slave_count > 0
+  let stations = scan_report.slaves.map(fn(slave) { slave.station_address })
 
   let validate_report = validate(scan_report, expected)
   if not(validate_report.all_ok) {
@@ -483,83 +505,30 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
     }
   }
 
-  let pre_run_state = if startup_state == @protocol.Op {
-    @protocol.SafeOp
-  } else {
-    startup_state
-  }
   if has_discovered_slaves {
-    for slave in scan_report.slaves {
-      let startup_fault = transition_slave_to_target(
-        nic,
-        slave.station_address,
-        pre_run_state,
-        timeout,
-      )
-      match startup_fault {
-        Some(fault) =>
-          return {
-            scan: scan_report,
-            validation: validate_report,
-            cycles_requested: settings.cycles,
-            cycles_ok: 0,
-            until_fault: settings.until_fault,
-            cycle_period_ns: run_config.cycle_period_ns,
-            output_period_ns: settings.output_period_ns,
-            telemetry: Telemetry::new(),
-            final_phase: Configuring,
-            fault: Some(fault),
-          }
-        None => ()
-      }
-    }
-  }
-
-  if has_discovered_slaves && startup_state == @protocol.Op {
-    warmup_process_data_for_op(nic, pdo_ctx, timeout)
-    for slave in scan_report.slaves {
-      let startup_fault = transition_slave_to_target(
-        nic,
-        slave.station_address,
-        startup_state,
-        timeout,
-      )
-      match startup_fault {
-        Some(fault) =>
-          return {
-            scan: scan_report,
-            validation: validate_report,
-            cycles_requested: settings.cycles,
-            cycles_ok: 0,
-            until_fault: settings.until_fault,
-            cycle_period_ns: run_config.cycle_period_ns,
-            output_period_ns: settings.output_period_ns,
-            telemetry: Telemetry::new(),
-            final_phase: Configuring,
-            fault: Some(fault),
-          }
-        None => ()
-      }
+    let startup_fault = transition_stations_for_startup(
+      nic, stations, startup_state, pdo_ctx, run_config, timeout,
+    )
+    match startup_fault {
+      Some(fault) =>
+        return {
+          scan: scan_report,
+          validation: validate_report,
+          cycles_requested: settings.cycles,
+          cycles_ok: 0,
+          until_fault: settings.until_fault,
+          cycle_period_ns: run_config.cycle_period_ns,
+          output_period_ns: settings.output_period_ns,
+          telemetry: Telemetry::new(),
+          final_phase: Configuring,
+          fault: Some(fault),
+        }
+      None => ()
     }
   }
 
   let rt = Runtime::new(run_config)
   rt.configure_pdo(pdo_ctx, expected_wkc)
-  let stations = expected.map(fn(s) { s.configured_address })
-
-  if has_discovered_slaves &&
-    startup_state == @protocol.Op &&
-    run_config.dc_enabled {
-    ignore(
-      try? @protocol.dc_configure_linear(
-        nic,
-        stations,
-        run_config.cycle_period_ns.to_int().reinterpret_as_uint(),
-        timeout,
-        static_sync_iterations=32,
-      ),
-    )
-  }
 
   let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
   rt.set_timeout_threshold(settings.max_consecutive_timeouts)
@@ -588,16 +557,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   if has_discovered_slaves {
     match shutdown_state {
       Some(target) =>
-        for slave in scan_report.slaves {
-          ignore(
-            transition_slave_to_target(
-              nic,
-              slave.station_address,
-              target,
-              timeout,
-            ),
-          )
-        }
+        ignore(transition_stations_to_target(nic, stations, target, timeout))
       None => ()
     }
   }
@@ -625,6 +585,175 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
 }
 
 ///|
+fn build_operational_startup_steps(
+  dc_enabled : Bool,
+  has_process_data : Bool,
+) -> Array[OperationalStartupStep] {
+  let steps : Array[OperationalStartupStep] = [TransitionToSafeOp]
+  if dc_enabled {
+    steps.push(DcPreconfigure)
+  }
+  if has_process_data {
+    steps.push(WarmupProcessData)
+  }
+  steps.push(TransitionToOp)
+  steps
+}
+
+///|
+/// Recovery policy is driven by the AL Status Code observed before the caller
+/// acknowledges the pending error. Low-stage configuration failures should be
+/// reinitialized from Init, while SafeOp->Op readiness failures should remain
+/// in SafeOp so the caller can continue after fixing the missing condition.
+fn classify_startup_recovery_strategy(
+  current : @protocol.EsmState?,
+  target : @protocol.EsmState,
+  status_code : UInt?,
+) -> StartupRecoveryStrategy {
+  match status_code {
+    Some(0x0016U) | Some(0x001DU) | Some(0x001EU) | Some(0x0070U) =>
+      RollbackToInit
+    Some(0x001BU) | Some(0x002DU) | Some(0x002EU) | Some(0x0030U) =>
+      if target == @protocol.Op || current == Some(@protocol.SafeOp) {
+        HoldSafeOp
+      } else {
+        RetryTargetPath
+      }
+    _ =>
+      if target == @protocol.Op && current == Some(@protocol.SafeOp) {
+        HoldSafeOp
+      } else {
+        RetryTargetPath
+      }
+  }
+}
+
+///|
+fn[N : @hal.Nic] stabilize_failed_startup_station(
+  nic : N,
+  station : UInt,
+  strategy : StartupRecoveryStrategy,
+  timeout : @hal.Duration,
+) -> Unit {
+  let stabilize_target = match strategy {
+    RollbackToInit => Some(@protocol.Init)
+    HoldSafeOp => Some(@protocol.SafeOp)
+    RetryTargetPath => None
+  }
+  match stabilize_target {
+    Some(target) => {
+      let snapshot = Some(
+        @protocol.read_al_status_snapshot(nic, station, timeout),
+      ) catch {
+        _ => None
+      }
+      match snapshot {
+        Some(status) if status.error_indication =>
+          ignore(try? @protocol.clear_al_error(nic, station, timeout))
+        _ => ()
+      }
+      ignore(
+        try? @protocol.transition_to_target_strict(
+          nic, station, target, timeout,
+        ),
+      )
+    }
+    None => ()
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_startup_fault_details(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> (@protocol.EsmState?, UInt?) {
+  let current = Some(@protocol.read_al_status(nic, station, timeout)) catch {
+    _ => None
+  }
+  let status_code = Some(@protocol.read_al_status_code(nic, station, timeout)) catch {
+    _ => None
+  }
+  (current, status_code)
+}
+
+///|
+fn[N : @hal.Nic] transition_stations_for_startup(
+  nic : N,
+  stations : Array[UInt],
+  startup_state : @protocol.EsmState,
+  pdo_ctx : @protocol.PdoContext,
+  run_config : @hal.MasterConfig,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  if startup_state != @protocol.Op {
+    return transition_stations_to_target(nic, stations, startup_state, timeout)
+  }
+
+  let steps = build_operational_startup_steps(
+    run_config.dc_enabled,
+    pdo_ctx.logical_size > 0,
+  )
+  for step in steps {
+    match step {
+      TransitionToSafeOp => {
+        let fault = transition_stations_to_target(
+          nic,
+          stations,
+          @protocol.SafeOp,
+          timeout,
+        )
+        match fault {
+          Some(_) => return fault
+          None => ()
+        }
+      }
+      DcPreconfigure =>
+        ignore(
+          try? @protocol.dc_configure_linear(
+            nic,
+            stations,
+            run_config.cycle_period_ns.to_int().reinterpret_as_uint(),
+            timeout,
+            static_sync_iterations=32,
+          ),
+        )
+      WarmupProcessData => warmup_process_data_for_op(nic, pdo_ctx, timeout)
+      TransitionToOp => {
+        let fault = transition_stations_to_target(
+          nic,
+          stations,
+          @protocol.Op,
+          timeout,
+        )
+        match fault {
+          Some(_) => return fault
+          None => ()
+        }
+      }
+    }
+  }
+  None
+}
+
+///|
+fn[N : @hal.Nic] transition_stations_to_target(
+  nic : N,
+  stations : Array[UInt],
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  for station in stations {
+    let fault = transition_slave_to_target(nic, station, target, timeout)
+    match fault {
+      Some(_) => return fault
+      None => ()
+    }
+  }
+  None
+}
+
+///|
 fn[N : @hal.Nic] transition_slave_to_target(
   nic : N,
   station : UInt,
@@ -634,11 +763,25 @@ fn[N : @hal.Nic] transition_slave_to_target(
   if attempt_transition_slave_to_target(nic, station, target, timeout) {
     None
   } else {
-    ignore(try? @protocol.broadcast_state(nic, target, timeout))
-    if attempt_transition_slave_to_target(nic, station, target, timeout) {
+    let (current, status_code) = read_startup_fault_details(
+      nic, station, timeout,
+    )
+    let strategy = classify_startup_recovery_strategy(
+      current, target, status_code,
+    )
+    stabilize_failed_startup_station(nic, station, strategy, timeout)
+    if strategy == RetryTargetPath &&
+      attempt_transition_slave_to_target(nic, station, target, timeout) {
       None
     } else {
-      Some(startup_transition_fault(nic, station, target, timeout))
+      Some(
+        RunFault::StartupTransitionFailed(
+          station~,
+          target~,
+          current~,
+          status_code~,
+        ),
+      )
     }
   }
 }
@@ -675,22 +818,6 @@ fn[N : @hal.Nic] warmup_process_data_for_op(
   if pdo_ctx.logical_size > 0 {
     ignore(try? @protocol.pdo_exchange_result(nic, pdo_ctx, timeout))
   }
-}
-
-///|
-fn[N : @hal.Nic] startup_transition_fault(
-  nic : N,
-  station : UInt,
-  target : @protocol.EsmState,
-  timeout : @hal.Duration,
-) -> RunFault {
-  let current = Some(@protocol.read_al_status(nic, station, timeout)) catch {
-    _ => None
-  }
-  let status_code = Some(@protocol.read_al_status_code(nic, station, timeout)) catch {
-    _ => None
-  }
-  RunFault::StartupTransitionFailed(station~, target~, current~, status_code~)
 }
 
 ///|
