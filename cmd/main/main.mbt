@@ -292,15 +292,15 @@ fn target_requires_process_data_configuration(
 }
 
 ///|
-fn[N : @hal.Nic] configure_process_data_from_eeprom(
+fn[N : @hal.Nic] prepare_station_startup(
   nic : N,
   station : UInt,
   logical_base : UInt,
   timeout : @hal.Duration,
-) -> @mailbox.SlaveMapping raise @hal.EcError {
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
   @runtime.prepare_slave_startup(
     nic, station, logical_base, process_data_eeprom_word_count, timeout,
-  ).mapping
+  )
 }
 
 ///|
@@ -441,6 +441,7 @@ fn[N : @hal.Nic] compute_state_transition_report(
         station: None,
         current: None,
         final_state: None,
+        al_error_flag: None,
         status_code: None,
         wkc: Some(wkc),
       }
@@ -458,29 +459,52 @@ fn[N : @hal.Nic] compute_station_transition_report(
 ) -> StateTransitionReport raise @hal.EcError {
   let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
   if use_path && target == @protocol.Op && current != @protocol.Op {
-    let (final_state, kick_wkc) = transition_station_to_op(
+    let (final_snapshot, kick_wkc) = transition_station_to_op(
       nic, station, current, timeout,
     )
-    let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
     return {
       mode: "station-path",
       target,
       station: Some(station),
       current: Some(current),
-      final_state: Some(final_state),
-      status_code: match status_code {
-        Ok(code) => Some(code)
-        Err(_) => None
-      },
+      final_state: Some(final_snapshot.state),
+      al_error_flag: Some(final_snapshot.error_indication),
+      status_code: final_snapshot.status_code,
       wkc: kick_wkc,
     }
   }
-  if target_requires_process_data_configuration(target) {
-    ignore(
-      configure_process_data_from_eeprom(
-        nic, station, pdo_logical_base, timeout,
-      ),
+  if use_path &&
+    target == @protocol.SafeOp &&
+    current != @protocol.SafeOp &&
+    current != @protocol.Op {
+    let preparation = prepare_station_startup(
+      nic, station, pdo_logical_base, timeout,
     )
+    let final_state = transition_station_to_safeop_with_process_mapping(
+      nic, station, current, preparation, timeout,
+    )
+    let final_snapshot = try? @protocol.read_al_status_snapshot(
+      nic, station, timeout,
+    )
+    return {
+      mode: "station-path",
+      target,
+      station: Some(station),
+      current: Some(current),
+      final_state: match final_snapshot {
+        Ok(snapshot) => Some(snapshot.state)
+        Err(_) => Some(final_state)
+      },
+      al_error_flag: match final_snapshot {
+        Ok(snapshot) => Some(snapshot.error_indication)
+        Err(_) => None
+      },
+      status_code: match final_snapshot {
+        Ok(snapshot) => snapshot.status_code
+        Err(_) => None
+      },
+      wkc: None,
+    }
   }
   let final_state = if use_path {
     transition_station_to_target_strict_after_recovery(
@@ -489,7 +513,9 @@ fn[N : @hal.Nic] compute_station_transition_report(
   } else {
     @protocol.request_state(nic, station, target, timeout)
   }
-  let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
+  let final_snapshot = try? @protocol.read_al_status_snapshot(
+    nic, station, timeout,
+  )
   {
     mode: if use_path {
       "station-path"
@@ -499,9 +525,16 @@ fn[N : @hal.Nic] compute_station_transition_report(
     target,
     station: Some(station),
     current: Some(current),
-    final_state: Some(final_state),
-    status_code: match status_code {
-      Ok(code) => Some(code)
+    final_state: match final_snapshot {
+      Ok(snapshot) => Some(snapshot.state)
+      Err(_) => Some(final_state)
+    },
+    al_error_flag: match final_snapshot {
+      Ok(snapshot) => Some(snapshot.error_indication)
+      Err(_) => None
+    },
+    status_code: match final_snapshot {
+      Ok(snapshot) => snapshot.status_code
       Err(_) => None
     },
     wkc: None,
@@ -523,39 +556,105 @@ fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery(
 }
 
 ///|
+fn[N : @hal.Nic] transition_station_to_op_after_recovery(
+  nic : N,
+  station : UInt,
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStatusSnapshot raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.clear_al_error(nic, station, timeout))
+  }
+  @protocol.request_state_with_process_data_snapshot(
+    nic,
+    station,
+    @protocol.Op,
+    pdo_ctx,
+    timeout,
+  )
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
+  nic : N,
+  station : UInt,
+  current : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmState raise @hal.EcError {
+  if current == @protocol.PreOp ||
+    current == @protocol.SafeOp ||
+    current == @protocol.Op {
+    return current
+  }
+  ignore(
+    @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
+  )
+  transition_station_to_target_strict_after_recovery(
+    nic,
+    station,
+    @protocol.PreOp,
+    timeout,
+  )
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
+  nic : N,
+  station : UInt,
+  current : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmState raise @hal.EcError {
+  if current == @protocol.SafeOp || current == @protocol.Op {
+    return current
+  }
+  let preop_state = transition_station_to_preop_with_mailbox(
+    nic, station, current, preparation, timeout,
+  )
+  if preop_state == @protocol.SafeOp || preop_state == @protocol.Op {
+    return preop_state
+  }
+  ignore(
+    @runtime.write_process_data_mapping(
+      nic,
+      station,
+      preparation.mapping,
+      timeout,
+    ),
+  )
+  transition_station_to_target_strict_after_recovery(
+    nic,
+    station,
+    @protocol.SafeOp,
+    timeout,
+  )
+}
+
+///|
 fn[N : @hal.Nic] transition_station_to_op(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
   timeout : @hal.Duration,
-) -> (@protocol.EsmState, UInt?) raise @hal.EcError {
-  let preparation = @runtime.prepare_slave_startup(
-    nic, station, pdo_logical_base, process_data_eeprom_word_count, timeout,
+) -> (@protocol.EsmStatusSnapshot, UInt?) raise @hal.EcError {
+  let preparation = prepare_station_startup(
+    nic, station, pdo_logical_base, timeout,
   )
   let pdo_ctx = @protocol.PdoContext::build(
     [(preparation.mapping, station)],
     pdo_logical_base,
   )
+  match preparation.startup_outputs {
+    Some(outputs) => pdo_ctx.set_slave_outputs(station, outputs)
+    None => ()
+  }
   let has_process_data = preparation.mapping.output_bytes > 0 ||
     preparation.mapping.input_bytes > 0
-  let path = @protocol.build_transition_route(current, @protocol.Op)
-  let safeop_path : Array[@protocol.EsmState] = []
-  for state in path {
-    safeop_path.push(state)
-    if state == @protocol.SafeOp {
-      break
-    }
-  }
-  let state_before_op = if safeop_path.length() > 1 {
-    transition_station_to_target_strict_after_recovery(
-      nic,
-      station,
-      @protocol.SafeOp,
-      timeout,
-    )
-  } else {
-    current
-  }
+  let state_before_op = transition_station_to_safeop_with_process_mapping(
+    nic, station, current, preparation, timeout,
+  )
   match preparation.dc_cycle_period_ns {
     Some(cycle_period_ns) =>
       ignore(
@@ -574,22 +673,28 @@ fn[N : @hal.Nic] transition_station_to_op(
   } else {
     None
   }
-  let final_state = if state_before_op == @protocol.Op {
-    state_before_op
+  let final_snapshot : @protocol.EsmStatusSnapshot = if state_before_op ==
+    @protocol.Op {
+    { state: state_before_op, error_indication: false, status_code: None }
+  } else if has_process_data {
+    transition_station_to_op_after_recovery(nic, station, pdo_ctx, timeout)
   } else {
-    transition_station_to_target_strict_after_recovery(
+    let final_state = transition_station_to_target_strict_after_recovery(
       nic,
       station,
       @protocol.Op,
       timeout,
     )
+    @protocol.read_al_status_snapshot(nic, station, timeout) catch {
+      _ => { state: final_state, error_indication: false, status_code: None }
+    }
   }
-  let final_wkc = if final_state == @protocol.Op && has_process_data {
+  let final_wkc = if final_snapshot.state == @protocol.Op && has_process_data {
     Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
   } else {
     kick_before_op
   }
-  (final_state, final_wkc)
+  (final_snapshot, final_wkc)
 }
 
 ///|
@@ -1339,6 +1444,7 @@ struct StateTransitionReport {
   station : UInt?
   current : @protocol.EsmState?
   final_state : @protocol.EsmState?
+  al_error_flag : Bool?
   status_code : UInt?
   wkc : UInt?
 }
@@ -3248,13 +3354,23 @@ pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink with emit(
 ///|
 fn run_fault_json(fault : @runtime.RunFault) -> Json {
   match fault {
-    StartupTransitionFailed(station~, target~, current~, status_code~) =>
+    StartupTransitionFailed(
+      station~,
+      target~,
+      current~,
+      error_indication~,
+      status_code~
+    ) =>
       Json::object({
         "kind": Json::string("startup-transition-failed"),
         "station": Json::number(station.to_double()),
         "target": Json::string(target.to_string()),
         "current": match current {
           Some(state) => Json::string(state.to_string())
+          None => Json::null()
+        },
+        "al_error_flag": match error_indication {
+          Some(flag) => Json::boolean(flag)
           None => Json::null()
         },
         "status_code": match status_code {
@@ -3299,6 +3415,10 @@ fn state_transition_report_json(report : StateTransitionReport) -> Json {
       Some(state) => Json::string(state.to_string())
       None => Json::null()
     },
+    "al_error_flag": match report.al_error_flag {
+      Some(flag) => Json::boolean(flag)
+      None => Json::null()
+    },
     "status_code": match report.status_code {
       Some(code) => Json::number(code.to_double())
       None => Json::null()
@@ -3313,6 +3433,7 @@ fn state_transition_report_json(report : StateTransitionReport) -> Json {
         report.target,
         report.current,
         report.final_state,
+        report.al_error_flag,
         report.status_code,
         report.wkc,
       ),
@@ -3456,6 +3577,11 @@ fn state_transition_report_text(report : StateTransitionReport) -> String {
   }
   match report.final_state {
     Some(state) => buf.write_string("Final: " + state.to_string() + "\n")
+    None => ()
+  }
+  match report.al_error_flag {
+    Some(true) => buf.write_string("AL Error Flag: set\n")
+    Some(false) => buf.write_string("AL Error Flag: clear\n")
     None => ()
   }
   match report.status_code {

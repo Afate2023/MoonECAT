@@ -30,7 +30,7 @@ pub fn diagnostic_surface_from_run(RunReport) -> DiagnosticSurface
 
 pub fn diagnostic_surface_from_slave_diagnosis(ScanReport, SlaveDiagnosis) -> DiagnosticSurface
 
-pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @protocol.EsmState?, @protocol.EsmState?, UInt?, UInt?) -> DiagnosticSurface
+pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @protocol.EsmState?, @protocol.EsmState?, Bool?, UInt?, UInt?) -> DiagnosticSurface
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
@@ -105,6 +105,8 @@ pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> Validat
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
 pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
+
+pub fn[N : @hal.Nic] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
@@ -425,8 +427,12 @@ pub(all) struct ObservedSlaveAddress {
 pub impl Eq for ObservedSlaveAddress
 pub impl Show for ObservedSlaveAddress
 
+type OperationalStartupStep
+pub impl Eq for OperationalStartupStep
+pub impl Show for OperationalStartupStep
+
 pub(all) enum RunFault {
-  StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, status_code~ : UInt?)
+  StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
   TimeoutRecoveryRequired(observed_timeouts~ : Int64, consecutive_timeouts~ : Int)
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)
@@ -596,7 +602,12 @@ pub impl Show for SlaveReport
 pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
   dc_cycle_period_ns : Int64?
+  startup_outputs : Bytes?
 }
+
+type StartupRecoveryStrategy
+pub impl Eq for StartupRecoveryStrategy
+pub impl Show for StartupRecoveryStrategy
 
 pub(all) struct StateSurfaceSummary {
   target_state : @protocol.EsmState?

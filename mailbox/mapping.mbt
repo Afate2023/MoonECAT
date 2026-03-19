@@ -45,6 +45,53 @@ pub fn calculate_sm_configs(
 }
 
 ///|
+fn pdo_bit_length_for_sync_manager(
+  pdos : Array[SiiPdo],
+  sync_manager : Byte,
+) -> Int {
+  let mut total_bits = 0
+  for pdo in pdos {
+    if pdo.sync_manager == sync_manager {
+      for entry in pdo.entries {
+        total_bits = total_bits + entry.bit_length.to_int()
+      }
+    }
+  }
+  total_bits
+}
+
+///|
+pub fn apply_pdo_lengths_to_sm_configs(
+  sm_configs : Array[SmConfig],
+  tx_pdos : Array[SiiPdo],
+  rx_pdos : Array[SiiPdo],
+) -> Array[SmConfig] {
+  let updated : Array[SmConfig] = []
+  for i = 0; i < sm_configs.length(); i = i + 1 {
+    let sm = sm_configs[i]
+    let patched = if sm.length == 0U {
+      let total_bits = match sm.sm_type {
+        ProcessDataOut => pdo_bit_length_for_sync_manager(rx_pdos, i.to_byte())
+        ProcessDataIn => pdo_bit_length_for_sync_manager(tx_pdos, i.to_byte())
+        _ => 0
+      }
+      if total_bits > 0 {
+        {
+          ..sm,
+          length: ((total_bits + 7) / 8).reinterpret_as_uint(),
+        }
+      } else {
+        sm
+      }
+    } else {
+      sm
+    }
+    updated.push(patched)
+  }
+  updated
+}
+
+///|
 /// Compute FmmuConfig array from SII FMMU directions and the calculated
 /// SM configs.  Each FMMU entry maps a contiguous block of logical address
 /// space to the physical address of the corresponding process-data SM.
@@ -177,14 +224,22 @@ pub fn calculate_slave_mapping(
   // Extract FMMU and SM category data
   let mut fmmu_dirs : Array[FmmuDirection] = []
   let mut sm_entries : Array[SiiSmEntry] = []
+  let mut tx_pdos : Array[SiiPdo] = []
+  let mut rx_pdos : Array[SiiPdo] = []
   for i = 0; i < categories.length(); i = i + 1 {
     match categories[i].category {
       Fmmu => fmmu_dirs = parse_sii_fmmu(categories[i].data)
       SyncManager => sm_entries = parse_sii_sm(categories[i].data)
+      TxPdo => tx_pdos = parse_sii_pdo(categories[i].data)
+      RxPdo => rx_pdos = parse_sii_pdo(categories[i].data)
       _ => ()
     }
   }
-  let sm_configs = calculate_sm_configs(sii_header, sm_entries)
+  let sm_configs = apply_pdo_lengths_to_sm_configs(
+    calculate_sm_configs(sii_header, sm_entries),
+    tx_pdos,
+    rx_pdos,
+  )
   let (fmmu_configs, output_bytes, input_bytes) = calculate_fmmu_configs(
     fmmu_dirs, sm_configs, logical_base,
   )

@@ -1339,7 +1339,8 @@ test "cli state path clears error then follows strict route" {
   assert_eq(report.mode, "station-path")
   assert_eq(report.current, Some(@protocol.EsmState::SafeOp))
   assert_eq(report.final_state, Some(@protocol.EsmState::Init))
-  assert_eq(report.status_code, Some(0U))
+  assert_eq(report.al_error_flag, Some(false))
+  assert_eq(report.status_code, None)
   assert_eq(nic.control_writes.length(), 3)
   assert_eq(
     nic.control_writes[0],
@@ -1360,6 +1361,7 @@ test "cli state transition report json includes station mode fields" {
     station: Some(0x1001U),
     current: Some(@protocol.PreOp),
     final_state: Some(@protocol.SafeOp),
+    al_error_flag: Some(false),
     status_code: Some(0U),
     wkc: None,
   })
@@ -1380,6 +1382,7 @@ test "cli state transition report text includes broadcast mode and wkc" {
     station: None,
     current: None,
     final_state: None,
+    al_error_flag: None,
     status_code: None,
     wkc: Some(0U),
   })

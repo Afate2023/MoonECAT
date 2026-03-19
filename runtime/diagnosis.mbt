@@ -434,9 +434,20 @@ pub fn diagnostic_surface_from_run(report : RunReport) -> DiagnosticSurface {
 ///|
 fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
   match fault {
-    StartupTransitionFailed(station~, target~, current~, status_code~) => {
+    StartupTransitionFailed(
+      station~,
+      target~,
+      current~,
+      error_indication~,
+      status_code~
+    ) => {
       let current_text = match current {
         Some(state) => state.to_string()
+        None => "unknown"
+      }
+      let error_text = match error_indication {
+        Some(true) => "set"
+        Some(false) => "clear"
         None => "unknown"
       }
       let status_text = match status_code {
@@ -454,6 +465,8 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
           target.to_string() +
           " current=" +
           current_text +
+          " error_flag=" +
+          error_text +
           " status_code=" +
           status_text,
         },
@@ -501,6 +514,7 @@ pub fn diagnostic_surface_from_state_transition(
   target : @protocol.EsmState,
   current : @protocol.EsmState?,
   final_state : @protocol.EsmState?,
+  al_error_flag : Bool?,
   status_code : UInt?,
   wkc : UInt?,
 ) -> DiagnosticSurface {
@@ -528,6 +542,16 @@ pub fn diagnostic_surface_from_state_transition(
       })
     _ => ()
   }
+  match al_error_flag {
+    Some(true) =>
+      issues.push({
+        source: Registers,
+        category: AlStatus,
+        level: Block,
+        detail: "AL error indication is set",
+      })
+    _ => ()
+  }
   match wkc {
     Some(value) if value == 0U =>
       issues.push({
@@ -545,7 +569,7 @@ pub fn diagnostic_surface_from_state_transition(
       current_state: current,
       final_state,
       al_state: None,
-      al_error_flag: None,
+      al_error_flag,
       al_status_code: status_code,
       wkc,
     },
@@ -726,8 +750,11 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
     Err(_) => @protocol.Init
   }
   let eeprom = diagnosis_timeout_step(
-    try? @protocol.eeprom_read_ap(
-      nic, position, 0U, diagnosis_sii_word_count, timeout,
+    try? read_sii_with_metadata_ap(
+      nic,
+      position,
+      diagnosis_sii_word_count,
+      timeout,
     ),
     "diagnosis.prepare.eeprom_read_ap",
   )
@@ -778,8 +805,11 @@ pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
     Err(_) => @protocol.Init
   }
   let eeprom = diagnosis_timeout_step(
-    try? @protocol.eeprom_read_ap(
-      nic, position, 0U, diagnosis_sii_word_count, timeout,
+    try? read_sii_with_metadata_ap(
+      nic,
+      position,
+      diagnosis_sii_word_count,
+      timeout,
     ),
     "mailbox.prepare.eeprom_read_ap",
   )
@@ -929,12 +959,21 @@ fn[N : @hal.Nic] enter_diagnosis_preop(
       ),
     )
   }
+  let preop_snapshot = diagnosis_timeout_step(
+    try? @protocol.read_al_status_snapshot(nic, station, timeout),
+    "diagnosis.prepare.read_al_status_before_preop_fp",
+  )
+  if preop_snapshot.error_indication {
+    ignore(
+      diagnosis_timeout_step(
+        try? @protocol.clear_al_error(nic, station, timeout),
+        "diagnosis.prepare.clear_al_error_fp",
+      ),
+    )
+  }
   let confirmed_preop = diagnosis_timeout_step(
-    try? @protocol.transition_through(
-      nic,
-      station,
-      @protocol.build_transition_path(@protocol.PreOp),
-      timeout,
+    try? @protocol.transition_to_target_strict(
+      nic, station, @protocol.PreOp, timeout,
     ),
     "diagnosis.prepare.request_preop_fp",
   )

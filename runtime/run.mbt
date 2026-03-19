@@ -19,6 +19,7 @@ pub(all) enum RunFault {
     station~ : UInt,
     target~ : @protocol.EsmState,
     current~ : @protocol.EsmState?,
+    error_indication~ : Bool?,
     status_code~ : UInt?
   )
   TimeoutRecoveryRequired(
@@ -81,6 +82,7 @@ pub(all) struct RunReport {
 pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
   dc_cycle_period_ns : Int64?
+  startup_outputs : Bytes?
 }
 
 ///|
@@ -88,6 +90,80 @@ pub(all) struct RunStartupPreparation {
   pdo_ctx : @protocol.PdoContext
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
+}
+
+///|
+let startup_eeprom_word_count : Int = 128
+
+///|
+pub fn required_sii_read_word_count(
+  initial_eeprom : Bytes,
+  initial_word_count : Int,
+) -> Int {
+  let metadata : Result[@mailbox.SiiStandardMetadata, Error] = try? @mailbox.parse_sii_standard_metadata(
+    initial_eeprom,
+  )
+  match metadata {
+    Ok(value) => {
+      let required_word_count = ((value.eeprom_size_bytes() + 3U) / 4U).reinterpret_as_int()
+      if required_word_count > initial_word_count {
+        required_word_count
+      } else {
+        initial_word_count
+      }
+    }
+    Err(_) => initial_word_count
+  }
+}
+
+///|
+pub fn[N : @hal.Nic] read_sii_with_metadata_fp(
+  nic : N,
+  station : UInt,
+  initial_word_count : Int,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let initial_eeprom = @protocol.eeprom_read(
+    nic,
+    station,
+    0U,
+    initial_word_count,
+    timeout,
+  )
+  let total_word_count = required_sii_read_word_count(
+    initial_eeprom,
+    initial_word_count,
+  )
+  if total_word_count <= initial_word_count {
+    initial_eeprom
+  } else {
+    @protocol.eeprom_read(nic, station, 0U, total_word_count, timeout)
+  }
+}
+
+///|
+pub fn[N : @hal.Nic] read_sii_with_metadata_ap(
+  nic : N,
+  position : UInt,
+  initial_word_count : Int,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let initial_eeprom = @protocol.eeprom_read_ap(
+    nic,
+    position,
+    0U,
+    initial_word_count,
+    timeout,
+  )
+  let total_word_count = required_sii_read_word_count(
+    initial_eeprom,
+    initial_word_count,
+  )
+  if total_word_count <= initial_word_count {
+    initial_eeprom
+  } else {
+    @protocol.eeprom_read_ap(nic, position, 0U, total_word_count, timeout)
+  }
 }
 
 ///|
@@ -125,6 +201,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
   timeout : @hal.Duration,
 ) -> RunStartupPreparation raise @hal.EcError {
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  let startup_outputs : Array[(UInt, Bytes)] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
   for slave in scan_report.slaves {
@@ -136,6 +213,10 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       timeout,
     )
     slave_mappings.push((preparation.mapping, slave.station_address))
+    match preparation.startup_outputs {
+      Some(outputs) => startup_outputs.push((slave.station_address, outputs))
+      None => ()
+    }
     dc_cycle_period_ns = prefer_dc_cycle_period(
       dc_cycle_period_ns,
       preparation.dc_cycle_period_ns,
@@ -144,8 +225,13 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       preparation.mapping.output_bytes.reinterpret_as_uint() +
       preparation.mapping.input_bytes.reinterpret_as_uint()
   }
+  let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  for i = 0; i < startup_outputs.length(); i = i + 1 {
+    let (station, outputs) = startup_outputs[i]
+    pdo_ctx.set_slave_outputs(station, outputs)
+  }
   {
-    pdo_ctx: @protocol.PdoContext::build(slave_mappings, logical_base),
+    pdo_ctx,
     expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
     dc_cycle_period_ns,
   }
@@ -159,16 +245,136 @@ pub fn[N : @hal.Nic] prepare_slave_startup(
   eeprom_word_count : Int,
   timeout : @hal.Duration,
 ) -> SlaveStartupPreparation raise @hal.EcError {
-  let eeprom = @protocol.eeprom_read(
-    nic, station, 0U, eeprom_word_count, timeout,
+  let eeprom = read_sii_with_metadata_fp(
+    nic,
+    station,
+    eeprom_word_count,
+    timeout,
   )
   let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
-  write_process_data_mapping(nic, station, mapping, timeout)
   let categories = @mailbox.parse_sii_categories(eeprom)
   {
     mapping,
     dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
+    startup_outputs: derive_startup_outputs(mapping, categories),
   }
+}
+
+///|
+fn derive_startup_outputs(
+  mapping : @mailbox.SlaveMapping,
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Bytes? {
+  if mapping.output_bytes <= 0 {
+    return None
+  }
+  let general = collect_sii_general(categories)
+  guard general is Some(general) else { return None }
+  if general.ds402_channels == b'\x00' {
+    return None
+  }
+  let rx_pdos = collect_sii_pdos(categories, @mailbox.RxPdo)
+  let seed = Array::make(mapping.output_bytes, b'\x00')
+  let mut wrote = false
+  match find_pdo_entry_byte_offset(rx_pdos, 0x6040U, b'\x00') {
+    Some((controlword_offset, controlword_length)) =>
+      if controlword_length == 16 &&
+        controlword_offset + 1 < mapping.output_bytes {
+        seed[controlword_offset] = b'\x06'
+        seed[controlword_offset + 1] = b'\x00'
+        wrote = true
+      }
+    _ => ()
+  }
+  match
+    (
+      find_pdo_entry_byte_offset(rx_pdos, 0x6060U, b'\x00'),
+      preferred_ds402_mode_seed(rx_pdos),
+    ) {
+    (Some((mode_offset, mode_length)), Some(mode_value)) =>
+      if mode_length == 8 &&
+        mode_offset < mapping.output_bytes &&
+        mode_value != b'\x00' {
+        seed[mode_offset] = mode_value
+        wrote = true
+      }
+    _ => ()
+  }
+  if not(wrote) {
+    return None
+  }
+  Some(Bytes::from_array(seed))
+}
+
+///|
+fn preferred_ds402_mode_seed(rx_pdos : Array[@mailbox.SiiPdo]) -> Byte? {
+  guard find_pdo_entry_byte_offset(rx_pdos, 0x6060U, b'\x00') is Some(_) else {
+    return None
+  }
+  if find_pdo_entry_byte_offset(rx_pdos, 0x607AU, b'\x00') is Some(_) {
+    return Some(b'\x08')
+  }
+  if find_pdo_entry_byte_offset(rx_pdos, 0x60FFU, b'\x00') is Some(_) {
+    return Some(b'\x09')
+  }
+  None
+}
+
+///|
+fn collect_sii_general(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> @mailbox.SiiGeneral? {
+  for category in categories {
+    if category.category == @mailbox.General {
+      let parsed : Result[@mailbox.SiiGeneral, Error] = try? @mailbox.parse_sii_general(
+        category.data,
+      )
+      match parsed {
+        Ok(general) => return Some(general)
+        Err(_) => ()
+      }
+    }
+  }
+  None
+}
+
+///|
+fn collect_sii_pdos(
+  categories : Array[@mailbox.SiiCategoryEntry],
+  target : @mailbox.SiiCategory,
+) -> Array[@mailbox.SiiPdo] {
+  let pdos : Array[@mailbox.SiiPdo] = []
+  for category in categories {
+    if category.category == target {
+      let parsed = @mailbox.parse_sii_pdo(category.data)
+      for pdo in parsed {
+        pdos.push(pdo)
+      }
+    }
+  }
+  pdos
+}
+
+///|
+fn find_pdo_entry_byte_offset(
+  pdos : Array[@mailbox.SiiPdo],
+  entry_index : UInt,
+  subindex : Byte,
+) -> (Int, Int)? {
+  let mut bit_offset = 0
+  for pdo in pdos {
+    for entry in pdo.entries {
+      let bit_length = entry.bit_length.to_int()
+      if entry.entry_index == entry_index && entry.subindex == subindex {
+        if bit_length <= 0 || bit_offset % 8 != 0 || bit_length % 8 != 0 {
+          return None
+        }
+        return Some((bit_offset / 8, bit_length))
+      }
+      bit_offset = bit_offset + bit_length
+    }
+  }
+  None
 }
 
 ///|
@@ -225,9 +431,37 @@ pub fn dc_cycle_period_ns(clock : @mailbox.SiiDcClock) -> Int64? {
 }
 
 ///|
-/// Write startup SyncManager and FMMU configuration derived from SII.
-/// This includes mailbox SM0/SM1 when present, followed by process-data SMs
-/// and FMMU windows needed before SafeOp/Op entry.
+/// Write only mailbox SyncManager configuration derived from SII.
+pub fn[N : @hal.Nic] write_mailbox_mapping(
+  nic : N,
+  station : UInt,
+  mapping : @mailbox.SlaveMapping,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
+    let sm = mapping.sm_configs[i]
+    match sm.sm_type {
+      @mailbox.MailboxOut | @mailbox.MailboxIn => {
+        let sm_addr = @protocol.reg_sm_base +
+          i.reinterpret_as_uint() *
+          @protocol.sm_entry_size.reinterpret_as_uint()
+        let _ = @protocol.write_register_fp(
+          nic,
+          station,
+          sm_addr,
+          sm.to_bytes(),
+          timeout,
+        )
+      }
+      _ => ()
+    }
+  }
+}
+
+///|
+/// Write process-data SyncManager and FMMU configuration derived from SII.
+/// Call this only after mailbox configuration is accepted and the station is
+/// already in PreOp.
 pub fn[N : @hal.Nic] write_process_data_mapping(
   nic : N,
   station : UInt,
@@ -237,10 +471,7 @@ pub fn[N : @hal.Nic] write_process_data_mapping(
   for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
     let sm = mapping.sm_configs[i]
     match sm.sm_type {
-      @mailbox.MailboxOut
-      | @mailbox.MailboxIn
-      | @mailbox.ProcessDataOut
-      | @mailbox.ProcessDataIn => {
+      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
         let sm_addr = @protocol.reg_sm_base +
           i.reinterpret_as_uint() *
           @protocol.sm_entry_size.reinterpret_as_uint()
@@ -667,14 +898,10 @@ fn[N : @hal.Nic] read_startup_fault_details(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
-) -> (@protocol.EsmState?, UInt?) {
-  let current = Some(@protocol.read_al_status(nic, station, timeout)) catch {
+) -> @protocol.EsmStatusSnapshot? {
+  Some(@protocol.read_al_status_snapshot(nic, station, timeout)) catch {
     _ => None
   }
-  let status_code = Some(@protocol.read_al_status_code(nic, station, timeout)) catch {
-    _ => None
-  }
-  (current, status_code)
 }
 
 ///|
@@ -686,8 +913,24 @@ fn[N : @hal.Nic] transition_stations_for_startup(
   run_config : @hal.MasterConfig,
   timeout : @hal.Duration,
 ) -> RunFault? {
+  if startup_state == @protocol.PreOp {
+    return transition_stations_to_preop_with_mailbox(nic, stations, timeout)
+  }
+  if startup_state == @protocol.SafeOp {
+    return transition_stations_to_safeop_with_process_mapping(
+      nic, stations, pdo_ctx, timeout,
+    )
+  }
   if startup_state != @protocol.Op {
     return transition_stations_to_target(nic, stations, startup_state, timeout)
+  }
+
+  let safeop_fault = transition_stations_to_safeop_with_process_mapping(
+    nic, stations, pdo_ctx, timeout,
+  )
+  match safeop_fault {
+    Some(_) => return safeop_fault
+    None => ()
   }
 
   let steps = build_operational_startup_steps(
@@ -696,18 +939,7 @@ fn[N : @hal.Nic] transition_stations_for_startup(
   )
   for step in steps {
     match step {
-      TransitionToSafeOp => {
-        let fault = transition_stations_to_target(
-          nic,
-          stations,
-          @protocol.SafeOp,
-          timeout,
-        )
-        match fault {
-          Some(_) => return fault
-          None => ()
-        }
-      }
+      TransitionToSafeOp => ()
       DcPreconfigure =>
         ignore(
           try? @protocol.dc_configure_linear(
@@ -720,11 +952,8 @@ fn[N : @hal.Nic] transition_stations_for_startup(
         )
       WarmupProcessData => warmup_process_data_for_op(nic, pdo_ctx, timeout)
       TransitionToOp => {
-        let fault = transition_stations_to_target(
-          nic,
-          stations,
-          @protocol.Op,
-          timeout,
+        let fault = transition_stations_to_op_with_process_data(
+          nic, stations, pdo_ctx, timeout,
         )
         match fault {
           Some(_) => return fault
@@ -734,6 +963,48 @@ fn[N : @hal.Nic] transition_stations_for_startup(
     }
   }
   None
+}
+
+///|
+fn[N : @hal.Nic] transition_stations_to_preop_with_mailbox(
+  nic : N,
+  stations : Array[UInt],
+  timeout : @hal.Duration,
+) -> RunFault? {
+  for station in stations {
+    let fault = transition_slave_to_preop_with_mailbox(nic, station, timeout)
+    match fault {
+      Some(_) => return fault
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
+  nic : N,
+  stations : Array[UInt],
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  let preop_fault = transition_stations_to_preop_with_mailbox(
+    nic, stations, timeout,
+  )
+  match preop_fault {
+    Some(_) => return preop_fault
+    None => ()
+  }
+  for station in stations {
+    let process_fault = configure_slave_process_mapping_from_pdo_ctx(
+      nic, station, pdo_ctx, timeout,
+    )
+    match process_fault {
+      Some(_) => return process_fault
+      None => ()
+    }
+  }
+  transition_stations_to_target(nic, stations, @protocol.SafeOp, timeout)
 }
 
 ///|
@@ -754,6 +1025,25 @@ fn[N : @hal.Nic] transition_stations_to_target(
 }
 
 ///|
+fn[N : @hal.Nic] transition_stations_to_op_with_process_data(
+  nic : N,
+  stations : Array[UInt],
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  for station in stations {
+    let fault = transition_slave_to_op_with_process_data(
+      nic, station, pdo_ctx, timeout,
+    )
+    match fault {
+      Some(_) => return fault
+      None => ()
+    }
+  }
+  None
+}
+
+///|
 fn[N : @hal.Nic] transition_slave_to_target(
   nic : N,
   station : UInt,
@@ -763,11 +1053,11 @@ fn[N : @hal.Nic] transition_slave_to_target(
   if attempt_transition_slave_to_target(nic, station, target, timeout) {
     None
   } else {
-    let (current, status_code) = read_startup_fault_details(
-      nic, station, timeout,
-    )
+    let snapshot = read_startup_fault_details(nic, station, timeout)
     let strategy = classify_startup_recovery_strategy(
-      current, target, status_code,
+      snapshot.map(fn(value) { value.state }),
+      target,
+      snapshot.bind(fn(value) { value.status_code }),
     )
     stabilize_failed_startup_station(nic, station, strategy, timeout)
     if strategy == RetryTargetPath &&
@@ -778,11 +1068,143 @@ fn[N : @hal.Nic] transition_slave_to_target(
         RunFault::StartupTransitionFailed(
           station~,
           target~,
-          current~,
-          status_code~,
+          current=snapshot.map(fn(value) { value.state }),
+          error_indication=snapshot.map(fn(value) { value.error_indication }),
+          status_code=snapshot.bind(fn(value) { value.status_code }),
         ),
       )
     }
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  let preparation = prepare_slave_startup(
+    nic, station, 0U, startup_eeprom_word_count, timeout,
+  ) catch {
+    _ =>
+      return Some(
+        RunFault::StartupTransitionFailed(
+          station~,
+          target=@protocol.PreOp,
+          current=None,
+          error_indication=None,
+          status_code=None,
+        ),
+      )
+  }
+  ignore(write_mailbox_mapping(nic, station, preparation.mapping, timeout)) catch {
+    _ =>
+      return Some(
+        RunFault::StartupTransitionFailed(
+          station~,
+          target=@protocol.PreOp,
+          current=None,
+          error_indication=None,
+          status_code=None,
+        ),
+      )
+  }
+  transition_slave_to_target(nic, station, @protocol.PreOp, timeout)
+}
+
+///|
+fn pdo_logical_base_for_station(
+  pdo_ctx : @protocol.PdoContext,
+  station : UInt,
+) -> UInt? {
+  for mapping in pdo_ctx.mappings {
+    if mapping.station == station {
+      return Some(mapping.output_logical)
+    }
+  }
+  None
+}
+
+///|
+fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
+  nic : N,
+  station : UInt,
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  let logical_base = match pdo_logical_base_for_station(pdo_ctx, station) {
+    Some(value) => value
+    None => 0U
+  }
+  let preparation = prepare_slave_startup(
+    nic, station, logical_base, startup_eeprom_word_count, timeout,
+  ) catch {
+    _ =>
+      return Some(
+        RunFault::StartupTransitionFailed(
+          station~,
+          target=@protocol.SafeOp,
+          current=None,
+          error_indication=None,
+          status_code=None,
+        ),
+      )
+  }
+  ignore(write_process_data_mapping(nic, station, preparation.mapping, timeout)) catch {
+    _ =>
+      return Some(
+        RunFault::StartupTransitionFailed(
+          station~,
+          target=@protocol.SafeOp,
+          current=None,
+          error_indication=None,
+          status_code=None,
+        ),
+      )
+  }
+  None
+}
+
+///|
+fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
+  nic : N,
+  station : UInt,
+  pdo_ctx : @protocol.PdoContext,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  let snapshot = Some(
+    @protocol.request_state_with_process_data_snapshot(
+      nic,
+      station,
+      @protocol.Op,
+      pdo_ctx,
+      timeout,
+    ),
+  ) catch {
+    _ => None
+  }
+  if snapshot is Some(observed) && observed.state == @protocol.Op {
+    None
+  } else {
+    let fault_snapshot = match snapshot {
+      Some(observed) => Some(observed)
+      None => read_startup_fault_details(nic, station, timeout)
+    }
+    let strategy = classify_startup_recovery_strategy(
+      fault_snapshot.map(fn(value) { value.state }),
+      @protocol.Op,
+      fault_snapshot.bind(fn(value) { value.status_code }),
+    )
+    stabilize_failed_startup_station(nic, station, strategy, timeout)
+    Some(
+      RunFault::StartupTransitionFailed(
+        station~,
+        target=@protocol.Op,
+        current=fault_snapshot.map(fn(value) { value.state }),
+        error_indication=fault_snapshot.map(fn(value) { value.error_indication }),
+        status_code=fault_snapshot.bind(fn(value) { value.status_code }),
+      ),
+    )
   }
 }
 
@@ -878,9 +1300,20 @@ fn resolve_progress_every_cycles(
 ///|
 fn run_fault_text(fault : RunFault) -> String {
   match fault {
-    StartupTransitionFailed(station~, target~, current~, status_code~) => {
+    StartupTransitionFailed(
+      station~,
+      target~,
+      current~,
+      error_indication~,
+      status_code~
+    ) => {
       let current_text = match current {
         Some(state) => state.to_string()
+        None => "unknown"
+      }
+      let error_text = match error_indication {
+        Some(true) => "set"
+        Some(false) => "clear"
         None => "unknown"
       }
       let status_text = match status_code {
@@ -893,6 +1326,8 @@ fn run_fault_text(fault : RunFault) -> String {
       target.to_string() +
       " current=" +
       current_text +
+      " error_flag=" +
+      error_text +
       " status_code=" +
       status_text
     }

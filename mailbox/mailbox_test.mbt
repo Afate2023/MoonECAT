@@ -362,6 +362,107 @@ test "calculate_slave_mapping mailbox-only slave" {
 }
 
 ///|
+test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
+  let sm_configs : Array[@mailbox.SmConfig] = [
+    {
+      physical_start: 0x1000U,
+      length: 128U,
+      control: b'\x26',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxOut,
+    },
+    {
+      physical_start: 0x1080U,
+      length: 128U,
+      control: b'\x22',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::MailboxIn,
+    },
+    {
+      physical_start: 0x1100U,
+      length: 0U,
+      control: b'\x64',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataOut,
+    },
+    {
+      physical_start: 0x1400U,
+      length: 0U,
+      control: b'\x20',
+      status: b'\x00',
+      enable: true,
+      sm_type: @mailbox.SmType::ProcessDataIn,
+    },
+  ]
+  let rx_pdos : Array[@mailbox.SiiPdo] = [
+    {
+      pdo_index: 0x1600U,
+      entry_count: b'\x02',
+      sync_manager: b'\x02',
+      synchronization: b'\x00',
+      name_idx: b'\x00',
+      flags: 0U,
+      entries: [
+        {
+          entry_index: 0x6040U,
+          subindex: b'\x00',
+          name_idx: b'\x00',
+          data_type: b'\x00',
+          bit_length: b'\x10',
+          flags: 0U,
+        },
+        {
+          entry_index: 0x607AU,
+          subindex: b'\x00',
+          name_idx: b'\x00',
+          data_type: b'\x00',
+          bit_length: b'\x20',
+          flags: 0U,
+        },
+      ],
+    },
+  ]
+  let tx_pdos : Array[@mailbox.SiiPdo] = [
+    {
+      pdo_index: 0x1A00U,
+      entry_count: b'\x02',
+      sync_manager: b'\x03',
+      synchronization: b'\x00',
+      name_idx: b'\x00',
+      flags: 0U,
+      entries: [
+        {
+          entry_index: 0x6041U,
+          subindex: b'\x00',
+          name_idx: b'\x00',
+          data_type: b'\x00',
+          bit_length: b'\x10',
+          flags: 0U,
+        },
+        {
+          entry_index: 0x6064U,
+          subindex: b'\x00',
+          name_idx: b'\x00',
+          data_type: b'\x00',
+          bit_length: b'\x20',
+          flags: 0U,
+        },
+      ],
+    },
+  ]
+  let patched = @mailbox.apply_pdo_lengths_to_sm_configs(
+    sm_configs,
+    tx_pdos,
+    rx_pdos,
+  )
+  assert_eq(patched[2].length, 6U)
+  assert_eq(patched[3].length, 6U)
+}
+
+///|
 test "parse_sii_header identity consistency with fixture" {
   let eeprom = @fixtures.sample_sii_eeprom()
   let sii = @mailbox.parse_sii_header(eeprom)

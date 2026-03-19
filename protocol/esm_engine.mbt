@@ -68,6 +68,70 @@ pub fn[N : @hal.Nic] request_state(
 }
 
 ///|
+/// Request an ESM state transition while continuing cyclic PDO exchange,
+/// and return the last confirmed AL snapshot observed during polling.
+pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  pdo_ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  if pdo_ctx.logical_size <= 0 {
+    let _ = request_state(nic, station, target, timeout)
+    return read_al_status_snapshot(nic, station, timeout) catch {
+      _ => { state: target, error_indication: false, status_code: None }
+    }
+  }
+  let current_status = read_al_status_raw_fp(nic, station, timeout)
+  if (current_status & b'\x10') != b'\x00' {
+    ignore(
+      request_state_control_fp(
+        nic,
+        station,
+        (current_status & b'\x0F') | b'\x10',
+        timeout,
+      ),
+    )
+  }
+  let target_byte = target.to_byte()
+  let _ = request_state_control_fp(nic, station, target_byte, timeout)
+  wait_for_state_fp_with_process_data_snapshot(
+    nic, station, target, pdo_ctx, timeout,
+  )
+}
+
+///|
+/// Request an ESM state transition while continuing cyclic PDO exchange.
+///
+/// This is primarily needed for SAFEOP -> OP on actuator-style devices where
+/// the SubDevice only confirms OP once output process data has been received
+/// during the confirmation window.
+pub fn[N : @hal.Nic] request_state_with_process_data(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  pdo_ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let snapshot = request_state_with_process_data_snapshot(
+    nic, station, target, pdo_ctx, timeout,
+  )
+  if snapshot.state != target && snapshot.error_indication {
+    let _ = request_state_control_fp(
+      nic,
+      station,
+      target.to_byte() | b'\x10',
+      timeout,
+    )
+    return wait_for_state_fp_with_process_data_snapshot(
+        nic, station, target, pdo_ctx, timeout,
+      ).state
+  }
+  snapshot.state
+}
+
+///|
 /// Request an ESM state transition using auto-increment addressing.
 pub fn[N : @hal.Nic] request_state_ap(
   nic : N,
@@ -222,6 +286,41 @@ fn[N : @hal.Nic] wait_for_state_fp(
     }
   }
   last_status
+}
+
+///|
+fn[N : @hal.Nic] snapshot_from_status_fp(
+  nic : N,
+  station : UInt,
+  status : Byte,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let status_code = if (status & b'\x10') != b'\x00' {
+    Some(read_al_status_code(nic, station, timeout))
+  } else {
+    None
+  }
+  decode_al_status_snapshot(status, status_code)
+}
+
+///|
+fn[N : @hal.Nic] wait_for_state_fp_with_process_data_snapshot(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  pdo_ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let mut last_status = b'\x00'
+  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+    ignore(pdo_exchange_result(nic, pdo_ctx, timeout))
+    last_status = read_al_status_raw_fp(nic, station, timeout)
+    if (last_status & b'\x0F') == target.to_byte() ||
+      (last_status & b'\x10') != b'\x00' {
+      return snapshot_from_status_fp(nic, station, last_status, timeout)
+    }
+  }
+  snapshot_from_status_fp(nic, station, last_status, timeout)
 }
 
 ///|

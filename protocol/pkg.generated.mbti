@@ -207,6 +207,10 @@ pub fn[N : @hal.Nic] request_state_ap(N, UInt, EsmState, @hal.Duration) -> EsmSt
 
 pub fn[N : @hal.Nic] request_state_aware(N, UInt, EsmState, device_emulation? : Bool, @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] request_state_with_process_data(N, UInt, EsmState, PdoContext, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(N, UInt, EsmState, PdoContext, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
+
 pub fn[N : @hal.Nic] sdo_download(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] sdo_download_complete_access(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, Bytes, @hal.Duration) -> Unit raise @hal.EcError
