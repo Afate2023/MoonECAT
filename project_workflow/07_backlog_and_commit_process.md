@@ -40,8 +40,8 @@
 
 最近回填：
 
-- `Native 自动选卡 + 省略站号广播覆盖` → `2e73969` `test(cli): cover native auto-select and broadcast state`
-- `严格 ESM 路径接入 state/run` → `e0aff06` `feat(esm): wire strict transitions into state and run`
-- `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `3a72979` `fix(runtime): stabilize native op startup sequencing`
-- `Native run 长跑控制 + 连续超时故障 + CLI 周期参数` → `76db9d4` `feat(runtime): add long-run controls and timeout faults`
-- `Native 自动选卡探测 + scan 站地址策略切面` → `d9dba95` `feat(native): auto-probe interfaces and extract scan strategy`
+- `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
+- `严格 ESM 路径接入 state/run` → `e143fce` `feat(esm): wire strict transitions into state and run`
+- `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `a4cb887` `fix(runtime): stabilize native op startup sequencing`
+- `Native run 长跑控制 + 连续超时故障 + CLI 周期参数` → `71f178e` `feat(runtime): add long-run controls and timeout faults`
+- `Native 自动选卡探测 + scan 站地址策略切面` → `bff2f5e` `feat(native): auto-probe interfaces and extract scan strategy`

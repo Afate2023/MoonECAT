@@ -56,10 +56,10 @@
 - [x] 建立单元测试和夹具测试 (~163 tests)。
 - [x] 建立流程回放和最小集成测试。
   - ✅ [runtime/runtime_test.mbt](../runtime/runtime_test.mbt): `replay integration minimal flow: scan->validate->run->stop`
-  - ✅ commit: `420a99a` `test(runtime): add minimal replay integration flow`
+  - ✅ commit: `898616e` `test(runtime): add minimal replay integration flow`
 - [x] 持续把参考分析文档转成实现约束和验收标准。
   - ✅ [docs/REFERENCE_CONSTRAINTS.md](../docs/REFERENCE_CONSTRAINTS.md): 建立“参考调用流 -> 实现约束 -> 测试验收”映射矩阵
-  - ✅ commit: `44dfea1` `docs: map reference callflows to constraints and tests`
+  - ✅ commit: `bc236ed` `docs: map reference callflows to constraints and tests`
 
 ## 5. 依赖顺序
 
@@ -85,7 +85,7 @@
   - ✅ [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `Pressure: timeout-heavy loop keeps accounting consistent`
 - [x] 跟踪不同负载下的周期稳定性和错误率。
   - ✅ [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `Pressure: telemetry remains monotonic across different loads`
-  - ✅ commit: `7c91dcf` `test(runtime): add pressure regression coverage for core loop`
+  - ✅ commit: `e4bff92` `test(runtime): add pressure regression coverage for core loop`
 
 ### 平台接口碎片化
 
@@ -113,7 +113,7 @@
   - ✅ 超时/链路异常: [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `Recovery: run_cycles records RecvTimeout and continues` + `Runtime run_cycle propagates LinkDown on broken NIC`
   - ✅ 配置不一致: [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `run with mock loopback: validation fails when slaves expected but not found`
   - ✅ 重试边界: [mailbox/mailbox_test.mbt](../mailbox/mailbox_test.mbt) `Rmsm record_timeout allows retries up to max`
-  - ✅ commit: `bc33a9f` `test(runtime): cover timeout and link-down recovery paths`
+  - ✅ commit: `97845a4` `test(runtime): cover timeout and link-down recovery paths`
 - [x] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
   - ✅ [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `Decoupling: mailbox diagnosis failure does not block PDO run loop`
-  - ✅ commit: `5f1e012` `test(runtime): verify mailbox and PDO path decoupling`
+  - ✅ commit: `5f7629a` `test(runtime): verify mailbox and PDO path decoupling`

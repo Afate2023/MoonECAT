@@ -46,10 +46,10 @@
   - 📦 [protocol/protocol_test.mbt](../protocol/protocol_test.mbt) (~15 tests)
 
 提交映射（选项 → commit）：
-- `EtherCAT 帧编解码` → `1aeb2f3` `feat: add ethercat frame codec`
-- `PDU 编解码与管线原语` → `3cb23a2` `feat: add pdu pipeline primitives`
-- `Mock Loopback 后端` → `43045fe` `feat: add mock loopback hal`
-- `帧/PDU 收发闭环测试` → `fcfa689` `test: cover frame and pdu roundtrip`
+- `EtherCAT 帧编解码` → `7d4a727` `feat: add ethercat frame codec`
+- `PDU 编解码与管线原语` → `6ca34be` `feat: add pdu pipeline primitives`
+- `Mock Loopback 后端` → `641fc49` `feat: add mock loopback hal`
+- `帧/PDU 收发闭环测试` → `5ab7859` `test: cover frame and pdu roundtrip`
 
 ### M3 拓扑发现、SII/ESI、配置计算 — ✅ 已完成
 
@@ -69,12 +69,12 @@
   - 📦 [fixtures/fixtures.mbt](../fixtures/fixtures.mbt) + [mailbox/mailbox_test.mbt](../mailbox/mailbox_test.mbt) + [runtime/runtime_test.mbt](../runtime/runtime_test.mbt)
 
 提交映射（选项 → commit）：
-- `基础发现流程与拓扑对象` → `9739150` `feat: add slave discovery model`
-- `SII/ESI 最小解析` → `4dde9ff` `feat: parse sii and esi metadata`
-- `FMMU/SM 自动配置计算` → `f64ccba` `feat: calculate fmmu and sync manager mapping`
-- `发现与配置夹具测试` → `5b72cd9` `test: add discovery and config fixture coverage`
-- `网络一致性 4-tuple 校验` → `773692c` `fix(validate): compare full identity 4-tuple`
-- `SII/ESI 规范修正` → `b95a431` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
+- `基础发现流程与拓扑对象` → `ea96328` `feat: add slave discovery model`
+- `SII/ESI 最小解析` → `a8be821` `feat: parse sii and esi metadata`
+- `FMMU/SM 自动配置计算` → `bfbe7d5` `feat: calculate fmmu and sync manager mapping`
+- `发现与配置夹具测试` → `b38f38c` `test: add discovery and config fixture coverage`
+- `网络一致性 4-tuple 校验` → `3a08bff` `fix(validate): compare full identity 4-tuple`
+- `SII/ESI 规范修正` → `2006272` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
 
 ### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成
 
@@ -102,9 +102,9 @@
   - ✅ [mailbox/sii_flags.mbt](../mailbox/sii_flags.mbt) : SiiGeneral::is_op_only/prefers_not_lrw/supports_identification_ado
 
 提交映射（选项 → commit）：
-- `ESM 状态流转与回退` → `3652ca4` `feat: add esm transition engine`
-- `PDO 周期交换主循环` → `88e4a3a` `feat: add pdo runtime loop`
-- `运行时调度与 telemetry` → `e5886a4` `feat: add runtime scheduler and telemetry`
-- `Free Run 与恢复路径测试` → `0ec6ce2` `test: cover free-run and recovery paths`
-- `Device Emulation + OpOnly 扩展` → `ff166d4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
-- `ESM 超时策略（默认值 + 可覆盖策略）` → `394a457` `feat(protocol): add ESM timeout policy and defaults`
+- `ESM 状态流转与回退` → `b4019b1` `feat: add esm transition engine`
+- `PDO 周期交换主循环` → `cfd6f14` `feat: add pdo runtime loop`
+- `运行时调度与 telemetry` → `ddc6158` `feat: add runtime scheduler and telemetry`
+- `Free Run 与恢复路径测试` → `3ccd459` `test: cover free-run and recovery paths`
+- `Device Emulation + OpOnly 扩展` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
+- `ESM 超时策略（默认值 + 可覆盖策略）` → `51ab95c` `feat(protocol): add ESM timeout policy and defaults`

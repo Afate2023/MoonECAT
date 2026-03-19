@@ -35,13 +35,13 @@
   - ✅ [protocol/sdo_transaction.mbt](../protocol/sdo_transaction.mbt): `sdo_info_get_od_description` / `sdo_info_get_oe_description`
 
 提交映射（选项 → commit）：
-- `SDO Upload/Download 事务闭环` → `f161c3c` `feat: add coe sdo transaction engine`
-- `Mailbox Resilient Layer (RMSM)` + `Mailbox polling` + `Emergency Message` → `ff166d4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
-- `Segmented Transfer（上传）` → `ce75e4e` `feat: add segmented SDO upload path`
-- `Complete Access + SDO Info 基础` → `250e770` `feat: add complete-access and sdo-info foundations`
-- `Segmented Transfer（下载）+ CA 分段续传` → `f9fc97c` `feat: complete segmented sdo and CA continuation`
-- `SDO Info OD/OE + 运行态 DC 补偿联动实现`（含 SDO Info 完整收口） → `766037d` `feat: complete sdo info and runtime dc compensation`
-- `格式与接口同步` → `594e30c` `chore: sync formatted sources and mbti after info`
+- `SDO Upload/Download 事务闭环` → `698052c` `feat: add coe sdo transaction engine`
+- `Mailbox Resilient Layer (RMSM)` + `Mailbox polling` + `Emergency Message` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
+- `Segmented Transfer（上传）` → `27b9c4b` `feat: add segmented SDO upload path`
+- `Complete Access + SDO Info 基础` → `afb1a29` `feat: add complete-access and sdo-info foundations`
+- `Segmented Transfer（下载）+ CA 分段续传` → `9266591` `feat: complete segmented sdo and CA continuation`
+- `SDO Info OD/OE + 运行态 DC 补偿联动实现`（含 SDO Info 完整收口） → `0971f77` `feat: complete sdo info and runtime dc compensation`
+- `格式与接口同步` → `a969b5e` `chore: sync formatted sources and mbti after info`
 
 ### M6 网络配置增强 — ✅ 已完成
 
@@ -55,14 +55,14 @@
   - ✅ [protocol/discovery.mbt](../protocol/discovery.mbt): `read_station_alias` + `enable_alias_addressing`
 - [x] Error Register / Diagnosis Object 接口：向应用暴露错误和诊断信息 [ETG.1500 §5.3.5]
   - ✅ [runtime/diagnosis.mbt](../runtime/diagnosis.mbt): `read_error_register`/`read_diagnosis_counter`/`read_slave_diagnosis`
-  - ✅ 真实设备诊断路径已稳定：修复 FP 地址打包、ESM 轮询/告警确认、Mailbox 轮询窗口与 CoE 头地址语义，并补齐 diagnosis 专用 prepare/restore helper（commit: `9529449`）
+  - ✅ 真实设备诊断路径已稳定：修复 FP 地址打包、ESM 轮询/告警确认、Mailbox 轮询窗口与 CoE 头地址语义，并补齐 diagnosis 专用 prepare/restore helper（commit: `fa72af8`）
 
 提交映射（选项 → commit）：
-- `EEPROM/SII 寄存器级读取流程` → `ff166d4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
-- `Explicit Device Identification (#303)` → `8c6070f` `feat: add explicit device identification validation`
-- `Station Alias Addressing` → `690427d` `feat: implement IRQ consumption and alias addressing path`
-- `Error Register / Diagnosis Object 接口` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
-- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
+- `EEPROM/SII 寄存器级读取流程` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
+- `Explicit Device Identification (#303)` → `9ce7516` `feat: add explicit device identification validation`
+- `Station Alias Addressing` → `fbb3745` `feat: implement IRQ consumption and alias addressing path`
+- `Error Register / Diagnosis Object 接口` → `9541967` `feat: wire cli commands and add diagnosis interface`
+- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `fa72af8` `Fix real-device diagnosis transport and runtime helpers`
 
 ### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
 
@@ -80,9 +80,9 @@
   - ✅ [protocol/dc.mbt](../protocol/dc.mbt): `dc_read_sync_window`
 
 提交映射（选项 → commit）：
-- `DC 初始化流程 + SYNC0 + 漂移补偿主路径` → `533285d` `feat: implement distributed clock runtime and protocol support`
-- `传播延迟估计模型改进` → `d52498b` `feat: improve dc propagation delay estimation`
-- `运行态连续传播延迟补偿（周期重估）` → `766037d` `feat: complete sdo info and runtime dc compensation`
+- `DC 初始化流程 + SYNC0 + 漂移补偿主路径` → `ce48f37` `feat: implement distributed clock runtime and protocol support`
+- `传播延迟估计模型改进` → `4287d29` `feat: improve dc propagation delay estimation`
+- `运行态连续传播延迟补偿（周期重估）` → `0971f77` `feat: complete sdo info and runtime dc compensation`
 
 ### M8 CLI、文档、最终集成与多后端交付 — ⚠️ Native / Extism 后端待落地
 
@@ -98,18 +98,18 @@
   - ✅ 当前已支持 `--backend <mock|native|native-windows-npcap|native-linux-raw>` 与 `--if <interface>` 参数，默认仍为 mock
   - ✅ `run` 已支持 `--startup-state` / `--shutdown-state`，可控制运行前后 EtherCAT 从站状态机迁移
   - ✅ `diagnosis` 已支持通过 Native 后端对指定从站读取 Error Register / Diagnosis Counter，支持 `--station` 与 JSON 输出
-  - ✅ `od` 已支持通过 Native 后端对指定从站执行 `OD List` / `OD Description` / `OE Description` 只读浏览，支持 `--station`、`--index`、`--subindex`、`--list-type` 与 JSON 输出（commit: `3832187`）
-  - ✅ `od` 失败路径已补齐结构化错误输出：JSON `error.category/detail/abort_code` 与文本 `Error Category` / `Abort Code` / `Error Detail` 同步，分类稳定到 `transport-failure` / `protocol-failure` / `unsupported`（commit: `6bdaa00`）
-  - ✅ diagnosis 的 mailbox/ESM 准备与恢复逻辑已下沉到 [runtime/diagnosis.mbt](../runtime/diagnosis.mbt)，CLI 保持为薄封装；`Init -> PreOp` 归一化仅用于 diagnosis，不泛化到通用 state 命令（commit: `46592ca`）
+  - ✅ `od` 已支持通过 Native 后端对指定从站执行 `OD List` / `OD Description` / `OE Description` 只读浏览，支持 `--station`、`--index`、`--subindex`、`--list-type` 与 JSON 输出（commit: `fcc384e`）
+  - ✅ `od` 失败路径已补齐结构化错误输出：JSON `error.category/detail/abort_code` 与文本 `Error Category` / `Abort Code` / `Error Detail` 同步，分类稳定到 `transport-failure` / `protocol-failure` / `unsupported`（commit: `f8f75bd`）
+  - ✅ diagnosis 的 mailbox/ESM 准备与恢复逻辑已下沉到 [runtime/diagnosis.mbt](../runtime/diagnosis.mbt)，CLI 保持为薄封装；`Init -> PreOp` 归一化仅用于 diagnosis，不泛化到通用 state 命令（commit: `24e89e6`）
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
-  - ✅ [cmd/main/main.mbt](../cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](../cmd/main/main_wbtest.mbt)，代码提交：`0b374aa`
+  - ✅ [cmd/main/main.mbt](../cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](../cmd/main/main_wbtest.mbt)，代码提交：`26166fc`
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](../docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](../docs/NATIVE_BACKEND_PLAN.md)
-  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `061928d`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `8ac4ce6`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `f691f91`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `834884b` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `d9dba95`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。随后补齐了 Native 自动选卡 / 省略 `--station` 广播语义的 CLI 覆盖（commit: `2e73969`），并把严格 ESM 路径、AL 错误清除和 state/run 统一状态迁移接到实机路径上（commit: `e0aff06`）；2026-03-18 再按 EtherCAT Compendium 重排 `run --startup-state op` 的启动阶段、补充基于 AL Status Code 的恢复策略，并把 startup mapping 扩展为同时写入 mailbox `SM0/SM1` 与 PDO SyncManager/FMMU，使真实单从站链路重新稳定进入 `Op`（commit: `3a72979`）。2026-03-19 又补齐了基于 EEPROM 元数据的完整 SII 补读、`Init -> PreOp` mailbox/diagnosis 严格恢复路径，以及零长度 PDO SM 的位宽回填，当前在新伺服上已重新验证 `state --path --state preop`、`diagnosis` 与 `od` 可用（commit: `b4b5993`）；但 `PreOp -> SafeOp` 仍因激活 CoE PDO 赋值 (`0x1C12/0x1C13 -> 0x1602/0x1A02`) 与 SII PDO 描述不一致而卡在 `AL 0x001E`，下一步需让 SafeOp 过程映射优先采用 CoE 激活 PDO。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+  - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `4eabaf7`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `1a38d47`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `263394a`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `bd95053` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `bff2f5e`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。随后补齐了 Native 自动选卡 / 省略 `--station` 广播语义的 CLI 覆盖（commit: `5c4dd51`），并把严格 ESM 路径、AL 错误清除和 state/run 统一状态迁移接到实机路径上（commit: `e143fce`）；2026-03-18 再按 EtherCAT Compendium 重排 `run --startup-state op` 的启动阶段、补充基于 AL Status Code 的恢复策略，并把 startup mapping 扩展为同时写入 mailbox `SM0/SM1` 与 PDO SyncManager/FMMU，使真实单从站链路重新稳定进入 `Op`（commit: `a4cb887`）。2026-03-19 又补齐了基于 EEPROM 元数据的完整 SII 补读、`Init -> PreOp` mailbox/diagnosis 严格恢复路径，以及零长度 PDO SM 的位宽回填，当前在新伺服上已重新验证 `state --path --state preop`、`diagnosis` 与 `od` 可用（commit: `e763563`）；但 `PreOp -> SafeOp` 仍因激活 CoE PDO 赋值 (`0x1C12/0x1C13 -> 0x1602/0x1A02`) 与 SII PDO 描述不一致而卡在 `AL 0x001E`，下一步需让 SafeOp 过程映射优先采用 CoE 激活 PDO。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
   - ✅ 参考 [References/EtherCAT_Compendium/EtherCAT_Compendium.md](../References/EtherCAT_Compendium/EtherCAT_Compendium.md) §3.9 Working Counter、§7 EtherCAT State Machine、§7.4 AL Status Codes：Native `diagnosis` 现已在进入 PreOp 前抓取单站 `AL Status(0x0130)` / Error Flag / `AL Status Code(0x0134)` 快照，并与 CoE `0x1001` / `0x10F3` 一并输出，便于 WKC 或 ESM 异常后的逐站定位
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
@@ -158,7 +158,7 @@
   - 非目标：插件内部直连 Raw Socket、在 `protocol/` 或 `runtime/` 中直接依赖 Extism API、单独维护第二套 CLI 逻辑
   - 依赖：`docs/EXTISM_HOST_BOUNDARY.md`、共享内存信封格式、稳定的库层 API
 - [x] **【新增】多后端发布物矩阵**：把 CLI Native、Library Native、Extism Plugin 三类产物的边界、配置与回归入口写清楚。
-  - ✅ [docs/BACKEND_RELEASE_MATRIX.md](../docs/BACKEND_RELEASE_MATRIX.md)：已补齐 Native CLI / Native Library / Extism Plugin 的输入、输出、依赖环境与最小验证命令（commit: `8aa93aa`）
+  - ✅ [docs/BACKEND_RELEASE_MATRIX.md](../docs/BACKEND_RELEASE_MATRIX.md)：已补齐 Native CLI / Native Library / Extism Plugin 的输入、输出、依赖环境与最小验证命令（commit: `5583dcb`）
   - ✅ 当前 Native CLI smoke 已在 Windows Npcap 1.8.4 上实测跑通：`list-if -> scan -> validate -> run`，其中空总线场景返回 `0 slaves / PASS / Done`
   - ✅ 2026-03-12 再验证：`moon test` = `286/286`、`moon test hal/native` = `5/5`、`moon test plugin/extism` = `5/5`，且 `list-if` 与 Realtek USB GbE 接口上的 `scan` 均成功
   - ✅ 2026-03-16 再验证：`moon run cmd/main list-if -- --backend native --json` 已能把 Realtek USB GbE 识别为唯一 `connected=true / wireless=false` 候选；随后 `moon run cmd/main scan -- --backend native --json` 在省略 `--if` 时自动选中该口并扫描到 1 个真实从站（station 4097 / vendor 1894 / product 2320）
@@ -186,32 +186,32 @@
 - `backend release matrix docs`：交付物矩阵、运行方式与回归入口整理
 
 提交映射（选项 → commit）：
-- `moonecat scan` 库层接口 → `04b1e6d` `feat: add moonecat scan command`
-- `moonecat validate` 库层接口 → `452a661` `feat: add moonecat validate command`
-- `moonecat run` 库层接口框架 → `9c9bc85` `feat: add moonecat run command`
-- `补全文档（架构/接口/测试方式）` → `e5d8a81` `docs: document architecture and user workflows`
-- `CLI 实际接入` + `结构化诊断输出` → `f4696dc` `feat: wire cli commands and add diagnosis interface`
-- `Windows Npcap Native 后端骨架` → `92c9a5e` `feat(native): add windows npcap backend scaffold`
-- `Native interface enumeration + runtime loading` → `061928d` `feat(native): load npcap at runtime and enable list-if`
-- `Native CLI smoke regression + release matrix docs` → `8aa93aa` `test(cli): add native smoke regression and release matrix docs`
-- `Native real smoke stability fix` → `8ac4ce6` `fix(native): stabilize real smoke run path`
-- `Native slave identity recovery` → `f691f91` `fix(native): recover slave identity from real scans`
-- `Native interface auto-probe + scan strategy seam` → `d9dba95` `feat(native): auto-probe interfaces and extract scan strategy`
-- `最小 read-sii CLI 入口` → `0b374aa` `feat(cli): add minimal read-sii command`
-- `Native EtherCAT 状态迁移 CLI 入口` → `b29927b` `feat(cli): add native ethercat state transition command`
-- `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `834884b` `feat(native): add configurable run states and raw-socket error mapping`
-- `Native 自动选卡 + 省略站号广播覆盖` → `2e73969` `test(cli): cover native auto-select and broadcast state`
-- `严格 ESM 路径接入 state/run` → `e0aff06` `feat(esm): wire strict transitions into state and run`
-- `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `3a72979` `fix(runtime): stabilize native op startup sequencing`
-- `Native mailbox diagnosis CLI 入口` → `d581026` `feat(cli): add native diagnosis command`
-- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `9529449` `Fix real-device diagnosis transport and runtime helpers`
-- `CLI diagnosis 改为 runtime session helper 薄封装` → `46592ca` `Refactor CLI diagnosis to use runtime session helpers`
-- `对象字典浏览 CLI 入口` → `3832187` `feat(cli): add object dictionary browsing command`
-- `对象字典浏览错误分类与结构化失败输出` → `6bdaa00` `feat(cli): classify od browse failures`
-- `CLI 后端选择（mock/native）` → `c004811` `feat(cli): add selectable mock and native backends`
-- `Extism / WASM 插件骨架` → `57e6521` `feat(extism): scaffold plugin envelopes and entrypoints`
-- `Extism Mock 回放入口` → `3a9e8d7` `feat(extism): wire mock replay scan validate run entrypoints`
-- `Extism host capability contract` → `f9c7131` `feat(extism): describe required host capabilities`
-- `接口与格式同步` → `594e30c` `chore: sync formatted sources and mbti after info`
-- `Extism 宿主接入边界整理` → `db9bb9e` `docs: refresh remaining items and define Extism host boundary`
-- `Native run 长跑控制、连续超时故障与 CLI 周期参数` → `76db9d4` `feat(runtime): add long-run controls and timeout faults`
+- `moonecat scan` 库层接口 → `1c427d7` `feat: add moonecat scan command`
+- `moonecat validate` 库层接口 → `3d921de` `feat: add moonecat validate command`
+- `moonecat run` 库层接口框架 → `a9dbc96` `feat: add moonecat run command`
+- `补全文档（架构/接口/测试方式）` → `f5d3b14` `docs: document architecture and user workflows`
+- `CLI 实际接入` + `结构化诊断输出` → `9541967` `feat: wire cli commands and add diagnosis interface`
+- `Windows Npcap Native 后端骨架` → `c873347` `feat(native): add windows npcap backend scaffold`
+- `Native interface enumeration + runtime loading` → `4eabaf7` `feat(native): load npcap at runtime and enable list-if`
+- `Native CLI smoke regression + release matrix docs` → `5583dcb` `test(cli): add native smoke regression and release matrix docs`
+- `Native real smoke stability fix` → `1a38d47` `fix(native): stabilize real smoke run path`
+- `Native slave identity recovery` → `263394a` `fix(native): recover slave identity from real scans`
+- `Native interface auto-probe + scan strategy seam` → `bff2f5e` `feat(native): auto-probe interfaces and extract scan strategy`
+- `最小 read-sii CLI 入口` → `26166fc` `feat(cli): add minimal read-sii command`
+- `Native EtherCAT 状态迁移 CLI 入口` → `f01a411` `feat(cli): add native ethercat state transition command`
+- `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `bd95053` `feat(native): add configurable run states and raw-socket error mapping`
+- `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
+- `严格 ESM 路径接入 state/run` → `e143fce` `feat(esm): wire strict transitions into state and run`
+- `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `a4cb887` `fix(runtime): stabilize native op startup sequencing`
+- `Native mailbox diagnosis CLI 入口` → `36cfe87` `feat(cli): add native diagnosis command`
+- `真实设备 diagnosis 传输与 runtime helper 稳定化` → `fa72af8` `Fix real-device diagnosis transport and runtime helpers`
+- `CLI diagnosis 改为 runtime session helper 薄封装` → `24e89e6` `Refactor CLI diagnosis to use runtime session helpers`
+- `对象字典浏览 CLI 入口` → `fcc384e` `feat(cli): add object dictionary browsing command`
+- `对象字典浏览错误分类与结构化失败输出` → `f8f75bd` `feat(cli): classify od browse failures`
+- `CLI 后端选择（mock/native）` → `04fa2f9` `feat(cli): add selectable mock and native backends`
+- `Extism / WASM 插件骨架` → `2484759` `feat(extism): scaffold plugin envelopes and entrypoints`
+- `Extism Mock 回放入口` → `9cc3456` `feat(extism): wire mock replay scan validate run entrypoints`
+- `Extism host capability contract` → `f0661ce` `feat(extism): describe required host capabilities`
+- `接口与格式同步` → `a969b5e` `chore: sync formatted sources and mbti after info`
+- `Extism 宿主接入边界整理` → `137f80a` `docs: refresh remaining items and define Extism host boundary`
+- `Native run 长跑控制、连续超时故障与 CLI 周期参数` → `71f178e` `feat(runtime): add long-run controls and timeout faults`
