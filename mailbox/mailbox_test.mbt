@@ -140,7 +140,7 @@ test "parse_sii_sm from fixture" {
   assert_eq(sm_entries[0].length, 128U)
   assert_eq(sm_entries[0].sm_type, @mailbox.SmType::MailboxOut)
   assert_eq(sm_entries[0].status, b'\x00')
-  assert_true(sm_entries[0].enable)
+  assert_eq(sm_entries[0].activate, b'\x01')
   assert_eq(sm_entries[1].physical_start, 0x1080U)
   assert_eq(sm_entries[1].sm_type, @mailbox.SmType::MailboxIn)
 }
@@ -201,7 +201,7 @@ test "calculate_sm_configs uses sii header for mailbox" {
       length: 0U,
       control: b'\x26',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxOut,
     },
     {
@@ -209,7 +209,7 @@ test "calculate_sm_configs uses sii header for mailbox" {
       length: 0U,
       control: b'\x22',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxIn,
     },
   ]
@@ -230,7 +230,7 @@ test "calculate_fmmu_configs maps process data" {
       length: 128U,
       control: b'\x26',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxOut,
     },
     {
@@ -238,7 +238,7 @@ test "calculate_fmmu_configs maps process data" {
       length: 128U,
       control: b'\x22',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxIn,
     },
     {
@@ -246,7 +246,7 @@ test "calculate_fmmu_configs maps process data" {
       length: 32U,
       control: b'\x64',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataOut,
     },
     {
@@ -254,7 +254,7 @@ test "calculate_fmmu_configs maps process data" {
       length: 16U,
       control: b'\x20',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataIn,
     },
   ]
@@ -301,7 +301,7 @@ test "SmConfig to_bytes roundtrip" {
     length: 128U,
     control: b'\x26',
     status: b'\x00',
-    enable: true,
+    activate: b'\x01',
     sm_type: @mailbox.SmType::MailboxOut,
   }
   let encoded = sm.to_bytes()
@@ -314,7 +314,7 @@ test "SmConfig to_bytes roundtrip" {
   assert_eq(encoded[3], b'\x00')
   // Control
   assert_eq(encoded[4], b'\x26')
-  // Enable
+  // Activation register
   assert_eq(encoded[6], b'\x01')
 }
 
@@ -369,7 +369,7 @@ test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
       length: 128U,
       control: b'\x26',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxOut,
     },
     {
@@ -377,7 +377,7 @@ test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
       length: 128U,
       control: b'\x22',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxIn,
     },
     {
@@ -385,7 +385,7 @@ test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
       length: 0U,
       control: b'\x64',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataOut,
     },
     {
@@ -393,7 +393,7 @@ test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
       length: 0U,
       control: b'\x20',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataIn,
     },
   ]
@@ -454,9 +454,7 @@ test "apply_pdo_lengths_to_sm_configs backfills zero-length process sms" {
     },
   ]
   let patched = @mailbox.apply_pdo_lengths_to_sm_configs(
-    sm_configs,
-    tx_pdos,
-    rx_pdos,
+    sm_configs, tx_pdos, rx_pdos,
   )
   assert_eq(patched[2].length, 6U)
   assert_eq(patched[3].length, 6U)
@@ -510,7 +508,7 @@ test "calculate_fmmu_configs with no FMMU directions" {
       length: 32U,
       control: b'\x64',
       status: b'\x00',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataOut,
     },
   ]
@@ -561,7 +559,7 @@ test "SmConfig to_bytes length is always 8" {
       length: 0U,
       control: b'\x00',
       status: b'\x00',
-      enable: false,
+      activate: b'\x00',
       sm_type: @mailbox.SmType::Unused,
     },
     {
@@ -569,7 +567,7 @@ test "SmConfig to_bytes length is always 8" {
       length: 0xFFFFU,
       control: b'\xFF',
       status: b'\xFF',
-      enable: true,
+      activate: b'\x01',
       sm_type: @mailbox.SmType::ProcessDataIn,
     },
   ]

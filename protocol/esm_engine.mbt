@@ -6,6 +6,9 @@
 let request_state_max_polls : Int = 32
 
 ///|
+let request_state_extended_max_polls : Int = 4096
+
+///|
 pub(all) struct EsmStatusSnapshot {
   state : EsmState
   error_indication : Bool
@@ -235,6 +238,37 @@ pub fn[N : @hal.Nic] clear_al_error(
 }
 
 ///|
+fn should_rollback_al_error_to_init(status_code : UInt?) -> Bool {
+  match status_code {
+    Some(0x0016U) | Some(0x001DU) | Some(0x001EU) | Some(0x0070U) => true
+    _ => false
+  }
+}
+
+///|
+/// Recover from a pending AL error before the caller selects a new target
+/// state. Configuration-stage failures are stabilized by rolling back to Init;
+/// other errors are acknowledged in place.
+pub fn[N : @hal.Nic] recover_al_error_for_transition(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, timeout)
+  if not(snapshot.error_indication) {
+    return snapshot
+  }
+  if should_rollback_al_error_to_init(snapshot.status_code) &&
+    snapshot.state != Init {
+    let final_state = request_state(nic, station, Init, timeout)
+    return read_al_status_snapshot(nic, station, timeout) catch {
+      _ => { state: final_state, error_indication: false, status_code: None }
+    }
+  }
+  clear_al_error(nic, station, timeout)
+}
+
+///|
 pub fn[N : @hal.Nic] clear_al_error_ap(
   nic : N,
   position : UInt,
@@ -279,7 +313,8 @@ fn[N : @hal.Nic] wait_for_state_fp(
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
   let mut last_status = b'\x00'
-  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+  let poll_budget = request_state_poll_budget(target, timeout)
+  for _attempt = 0; _attempt < poll_budget; _attempt = _attempt + 1 {
     last_status = read_al_status_raw_fp(nic, station, timeout)
     if (last_status & b'\x0F') == target.to_byte() {
       return last_status
@@ -312,7 +347,8 @@ fn[N : @hal.Nic] wait_for_state_fp_with_process_data_snapshot(
   timeout : @hal.Duration,
 ) -> EsmStatusSnapshot raise @hal.EcError {
   let mut last_status = b'\x00'
-  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+  let poll_budget = request_state_poll_budget(target, timeout)
+  for _attempt = 0; _attempt < poll_budget; _attempt = _attempt + 1 {
     ignore(pdo_exchange_result(nic, pdo_ctx, timeout))
     last_status = read_al_status_raw_fp(nic, station, timeout)
     if (last_status & b'\x0F') == target.to_byte() ||
@@ -331,13 +367,36 @@ fn[N : @hal.Nic] wait_for_state_ap(
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
   let mut last_status = b'\x00'
-  for _attempt = 0; _attempt < request_state_max_polls; _attempt = _attempt + 1 {
+  let poll_budget = request_state_poll_budget(target, timeout)
+  for _attempt = 0; _attempt < poll_budget; _attempt = _attempt + 1 {
     last_status = read_al_status_raw_ap(nic, position, timeout)
     if (last_status & b'\x0F') == target.to_byte() {
       return last_status
     }
   }
   last_status
+}
+
+///|
+fn request_state_poll_budget(target : EsmState, timeout : @hal.Duration) -> Int {
+  let @hal.Duration(transport_timeout_ns) = timeout
+  let @hal.Duration(transition_timeout_ns) = esm_default_timeout(target)
+  let effective_transport_timeout_ns = if transport_timeout_ns > 0L {
+    transport_timeout_ns
+  } else {
+    1L
+  }
+  let suggested_polls = ((
+    transition_timeout_ns + effective_transport_timeout_ns - 1L
+  ) /
+  effective_transport_timeout_ns).to_int()
+  if suggested_polls <= request_state_max_polls {
+    request_state_max_polls
+  } else if suggested_polls >= request_state_extended_max_polls {
+    request_state_extended_max_polls
+  } else {
+    suggested_polls
+  }
 }
 
 ///|
@@ -628,8 +687,10 @@ pub fn build_strict_transition_route(
 /// Strict state transition entry point.
 ///
 /// If AL Error Indication is currently set, this function refuses to guess the
-/// recovery policy and requires the caller to clear the error first via
-/// `clear_al_error(...)`, then explicitly choose the next target state.
+/// recovery policy and requires the caller to recover the error first via
+/// `recover_al_error_for_transition(...)` (or `clear_al_error(...)` when the
+/// caller knows an in-place acknowledge is correct), then explicitly choose
+/// the next target state.
 pub fn[N : @hal.Nic] transition_to_target_strict(
   nic : N,
   station : UInt,

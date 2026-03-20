@@ -397,7 +397,7 @@ pub(all) struct SiiSmEntry {
   length : UInt
   control : Byte
   status : Byte
-  enable : Bool
+  activate : Byte
   sm_type : SmType
 } derive(Eq, Show)
 
@@ -412,7 +412,7 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
     let length = read_sii_word(data, offset / 2 + 1)
     let control = data[offset + 4]
     let status = data[offset + 5]
-    let enable = (data[offset + 6].to_int() & 0x01) != 0
+    let activate = data[offset + 6]
     let type_byte = data[offset + 7]
     let sm_type : SmType = match type_byte {
       b'\x01' => MailboxOut
@@ -426,7 +426,7 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
       length,
       control,
       status,
-      enable,
+      activate,
       sm_type,
     })
     offset = offset + entry_size

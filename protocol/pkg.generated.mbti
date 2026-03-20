@@ -141,6 +141,8 @@ pub fn[N : @hal.Nic] read_station_alias(N, UInt, @hal.Duration) -> UInt raise @h
 
 pub fn readwrite_command(AddressType) -> EcCommand
 
+pub fn[N : @hal.Nic] recover_al_error_for_transition(N, UInt, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
+
 pub let reg_al_control : UInt
 
 pub let reg_al_status : UInt

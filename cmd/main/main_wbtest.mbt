@@ -1326,7 +1326,7 @@ pub impl @hal.Nic for StrictTransitionNic with close(self) {
 }
 
 ///|
-test "cli state path clears error then follows strict route" {
+test "cli state path recovers configuration error to init" {
   let nic = StrictTransitionNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
   let timeout = @hal.Duration(1000L)
   let report = compute_station_transition_report(
@@ -1341,16 +1341,12 @@ test "cli state path clears error then follows strict route" {
   assert_eq(report.final_state, Some(@protocol.EsmState::Init))
   assert_eq(report.al_error_flag, Some(false))
   assert_eq(report.status_code, None)
-  assert_eq(nic.control_writes.length(), 3)
+  assert_eq(nic.control_writes.length(), 2)
   assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
-  assert_eq(
-    nic.control_writes[1] & b'\x0F',
-    @protocol.EsmState::PreOp.to_byte(),
-  )
-  assert_eq(nic.control_writes[2] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
 }
 
 ///|
@@ -1634,7 +1630,7 @@ test "cli read-sii json includes categories" {
         length: 256U,
         control: b'\x26',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.SmType::MailboxOut,
       },
     ],
@@ -1680,4 +1676,128 @@ test "cli read-sii json includes categories" {
   assert_true(text.contains("\"tx_pdo\""))
   assert_true(text.contains("\"strings\""))
   assert_true(text.contains("\"categories\""))
+}
+
+///|
+test "cli decode esc syncmanager window decodes physical fields" {
+  let report = decode_esc_sync_manager_window(
+    2,
+    0x0810U,
+    Bytes::from_array([
+      b'\x00', b'\x11', b'\x06', b'\x00', b'\x64', b'\x00', b'\x01', b'\x00',
+    ]),
+  )
+  assert_eq(report.index, 2)
+  assert_eq(report.register_offset, 0x0810U)
+  assert_eq(report.physical_start, 0x1100U)
+  assert_eq(report.length, 6U)
+  assert_eq(report.control, b'\x64')
+  assert_eq(report.activate, b'\x01')
+}
+
+///|
+test "cli decode esc fmmu window decodes addressing fields" {
+  let report = decode_esc_fmmu_window(
+    0,
+    0x0600U,
+    Bytes::from_array([
+      b'\x00', b'\x10', b'\x00', b'\x00', b'\x06', b'\x00', b'\x00', b'\x07', b'\x00',
+      b'\x11', b'\x00', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00',
+    ]),
+  )
+  assert_eq(report.index, 0)
+  assert_eq(report.logical_start, 0x1000U)
+  assert_eq(report.length, 6U)
+  assert_eq(report.physical_start, 0x1100U)
+  assert_eq(report.type_register, b'\x02')
+  assert_eq(report.activate, b'\x01')
+}
+
+///|
+test "cli expected syncmanager report encodes computed config" {
+  let mapping : @mailbox.SlaveMapping = {
+    sm_configs: [
+      {
+        physical_start: 0x1000U,
+        length: 8U,
+        control: b'\x26',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.MailboxOut,
+      },
+      {
+        physical_start: 0x1080U,
+        length: 8U,
+        control: b'\x22',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.MailboxIn,
+      },
+      {
+        physical_start: 0x1100U,
+        length: 6U,
+        control: b'\x64',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.ProcessDataOut,
+      },
+      {
+        physical_start: 0x1180U,
+        length: 10U,
+        control: b'\x20',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.ProcessDataIn,
+      },
+    ],
+    fmmu_configs: [],
+    output_bytes: 6,
+    input_bytes: 10,
+  }
+  let report = expected_sync_manager_register_report(mapping, 2)
+  assert_eq(report.index, 2)
+  assert_eq(report.register_offset, 0x0810U)
+  assert_eq(report.physical_start, 0x1100U)
+  assert_eq(report.length, 6U)
+  assert_eq(report.control, b'\x64')
+  assert_eq(report.activate, b'\x01')
+}
+
+///|
+test "cli expected fmmu report encodes computed config" {
+  let mapping : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [
+      {
+        logical_start: 0x1000U,
+        length: 6U,
+        logical_start_bit: b'\x00',
+        logical_end_bit: b'\x07',
+        physical_start: 0x1100U,
+        physical_start_bit: b'\x00',
+        direction: @mailbox.Outputs,
+        activate: true,
+      },
+      {
+        logical_start: 0x1006U,
+        length: 10U,
+        logical_start_bit: b'\x00',
+        logical_end_bit: b'\x07',
+        physical_start: 0x1180U,
+        physical_start_bit: b'\x00',
+        direction: @mailbox.Inputs,
+        activate: true,
+      },
+    ],
+    output_bytes: 6,
+    input_bytes: 10,
+  }
+  let report = expected_fmmu_register_report(mapping, 0)
+  assert_eq(report.index, 0)
+  assert_eq(report.register_offset, 0x0600U)
+  assert_eq(report.logical_start, 0x1000U)
+  assert_eq(report.length, 6U)
+  assert_eq(report.physical_start, 0x1100U)
+  assert_eq(report.type_register, b'\x02')
+  assert_eq(report.activate, b'\x01')
 }

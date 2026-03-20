@@ -6,6 +6,8 @@ import {
 }
 
 // Values
+pub fn apply_pdo_lengths_to_sm_configs(Array[SmConfig], Array[SiiPdo], Array[SiiPdo]) -> Array[SmConfig]
+
 pub fn build_sdo_download(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
 pub fn build_sdo_download_ca(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
@@ -370,7 +372,7 @@ pub(all) struct SiiSmEntry {
   length : UInt
   control : Byte
   status : Byte
-  enable : Bool
+  activate : Byte
   sm_type : SmType
 }
 pub impl Eq for SiiSmEntry
@@ -398,7 +400,7 @@ pub(all) struct SmConfig {
   length : UInt
   control : Byte
   status : Byte
-  enable : Bool
+  activate : Byte
   sm_type : SmType
 }
 pub fn SmConfig::to_bytes(Self) -> Bytes

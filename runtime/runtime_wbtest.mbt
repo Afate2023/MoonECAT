@@ -104,6 +104,248 @@ test "runtime required sii read word count expands to eeprom metadata size" {
 }
 
 ///|
+pub struct ActivePdoLengthsNic {
+  mut next_response : Bytes
+  mut pending_mailbox_response : Bytes
+  mut is_open : Bool
+  mut mailbox_ready : Bool
+}
+
+///|
+fn ActivePdoLengthsNic::new() -> ActivePdoLengthsNic {
+  {
+    next_response: Bytes::new(0),
+    pending_mailbox_response: Bytes::new(0),
+    is_open: true,
+    mailbox_ready: false,
+  }
+}
+
+///|
+fn mailbox_status_bytes(ready : Bool) -> Bytes {
+  Bytes::makei(8, fn(i) {
+    if i == 5 {
+      if ready {
+        b'\x08'
+      } else {
+        b'\x00'
+      }
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn response_payload_for_object(
+  index : UInt,
+  subindex : Byte,
+) -> Bytes raise @hal.EcError {
+  match (index, subindex) {
+    (0x1C12U, b'\x00') => Bytes::from_array([b'\x01'])
+    (0x1C12U, b'\x01') => Bytes::from_array([b'\x02', b'\x16'])
+    (0x1C13U, b'\x00') => Bytes::from_array([b'\x01'])
+    (0x1C13U, b'\x01') => Bytes::from_array([b'\x02', b'\x1A'])
+    (0x1602U, b'\x00') => Bytes::from_array([b'\x02'])
+    (0x1602U, b'\x01') =>
+      Bytes::from_array([b'\x60', b'\x40', b'\x00', b'\x10'])
+    (0x1602U, b'\x02') =>
+      Bytes::from_array([b'\x60', b'\xFF', b'\x00', b'\x20'])
+    (0x1A02U, b'\x00') => Bytes::from_array([b'\x02'])
+    (0x1A02U, b'\x01') =>
+      Bytes::from_array([b'\x60', b'\x41', b'\x00', b'\x10'])
+    (0x1A02U, b'\x02') =>
+      Bytes::from_array([b'\x60', b'\x64', b'\x00', b'\x20'])
+    _ => raise @hal.EcError::SdoAbort(0x06090011U)
+  }
+}
+
+///|
+fn build_sdo_upload_response_frame(
+  station : UInt,
+  counter : Byte,
+  index : UInt,
+  subindex : Byte,
+  payload : Bytes,
+) -> Bytes {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  let n_unused = 4 - payload.length()
+  let command = b'\x43' | (n_unused.to_byte() << 2)
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30'
+    } else if i == 8 {
+      command
+    } else if i == 9 {
+      (index & 0xFFU).to_byte()
+    } else if i == 10 {
+      ((index >> 8) & 0xFFU).to_byte()
+    } else if i == 11 {
+      subindex
+    } else if i < 12 + payload.length() {
+      payload[i - 12]
+    } else {
+      b'\x00'
+    }
+  })
+  Bytes::makei(128, fn(i) {
+    if i < frame.length() {
+      frame[i]
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn active_pdo_mailbox_response(data : Bytes) -> Bytes raise @hal.EcError {
+  let mbh = @mailbox.MailboxHeader::from_bytes(data)
+  let index = data[9].to_uint() | (data[10].to_uint() << 8)
+  let subindex = data[11]
+  let payload = response_payload_for_object(index, subindex)
+  build_sdo_upload_response_frame(
+    0x1001U,
+    mbh.counter,
+    index,
+    subindex,
+    payload,
+  )
+}
+
+///|
+fn build_sdo_download_response_frame(
+  station : UInt,
+  counter : Byte,
+  index : UInt,
+  subindex : Byte,
+) -> Bytes {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: station,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter,
+  }
+  let hdr = mbh.to_bytes()
+  let frame = Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else if i == 6 {
+      b'\x00'
+    } else if i == 7 {
+      b'\x30'
+    } else if i == 8 {
+      b'\x60'
+    } else if i == 9 {
+      (index & 0xFFU).to_byte()
+    } else if i == 10 {
+      ((index >> 8) & 0xFFU).to_byte()
+    } else if i == 11 {
+      subindex
+    } else {
+      b'\x00'
+    }
+  })
+  Bytes::makei(128, fn(i) {
+    if i < frame.length() {
+      frame[i]
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+pub impl @hal.Nic for ActivePdoLengthsNic with open_(name) {
+  ignore(name)
+  ActivePdoLengthsNic::new()
+}
+
+///|
+pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  let sm0_status_addr = @protocol.reg_sm_base
+  let sm1_status_addr = @protocol.reg_sm_base +
+    @protocol.sm_entry_size.reinterpret_as_uint()
+  self.next_response = match pdu.header.command {
+    @protocol.FPRD => {
+      let response_data = if offset == sm0_status_addr {
+        mailbox_status_bytes(false)
+      } else if offset == sm1_status_addr {
+        mailbox_status_bytes(self.mailbox_ready)
+      } else if offset == 0x1080U {
+        self.mailbox_ready = false
+        self.pending_mailbox_response
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_esm_response_frame(request, response_data, 1U)
+    }
+    @protocol.FPWR => {
+      if offset == 0x1000U {
+        self.pending_mailbox_response = active_pdo_mailbox_response(pdu.data)
+        self.mailbox_ready = true
+      }
+      build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    _ => build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for ActivePdoLengthsNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for ActivePdoLengthsNic with close(self) {
+  self.is_open = false
+}
+
+///|
+test "active process data lengths in preop use object mapping lengths" {
+  let nic = ActivePdoLengthsNic::new()
+  let mailbox_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let lengths = active_process_data_lengths_in_preop(
+    nic,
+    0x1001U,
+    mailbox_config,
+    @hal.Duration(1000L),
+  )
+  assert_eq(lengths, (Some(6), Some(6)))
+}
+
+///|
 fn ds402_general_category(ds402_channels : Byte) -> @mailbox.SiiCategoryEntry {
   let payload = Array::make(20, b'\x00')
   payload[9] = ds402_channels
@@ -207,9 +449,11 @@ pub impl @hal.Nic for StrictRunTransitionNic with close(self) {
 ///|
 pub struct Ds402OpNeedsShutdownControlwordNic {
   mut next_response : Bytes
+  mut pending_mailbox_response : Bytes
   mut is_open : Bool
   mut current_state : Byte
   mut op_request_pending : Bool
+  mut mailbox_ready : Bool
   mut observed_shutdown_seed : Bool
   mut observed_mode_seed : Bool
 }
@@ -218,9 +462,11 @@ pub struct Ds402OpNeedsShutdownControlwordNic {
 fn Ds402OpNeedsShutdownControlwordNic::new() -> Ds402OpNeedsShutdownControlwordNic {
   {
     next_response: Bytes::new(0),
+    pending_mailbox_response: Bytes::new(0),
     is_open: true,
     current_state: @protocol.EsmState::SafeOp.to_byte(),
     op_request_pending: false,
+    mailbox_ready: false,
     observed_shutdown_seed: false,
     observed_mode_seed: false,
   }
@@ -245,16 +491,46 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with send(self, data) {
   let request = @protocol.EcFrame::decode(data)
   let pdu = request.pdus[0]
   let offset = @protocol.address_offset(pdu.header.address)
+  let sm0_status_addr = @protocol.reg_sm_base
+  let sm1_status_addr = @protocol.reg_sm_base +
+    @protocol.sm_entry_size.reinterpret_as_uint()
   self.next_response = match pdu.header.command {
     @protocol.FPRD => {
       let response_data = if offset == @protocol.reg_al_status {
         ds402_op_status_bytes(self)
+      } else if offset == sm0_status_addr {
+        mailbox_status_bytes(false)
+      } else if offset == sm1_status_addr {
+        mailbox_status_bytes(self.mailbox_ready)
+      } else if offset == 0x1080U {
+        self.mailbox_ready = false
+        self.pending_mailbox_response
       } else {
         Bytes::new(pdu.data.length())
       }
       build_esm_response_frame(request, response_data, 1U)
     }
     @protocol.FPWR => {
+      if offset == 0x1000U {
+        let mbh = @mailbox.MailboxHeader::from_bytes(pdu.data)
+        if pdu.data.length() > 11 {
+          let index = pdu.data[9].to_uint() | (pdu.data[10].to_uint() << 8)
+          let subindex = pdu.data[11]
+          if index == 0x6060U &&
+            subindex == b'\x00' &&
+            pdu.data.length() > 12 &&
+            pdu.data[12] == b'\x08' {
+            self.observed_mode_seed = true
+          }
+          self.pending_mailbox_response = build_sdo_download_response_frame(
+            0x1001U,
+            mbh.counter,
+            index,
+            subindex,
+          )
+          self.mailbox_ready = true
+        }
+      }
       if offset == @protocol.reg_al_control && pdu.data.length() >= 1 {
         let requested_state = pdu.data[0] & b'\x0F'
         let current = @protocol.EsmState::from_byte(self.current_state)
@@ -273,9 +549,6 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with send(self, data) {
         pdu.data[4] == b'\x06' &&
         pdu.data[5] == b'\x00' {
         self.observed_shutdown_seed = true
-      }
-      if pdu.data.length() >= 7 && pdu.data[6] == b'\x08' {
-        self.observed_mode_seed = true
       }
       if self.op_request_pending &&
         self.observed_shutdown_seed &&
@@ -308,7 +581,7 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with close(self) {
 }
 
 ///|
-test "runtime startup transition clears error then follows strict route" {
+test "runtime startup transition recovers SafeOp configuration error to init" {
   let nic = StrictRunTransitionNic::new(
     @protocol.EsmState::SafeOp,
     true,
@@ -322,16 +595,39 @@ test "runtime startup transition clears error then follows strict route" {
     timeout,
   )
   assert_true(ok)
-  assert_eq(nic.control_writes.length(), 3)
+  assert_eq(nic.control_writes.length(), 2)
   assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
+  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
+}
+
+///|
+test "runtime startup transition rolls PreOp configuration error back to init" {
+  let nic = StrictRunTransitionNic::new(
+    @protocol.EsmState::PreOp,
+    true,
+    0x001EU,
+  )
+  let timeout = @hal.Duration(1000L)
+  let ok = attempt_transition_slave_to_target(
+    nic,
+    0x1001U,
+    @protocol.PreOp,
+    timeout,
+  )
+  assert_true(ok)
+  assert_eq(nic.control_writes.length(), 3)
   assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    nic.control_writes[0],
+    @protocol.EsmState::PreOp.to_byte() | b'\x10',
+  )
+  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  assert_eq(
+    nic.control_writes[2] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
-  assert_eq(nic.control_writes[2] & b'\x0F', @protocol.EsmState::Init.to_byte())
 }
 
 ///|
@@ -447,6 +743,47 @@ test "derive_startup_outputs seeds ds402 mode byte when available" {
 }
 
 ///|
+test "derive_startup_mailbox_commands emits ds402 safeop-to-op mode command" {
+  let commands = derive_startup_mailbox_commands([
+    ds402_general_category(b'\x01'),
+    ds402_rxpdo_category_with_mode(),
+  ])
+  assert_eq(commands.length(), 1)
+  assert_eq(commands[0].transition, SafeOpToOp)
+  assert_eq(commands[0].index, 0x6060U)
+  assert_eq(commands[0].subindex, b'\x00')
+  assert_eq(commands[0].data, Bytes::from_array([b'\x08']))
+}
+
+///|
+test "apply_startup_mailbox_commands writes ds402 mode through mailbox sdo" {
+  let nic = Ds402OpNeedsShutdownControlwordNic::new()
+  apply_startup_mailbox_commands(
+    nic,
+    0x1001U,
+    {
+      out_address: 0x1000U,
+      out_size: 128U,
+      out_sm_index: 0,
+      in_address: 0x1080U,
+      in_size: 128U,
+      in_sm_index: 1,
+    },
+    [
+      {
+        transition: SafeOpToOp,
+        index: 0x6060U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x08']),
+      },
+    ],
+    SafeOpToOp,
+    @hal.Duration(1000L),
+  )
+  assert_true(nic.observed_mode_seed)
+}
+
+///|
 test "runtime op transition reaches op when ds402 startup outputs are preseeded" {
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [],
@@ -462,6 +799,24 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
   let pdo_ctx = @protocol.PdoContext::build([(mapping, 0x1001U)], 0x1000U)
   pdo_ctx.set_slave_outputs(0x1001U, seed)
   let nic = Ds402OpNeedsShutdownControlwordNic::new()
+  apply_startup_mailbox_commands(
+    nic,
+    0x1001U,
+    {
+      out_address: 0x1000U,
+      out_size: 128U,
+      out_sm_index: 0,
+      in_address: 0x1080U,
+      in_size: 128U,
+      in_sm_index: 1,
+    },
+    derive_startup_mailbox_commands([
+      ds402_general_category(b'\x01'),
+      ds402_rxpdo_category_with_mode(),
+    ]),
+    SafeOpToOp,
+    @hal.Duration(1000L),
+  )
   let fault = transition_slave_to_op_with_process_data(
     nic,
     0x1001U,
@@ -551,7 +906,7 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
         length: 128U,
         control: b'\x26',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.MailboxOut,
       },
       {
@@ -559,7 +914,7 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
         length: 128U,
         control: b'\x22',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.MailboxIn,
       },
       {
@@ -567,7 +922,7 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
         length: 32U,
         control: b'\x24',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.ProcessDataOut,
       },
       {
@@ -575,7 +930,7 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
         length: 16U,
         control: b'\x20',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.ProcessDataIn,
       },
     ],
@@ -614,7 +969,7 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
         length: 128U,
         control: b'\x26',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.MailboxOut,
       },
       {
@@ -622,7 +977,7 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
         length: 128U,
         control: b'\x22',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.MailboxIn,
       },
       {
@@ -630,7 +985,7 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
         length: 32U,
         control: b'\x24',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.ProcessDataOut,
       },
       {
@@ -638,7 +993,7 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
         length: 16U,
         control: b'\x20',
         status: b'\x00',
-        enable: true,
+        activate: b'\x01',
         sm_type: @mailbox.ProcessDataIn,
       },
     ],

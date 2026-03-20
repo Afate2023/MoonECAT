@@ -37,7 +37,7 @@ pub fn calculate_sm_configs(
       length: len,
       control: e.control,
       status: b'\x00',
-      enable: e.enable,
+      activate: e.activate,
       sm_type: e.sm_type,
     })
   }
@@ -76,10 +76,7 @@ pub fn apply_pdo_lengths_to_sm_configs(
         _ => 0
       }
       if total_bits > 0 {
-        {
-          ..sm,
-          length: ((total_bits + 7) / 8).reinterpret_as_uint(),
-        }
+        { ..sm, length: ((total_bits + 7) / 8).reinterpret_as_uint() }
       } else {
         sm
       }
@@ -262,8 +259,8 @@ pub fn SmConfig::to_bytes(self : SmConfig) -> Bytes {
   buf.write_byte(self.control)
   // Byte 5: status (always 0 for writes)
   buf.write_byte(self.status)
-  // Byte 6: activate (enable flag)
-  buf.write_byte(if self.enable { b'\x01' } else { b'\x00' })
+  // Byte 6: activation register, preserve all SII-provided bits.
+  buf.write_byte(self.activate)
   // Byte 7: reserved
   buf.write_byte(b'\x00')
   buf.to_bytes()

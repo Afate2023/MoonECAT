@@ -83,13 +83,37 @@ pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
   dc_cycle_period_ns : Int64?
   startup_outputs : Bytes?
+  startup_mailbox_commands : Array[StartupMailboxCommand]
+  mailbox_config : @mailbox.MailboxConfig
+  sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
+
+///|
+pub(all) enum StartupCommandTransition {
+  SafeOpToOp
+} derive(Eq, Show)
+
+///|
+pub(all) struct StartupMailboxCommand {
+  transition : StartupCommandTransition
+  index : UInt
+  subindex : Byte
+  data : Bytes
+} derive(Eq, Show)
+
+///|
+pub(all) struct StationStartupMailboxPlan {
+  station : UInt
+  mailbox_config : @mailbox.MailboxConfig
+  commands : Array[StartupMailboxCommand]
+} derive(Eq, Show)
 
 ///|
 pub(all) struct RunStartupPreparation {
   pdo_ctx : @protocol.PdoContext
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
+  startup_mailbox_plans : Array[StationStartupMailboxPlan]
 }
 
 ///|
@@ -124,15 +148,10 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_fp(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   let initial_eeprom = @protocol.eeprom_read(
-    nic,
-    station,
-    0U,
-    initial_word_count,
-    timeout,
+    nic, station, 0U, initial_word_count, timeout,
   )
   let total_word_count = required_sii_read_word_count(
-    initial_eeprom,
-    initial_word_count,
+    initial_eeprom, initial_word_count,
   )
   if total_word_count <= initial_word_count {
     initial_eeprom
@@ -149,15 +168,10 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_ap(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   let initial_eeprom = @protocol.eeprom_read_ap(
-    nic,
-    position,
-    0U,
-    initial_word_count,
-    timeout,
+    nic, position, 0U, initial_word_count, timeout,
   )
   let total_word_count = required_sii_read_word_count(
-    initial_eeprom,
-    initial_word_count,
+    initial_eeprom, initial_word_count,
   )
   if total_word_count <= initial_word_count {
     initial_eeprom
@@ -202,6 +216,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
 ) -> RunStartupPreparation raise @hal.EcError {
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
   let startup_outputs : Array[(UInt, Bytes)] = []
+  let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
   for slave in scan_report.slaves {
@@ -216,6 +231,13 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
     match preparation.startup_outputs {
       Some(outputs) => startup_outputs.push((slave.station_address, outputs))
       None => ()
+    }
+    if preparation.startup_mailbox_commands.length() > 0 {
+      startup_mailbox_plans.push({
+        station: slave.station_address,
+        mailbox_config: preparation.mailbox_config,
+        commands: preparation.startup_mailbox_commands,
+      })
     }
     dc_cycle_period_ns = prefer_dc_cycle_period(
       dc_cycle_period_ns,
@@ -234,6 +256,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
     pdo_ctx,
     expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
     dc_cycle_period_ns,
+    startup_mailbox_plans,
   }
 }
 
@@ -246,17 +269,304 @@ pub fn[N : @hal.Nic] prepare_slave_startup(
   timeout : @hal.Duration,
 ) -> SlaveStartupPreparation raise @hal.EcError {
   let eeprom = read_sii_with_metadata_fp(
-    nic,
-    station,
-    eeprom_word_count,
-    timeout,
+    nic, station, eeprom_word_count, timeout,
   )
+  let sii_header = @mailbox.parse_sii_header(eeprom)
   let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
   let categories = @mailbox.parse_sii_categories(eeprom)
   {
     mapping,
     dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
     startup_outputs: derive_startup_outputs(mapping, categories),
+    startup_mailbox_commands: derive_startup_mailbox_commands(categories),
+    mailbox_config: @mailbox.MailboxConfig::from_sii(sii_header),
+    sii_categories: categories,
+  }
+}
+
+///|
+fn decode_le_u32_payload(payload : Bytes) -> UInt? {
+  if payload.length() <= 0 {
+    return None
+  }
+  let mut value = 0U
+  let limit = if payload.length() < 4 { payload.length() } else { 4 }
+  for i = 0; i < limit; i = i + 1 {
+    value = value | (payload[i].to_int().reinterpret_as_uint() << (i * 8))
+  }
+  Some(value)
+}
+
+///|
+fn[N : @hal.Nic] sdo_upload_payload_retry(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  @protocol.sdo_upload_retry(
+    nic, station, mailbox_config, rmsm, index, subindex, timeout,
+  )
+}
+
+///|
+fn[N : @hal.Nic] sdo_upload_u32_retry(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let payload = sdo_upload_payload_retry(
+    nic, station, mailbox_config, rmsm, index, subindex, timeout,
+  )
+  match decode_le_u32_payload(payload) {
+    Some(value) => value
+    None =>
+      raise @hal.EcError::MailboxProtocol(
+        "SDO upload returned empty payload at 0x" +
+        index.to_string() +
+        ":" +
+        subindex.to_int().to_string(),
+      )
+  }
+}
+
+///|
+fn[N : @hal.Nic] assigned_pdo_indices(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  assignment_index : UInt,
+  timeout : @hal.Duration,
+) -> Array[UInt] raise @hal.EcError {
+  let count = sdo_upload_u32_retry(
+    nic, station, mailbox_config, rmsm, assignment_index, b'\x00', timeout,
+  ).reinterpret_as_int()
+  let indices : Array[UInt] = []
+  for i = 1; i <= count; i = i + 1 {
+    let pdo_index = sdo_upload_u32_retry(
+      nic,
+      station,
+      mailbox_config,
+      rmsm,
+      assignment_index,
+      i.to_byte(),
+      timeout,
+    )
+    indices.push(pdo_index & 0xFFFFU)
+  }
+  indices
+}
+
+///|
+fn[N : @hal.Nic] mapped_pdo_bit_length(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  pdo_index : UInt,
+  timeout : @hal.Duration,
+) -> Int raise @hal.EcError {
+  let count = sdo_upload_u32_retry(
+    nic, station, mailbox_config, rmsm, pdo_index, b'\x00', timeout,
+  ).reinterpret_as_int()
+  let mut total_bits = 0
+  for i = 1; i <= count; i = i + 1 {
+    let entry = sdo_upload_u32_retry(
+      nic,
+      station,
+      mailbox_config,
+      rmsm,
+      pdo_index,
+      i.to_byte(),
+      timeout,
+    )
+    total_bits = total_bits + ((entry >> 24) & 0xFFU).reinterpret_as_int()
+  }
+  total_bits
+}
+
+///|
+fn[N : @hal.Nic] active_process_data_lengths_in_preop(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  timeout : @hal.Duration,
+) -> (Int?, Int?) raise @hal.EcError {
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let rx_assignments = assigned_pdo_indices(
+    nic, station, mailbox_config, rmsm, 0x1C12U, timeout,
+  )
+  let tx_assignments = assigned_pdo_indices(
+    nic, station, mailbox_config, rmsm, 0x1C13U, timeout,
+  )
+  let mut output_bits = 0
+  for pdo_index in rx_assignments {
+    output_bits = output_bits +
+      mapped_pdo_bit_length(
+        nic, station, mailbox_config, rmsm, pdo_index, timeout,
+      )
+  }
+  let mut input_bits = 0
+  for pdo_index in tx_assignments {
+    input_bits = input_bits +
+      mapped_pdo_bit_length(
+        nic, station, mailbox_config, rmsm, pdo_index, timeout,
+      )
+  }
+  (
+    if output_bits > 0 {
+      Some((output_bits + 7) / 8)
+    } else {
+      None
+    },
+    if input_bits > 0 {
+      Some((input_bits + 7) / 8)
+    } else {
+      None
+    },
+  )
+}
+
+///|
+fn map_with_process_data_lengths(
+  mapping : @mailbox.SlaveMapping,
+  logical_base : UInt,
+  output_bytes : Int?,
+  input_bytes : Int?,
+) -> @mailbox.SlaveMapping {
+  let patched_sm_configs : Array[@mailbox.SmConfig] = []
+  for sm in mapping.sm_configs {
+    patched_sm_configs.push(
+      match sm.sm_type {
+        @mailbox.ProcessDataOut =>
+          match output_bytes {
+            Some(length) => { ..sm, length: length.reinterpret_as_uint() }
+            None => sm
+          }
+        @mailbox.ProcessDataIn =>
+          match input_bytes {
+            Some(length) => { ..sm, length: length.reinterpret_as_uint() }
+            None => sm
+          }
+        _ => sm
+      },
+    )
+  }
+  let directions : Array[@mailbox.FmmuDirection] = []
+  for fmmu in mapping.fmmu_configs {
+    directions.push(fmmu.direction)
+  }
+  let (fmmu_configs, total_output, total_input) = @mailbox.calculate_fmmu_configs(
+    directions, patched_sm_configs, logical_base,
+  )
+  {
+    sm_configs: patched_sm_configs,
+    fmmu_configs,
+    output_bytes: total_output,
+    input_bytes: total_input,
+  }
+}
+
+///|
+pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
+  nic : N,
+  station : UInt,
+  logical_base : UInt,
+  preparation : SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> SlaveStartupPreparation {
+  let lengths_result : Result[(Int?, Int?), Error] = try? active_process_data_lengths_in_preop(
+    nic,
+    station,
+    preparation.mailbox_config,
+    timeout,
+  )
+  match lengths_result {
+    Ok((output_bytes, input_bytes)) => {
+      let has_override = output_bytes is Some(_) || input_bytes is Some(_)
+      if not(has_override) {
+        preparation
+      } else {
+        let mapping = map_with_process_data_lengths(
+          preparation.mapping,
+          logical_base,
+          output_bytes,
+          input_bytes,
+        )
+        {
+          ..preparation,
+          mapping,
+          startup_outputs: derive_startup_outputs(
+            mapping,
+            preparation.sii_categories,
+          ),
+          startup_mailbox_commands: derive_startup_mailbox_commands(
+            preparation.sii_categories,
+          ),
+        }
+      }
+    }
+    Err(_) => preparation
+  }
+}
+
+///|
+fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
+  nic : N,
+  stations : Array[UInt],
+  logical_base : UInt,
+  timeout : @hal.Duration,
+) -> RunStartupPreparation raise @hal.EcError {
+  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  let startup_outputs : Array[(UInt, Bytes)] = []
+  let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let mut current_logical_base = logical_base
+  let mut dc_cycle_period_ns : Int64? = None
+  for station in stations {
+    let initial = prepare_slave_startup(
+      nic, station, current_logical_base, startup_eeprom_word_count, timeout,
+    )
+    let refined = refine_startup_preparation_in_preop(
+      nic, station, current_logical_base, initial, timeout,
+    )
+    slave_mappings.push((refined.mapping, station))
+    match refined.startup_outputs {
+      Some(outputs) => startup_outputs.push((station, outputs))
+      None => ()
+    }
+    if refined.startup_mailbox_commands.length() > 0 {
+      startup_mailbox_plans.push({
+        station,
+        mailbox_config: refined.mailbox_config,
+        commands: refined.startup_mailbox_commands,
+      })
+    }
+    dc_cycle_period_ns = prefer_dc_cycle_period(
+      dc_cycle_period_ns,
+      refined.dc_cycle_period_ns,
+    )
+    current_logical_base = current_logical_base +
+      refined.mapping.output_bytes.reinterpret_as_uint() +
+      refined.mapping.input_bytes.reinterpret_as_uint()
+  }
+  let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  for i = 0; i < startup_outputs.length(); i = i + 1 {
+    let (station, outputs) = startup_outputs[i]
+    pdo_ctx.set_slave_outputs(station, outputs)
+  }
+  {
+    pdo_ctx,
+    expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
+    dc_cycle_period_ns,
+    startup_mailbox_plans,
   }
 }
 
@@ -307,10 +617,31 @@ fn derive_startup_outputs(
 }
 
 ///|
-fn preferred_ds402_mode_seed(rx_pdos : Array[@mailbox.SiiPdo]) -> Byte? {
-  guard find_pdo_entry_byte_offset(rx_pdos, 0x6060U, b'\x00') is Some(_) else {
-    return None
+fn derive_startup_mailbox_commands(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Array[StartupMailboxCommand] {
+  let general = collect_sii_general(categories)
+  guard general is Some(general) else { return [] }
+  if general.ds402_channels == b'\x00' {
+    return []
   }
+  let rx_pdos = collect_sii_pdos(categories, @mailbox.RxPdo)
+  match preferred_ds402_mode_seed(rx_pdos) {
+    Some(mode_value) if mode_value != b'\x00' =>
+      [
+        {
+          transition: SafeOpToOp,
+          index: 0x6060U,
+          subindex: b'\x00',
+          data: Bytes::from_array([mode_value]),
+        },
+      ]
+    _ => []
+  }
+}
+
+///|
+fn preferred_ds402_mode_seed(rx_pdos : Array[@mailbox.SiiPdo]) -> Byte? {
   if find_pdo_entry_byte_offset(rx_pdos, 0x607AU, b'\x00') is Some(_) {
     return Some(b'\x08')
   }
@@ -318,6 +649,36 @@ fn preferred_ds402_mode_seed(rx_pdos : Array[@mailbox.SiiPdo]) -> Byte? {
     return Some(b'\x09')
   }
   None
+}
+
+///|
+pub fn[N : @hal.Nic] apply_startup_mailbox_commands(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  commands : Array[StartupMailboxCommand],
+  transition : StartupCommandTransition,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  if not(mailbox_config.is_valid()) || commands.length() <= 0 {
+    return
+  }
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  for command in commands {
+    if command.transition != transition {
+      continue
+    }
+    @protocol.sdo_download_retry(
+      nic,
+      station,
+      mailbox_config,
+      rmsm,
+      command.index,
+      command.subindex,
+      command.data,
+      timeout,
+    )
+  }
 }
 
 ///|
@@ -716,6 +1077,10 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   let progress_every_cycles = resolve_progress_every_cycles(
     run_config, settings,
   )
+  let mut active_pdo_ctx = pdo_ctx
+  let mut active_expected_wkc = expected_wkc
+  let mut active_startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let mut startup_preop_ready = false
   let scan_report = scan(nic, timeout)
   let has_discovered_slaves = scan_report.slave_count > 0
   let stations = scan_report.slaves.map(fn(slave) { slave.station_address })
@@ -737,8 +1102,44 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   }
 
   if has_discovered_slaves {
+    if startup_state == @protocol.SafeOp || startup_state == @protocol.Op {
+      let preop_fault = transition_stations_to_preop_with_mailbox(
+        nic, stations, timeout,
+      )
+      match preop_fault {
+        Some(fault) =>
+          return {
+            scan: scan_report,
+            validation: validate_report,
+            cycles_requested: settings.cycles,
+            cycles_ok: 0,
+            until_fault: settings.until_fault,
+            cycle_period_ns: run_config.cycle_period_ns,
+            output_period_ns: settings.output_period_ns,
+            telemetry: Telemetry::new(),
+            final_phase: Configuring,
+            fault: Some(fault),
+          }
+        None => ()
+      }
+      let refined_preparation = build_run_startup_preparation_from_preop(
+        nic,
+        stations,
+        pdo_ctx.logical_base,
+        timeout,
+      )
+      if refined_preparation.pdo_ctx.logical_size > 0 ||
+        refined_preparation.expected_wkc > 0U ||
+        (active_pdo_ctx.logical_size <= 0 && active_expected_wkc == 0U) {
+        active_pdo_ctx = refined_preparation.pdo_ctx
+        active_expected_wkc = refined_preparation.expected_wkc
+      }
+      active_startup_mailbox_plans = refined_preparation.startup_mailbox_plans
+      startup_preop_ready = true
+    }
     let startup_fault = transition_stations_for_startup(
-      nic, stations, startup_state, pdo_ctx, run_config, timeout,
+      nic, stations, startup_state, active_pdo_ctx, active_startup_mailbox_plans,
+      run_config, timeout, startup_preop_ready,
     )
     match startup_fault {
       Some(fault) =>
@@ -759,7 +1160,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   }
 
   let rt = Runtime::new(run_config)
-  rt.configure_pdo(pdo_ctx, expected_wkc)
+  rt.configure_pdo(active_pdo_ctx, active_expected_wkc)
 
   let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
   rt.set_timeout_threshold(settings.max_consecutive_timeouts)
@@ -880,7 +1281,11 @@ fn[N : @hal.Nic] stabilize_failed_startup_station(
       }
       match snapshot {
         Some(status) if status.error_indication =>
-          ignore(try? @protocol.clear_al_error(nic, station, timeout))
+          ignore(
+            try? @protocol.recover_al_error_for_transition(
+              nic, station, timeout,
+            ),
+          )
         _ => ()
       }
       ignore(
@@ -910,15 +1315,20 @@ fn[N : @hal.Nic] transition_stations_for_startup(
   stations : Array[UInt],
   startup_state : @protocol.EsmState,
   pdo_ctx : @protocol.PdoContext,
+  startup_mailbox_plans : Array[StationStartupMailboxPlan],
   run_config : @hal.MasterConfig,
   timeout : @hal.Duration,
+  preop_ready : Bool,
 ) -> RunFault? {
   if startup_state == @protocol.PreOp {
+    if preop_ready {
+      return None
+    }
     return transition_stations_to_preop_with_mailbox(nic, stations, timeout)
   }
   if startup_state == @protocol.SafeOp {
     return transition_stations_to_safeop_with_process_mapping(
-      nic, stations, pdo_ctx, timeout,
+      nic, stations, pdo_ctx, timeout, preop_ready,
     )
   }
   if startup_state != @protocol.Op {
@@ -926,10 +1336,21 @@ fn[N : @hal.Nic] transition_stations_for_startup(
   }
 
   let safeop_fault = transition_stations_to_safeop_with_process_mapping(
-    nic, stations, pdo_ctx, timeout,
+    nic, stations, pdo_ctx, timeout, preop_ready,
   )
   match safeop_fault {
     Some(_) => return safeop_fault
+    None => ()
+  }
+
+  let startup_mailbox_fault = apply_station_startup_mailbox_plans(
+    nic,
+    startup_mailbox_plans,
+    SafeOpToOp,
+    timeout,
+  )
+  match startup_mailbox_fault {
+    Some(_) => return startup_mailbox_fault
     None => ()
   }
 
@@ -987,13 +1408,16 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
   stations : Array[UInt],
   pdo_ctx : @protocol.PdoContext,
   timeout : @hal.Duration,
+  preop_ready : Bool,
 ) -> RunFault? {
-  let preop_fault = transition_stations_to_preop_with_mailbox(
-    nic, stations, timeout,
-  )
-  match preop_fault {
-    Some(_) => return preop_fault
-    None => ()
+  if not(preop_ready) {
+    let preop_fault = transition_stations_to_preop_with_mailbox(
+      nic, stations, timeout,
+    )
+    match preop_fault {
+      Some(_) => return preop_fault
+      None => ()
+    }
   }
   for station in stations {
     let process_fault = configure_slave_process_mapping_from_pdo_ctx(
@@ -1039,6 +1463,36 @@ fn[N : @hal.Nic] transition_stations_to_op_with_process_data(
       Some(_) => return fault
       None => ()
     }
+  }
+  None
+}
+
+///|
+fn[N : @hal.Nic] apply_station_startup_mailbox_plans(
+  nic : N,
+  plans : Array[StationStartupMailboxPlan],
+  transition : StartupCommandTransition,
+  timeout : @hal.Duration,
+) -> RunFault? {
+  for plan in plans {
+    let result : Result[Unit, Error] = try? apply_startup_mailbox_commands(
+      nic,
+      plan.station,
+      plan.mailbox_config,
+      plan.commands,
+      transition,
+      timeout,
+    )
+    guard result is Err(_) else { continue }
+    return Some(
+      RunFault::StartupTransitionFailed(
+        station=plan.station,
+        target=@protocol.Op,
+        current=Some(@protocol.SafeOp),
+        error_indication=None,
+        status_code=None,
+      ),
+    )
   }
   None
 }
@@ -1109,6 +1563,14 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
         ),
       )
   }
+  let snapshot = read_startup_fault_details(nic, station, timeout)
+  match snapshot {
+    Some(status) if status.error_indication =>
+      ignore(
+        try? @protocol.recover_al_error_for_transition(nic, station, timeout),
+      )
+    _ => ()
+  }
   transition_slave_to_target(nic, station, @protocol.PreOp, timeout)
 }
 
@@ -1136,7 +1598,7 @@ fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
     Some(value) => value
     None => 0U
   }
-  let preparation = prepare_slave_startup(
+  let initial = prepare_slave_startup(
     nic, station, logical_base, startup_eeprom_word_count, timeout,
   ) catch {
     _ =>
@@ -1150,6 +1612,9 @@ fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
         ),
       )
   }
+  let preparation = refine_startup_preparation_in_preop(
+    nic, station, logical_base, initial, timeout,
+  )
   ignore(write_process_data_mapping(nic, station, preparation.mapping, timeout)) catch {
     _ =>
       return Some(
@@ -1219,7 +1684,7 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
     _ => return false
   }
   if snapshot.error_indication {
-    ignore(@protocol.clear_al_error(nic, station, timeout)) catch {
+    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout)) catch {
       _ => return false
     }
   }

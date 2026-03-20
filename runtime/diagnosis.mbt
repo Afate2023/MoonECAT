@@ -751,10 +751,7 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
   }
   let eeprom = diagnosis_timeout_step(
     try? read_sii_with_metadata_ap(
-      nic,
-      position,
-      diagnosis_sii_word_count,
-      timeout,
+      nic, position, diagnosis_sii_word_count, timeout,
     ),
     "diagnosis.prepare.eeprom_read_ap",
   )
@@ -806,10 +803,7 @@ pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
   }
   let eeprom = diagnosis_timeout_step(
     try? read_sii_with_metadata_ap(
-      nic,
-      position,
-      diagnosis_sii_word_count,
-      timeout,
+      nic, position, diagnosis_sii_word_count, timeout,
     ),
     "mailbox.prepare.eeprom_read_ap",
   )
@@ -966,14 +960,17 @@ fn[N : @hal.Nic] enter_diagnosis_preop(
   if preop_snapshot.error_indication {
     ignore(
       diagnosis_timeout_step(
-        try? @protocol.clear_al_error(nic, station, timeout),
+        try? @protocol.recover_al_error_for_transition(nic, station, timeout),
         "diagnosis.prepare.clear_al_error_fp",
       ),
     )
   }
   let confirmed_preop = diagnosis_timeout_step(
     try? @protocol.transition_to_target_strict(
-      nic, station, @protocol.PreOp, timeout,
+      nic,
+      station,
+      @protocol.PreOp,
+      timeout,
     ),
     "diagnosis.prepare.request_preop_fp",
   )

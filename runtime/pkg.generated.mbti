@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
@@ -68,9 +70,17 @@ pub fn[N : @hal.Nic] read_error_register(N, UInt, @mailbox.MailboxConfig, @mailb
 
 pub fn[N : @hal.Nic] read_error_register_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_sii_with_metadata_ap(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_sii_with_metadata_fp(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+
+pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(N, UInt, UInt, SlaveStartupPreparation, @hal.Duration) -> SlaveStartupPreparation
+
+pub fn required_sii_read_word_count(Bytes, Int) -> Int
 
 pub fn[N : @hal.Nic] restore_slave_diagnosis_state(N, UInt, @protocol.EsmState, @hal.Duration) -> @protocol.EsmState raise @hal.EcError
 
@@ -501,6 +511,7 @@ pub(all) struct RunStartupPreparation {
   pdo_ctx : @protocol.PdoContext
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
+  startup_mailbox_plans : Array[StationStartupMailboxPlan]
 }
 
 pub(all) struct Runtime {
@@ -603,7 +614,25 @@ pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
   dc_cycle_period_ns : Int64?
   startup_outputs : Bytes?
+  startup_mailbox_commands : Array[StartupMailboxCommand]
+  mailbox_config : @mailbox.MailboxConfig
+  sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
+
+pub(all) enum StartupCommandTransition {
+  SafeOpToOp
+}
+pub impl Eq for StartupCommandTransition
+pub impl Show for StartupCommandTransition
+
+pub(all) struct StartupMailboxCommand {
+  transition : StartupCommandTransition
+  index : UInt
+  subindex : Byte
+  data : Bytes
+}
+pub impl Eq for StartupMailboxCommand
+pub impl Show for StartupMailboxCommand
 
 type StartupRecoveryStrategy
 pub impl Eq for StartupRecoveryStrategy
@@ -620,6 +649,14 @@ pub(all) struct StateSurfaceSummary {
 }
 pub impl Eq for StateSurfaceSummary
 pub impl Show for StateSurfaceSummary
+
+pub(all) struct StationStartupMailboxPlan {
+  station : UInt
+  mailbox_config : @mailbox.MailboxConfig
+  commands : Array[StartupMailboxCommand]
+}
+pub impl Eq for StationStartupMailboxPlan
+pub impl Show for StationStartupMailboxPlan
 
 pub(all) struct Telemetry {
   mut cycles : Int64

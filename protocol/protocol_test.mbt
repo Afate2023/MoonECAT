@@ -1054,17 +1054,121 @@ pub impl @hal.Nic for EsmControlNic with close(self) {
 }
 
 ///|
+pub struct EsmRollbackToInitNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut current_state : Byte
+  mut error_indication : Bool
+  mut status_code : UInt
+  control_writes : Array[Byte]
+}
+
+///|
+fn EsmRollbackToInitNic::new(
+  current_state : @protocol.EsmState,
+  status_code : UInt,
+) -> EsmRollbackToInitNic {
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    current_state: current_state.to_byte(),
+    error_indication: true,
+    status_code,
+    control_writes: [],
+  }
+}
+
+///|
+fn esm_rollback_status_bytes(nic : EsmRollbackToInitNic) -> Bytes {
+  let status = if nic.error_indication {
+    nic.current_state | b'\x10'
+  } else {
+    nic.current_state
+  }
+  Bytes::from_array([status, b'\x00'])
+}
+
+///|
+pub impl @hal.Nic for EsmRollbackToInitNic with open_(name) {
+  ignore(name)
+  EsmRollbackToInitNic::new(@protocol.EsmState::PreOp, 0x001EU)
+}
+
+///|
+pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  self.next_response = match pdu.header.command {
+    @protocol.FPRD => {
+      let response_data = if offset == @protocol.reg_al_status {
+        esm_rollback_status_bytes(self)
+      } else if offset == @protocol.reg_al_status_code {
+        esm_status_code_bytes(self.status_code)
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_response_frame(request, response_data, 1U)
+    }
+    @protocol.FPWR => {
+      if offset == @protocol.reg_al_control && pdu.data.length() >= 1 {
+        let control = pdu.data[0]
+        self.control_writes.push(control)
+        let requested_state = control & b'\x0F'
+        let acknowledge = (control & b'\x10') != b'\x00'
+        if requested_state == @protocol.EsmState::Init.to_byte() {
+          self.current_state = requested_state
+          self.error_indication = false
+          self.status_code = 0U
+        } else if acknowledge && requested_state == self.current_state {
+          self.error_indication = true
+        }
+      }
+      build_response_frame(request, esm_rollback_status_bytes(self), 1U)
+    }
+    _ => build_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for EsmRollbackToInitNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for EsmRollbackToInitNic with close(self) {
+  self.is_open = false
+}
+
+///|
 pub struct EsmOpNeedsPdoNic {
   mut next_response : Bytes
   mut is_open : Bool
   mut current_state : Byte
   mut op_request_pending : Bool
   mut pdo_after_op_request : Int
+  required_pdo_after_op_request : Int
 }
 
 ///|
 fn EsmOpNeedsPdoNic::new(
   current_state : @protocol.EsmState,
+) -> EsmOpNeedsPdoNic {
+  EsmOpNeedsPdoNic::with_required_pdo_cycles(current_state, 1)
+}
+
+///|
+fn EsmOpNeedsPdoNic::with_required_pdo_cycles(
+  current_state : @protocol.EsmState,
+  required_pdo_after_op_request : Int,
 ) -> EsmOpNeedsPdoNic {
   {
     next_response: Bytes::new(0),
@@ -1072,6 +1176,7 @@ fn EsmOpNeedsPdoNic::new(
     current_state: current_state.to_byte(),
     op_request_pending: false,
     pdo_after_op_request: 0,
+    required_pdo_after_op_request,
   }
 }
 
@@ -1120,8 +1225,10 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
     @protocol.LRW | @protocol.LWR => {
       if self.op_request_pending {
         self.pdo_after_op_request = self.pdo_after_op_request + 1
-        self.current_state = @protocol.EsmState::Op.to_byte()
-        self.op_request_pending = false
+        if self.pdo_after_op_request >= self.required_pdo_after_op_request {
+          self.current_state = @protocol.EsmState::Op.to_byte()
+          self.op_request_pending = false
+        }
       }
       build_response_frame(request, pdu.data, 1U)
     }
@@ -1310,6 +1417,32 @@ test "request_state_with_process_data keeps sending PDO until Op is confirmed" {
 }
 
 ///|
+test "request_state_with_process_data extends confirmation window beyond fixed 32 polls" {
+  let nic = EsmOpNeedsPdoNic::with_required_pdo_cycles(
+    @protocol.EsmState::SafeOp,
+    48,
+  )
+  let timeout = @hal.Duration(1_000_000L)
+  let mapping : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let pdo_ctx = @protocol.PdoContext::build([(mapping, 0x1001U)], 0x1000U)
+  let final_state = @protocol.request_state_with_process_data(
+    nic,
+    0x1001U,
+    @protocol.EsmState::Op,
+    pdo_ctx,
+    timeout,
+  )
+  assert_eq(final_state, @protocol.EsmState::Op)
+  assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
+  assert_true(nic.pdo_after_op_request >= 48)
+}
+
+///|
 test "request_state_with_process_data_snapshot captures AL error window" {
   let nic = EsmOpFailureSnapshotNic::new()
   let timeout = @hal.Duration(1000L)
@@ -1373,6 +1506,24 @@ test "clear_al_error stabilizes state before caller chooses next target" {
     @protocol.EsmState::PreOp.to_byte(),
   )
   assert_eq(nic.control_writes[2] & b'\x0F', @protocol.EsmState::Init.to_byte())
+}
+
+///|
+test "recover_al_error_for_transition rolls configuration error back to init" {
+  let nic = EsmRollbackToInitNic::new(@protocol.EsmState::PreOp, 0x001EU)
+  let timeout = @hal.Duration(1000L)
+  let recovered = @protocol.recover_al_error_for_transition(
+    nic, 0x1001U, timeout,
+  )
+  assert_eq(recovered.state, @protocol.EsmState::Init)
+  assert_true(not(recovered.error_indication))
+  assert_eq(recovered.status_code, None)
+  assert_eq(nic.control_writes.length(), 2)
+  assert_eq(
+    nic.control_writes[0],
+    @protocol.EsmState::PreOp.to_byte() | b'\x10',
+  )
+  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
 }
 
 ///|

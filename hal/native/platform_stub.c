@@ -3,6 +3,42 @@
 
 #include <moonbit.h>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <tchar.h>
+#include <windows.h>
+
+static void moonecat_copy_windows_error_message(char *buffer, size_t capacity,
+                                                const char *message) {
+  WCHAR wide_buffer[512];
+  int wide_len;
+  int utf8_len;
+  if (capacity == 0) {
+    return;
+  }
+  if (message == NULL) {
+    buffer[0] = '\0';
+    return;
+  }
+  wide_len =
+      MultiByteToWideChar(CP_ACP, 0, message, -1, wide_buffer,
+                          (int)(sizeof(wide_buffer) / sizeof(wide_buffer[0])));
+  if (wide_len <= 0) {
+    strncpy(buffer, message, capacity - 1);
+    buffer[capacity - 1] = '\0';
+    return;
+  }
+  utf8_len = WideCharToMultiByte(CP_UTF8, 0, wide_buffer, -1, buffer,
+                                 (int)capacity, NULL, NULL);
+  if (utf8_len <= 0) {
+    strncpy(buffer, message, capacity - 1);
+    buffer[capacity - 1] = '\0';
+    return;
+  }
+  buffer[capacity - 1] = '\0';
+}
+#endif
+
 static int32_t g_last_error_code = 1;
 static char g_last_error_message[512] = "ok";
 
@@ -12,8 +48,13 @@ static void moonecat_set_error(int32_t code, const char *message) {
     g_last_error_message[0] = '\0';
     return;
   }
+#ifdef _WIN32
+  moonecat_copy_windows_error_message(g_last_error_message,
+                                      sizeof(g_last_error_message), message);
+#else
   strncpy(g_last_error_message, message, sizeof(g_last_error_message) - 1);
   g_last_error_message[sizeof(g_last_error_message) - 1] = '\0';
+#endif
 }
 
 MOONBIT_FFI_EXPORT
@@ -95,10 +136,7 @@ static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer,
 
 #ifdef _WIN32
 
-#define WIN32_LEAN_AND_MEAN
 #include <pcap.h>
-#include <tchar.h>
-#include <windows.h>
 
 typedef int(__cdecl *moonecat_pcap_init_fn)(unsigned int, char *);
 typedef int(__cdecl *moonecat_pcap_findalldevs_fn)(pcap_if_t **, char *);
@@ -323,18 +361,18 @@ moonbit_bytes_t moonecat_windows_npcap_list_interfaces_json(void) {
                                                                 : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, ",\"up\":");
     used = moonecat_append_text(
-      listing, sizeof(listing), used,
-      moonecat_windows_interface_up(dev->flags) ? "true" : "false");
-    used = moonecat_append_text(listing, sizeof(listing), used,
-                  ",\"connected\":");
+        listing, sizeof(listing), used,
+        moonecat_windows_interface_up(dev->flags) ? "true" : "false");
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"connected\":");
     used = moonecat_append_text(
-      listing, sizeof(listing), used,
-      moonecat_windows_interface_connected(dev->flags) ? "true" : "false");
-    used = moonecat_append_text(listing, sizeof(listing), used,
-                  ",\"wireless\":");
+        listing, sizeof(listing), used,
+        moonecat_windows_interface_connected(dev->flags) ? "true" : "false");
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"wireless\":");
     used = moonecat_append_text(
-      listing, sizeof(listing), used,
-      moonecat_windows_interface_wireless(dev->flags) ? "true" : "false");
+        listing, sizeof(listing), used,
+        moonecat_windows_interface_wireless(dev->flags) ? "true" : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
       break;
@@ -515,10 +553,11 @@ void moonecat_windows_npcap_close(int32_t handle_id) {
 #include <linux/if_packet.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+
 
 static int g_linux_raw_handles[32] = {0};
 
@@ -658,12 +697,13 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
        cursor++) {
     char index_text[32];
     short if_flags = 0;
-    int has_flags = moonecat_linux_get_interface_flags(cursor->if_name, &if_flags);
+    int has_flags =
+        moonecat_linux_get_interface_flags(cursor->if_name, &if_flags);
     int loopback = has_flags ? ((if_flags & IFF_LOOPBACK) != 0) : 0;
     int up = has_flags ? ((if_flags & IFF_UP) != 0) : 1;
-    int connected =
-        has_flags ? (((if_flags & IFF_UP) != 0) && ((if_flags & IFF_RUNNING) != 0))
-                  : 1;
+    int connected = has_flags ? (((if_flags & IFF_UP) != 0) &&
+                                 ((if_flags & IFF_RUNNING) != 0))
+                              : 1;
     int wireless = moonecat_linux_interface_wireless(cursor->if_name);
     if (!first) {
       used = moonecat_append_text(listing, sizeof(listing), used, ",");
@@ -677,21 +717,21 @@ moonbit_bytes_t moonecat_linux_raw_socket_list_interfaces_json(void) {
         listing, sizeof(listing), used,
         ",\"description\":\"linux raw socket\",\"index\":");
     used = moonecat_append_text(listing, sizeof(listing), used, index_text);
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"loopback\":");
     used = moonecat_append_text(listing, sizeof(listing), used,
-                  ",\"loopback\":");
-    used = moonecat_append_text(listing, sizeof(listing), used,
-                  loopback ? "true" : "false");
+                                loopback ? "true" : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, ",\"up\":");
     used = moonecat_append_text(listing, sizeof(listing), used,
-                  up ? "true" : "false");
+                                up ? "true" : "false");
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"connected\":");
     used = moonecat_append_text(listing, sizeof(listing), used,
-                  ",\"connected\":");
+                                connected ? "true" : "false");
+    used =
+        moonecat_append_text(listing, sizeof(listing), used, ",\"wireless\":");
     used = moonecat_append_text(listing, sizeof(listing), used,
-                  connected ? "true" : "false");
-    used = moonecat_append_text(listing, sizeof(listing), used,
-                  ",\"wireless\":");
-    used = moonecat_append_text(listing, sizeof(listing), used,
-                  wireless ? "true" : "false");
+                                wireless ? "true" : "false");
     used = moonecat_append_text(listing, sizeof(listing), used, "}");
     if (used + 64 >= sizeof(listing)) {
       break;

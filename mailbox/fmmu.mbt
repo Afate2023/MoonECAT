@@ -25,7 +25,7 @@ pub(all) struct SmConfig {
   length : UInt
   control : Byte
   status : Byte
-  enable : Bool
+  activate : Byte
   sm_type : SmType
 } derive(Eq, Show)
 

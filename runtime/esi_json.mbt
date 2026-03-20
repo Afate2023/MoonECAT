@@ -772,7 +772,11 @@ fn materialize_sii_sm_entry(sm : EsiJsonSmEntry) -> @mailbox.SiiSmEntry {
     length: sm.length,
     control: sm.control,
     status: sm.status,
-    enable: sm.enable,
+    activate: if sm.enable {
+      b'\x01'
+    } else {
+      b'\x00'
+    },
     sm_type: map_esi_json_sm_type(sm.sm_type),
   }
 }
@@ -1032,7 +1036,7 @@ fn encode_sii_sync_managers(sms : Array[@mailbox.SiiSmEntry]) -> Bytes {
     push_u16(values, sm.length)
     values.push(sm.control)
     values.push(sm.status)
-    values.push(if sm.enable { b'\x01' } else { b'\x00' })
+    values.push(sm.activate)
     values.push(
       match sm.sm_type {
         MailboxOut => b'\x01'

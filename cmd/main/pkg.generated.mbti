@@ -20,6 +20,14 @@ pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
 type CliTextRunProgressSink
 pub impl @runtime.RunProgressSink for CliTextRunProgressSink
 
+type EscFmmuRegisterReport
+
+type EscRegisterReport
+
+type EscSyncManagerRegisterReport
+
+type ExpectedEscRegisterReport
+
 type OdBrowseQuery
 
 type OdBrowseReport
