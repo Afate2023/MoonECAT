@@ -14,6 +14,10 @@
   - ✅ [protocol/sdo_transaction.mbt](../protocol/sdo_transaction.mbt) : sdo_download/upload + retry
 - [x] **【缺口】Mailbox Resilient Layer (RMSM)**：丢帧恢复状态机 + Counter/Repeat 管理 [ETG.1500 #402 shall]
   - ✅ [mailbox/rmsm.mbt](../mailbox/rmsm.mbt): Rmsm struct + begin/validate/timeout/reset
+  - ✅ [mailbox/mailbox.mbt](../mailbox/mailbox.mbt): `MailboxRepeatState`，统一 Repeat Request / RepeatAck 位语义
+  - ✅ [protocol/mailbox_transport.mbt](../protocol/mailbox_transport.mbt): `mailbox_recv_rmsm` / `mailbox_recv_ap_rmsm`，在读邮箱超时后触发 SM Repeat 请求并轮询 RepeatAck
+  - ✅ [protocol/sdo_transaction.mbt](../protocol/sdo_transaction.mbt): CoE/SDO 读响应、分段上传/下载、SDO Info 全部切到 repeat-aware mailbox receive
+  - ✅ [protocol/protocol_test.mbt](../protocol/protocol_test.mbt): FP/AP repeat replay mock 覆盖；`moon test protocol` = `109/109`，`moon test mailbox` = `93/93`
 - [x] **【缺口】Mailbox polling**：周期性检查 Input-Mailbox 或 Status-Bit [ETG.1500 #404 shall]
   - ✅ [protocol/mailbox_transport.mbt](../protocol/mailbox_transport.mbt): mailbox_poll SM status bit
 - [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
@@ -37,6 +41,7 @@
 提交映射（选项 → commit）：
 - `SDO Upload/Download 事务闭环` → `698052c` `feat: add coe sdo transaction engine`
 - `Mailbox Resilient Layer (RMSM)` + `Mailbox polling` + `Emergency Message` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`
+- `Mailbox Repeat Request/Ack recovery wiring` → `62c4742` `feat(mailbox): recover lost reads with repeat ack`
 - `Segmented Transfer（上传）` → `27b9c4b` `feat: add segmented SDO upload path`
 - `Complete Access + SDO Info 基础` → `afb1a29` `feat: add complete-access and sdo-info foundations`
 - `Segmented Transfer（下载）+ CA 分段续传` → `9266591` `feat: complete segmented sdo and CA continuation`
