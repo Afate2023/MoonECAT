@@ -99,6 +99,10 @@ pub fn[N : @hal.Nic] mailbox_recv(N, UInt, @mailbox.MailboxConfig, @hal.Duration
 
 pub fn[N : @hal.Nic] mailbox_recv_ap(N, UInt, @mailbox.MailboxConfig, @hal.Duration, max_polls? : Int) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] mailbox_recv_ap_rmsm(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration, max_polls? : Int) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] mailbox_recv_rmsm(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration, max_polls? : Int) -> Bytes raise @hal.EcError
+
 pub fn[N : @hal.Nic] mailbox_send(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] mailbox_send_ap(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Unit raise @hal.EcError

@@ -1781,10 +1781,31 @@ test "mailbox_recv times out when poll never succeeds" {
 }
 
 ///|
+pub struct RepeatMailboxMockNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+  mut repeat_triggered : Bool
+  mut last_command : Byte
+  mut last_offset : UInt
+}
+
+///|
+fn RepeatMailboxMockNic::new() -> RepeatMailboxMockNic {
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    repeat_triggered: false,
+    last_command: b'\xFF',
+    last_offset: 0U,
+  }
+}
+
+///|
 pub struct ApMailboxMockNic {
   mut next_response : Bytes
   mut is_open : Bool
   mut mailbox_ready : Bool
+  mut repeat_triggered : Bool
   mut last_command : Byte
   mut last_offset : UInt
 }
@@ -1795,6 +1816,7 @@ fn ApMailboxMockNic::new() -> ApMailboxMockNic {
     next_response: Bytes::new(0),
     is_open: true,
     mailbox_ready: false,
+    repeat_triggered: false,
     last_command: b'\xFF',
     last_offset: 0U,
   }
@@ -1848,6 +1870,75 @@ fn build_ap_mailbox_sdo_upload_response(
 }
 
 ///|
+pub impl @hal.Nic for RepeatMailboxMockNic with open_(name) {
+  ignore(name)
+  RepeatMailboxMockNic::new()
+}
+
+///|
+pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  self.last_command = pdu.header.command.to_byte()
+  self.last_offset = @protocol.address_offset(pdu.header.address)
+  let sm1_base_addr = @protocol.reg_sm_base +
+    @protocol.sm_entry_size.reinterpret_as_uint()
+  self.next_response = match pdu.header.command {
+    @protocol.FPRD => {
+      let response_data = if self.last_offset == sm1_base_addr {
+        let status = if self.repeat_triggered { b'\x08' } else { b'\x00' }
+        let repeat_ack = if self.repeat_triggered { b'\x02' } else { b'\x00' }
+        Bytes::makei(8, fn(i) {
+          if i == 5 {
+            status
+          } else if i == 7 {
+            repeat_ack
+          } else {
+            b'\x00'
+          }
+        })
+      } else if self.last_offset == 0x1080U {
+        build_ap_mailbox_sdo_upload_response(
+          0x1001U,
+          b'\x01',
+          0x1001U,
+          b'\x00',
+          Bytes::from_array([b'\xAA', b'\x00', b'\x00', b'\x00']),
+        )
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_eeprom_response(request, response_data, 1U)
+    }
+    @protocol.FPWR => {
+      if self.last_offset == sm1_base_addr + 6U && pdu.data.length() >= 1 {
+        self.repeat_triggered = (pdu.data[0] & b'\x02') != b'\x00'
+      }
+      build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+    }
+    _ => build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for RepeatMailboxMockNic with close(self) {
+  self.is_open = false
+}
+
+///|
 pub impl @hal.Nic for ApMailboxMockNic with open_(name) {
   ignore(name)
   ApMailboxMockNic::new()
@@ -1867,8 +1958,21 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
       let sm1_base_addr = @protocol.reg_sm_base +
         @protocol.sm_entry_size.reinterpret_as_uint()
       let response_data = if self.last_offset == sm1_base_addr {
-        let status = if self.mailbox_ready { b'\x08' } else { b'\x00' }
-        Bytes::makei(8, fn(i) { if i == 5 { status } else { b'\x00' } })
+        let status = if self.mailbox_ready || self.repeat_triggered {
+          b'\x08'
+        } else {
+          b'\x00'
+        }
+        let repeat_ack = if self.repeat_triggered { b'\x02' } else { b'\x00' }
+        Bytes::makei(8, fn(i) {
+          if i == 5 {
+            status
+          } else if i == 7 {
+            repeat_ack
+          } else {
+            b'\x00'
+          }
+        })
       } else if self.last_offset == 0x1080U {
         build_ap_mailbox_sdo_upload_response(
           0x1001U,
@@ -1883,8 +1987,13 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
       build_eeprom_response(request, response_data, 1U)
     }
     @protocol.APWR => {
+      let sm1_activate_addr = @protocol.reg_sm_base +
+        @protocol.sm_entry_size.reinterpret_as_uint() +
+        6U
       if self.last_offset == 0x1000U {
         self.mailbox_ready = true
+      } else if self.last_offset == sm1_activate_addr && pdu.data.length() >= 1 {
+        self.repeat_triggered = (pdu.data[0] & b'\x02') != b'\x00'
       }
       build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
     }
@@ -1962,6 +2071,61 @@ test "mailbox_read_ap reads input mailbox via APRD" {
   assert_eq(nic.last_command, @protocol.APRD.to_byte())
   assert_eq(nic.last_offset, 0x1080U)
   assert_eq(data.length(), 128)
+}
+
+///|
+test "mailbox_recv_rmsm requests repeat and returns replayed frame" {
+  let nic = RepeatMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  ignore(rmsm.begin_transaction())
+  let frame = @protocol.mailbox_recv_rmsm(
+    nic,
+    0x1001U,
+    cfg,
+    rmsm,
+    timeout,
+    max_polls=1,
+  )
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_true(nic.repeat_triggered)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  assert_eq(mbh.counter, b'\x01')
+}
+
+///|
+test "mailbox_recv_ap_rmsm requests repeat and returns replayed frame" {
+  let nic = ApMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  ignore(rmsm.begin_transaction())
+  let frame = @protocol.mailbox_recv_ap_rmsm(
+    nic,
+    0U,
+    cfg,
+    rmsm,
+    timeout,
+    max_polls=1,
+  )
+  let mbh = @mailbox.MailboxHeader::from_bytes(frame)
+  assert_true(nic.repeat_triggered)
+  assert_eq(mbh.counter, b'\x01')
 }
 
 ///|

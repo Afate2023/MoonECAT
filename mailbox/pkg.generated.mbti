@@ -146,6 +146,18 @@ pub fn MailboxHeader::to_bytes(Self) -> Bytes
 pub impl Eq for MailboxHeader
 pub impl Show for MailboxHeader
 
+pub(all) struct MailboxRepeatState {
+  request : Bool
+  acknowledge : Bool
+}
+pub fn MailboxRepeatState::apply_to_activate_byte(Self, Byte) -> Byte
+pub fn MailboxRepeatState::apply_to_pdi_control_byte(Self, Byte) -> Byte
+pub fn MailboxRepeatState::from_sync_manager_bytes(Byte, Byte) -> Self
+pub fn MailboxRepeatState::is_acknowledged(Self) -> Bool
+pub fn MailboxRepeatState::toggle_request(Self) -> Bool
+pub impl Eq for MailboxRepeatState
+pub impl Show for MailboxRepeatState
+
 pub(all) enum MailboxType {
   Err
   AoE
@@ -165,11 +177,16 @@ pub(all) struct Rmsm {
   max_retries : Int
   mut retries : Int
   mut last_recv_counter : Byte
+  mut repeat_request : Bool
+  mut awaiting_repeat_ack : Bool
 }
+pub fn Rmsm::awaits_repeat_ack(Self) -> Bool
+pub fn Rmsm::begin_read_repeat(Self, Byte) -> Byte raise @hal.EcError
 pub fn Rmsm::begin_transaction(Self) -> Byte raise @hal.EcError
 pub fn Rmsm::current_counter(Self) -> Byte
 pub fn Rmsm::is_idle(Self) -> Bool
 pub fn Rmsm::new(max_retries? : Int) -> Self
+pub fn Rmsm::observe_repeat_ack(Self, Byte) -> Bool
 pub fn Rmsm::record_timeout(Self) -> Bool
 pub fn Rmsm::reset(Self) -> Unit
 pub fn Rmsm::validate_response(Self, Byte) -> Bool raise @hal.EcError
@@ -289,6 +306,11 @@ pub(all) struct SiiData {
   mailbox_tx_size : UInt
   mailbox_protocols : UInt
 }
+pub fn SiiData::supports_coe(Self) -> Bool
+pub fn SiiData::supports_eoe(Self) -> Bool
+pub fn SiiData::supports_foe(Self) -> Bool
+pub fn SiiData::supports_soe(Self) -> Bool
+pub fn SiiData::supports_voe(Self) -> Bool
 pub impl Eq for SiiData
 pub impl Show for SiiData
 
@@ -327,7 +349,15 @@ pub(all) struct SiiGeneral {
 }
 pub fn SiiGeneral::is_op_only(Self) -> Bool
 pub fn SiiGeneral::prefers_not_lrw(Self) -> Bool
+pub fn SiiGeneral::supports_coe_complete_access(Self) -> Bool
+pub fn SiiGeneral::supports_coe_pdo_assign(Self) -> Bool
+pub fn SiiGeneral::supports_coe_pdo_configuration(Self) -> Bool
+pub fn SiiGeneral::supports_coe_sdo(Self) -> Bool
+pub fn SiiGeneral::supports_coe_sdo_info(Self) -> Bool
+pub fn SiiGeneral::supports_coe_upload_at_startup(Self) -> Bool
 pub fn SiiGeneral::supports_identification_ado(Self) -> Bool
+pub fn SiiGeneral::supports_identification_physical_memory(Self) -> Bool
+pub fn SiiGeneral::supports_mailbox_data_link_layer(Self) -> Bool
 pub impl Eq for SiiGeneral
 pub impl Show for SiiGeneral
 

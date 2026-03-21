@@ -11,6 +11,14 @@ let sm_register_window_size : Int = 8
 let sm_status_offset : UInt = 5U
 
 ///|
+/// SM activate register offset within the SM config register area.
+let sm_activate_offset : UInt = 6U
+
+///|
+/// SM PDI/status register offset within the SM config register area.
+let sm_pdi_control_offset : UInt = 7U
+
+///|
 /// Mailbox status bit (bit 3) in the SM status register.
 /// For SM Input: 1 = mailbox full (data available for master to read).
 /// For SM Output: 0 = mailbox empty (ready for master to write).
@@ -29,6 +37,121 @@ let mailbox_send_wait_max_polls : Int = 32
 fn sm_register_address(sm_index : Int) -> UInt {
   reg_sm_base +
   sm_index.reinterpret_as_uint() * sm_entry_size.reinterpret_as_uint()
+}
+
+///|
+fn mailbox_status_from_sm_window(window : Bytes) -> Bool {
+  if window.length() <= sm_status_offset.reinterpret_as_int() {
+    return false
+  }
+  (window[sm_status_offset.reinterpret_as_int()] & mb_status_bit) != b'\x00'
+}
+
+///|
+fn read_sm_window_activate_byte(window : Bytes) -> Byte raise @hal.EcError {
+  if window.length() <= sm_activate_offset.reinterpret_as_int() {
+    raise @hal.EcError::MailboxProtocol(
+      "short SyncManager window: missing activate byte",
+    )
+  }
+  window[sm_activate_offset.reinterpret_as_int()]
+}
+
+///|
+fn read_sm_window_pdi_control_byte(window : Bytes) -> Byte raise @hal.EcError {
+  if window.length() <= sm_pdi_control_offset.reinterpret_as_int() {
+    raise @hal.EcError::MailboxProtocol(
+      "short SyncManager window: missing PDI control byte",
+    )
+  }
+  window[sm_pdi_control_offset.reinterpret_as_int()]
+}
+
+///|
+fn[N : @hal.Nic] mailbox_repeat_read_fp(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  max_polls : Int,
+) -> Bytes raise @hal.EcError {
+  let sm_addr = sm_register_address(mb_config.in_sm_index)
+  let sm_window = read_register_fp(
+    nic, station, sm_addr, sm_register_window_size, timeout,
+  )
+  let repeat_activate = rmsm.begin_read_repeat(
+    read_sm_window_activate_byte(sm_window.data),
+  )
+  let _ = write_register_fp(
+    nic,
+    station,
+    sm_addr + sm_activate_offset,
+    Bytes::from_array([repeat_activate]),
+    timeout,
+  )
+  let mut ack_seen = false
+  for _attempt = 0; _attempt < max_polls; _attempt = _attempt + 1 {
+    let poll_window = read_register_fp(
+      nic, station, sm_addr, sm_register_window_size, timeout,
+    )
+    if not(ack_seen) {
+      ack_seen = rmsm.observe_repeat_ack(
+        read_sm_window_pdi_control_byte(poll_window.data),
+      )
+    }
+    if ack_seen && mailbox_status_from_sm_window(poll_window.data) {
+      let pdu = read_register_fp(
+        nic,
+        station,
+        mb_config.in_address,
+        mb_config.in_size.reinterpret_as_int(),
+        timeout,
+      )
+      return pdu.data
+    }
+  }
+  raise @hal.EcError::MailboxTimeout
+}
+
+///|
+fn[N : @hal.Nic] mailbox_repeat_read_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  max_polls : Int,
+) -> Bytes raise @hal.EcError {
+  let sm_addr = sm_register_address(mb_config.in_sm_index)
+  let sm_window = read_register_ap(
+    nic, position, sm_addr, sm_register_window_size, timeout,
+  )
+  let repeat_activate = rmsm.begin_read_repeat(
+    read_sm_window_activate_byte(sm_window.data),
+  )
+  let _ = write_register_ap(
+    nic,
+    position,
+    sm_addr + sm_activate_offset,
+    Bytes::from_array([repeat_activate]),
+    timeout,
+  )
+  let mut ack_seen = false
+  for _attempt = 0; _attempt < max_polls; _attempt = _attempt + 1 {
+    let poll_window = read_register_ap(
+      nic, position, sm_addr, sm_register_window_size, timeout,
+    )
+    if not(ack_seen) {
+      ack_seen = rmsm.observe_repeat_ack(
+        read_sm_window_pdi_control_byte(poll_window.data),
+      )
+    }
+    if ack_seen && mailbox_status_from_sm_window(poll_window.data) {
+      return mailbox_read_ap(nic, position, mb_config, timeout)
+    }
+  }
+  raise @hal.EcError::MailboxTimeout
 }
 
 ///|
@@ -202,6 +325,26 @@ pub fn[N : @hal.Nic] mailbox_recv(
 }
 
 ///|
+/// Receive a mailbox frame and use RMSM Repeat/RepeatAck recovery once when
+/// the initial mailbox read times out.
+pub fn[N : @hal.Nic] mailbox_recv_rmsm(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  max_polls? : Int = default_max_polls,
+) -> Bytes raise @hal.EcError {
+  let initial = try? mailbox_recv(nic, station, mb_config, timeout, max_polls~)
+  match initial {
+    Ok(data) => data
+    Err(@hal.EcError::MailboxTimeout) =>
+      mailbox_repeat_read_fp(nic, station, mb_config, rmsm, timeout, max_polls)
+    Err(err) => raise err
+  }
+}
+
+///|
 /// Read the current AP mailbox input buffer once without polling.
 pub fn[N : @hal.Nic] mailbox_read_ap(
   nic : N,
@@ -235,6 +378,32 @@ pub fn[N : @hal.Nic] mailbox_recv_ap(
     }
   }
   raise @hal.EcError::MailboxTimeout
+}
+
+///|
+/// Receive a mailbox frame using AP addressing and use RMSM Repeat/RepeatAck
+/// recovery once when the initial mailbox read times out.
+pub fn[N : @hal.Nic] mailbox_recv_ap_rmsm(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+  max_polls? : Int = default_max_polls,
+) -> Bytes raise @hal.EcError {
+  let initial = try? mailbox_recv_ap(
+    nic,
+    position,
+    mb_config,
+    timeout,
+    max_polls~,
+  )
+  match initial {
+    Ok(data) => data
+    Err(@hal.EcError::MailboxTimeout) =>
+      mailbox_repeat_read_ap(nic, position, mb_config, rmsm, timeout, max_polls)
+    Err(err) => raise err
+  }
 }
 
 ///|

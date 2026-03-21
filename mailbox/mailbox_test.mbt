@@ -106,6 +106,10 @@ test "parse_sii_general from fixture" {
   assert_eq(general.name_idx, b'\x04')
   assert_true(general.foe_supported)
   assert_true(general.eoe_supported)
+  assert_true(general.supports_coe_sdo())
+  assert_true(general.supports_coe_sdo_info())
+  assert_true(general.supports_coe_pdo_assign())
+  assert_true(not(general.supports_coe_pdo_configuration()))
   assert_eq(general.soe_channels, b'\x00')
 }
 
@@ -614,6 +618,44 @@ test "MailboxHeader encode/decode roundtrip" {
   assert_eq(decoded.priority, b'\x02')
   assert_eq(decoded.mb_type, @mailbox.MailboxType::CoE)
   assert_eq(decoded.counter, b'\x05')
+}
+
+///|
+test "MailboxHeader masks counter to 3 bits" {
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0x1001U,
+    channel: b'\x01',
+    priority: b'\x02',
+    mb_type: @mailbox.MailboxType::CoE,
+    counter: b'\x0F',
+  }
+  let encoded = mbh.to_bytes()
+  assert_eq(encoded[5] & b'\x80', b'\x00')
+  let decoded = @mailbox.MailboxHeader::from_bytes(encoded)
+  assert_eq(decoded.counter, b'\x07')
+}
+
+///|
+test "MailboxRepeatState decodes request and acknowledge bits" {
+  let repeat = @mailbox.MailboxRepeatState::from_sync_manager_bytes(
+    b'\x02', b'\x02',
+  )
+  assert_true(repeat.request)
+  assert_true(repeat.acknowledge)
+  assert_true(repeat.is_acknowledged())
+}
+
+///|
+test "MailboxRepeatState applies request without disturbing other bits" {
+  let repeat : @mailbox.MailboxRepeatState = {
+    request: true,
+    acknowledge: false,
+  }
+  let activate = repeat.apply_to_activate_byte(b'\x41')
+  assert_eq(activate, b'\x43')
+  let pdi = repeat.apply_to_pdi_control_byte(b'\x81')
+  assert_eq(pdi, b'\x81')
 }
 
 ///|
@@ -1157,7 +1199,7 @@ test "Rmsm new starts in Idle" {
 test "Rmsm begin_transaction transitions to WaitingForResponse" {
   let rmsm = @mailbox.Rmsm::new()
   let cnt = rmsm.begin_transaction()
-  assert_true(cnt >= b'\x01' && cnt <= b'\x0F')
+  assert_true(cnt >= b'\x01' && cnt <= b'\x07')
   assert_true(not(rmsm.is_idle()))
 }
 
@@ -1191,9 +1233,22 @@ test "Rmsm validate_response accepts counter 0 (slave doesn't support)" {
 test "Rmsm validate_response detects counter mismatch" {
   let rmsm = @mailbox.Rmsm::new()
   let cnt = rmsm.begin_transaction()
-  let wrong_cnt = if cnt == b'\x0F' { b'\x01' } else { cnt + b'\x01' }
+  let wrong_cnt = if cnt == b'\x07' { b'\x01' } else { cnt + b'\x01' }
   let result = try? rmsm.validate_response(wrong_cnt)
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
+
+///|
+test "parse_sii_categories accepts standard end marker 0xFFFF" {
+  let data = Bytes::makei(132, fn(i) {
+    match i {
+      128 => b'\xFF'
+      129 => b'\xFF'
+      _ => b'\x00'
+    }
+  })
+  let categories = @mailbox.parse_sii_categories(data)
+  assert_eq(categories.length(), 0)
 }
 
 ///|
@@ -1210,6 +1265,36 @@ test "Rmsm validate_response detects repeat frame" {
 }
 
 ///|
+test "Rmsm begin_read_repeat toggles SyncManager repeat request bit" {
+  let rmsm = @mailbox.Rmsm::new()
+  let _ = rmsm.begin_transaction()
+  let first = rmsm.begin_read_repeat(b'\x01')
+  assert_eq(first, b'\x03')
+  assert_true(rmsm.awaits_repeat_ack())
+  let second = rmsm.begin_read_repeat(first)
+  assert_eq(second, b'\x01')
+  assert_true(rmsm.awaits_repeat_ack())
+}
+
+///|
+test "Rmsm observe_repeat_ack completes when toggle matches" {
+  let rmsm = @mailbox.Rmsm::new()
+  let _ = rmsm.begin_transaction()
+  ignore(rmsm.begin_read_repeat(b'\x00'))
+  assert_true(not(rmsm.observe_repeat_ack(b'\x00')))
+  assert_true(rmsm.awaits_repeat_ack())
+  assert_true(rmsm.observe_repeat_ack(b'\x02'))
+  assert_true(not(rmsm.awaits_repeat_ack()))
+}
+
+///|
+test "Rmsm begin_read_repeat rejects idle state" {
+  let rmsm = @mailbox.Rmsm::new()
+  let result = try? rmsm.begin_read_repeat(b'\x00')
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
+}
+
+///|
 test "Rmsm record_timeout allows retries up to max" {
   let rmsm = @mailbox.Rmsm::new(max_retries=2)
   let _ = rmsm.begin_transaction()
@@ -1222,8 +1307,10 @@ test "Rmsm record_timeout allows retries up to max" {
 test "Rmsm reset returns to Idle" {
   let rmsm = @mailbox.Rmsm::new()
   let _ = rmsm.begin_transaction()
+  ignore(rmsm.begin_read_repeat(b'\x00'))
   rmsm.reset()
   assert_true(rmsm.is_idle())
+  assert_true(not(rmsm.awaits_repeat_ack()))
 }
 
 // ========== Emergency Message Tests ==========
@@ -1428,4 +1515,62 @@ test "SiiGeneral all flags clear" {
   assert_true(not(gen.is_op_only()))
   assert_true(not(gen.prefers_not_lrw()))
   assert_true(not(gen.supports_identification_ado()))
+  assert_true(not(gen.supports_mailbox_data_link_layer()))
+  assert_true(not(gen.supports_identification_physical_memory()))
+}
+
+///|
+test "SiiGeneral mailbox and identification helpers detect bits" {
+  let gen : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x3F',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
+    flags: b'\x14',
+    current_on_ebus: 0U,
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
+  }
+  assert_true(gen.supports_coe_sdo())
+  assert_true(gen.supports_coe_sdo_info())
+  assert_true(gen.supports_coe_pdo_assign())
+  assert_true(gen.supports_coe_pdo_configuration())
+  assert_true(gen.supports_coe_upload_at_startup())
+  assert_true(gen.supports_coe_complete_access())
+  assert_true(gen.supports_mailbox_data_link_layer())
+  assert_true(gen.supports_identification_physical_memory())
+}
+
+///|
+test "SiiData mailbox protocol helpers detect masks" {
+  let sii : @mailbox.SiiData = {
+    vendor_id: 0U,
+    product_code: 0U,
+    revision: 0U,
+    serial: 0U,
+    bootstrap_rx_offset: 0U,
+    bootstrap_rx_size: 0U,
+    bootstrap_tx_offset: 0U,
+    bootstrap_tx_size: 0U,
+    mailbox_rx_offset: 0U,
+    mailbox_rx_size: 0U,
+    mailbox_tx_offset: 0U,
+    mailbox_tx_size: 0U,
+    mailbox_protocols: 0x003EU,
+  }
+  assert_true(sii.supports_eoe())
+  assert_true(sii.supports_coe())
+  assert_true(sii.supports_foe())
+  assert_true(sii.supports_soe())
+  assert_true(sii.supports_voe())
 }

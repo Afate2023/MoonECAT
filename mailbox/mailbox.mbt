@@ -40,3 +40,70 @@ pub(all) struct MailboxHeader {
   mb_type : MailboxType
   counter : Byte
 } derive(Eq, Show)
+
+///|
+/// Repeat request / acknowledge state for resilient mailbox read recovery.
+///
+/// Repeat Request is toggled by the MainDevice in the SyncManager activate
+/// byte (offset 0x0006 bit 1). Repeat Acknowledge is toggled by the SubDevice
+/// in the PDI-owned status byte (offset 0x0007 bit 1) after restoring the last
+/// readable mailbox payload.
+pub(all) struct MailboxRepeatState {
+  request : Bool
+  acknowledge : Bool
+} derive(Eq, Show)
+
+///|
+let mailbox_repeat_bit : Byte = b'\x02'
+
+///|
+fn set_mask_bit(value : Byte, mask : Byte, enabled : Bool) -> Byte {
+  if enabled {
+    value | mask
+  } else {
+    value & (mask ^ b'\xFF')
+  }
+}
+
+///|
+/// Decode resilient mailbox repeat state from the two SyncManager bytes.
+pub fn MailboxRepeatState::from_sync_manager_bytes(
+  activate : Byte,
+  pdi_control : Byte,
+) -> MailboxRepeatState {
+  {
+    request: (activate & mailbox_repeat_bit) != b'\x00',
+    acknowledge: (pdi_control & mailbox_repeat_bit) != b'\x00',
+  }
+}
+
+///|
+/// Return true once the SubDevice has observed and acknowledged the current
+/// repeat request toggle.
+pub fn MailboxRepeatState::is_acknowledged(self : MailboxRepeatState) -> Bool {
+  self.request == self.acknowledge
+}
+
+///|
+/// Toggle the MainDevice repeat request state for a mailbox-read replay.
+pub fn MailboxRepeatState::toggle_request(self : MailboxRepeatState) -> Bool {
+  not(self.request)
+}
+
+///|
+/// Apply the current repeat request value to a SyncManager activate byte.
+pub fn MailboxRepeatState::apply_to_activate_byte(
+  self : MailboxRepeatState,
+  activate : Byte,
+) -> Byte {
+  set_mask_bit(activate, mailbox_repeat_bit, self.request)
+}
+
+///|
+/// Apply the current repeat acknowledge value to the SyncManager PDI byte.
+pub fn MailboxRepeatState::apply_to_pdi_control_byte(
+  self : MailboxRepeatState,
+  pdi_control : Byte,
+) -> Byte {
+  set_mask_bit(pdi_control, mailbox_repeat_bit, self.acknowledge)
+}

@@ -74,7 +74,8 @@ declared in each package's `moon.pkg` file.
 - **FMMU/SM**: `FmmuConfig`, `SmConfig`, `SlaveMapping`,
   `SlaveMapping::from_esi` for automatic FMMU/SM configuration.
 - **CoE/SDO engine**: `MailboxHeader` encode/decode, `SdoTransaction`
-  encode, `decode_sdo_response`, `MailboxCounter` (1–15 cycling),
+  encode, `decode_sdo_response`, `MailboxCounter` (1–7 cycling),
+  `MailboxRepeatState`, RMSM repeat-request/ack handling,
   `build_sdo_download`, `build_sdo_upload`.
 
 ### `runtime/` — Runtime Orchestrator

@@ -114,7 +114,12 @@ let sii_cat_dc : UInt = 60U
 
 ///|
 /// End marker for SII categories.
-let sii_cat_end : UInt = 0x7FFFU
+let sii_cat_end : UInt = 0xFFFFU
+
+///|
+/// Older synthetic test data used 0x7FFF as the category terminator.
+/// Keep accepting it while emitting the standards-compliant 0xFFFF marker.
+let sii_cat_legacy_end : UInt = 0x7FFFU
 
 ///|
 /// Helper: read a little-endian UInt16 from a Bytes at a word offset.
@@ -267,7 +272,9 @@ pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
   while word_offset * 2 + 3 < data.length() {
     let cat_type = read_sii_word(data, word_offset)
     let cat_size_words = read_sii_word(data, word_offset + 1)
-    if cat_type == sii_cat_end || cat_type == 0U {
+    if cat_type == sii_cat_end ||
+      cat_type == sii_cat_legacy_end ||
+      cat_type == 0U {
       break
     }
     let cat_size_bytes = cat_size_words.reinterpret_as_int() * 2

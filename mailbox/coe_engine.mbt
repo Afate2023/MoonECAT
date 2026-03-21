@@ -6,7 +6,7 @@
 ///   Bytes 0-1: Length (data area only, little-endian)
 ///   Bytes 2-3: Address (station address, little-endian)
 ///   Byte 4: bits [7:6]=Priority, [5:2]=reserved, [1:0]=Channel
-///   Byte 5: bits [7:4]=Counter, [3:0]=Type
+///   Byte 5: bit [7]=reserved, [6:4]=Counter, [3:0]=Type
 ///   Bytes 6+: Protocol-specific data
 ///
 /// CoE header (2 bytes):
@@ -54,8 +54,8 @@ pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
   // Byte 4: Channel[1:0] | Priority[7:6]
   let b4 = (self.channel & b'\x03') | ((self.priority & b'\x03') << 6)
   buf.write_byte(b4)
-  // Byte 5: Type[3:0] | Counter[7:4]
-  let b5 = self.mb_type.to_byte() | ((self.counter & b'\x0F') << 4)
+  // Byte 5: Type[3:0] | Counter[6:4], bit 7 remains reserved.
+  let b5 = self.mb_type.to_byte() | ((self.counter & b'\x07') << 4)
   buf.write_byte(b5)
   buf.to_bytes()
 }
@@ -73,7 +73,7 @@ pub fn MailboxHeader::from_bytes(
   let channel = data[4] & b'\x03'
   let priority = (data[4] >> 6) & b'\x03'
   let type_byte = data[5] & b'\x0F'
-  let counter = (data[5] >> 4) & b'\x0F'
+  let counter = (data[5] >> 4) & b'\x07'
   let mb_type : MailboxType = match type_byte {
     b'\x00' => Err
     b'\x01' => AoE

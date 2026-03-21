@@ -120,9 +120,9 @@ pub fn sample_sii_eeprom() -> Bytes {
   // data[171]: status (ignored)
   data[172] = b'\x01' // enable = true
   data[173] = b'\x02' // SM type = MailboxIn
-  // End marker: 0x7FFF
+  // End marker: 0xFFFF
   data[174] = b'\xFF'
-  data[175] = b'\x7F'
+  data[175] = b'\xFF'
   Bytes::makei(data.length(), fn(i) { data[i] })
 }
 
@@ -196,6 +196,6 @@ pub fn sample_sii_eeprom_with_pdo() -> Bytes {
   data[169] = b'\x04' // SM type = ProcessDataIn
   // End marker
   data[170] = b'\xFF'
-  data[171] = b'\x7F'
+  data[171] = b'\xFF'
   Bytes::makei(data.length(), fn(i) { data[i] })
 }

@@ -29,7 +29,7 @@ pub fn[N : @hal.Nic] sdo_download(
   // Send request via mailbox SM
   mailbox_send(nic, station, mb_config, frame, timeout)
   // Wait for response
-  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
   // Decode and validate
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
   // Validate RMSM counter
@@ -67,7 +67,7 @@ pub fn[N : @hal.Nic] sdo_upload(
   // Send request via mailbox SM
   mailbox_send(nic, station, mb_config, frame, timeout)
   // Wait for response
-  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
   // Decode and validate
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
   // Validate RMSM counter
@@ -109,7 +109,9 @@ pub fn[N : @hal.Nic] sdo_upload_ap(
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send_ap(nic, position, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_ap(nic, position, mb_config, timeout)
+  let response_raw = mailbox_recv_ap_rmsm(
+    nic, position, mb_config, rmsm, timeout,
+  )
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
   let _ = rmsm.validate_response(mbh.counter)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
@@ -268,7 +270,7 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
   )
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
   let _ = rmsm.validate_response(mbh.counter)
   if resp.command != @mailbox.SdoCommand::DownloadResponse {
@@ -294,7 +296,7 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
   let txn = @mailbox.build_sdo_upload_ca(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
   let _ = rmsm.validate_response(mbh.counter)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
@@ -399,7 +401,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
       seg_counter, station, toggle,
     )
     mailbox_send(nic, station, mb_config, seg_req, timeout)
-    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let seg_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
     let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
     let _ = rmsm.validate_response(seg_mbh.counter)
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
@@ -459,7 +461,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
       seg_counter, station, toggle,
     )
     mailbox_send_ap(nic, position, mb_config, seg_req, timeout)
-    let seg_raw = mailbox_recv_ap(nic, position, mb_config, timeout)
+    let seg_raw = mailbox_recv_ap_rmsm(nic, position, mb_config, rmsm, timeout)
     let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
     let _ = rmsm.validate_response(seg_mbh.counter)
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
@@ -520,7 +522,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
     )
   }
   mailbox_send(nic, station, mb_config, init_txn.encode(), timeout)
-  let init_raw = mailbox_recv(nic, station, mb_config, timeout)
+  let init_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
   let (init_mbh, init_resp) = @mailbox.decode_sdo_response(init_raw)
   let _ = rmsm.validate_response(init_mbh.counter)
   if init_resp.command != @mailbox.SdoCommand::DownloadResponse {
@@ -541,7 +543,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
       seg_counter, station, toggle, last, chunk,
     )
     mailbox_send(nic, station, mb_config, seg_frame, timeout)
-    let seg_raw = mailbox_recv(nic, station, mb_config, timeout)
+    let seg_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
     let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
     let _ = rmsm.validate_response(seg_mbh.counter)
     if seg_resp.command != @mailbox.SdoCommand::DownloadResponse ||
@@ -577,7 +579,7 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
   let mut first = true
   let mut done = false
   while not(done) {
-    let raw = mailbox_recv(nic, station, mb_config, timeout)
+    let raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
     let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
     let _ = rmsm.validate_response(mbh.counter)
     if info.opcode != expected_opcode {

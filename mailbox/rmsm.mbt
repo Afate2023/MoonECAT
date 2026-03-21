@@ -18,7 +18,7 @@ pub(all) enum RmsmState {
 /// Per-slave Resilient Mailbox State Machine.
 /// Manages counter correlation and repeat detection.
 pub(all) struct Rmsm {
-  /// Mailbox counter (cycles 1–15).
+  /// Mailbox counter (cycles 1-7).
   counter : MailboxCounter
   /// Current state.
   mut state : RmsmState
@@ -28,6 +28,10 @@ pub(all) struct Rmsm {
   mut retries : Int
   /// Last received counter value for repeat detection.
   mut last_recv_counter : Byte
+  /// Current Repeat Request toggle value tracked for mailbox-read replay.
+  mut repeat_request : Bool
+  /// True while waiting for the SubDevice to mirror RepeatAck.
+  mut awaiting_repeat_ack : Bool
 } derive(Show)
 
 ///|
@@ -38,6 +42,8 @@ pub fn Rmsm::new(max_retries? : Int = 3) -> Rmsm {
     max_retries,
     retries: 0,
     last_recv_counter: b'\x00',
+    repeat_request: false,
+    awaiting_repeat_ack: false,
   }
 }
 
@@ -53,6 +59,7 @@ pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
   let cnt = self.counter.next()
   self.state = WaitingForResponse(cnt)
   self.retries = 0
+  self.awaiting_repeat_ack = false
   cnt
 }
 
@@ -90,7 +97,46 @@ pub fn Rmsm::validate_response(
   }
   self.last_recv_counter = recv_counter
   self.state = Idle
+  self.awaiting_repeat_ack = false
   true
+}
+
+///|
+/// Toggle Repeat Request in the SyncManager activate byte to recover a lost
+/// mailbox read frame. The returned byte is ready to write back to SMx+0x06.
+pub fn Rmsm::begin_read_repeat(
+  self : Rmsm,
+  activate : Byte,
+) -> Byte raise @hal.EcError {
+  guard self.state is WaitingForResponse(_) else {
+    raise @hal.EcError::MailboxProtocol(
+      "RMSM: cannot request mailbox repeat in state " + self.state.to_string(),
+    )
+  }
+  self.repeat_request = not(self.repeat_request)
+  self.awaiting_repeat_ack = true
+  { request: self.repeat_request, acknowledge: false }.apply_to_activate_byte(
+    activate,
+  )
+}
+
+///|
+/// Check whether the SubDevice has mirrored the RepeatAck bit for the current
+/// read-repeat sequence. Returns true exactly when the expected toggle is seen.
+pub fn Rmsm::observe_repeat_ack(self : Rmsm, pdi_control : Byte) -> Bool {
+  let repeat = MailboxRepeatState::from_sync_manager_bytes(b'\x00', pdi_control)
+  if self.awaiting_repeat_ack && repeat.acknowledge == self.repeat_request {
+    self.awaiting_repeat_ack = false
+    true
+  } else {
+    false
+  }
+}
+
+///|
+/// Report whether a mailbox-read repeat is currently waiting for RepeatAck.
+pub fn Rmsm::awaits_repeat_ack(self : Rmsm) -> Bool {
+  self.awaiting_repeat_ack
 }
 
 ///|
@@ -114,6 +160,7 @@ pub fn Rmsm::record_timeout(self : Rmsm) -> Bool {
 pub fn Rmsm::reset(self : Rmsm) -> Unit {
   self.state = Idle
   self.retries = 0
+  self.awaiting_repeat_ack = false
 }
 
 ///|
