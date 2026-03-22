@@ -28,7 +28,7 @@
 - [ ] 继续补 ENI 导入的配置工具数据模型，使 online/offline 两条配置来源在共享校验路径之外，进一步共享 SM/FMMU/PDO/诊断摘要等更完整配置语义。
 - [ ] 把已完成的 SDO Info / Complete Access / segmented 能力上浮到 CLI / 配置工具表面，形成稳定的对象字典浏览输出。
 - [ ] 补拓扑指纹与 Hot Connect group/optional segment 配置模型，使配置工具可表达“必选链路”与“可选链路”而不新增第二套校验语义。
-- [x] 补 SII category 深度解码与稳定 JSON 结构，支撑 `read-sii`、offline config 和配置工具共用更完整的 EEPROM/ESI 语义。已于 2026-03-22 先按 ETG.2010 补齐 `Timeouts(70)`、AoE mailbox bit、`CurrentOnEBus` signed decode 和 `esi-sii` AoE 投影保真（commit: `cdac077`）；同日继续补齐 `FMMUX(42)`、`SyncUnit(43)`、未知 category 原始保留、Vendor Info、ESC Config Area B 和 dynamic process-data `SM type 0x05/0x06`，并让 `read-sii` JSON/文本输出消费同一扩展模型（commit: `43b36e8`）。随后再引入共享 `SiiFullInfo` 聚合模型，把 CLI `read-sii`、offline `esi-sii`、runtime startup 和 mailbox mapping 全部切到同一份 SII 派生结果（commit: `ebbaf31`）。验证：`moon test` 全量 `408 passed / 0 failed`。
+- [x] 补 SII category 深度解码与稳定 JSON 结构，支撑 `read-sii`、offline config 和配置工具共用更完整的 EEPROM/ESI 语义。已于 2026-03-22 先按 ETG.2010 补齐 `Timeouts(70)`、AoE mailbox bit、`CurrentOnEBus` signed decode 和 `esi-sii` AoE 投影保真（commit: `cdac077`）；同日继续补齐 `FMMUX(42)`、`SyncUnit(43)`、未知 category 原始保留、Vendor Info、ESC Config Area B 和 dynamic process-data `SM type 0x05/0x06`，并让 `read-sii` JSON/文本输出消费同一扩展模型（commit: `43b36e8`）。随后再引入共享 `SiiFullInfo` 聚合模型，把 CLI `read-sii`、offline `esi-sii`、runtime startup 和 mailbox mapping 全部切到同一份 SII 派生结果（commit: `ebbaf31`）。2026-03-23 又把 ownership + 32/64-bit EEPROM 读取扩展链路收口为 protocol 级 `read_sii_bytes` / `read_sii_bytes_ap`，使 `read-sii` 可在给定初始窗口后自动补读完整 EEPROM（commit: `45b7217`）。验证：`moon test protocol` `111/111`、`moon test cmd/main` `70/70`、`moon test runtime` `105/105`。
 
 ### Runtime
 
