@@ -40,6 +40,7 @@
 
 最近回填：
 
+- `标准保留 SII 类别识别` → `5b8f96e` `feat(sii): recognize standard reserved categories`
 - `在线完整 EEPROM 补读链路` → `45b7217` `feat(protocol): auto-expand complete sii reads`
 - `SII 聚合模型共享到 CLI/runtime/offline mapping` → `ebbaf31` `feat(sii): share aggregated full-info model`
 - `启动恢复共享入口 + SO mailbox 启动命令 + ESC 映射诊断` → `b3b0717` `Refine startup recovery and ESC mapping diagnostics`
