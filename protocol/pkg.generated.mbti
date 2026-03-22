@@ -85,9 +85,9 @@ pub let fmmu_entry_size : Int
 
 pub fn logical_address(UInt) -> UInt
 
-pub fn[N : @hal.Nic] mailbox_exchange(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Bytes raise @hal.EcError
+pub fn[N : @hal.Nic] mailbox_exchange(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, Bytes, @hal.Duration) -> Bytes raise @hal.EcError
 
-pub fn[N : @hal.Nic] mailbox_exchange_ap(N, UInt, @mailbox.MailboxConfig, Bytes, @hal.Duration) -> Bytes raise @hal.EcError
+pub fn[N : @hal.Nic] mailbox_exchange_ap(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, Bytes, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] mailbox_poll(N, UInt, @mailbox.MailboxConfig, @hal.Duration) -> Bool raise @hal.EcError
 

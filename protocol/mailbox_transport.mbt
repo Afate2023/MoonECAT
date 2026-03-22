@@ -413,11 +413,12 @@ pub fn[N : @hal.Nic] mailbox_exchange(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
   data : Bytes,
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   mailbox_send(nic, station, mb_config, data, timeout)
-  mailbox_recv(nic, station, mb_config, timeout)
+  mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
 }
 
 ///|
@@ -426,9 +427,10 @@ pub fn[N : @hal.Nic] mailbox_exchange_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
   data : Bytes,
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   mailbox_send_ap(nic, position, mb_config, data, timeout)
-  mailbox_recv_ap(nic, position, mb_config, timeout)
+  mailbox_recv_ap_rmsm(nic, position, mb_config, rmsm, timeout)
 }

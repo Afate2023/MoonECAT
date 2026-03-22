@@ -1056,6 +1056,7 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
     nic,
     station,
     mb_config,
+    rmsm,
     timeout,
     stage + ".mailbox_recv_fp",
   )
@@ -1088,28 +1089,22 @@ fn[N : @hal.Nic] diagnosis_mailbox_recv_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
   timeout : @hal.Duration,
   stage : String,
 ) -> Bytes raise @hal.EcError {
-  for _attempt = 0
-      _attempt < diagnosis_mailbox_max_polls
-      _attempt = _attempt + 1 {
-    let ready = diagnosis_timeout_step(
-      try? @protocol.mailbox_poll(nic, station, mb_config, timeout),
-      stage + ".poll_status",
-    )
-    if ready {
-      return diagnosis_timeout_step(
-        try? @protocol.mailbox_recv(
-          nic,
-          station,
-          mb_config,
-          timeout,
-          max_polls=1,
-        ),
-        stage + ".read_frame",
-      )
-    }
+  let recv_result = try? @protocol.mailbox_recv_rmsm(
+    nic,
+    station,
+    mb_config,
+    rmsm,
+    timeout,
+    max_polls=diagnosis_mailbox_max_polls,
+  )
+  match recv_result {
+    Ok(frame) => return frame
+    Err(@hal.EcError::MailboxTimeout) => ()
+    Err(err) => raise err
   }
   let sm0_status = diagnosis_register_snapshot(
     try? @protocol.read_register_fp(
@@ -1133,7 +1128,7 @@ fn[N : @hal.Nic] diagnosis_mailbox_recv_fp(
   raise @hal.EcError::Internal(
     "timeout at " +
     stage +
-    ".poll_status (MailboxTimeout; SM0=" +
+    ".read_frame (MailboxTimeout; SM0=" +
     sm0_status +
     "; SM1=" +
     sm1_status +
