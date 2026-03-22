@@ -1636,6 +1636,11 @@ test "cli read-sii json includes categories" {
     categories: [
       { category: @mailbox.General, type_code: 30U, data: Bytes::new(32) },
       {
+        category: @mailbox.Dictionary,
+        type_code: 80U,
+        data: Bytes::from_array([b'\x12', b'\x34', b'\x56', b'\x78']),
+      },
+      {
         category: @mailbox.FmmuEx,
         type_code: 42U,
         data: Bytes::from_array([b'\x07', b'\x00', b'\x02', b'\x01']),
@@ -1655,8 +1660,8 @@ test "cli read-sii json includes categories" {
       },
       {
         category: @mailbox.Raw,
-        type_code: 80U,
-        data: Bytes::from_array([b'\x12', b'\x34', b'\x56', b'\x78']),
+        type_code: 0x1234U,
+        data: Bytes::from_array([b'\x9A', b'\xBC', b'\xDE', b'\xF0']),
       },
     ],
     strings: ["SlaveName"],
@@ -1753,6 +1758,7 @@ test "cli read-sii json includes categories" {
   assert_true(text.contains("\"categories\""))
   assert_true(text.contains("\"production_week\""))
   assert_true(text.contains("\"esc_config_b_present\": true"))
+  assert_true(text.contains("\"title\": \"Dictionary\""))
   assert_true(text.contains("\"known\": false"))
 }
 

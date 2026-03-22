@@ -285,6 +285,7 @@ pub impl Show for SdoTransaction
 
 pub(all) enum SiiCategory {
   Strings
+  DataTypes
   General
   Fmmu
   SyncManager
@@ -294,6 +295,10 @@ pub(all) enum SiiCategory {
   RxPdo
   Dc
   Timeouts
+  Dictionary
+  Hardware
+  VendorInformation
+  Images
   Raw
 }
 pub impl Eq for SiiCategory

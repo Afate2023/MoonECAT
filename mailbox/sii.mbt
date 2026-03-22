@@ -2,6 +2,7 @@
 /// SII category types (Slave Information Interface).
 pub(all) enum SiiCategory {
   Strings
+  DataTypes
   General
   Fmmu
   SyncManager
@@ -11,6 +12,10 @@ pub(all) enum SiiCategory {
   RxPdo
   Dc
   Timeouts
+  Dictionary
+  Hardware
+  VendorInformation
+  Images
   Raw
 } derive(Eq, Show)
 

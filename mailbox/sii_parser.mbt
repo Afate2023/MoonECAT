@@ -135,6 +135,9 @@ pub let sii_category_start : Int = 64
 let sii_cat_strings : UInt = 10U
 
 ///|
+let sii_cat_datatypes : UInt = 20U
+
+///|
 let sii_cat_general : UInt = 30U
 
 ///|
@@ -160,6 +163,18 @@ let sii_cat_dc : UInt = 60U
 
 ///|
 let sii_cat_timeouts : UInt = 70U
+
+///|
+let sii_cat_dictionary : UInt = 80U
+
+///|
+let sii_cat_hardware : UInt = 90U
+
+///|
+let sii_cat_vendor_information : UInt = 100U
+
+///|
+let sii_cat_images : UInt = 110U
 
 ///|
 /// End marker for SII categories.
@@ -355,6 +370,7 @@ pub fn parse_sii_standard_metadata(
 fn category_from_code(code : UInt) -> SiiCategory {
   match code {
     c if c == sii_cat_strings => Strings
+    c if c == sii_cat_datatypes => DataTypes
     c if c == sii_cat_general => General
     c if c == sii_cat_fmmu => Fmmu
     c if c == sii_cat_sm => SyncManager
@@ -364,6 +380,10 @@ fn category_from_code(code : UInt) -> SiiCategory {
     c if c == sii_cat_rxpdo => RxPdo
     c if c == sii_cat_dc => Dc
     c if c == sii_cat_timeouts => Timeouts
+    c if c == sii_cat_dictionary => Dictionary
+    c if c == sii_cat_hardware => Hardware
+    c if c == sii_cat_vendor_information => VendorInformation
+    c if c == sii_cat_images => Images
     _ => Raw
   }
 }

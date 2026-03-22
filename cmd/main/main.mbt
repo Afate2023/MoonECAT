@@ -2970,6 +2970,7 @@ fn sii_category_title(
 ) -> String {
   match category {
     Strings => "Strings"
+    DataTypes => "DataTypes"
     General => "General"
     Fmmu => "FMMU"
     SyncManager => "SyncManager"
@@ -2979,6 +2980,10 @@ fn sii_category_title(
     RxPdo => "RX PDO"
     Dc => "DC CLOCK"
     Timeouts => "Timeouts"
+    Dictionary => "Dictionary"
+    Hardware => "Hardware"
+    VendorInformation => "Vendor Information"
+    Images => "Images"
     Raw => "Raw Category " + format_hex(type_code, 4)
   }
 }
@@ -3742,6 +3747,7 @@ fn read_sii_text(
   for entry in categories {
     match entry.category {
       Strings => append_sii_strings_section(buf, entry, strings)
+      DataTypes => append_sii_raw_category_section(buf, entry)
       General =>
         match general {
           Some(info) => append_sii_general_section(buf, entry, info, strings)
@@ -3775,6 +3781,10 @@ fn read_sii_text(
           Some(timeouts) => append_sii_timeouts_section(buf, entry, timeouts)
           None => ()
         }
+      Dictionary => append_sii_raw_category_section(buf, entry)
+      Hardware => append_sii_raw_category_section(buf, entry)
+      VendorInformation => append_sii_raw_category_section(buf, entry)
+      Images => append_sii_raw_category_section(buf, entry)
       Raw => append_sii_raw_category_section(buf, entry)
     }
   }

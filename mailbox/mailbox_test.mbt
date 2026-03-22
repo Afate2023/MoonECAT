@@ -276,7 +276,7 @@ test "parse_sii_sync_units decodes flag bits" {
 }
 
 ///|
-test "parse_sii_categories preserves unknown category payload" {
+test "parse_sii_categories recognizes standard reserved category payload" {
   let data = Bytes::makei(140, fn(i) {
     match i {
       128 => b'\x50'
@@ -294,9 +294,81 @@ test "parse_sii_categories preserves unknown category payload" {
   })
   let categories = @mailbox.parse_sii_categories(data)
   assert_eq(categories.length(), 1)
-  assert_eq(categories[0].category, @mailbox.Raw)
+  assert_eq(categories[0].category, @mailbox.Dictionary)
   assert_eq(categories[0].type_code, 80U)
   assert_eq(categories[0].data.length(), 4)
+}
+
+///|
+test "parse_sii_categories preserves unknown vendor payload as raw" {
+  let data = Bytes::makei(140, fn(i) {
+    match i {
+      128 => b'\x34'
+      129 => b'\x12' // type 0x1234
+      130 => b'\x02'
+      131 => b'\x00' // 2 words = 4 bytes
+      132 => b'\x12'
+      133 => b'\x34'
+      134 => b'\x56'
+      135 => b'\x78'
+      136 => b'\xFF'
+      137 => b'\xFF'
+      _ => b'\x00'
+    }
+  })
+  let categories = @mailbox.parse_sii_categories(data)
+  assert_eq(categories.length(), 1)
+  assert_eq(categories[0].category, @mailbox.Raw)
+  assert_eq(categories[0].type_code, 0x1234U)
+  assert_eq(categories[0].data.length(), 4)
+}
+
+///|
+test "parse_sii_categories recognizes all standard reserved categories" {
+  let data = Bytes::makei(176, fn(i) {
+    match i {
+      128 => b'\x14'
+      129 => b'\x00' // 20
+      130 => b'\x01'
+      131 => b'\x00'
+      132 => b'\x01'
+      133 => b'\x02'
+      134 => b'\x50'
+      135 => b'\x00' // 80
+      136 => b'\x01'
+      137 => b'\x00'
+      138 => b'\x03'
+      139 => b'\x04'
+      140 => b'\x5A'
+      141 => b'\x00' // 90
+      142 => b'\x01'
+      143 => b'\x00'
+      144 => b'\x05'
+      145 => b'\x06'
+      146 => b'\x64'
+      147 => b'\x00' // 100
+      148 => b'\x01'
+      149 => b'\x00'
+      150 => b'\x07'
+      151 => b'\x08'
+      152 => b'\x6E'
+      153 => b'\x00' // 110
+      154 => b'\x01'
+      155 => b'\x00'
+      156 => b'\x09'
+      157 => b'\x0A'
+      158 => b'\xFF'
+      159 => b'\xFF'
+      _ => b'\x00'
+    }
+  })
+  let categories = @mailbox.parse_sii_categories(data)
+  assert_eq(categories.length(), 5)
+  assert_eq(categories[0].category, @mailbox.DataTypes)
+  assert_eq(categories[1].category, @mailbox.Dictionary)
+  assert_eq(categories[2].category, @mailbox.Hardware)
+  assert_eq(categories[3].category, @mailbox.VendorInformation)
+  assert_eq(categories[4].category, @mailbox.Images)
 }
 
 ///|

@@ -959,6 +959,7 @@ fn build_sii_header(
 fn known_sii_category_code(category : @mailbox.SiiCategory) -> UInt {
   match category {
     Strings => 0x0AU
+    DataTypes => 0x14U
     General => 0x1EU
     Fmmu => 0x28U
     SyncManager => 0x29U
@@ -968,6 +969,10 @@ fn known_sii_category_code(category : @mailbox.SiiCategory) -> UInt {
     RxPdo => 0x33U
     Dc => 0x3CU
     Timeouts => 0x46U
+    Dictionary => 0x50U
+    Hardware => 0x5AU
+    VendorInformation => 0x64U
+    Images => 0x6EU
     Raw => 0U
   }
 }
