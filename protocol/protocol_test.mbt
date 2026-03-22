@@ -2170,11 +2170,22 @@ pub struct EepromMockNic {
   mut next_response : Bytes
   mut is_open : Bool
   mut sii_word_address : UInt
+  image : Bytes
 }
 
 ///|
 fn EepromMockNic::new() -> EepromMockNic {
-  { next_response: Bytes::new(0), is_open: true, sii_word_address: 0U }
+  {
+    next_response: Bytes::new(0),
+    is_open: true,
+    sii_word_address: 0U,
+    image: Bytes::new(0),
+  }
+}
+
+///|
+fn EepromMockNic::with_image(image : Bytes) -> EepromMockNic {
+  { next_response: Bytes::new(0), is_open: true, sii_word_address: 0U, image }
 }
 
 ///|
@@ -2219,20 +2230,32 @@ pub impl @hal.Nic for EepromMockNic with send(self, data) {
   let pdu = request.pdus[0]
   let offset = @protocol.address_offset(pdu.header.address)
   self.next_response = match pdu.header.command {
-    @protocol.FPWR => {
+    @protocol.FPWR | @protocol.APWR => {
       if offset == @protocol.reg_sii_control && pdu.data.length() >= 4 {
         self.sii_word_address = pdu.data[2].to_uint() |
           (pdu.data[3].to_uint() << 8)
       }
       build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
     }
-    @protocol.FPRD => {
+    @protocol.FPRD | @protocol.APRD => {
       let response_data = if offset == @protocol.reg_sii_control {
         Bytes::from_array([b'\x00', b'\x00'])
       } else if offset == @protocol.reg_sii_data {
-        Bytes::makei(pdu.data.length(), fn(i) {
-          (self.sii_word_address.reinterpret_as_int() * 2 + i).to_byte()
-        })
+        let byte_offset = self.sii_word_address.reinterpret_as_int() * 2
+        if self.image.length() > 0 {
+          Bytes::makei(pdu.data.length(), fn(i) {
+            let index = byte_offset + i
+            if index < self.image.length() {
+              self.image[index]
+            } else {
+              b'\xFF'
+            }
+          })
+        } else {
+          Bytes::makei(pdu.data.length(), fn(i) {
+            (self.sii_word_address.reinterpret_as_int() * 2 + i).to_byte()
+          })
+        }
       } else {
         Bytes::new(pdu.data.length())
       }
@@ -2273,6 +2296,40 @@ test "eeprom_read multi-word via mock" {
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read(nic, 0x1001U, 0U, 3, timeout)
   assert_eq(data.length(), 12) // 3 words * 4 bytes
+}
+
+///|
+fn make_sii_image(byte_size : Int) -> Bytes {
+  let image = Array::make(byte_size, b'\x00')
+  let encoded_size = if byte_size <= 0x80 {
+    0U
+  } else {
+    ((byte_size.reinterpret_as_uint() - 0x80U) >> 7)
+  }
+  image[124] = (encoded_size & 0xFFU).to_byte()
+  image[125] = ((encoded_size >> 8) & 0xFFU).to_byte()
+  for i = 0; i < byte_size; i = i + 1 {
+    image[i] = (i % 251).to_byte()
+  }
+  image[124] = (encoded_size & 0xFFU).to_byte()
+  image[125] = ((encoded_size >> 8) & 0xFFU).to_byte()
+  Bytes::from_array(image)
+}
+
+///|
+test "read_sii_bytes expands probe to eeprom size" {
+  let nic = EepromMockNic::with_image(make_sii_image(512))
+  let timeout = @hal.Duration(1000L)
+  let data = @protocol.read_sii_bytes(nic, 0x1001U, 8, timeout)
+  assert_eq(data.length(), 512)
+}
+
+///|
+test "read_sii_bytes_ap expands probe to eeprom size" {
+  let nic = EepromMockNic::with_image(make_sii_image(512))
+  let timeout = @hal.Duration(1000L)
+  let data = @protocol.read_sii_bytes_ap(nic, 0U, 8, timeout)
+  assert_eq(data.length(), 512)
 }
 
 // ========== ESM Extensions Tests ==========

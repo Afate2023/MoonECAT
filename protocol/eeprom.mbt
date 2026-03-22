@@ -41,6 +41,14 @@ let sii_cfg_master : Byte = b'\x00'
 let sii_cfg_pdi : Byte = b'\x01'
 
 ///|
+/// EEPROM size word offset inside the fixed SII metadata block.
+let sii_eeprom_size_word_offset : Int = 62
+
+///|
+/// Minimum bytes needed to read standard metadata and determine total EEPROM size.
+let sii_initial_probe_bytes : Int = 128
+
+///|
 /// Maximum polls for SII busy flag before timeout.
 let sii_max_polls : Int = 1000
 
@@ -250,6 +258,63 @@ pub fn[N : @hal.Nic] eeprom_read(
 }
 
 ///|
+fn decode_sii_total_bytes(probe : Bytes) -> Int? {
+  if probe.length() < sii_initial_probe_bytes {
+    return None
+  }
+  let byte_offset = sii_eeprom_size_word_offset * 2
+  let encoded = probe[byte_offset].to_uint() | (probe[byte_offset + 1].to_uint() << 8)
+  Some(((encoded << 7) + 0x80U).reinterpret_as_int())
+}
+
+///|
+fn required_sii_probe_word_count(initial_word_count : Int) -> Int {
+  let minimum_probe_words = sii_initial_probe_bytes / 4
+  if initial_word_count > minimum_probe_words {
+    initial_word_count
+  } else {
+    minimum_probe_words
+  }
+}
+
+///|
+fn required_sii_total_word_count(initial_eeprom : Bytes, initial_word_count : Int) -> Int {
+  match decode_sii_total_bytes(initial_eeprom) {
+    Some(total_bytes) => {
+      let total_words = ((total_bytes + 3) / 4)
+      if total_words > initial_word_count {
+        total_words
+      } else {
+        initial_word_count
+      }
+    }
+    None => initial_word_count
+  }
+}
+
+///|
+/// Read a complete SII EEPROM image using the fixed metadata block to expand
+/// the initial probe to the EEPROM-declared total byte size.
+pub fn[N : @hal.Nic] read_sii_bytes(
+  nic : N,
+  station : UInt,
+  initial_word_count : Int,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let probe_word_count = required_sii_probe_word_count(initial_word_count)
+  let initial_eeprom = eeprom_read(nic, station, 0U, probe_word_count, timeout)
+  let total_word_count = required_sii_total_word_count(
+    initial_eeprom,
+    probe_word_count,
+  )
+  if total_word_count <= probe_word_count {
+    initial_eeprom
+  } else {
+    eeprom_read(nic, station, 0U, total_word_count, timeout)
+  }
+}
+
+///|
 /// Read a contiguous EEPROM range using auto-increment addressing.
 /// This is useful during scan while slave positions are stable but configured
 /// station addressing may not yet be reliable on all devices.
@@ -280,6 +345,33 @@ pub fn[N : @hal.Nic] eeprom_read_ap(
   }
   ignore(eeprom_restore_pdi_ap(nic, position, timeout) catch { _ => () })
   buf.to_bytes()
+}
+
+///|
+/// Read a complete SII EEPROM image using auto-increment addressing.
+pub fn[N : @hal.Nic] read_sii_bytes_ap(
+  nic : N,
+  position : UInt,
+  initial_word_count : Int,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let probe_word_count = required_sii_probe_word_count(initial_word_count)
+  let initial_eeprom = eeprom_read_ap(
+    nic,
+    position,
+    0U,
+    probe_word_count,
+    timeout,
+  )
+  let total_word_count = required_sii_total_word_count(
+    initial_eeprom,
+    probe_word_count,
+  )
+  if total_word_count <= probe_word_count {
+    initial_eeprom
+  } else {
+    eeprom_read_ap(nic, position, 0U, total_word_count, timeout)
+  }
 }
 
 ///|

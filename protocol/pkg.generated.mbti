@@ -139,6 +139,10 @@ pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu 
 
 pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_sii_bytes(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_sii_bytes_ap(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_station_address_ap(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_station_alias(N, UInt, @hal.Duration) -> UInt raise @hal.EcError

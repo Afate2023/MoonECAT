@@ -148,17 +148,7 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_fp(
   initial_word_count : Int,
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
-  let initial_eeprom = @protocol.eeprom_read(
-    nic, station, 0U, initial_word_count, timeout,
-  )
-  let total_word_count = required_sii_read_word_count(
-    initial_eeprom, initial_word_count,
-  )
-  if total_word_count <= initial_word_count {
-    initial_eeprom
-  } else {
-    @protocol.eeprom_read(nic, station, 0U, total_word_count, timeout)
-  }
+  @protocol.read_sii_bytes(nic, station, initial_word_count, timeout)
 }
 
 ///|
@@ -168,17 +158,7 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_ap(
   initial_word_count : Int,
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
-  let initial_eeprom = @protocol.eeprom_read_ap(
-    nic, position, 0U, initial_word_count, timeout,
-  )
-  let total_word_count = required_sii_read_word_count(
-    initial_eeprom, initial_word_count,
-  )
-  if total_word_count <= initial_word_count {
-    initial_eeprom
-  } else {
-    @protocol.eeprom_read_ap(nic, position, 0U, total_word_count, timeout)
-  }
+  @protocol.read_sii_bytes_ap(nic, position, initial_word_count, timeout)
 }
 
 ///|
