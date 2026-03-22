@@ -20,6 +20,46 @@ pub(all) enum SiiCategory {
 } derive(Eq, Show)
 
 ///|
+/// Stable export classification for SII categories.
+pub(all) enum SiiCategoryClass {
+  StandardKnown
+  StandardUnknown
+  DeviceSpecific
+  VendorSpecific
+  ApplicationSpecific
+} derive(Eq, Show)
+
+///|
+pub fn SiiCategoryClass::label(self : SiiCategoryClass) -> String {
+  match self {
+    StandardKnown => "standard-known"
+    StandardUnknown => "standard-unknown"
+    DeviceSpecific => "device-specific"
+    VendorSpecific => "vendor-specific"
+    ApplicationSpecific => "application-specific"
+  }
+}
+
+///|
+pub fn SiiCategoryEntry::category_class(self : SiiCategoryEntry) -> SiiCategoryClass {
+  if self.category != Raw {
+    return StandardKnown
+  }
+  let type_code = self.type_code
+  if type_code >= 1U && type_code <= 9U {
+    return DeviceSpecific
+  }
+  if type_code >= 0x2000U && type_code <= 0x2FFFU {
+    return ApplicationSpecific
+  }
+  if (type_code >= 0x0800U && type_code <= 0x1FFFU) ||
+    (type_code >= 0x3000U && type_code <= 0xFFFEU) {
+    return VendorSpecific
+  }
+  StandardUnknown
+}
+
+///|
 /// Basic SII data read from slave EEPROM.
 pub(all) struct SiiData {
   vendor_id : UInt

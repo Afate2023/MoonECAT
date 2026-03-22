@@ -1663,6 +1663,11 @@ test "cli read-sii json includes categories" {
         type_code: 0x1234U,
         data: Bytes::from_array([b'\x9A', b'\xBC', b'\xDE', b'\xF0']),
       },
+      {
+        category: @mailbox.Raw,
+        type_code: 0x2001U,
+        data: Bytes::from_array([b'\x11', b'\x22', b'\x33', b'\x44']),
+      },
     ],
     strings: ["SlaveName"],
     general,
@@ -1759,6 +1764,9 @@ test "cli read-sii json includes categories" {
   assert_true(text.contains("\"production_week\""))
   assert_true(text.contains("\"esc_config_b_present\": true"))
   assert_true(text.contains("\"title\": \"Dictionary\""))
+  assert_true(text.contains("\"category_class\": \"standard-known\""))
+  assert_true(text.contains("\"category_class\": \"vendor-specific\""))
+  assert_true(text.contains("\"category_class\": \"application-specific\""))
   assert_true(text.contains("\"known\": false"))
 }
 

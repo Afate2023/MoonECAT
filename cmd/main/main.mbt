@@ -2789,10 +2789,12 @@ fn read_sii_json(
   let rx_pdo = sii.rx_pdo
   let categories = sii.categories
   let categories_json = categories.map(fn(entry) {
+    let category_class = entry.category_class().label()
     Json::object({
       "category": Json::string(entry.category.to_string()),
       "title": Json::string(sii_category_title(entry.category, entry.type_code)),
       "category_code": Json::number(entry.type_code.to_double()),
+      "category_class": Json::string(category_class),
       "known": Json::boolean(entry.category != @mailbox.Raw),
       "byte_length": Json::number(entry.data.length().to_double()),
       "preview_hex": Json::string(bytes_preview_hex(entry.data, 16)),
@@ -3503,6 +3505,7 @@ fn append_sii_raw_category_section(
   buf : @buffer.Buffer,
   entry : @mailbox.SiiCategoryEntry,
 ) -> Unit {
+  let category_class = entry.category_class().label()
   buf.write_string(
     "Print Categorie: " +
     sii_category_title(entry.category, entry.type_code) +
@@ -3511,6 +3514,7 @@ fn append_sii_raw_category_section(
     ")\n",
   )
   buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string("  Class: " + category_class + "\n")
   buf.write_string(
     "  Raw Preview: " + bytes_preview_hex(entry.data, 24) + "\n\n",
   )

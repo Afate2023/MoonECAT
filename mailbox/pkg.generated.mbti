@@ -304,11 +304,23 @@ pub(all) enum SiiCategory {
 pub impl Eq for SiiCategory
 pub impl Show for SiiCategory
 
+pub(all) enum SiiCategoryClass {
+  StandardKnown
+  StandardUnknown
+  DeviceSpecific
+  VendorSpecific
+  ApplicationSpecific
+}
+pub fn SiiCategoryClass::label(Self) -> String
+pub impl Eq for SiiCategoryClass
+pub impl Show for SiiCategoryClass
+
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
   type_code : UInt
   data : Bytes
 }
+pub fn SiiCategoryEntry::category_class(Self) -> SiiCategoryClass
 pub impl Eq for SiiCategoryEntry
 pub impl Show for SiiCategoryEntry
 

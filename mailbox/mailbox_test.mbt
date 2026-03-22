@@ -372,6 +372,41 @@ test "parse_sii_categories recognizes all standard reserved categories" {
 }
 
 ///|
+test "sii category entry reports stable export classes" {
+  let standard_known : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Dictionary,
+    type_code: 80U,
+    data: Bytes::new(0),
+  }
+  let standard_unknown : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 120U,
+    data: Bytes::new(0),
+  }
+  let device_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 5U,
+    data: Bytes::new(0),
+  }
+  let vendor_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 0x1234U,
+    data: Bytes::new(0),
+  }
+  let application_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 0x2001U,
+    data: Bytes::new(0),
+  }
+  assert_eq(standard_known.category_class(), @mailbox.StandardKnown)
+  assert_eq(standard_unknown.category_class(), @mailbox.StandardUnknown)
+  assert_eq(device_specific.category_class(), @mailbox.DeviceSpecific)
+  assert_eq(vendor_specific.category_class(), @mailbox.VendorSpecific)
+  assert_eq(application_specific.category_class(), @mailbox.ApplicationSpecific)
+  assert_eq(@mailbox.VendorSpecific.label(), "vendor-specific")
+}
+
+///|
 test "parse_sii_sm decodes dynamic process data types" {
   let entries = @mailbox.parse_sii_sm(
     Bytes::from_array([
