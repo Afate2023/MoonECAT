@@ -52,6 +52,8 @@ pub fn parse_sii_dc(Bytes) -> SiiDcClock raise @hal.EcError
 
 pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
 
+pub fn parse_sii_fmmu_ex(Bytes) -> Array[SiiFmmuEx]
+
 pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
 
 pub fn parse_sii_header(Bytes) -> SiiData raise @hal.EcError
@@ -65,6 +67,8 @@ pub fn parse_sii_sm(Bytes) -> Array[SiiSmEntry]
 pub fn parse_sii_standard_metadata(Bytes) -> SiiStandardMetadata raise @hal.EcError
 
 pub fn parse_sii_strings(Bytes) -> Array[String]
+
+pub fn parse_sii_sync_units(Bytes) -> Array[SiiSyncUnit]
 
 pub fn parse_sii_timeouts(Bytes) -> SiiTimeouts raise @hal.EcError
 
@@ -280,16 +284,20 @@ pub(all) enum SiiCategory {
   General
   Fmmu
   SyncManager
+  FmmuEx
+  SyncUnit
   TxPdo
   RxPdo
   Dc
   Timeouts
+  Raw
 }
 pub impl Eq for SiiCategory
 pub impl Show for SiiCategory
 
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
+  type_code : UInt
   data : Bytes
 }
 pub impl Show for SiiCategoryEntry
@@ -308,7 +316,22 @@ pub(all) struct SiiData {
   mailbox_tx_offset : UInt
   mailbox_tx_size : UInt
   mailbox_protocols : UInt
+  firmware_version : UInt
+  hardware_version : UInt
+  production_date_raw : UInt
+  pdi_control_1 : Byte
+  esc_config_b0 : Byte
+  pdi_config_1 : UInt
+  pdi_config_1_ext : UInt
+  esc_config_b4 : UInt
+  esc_config_b5 : UInt
+  esc_config_b6 : UInt
+  checksum_b : UInt
+  esc_config_b_present : Bool
 }
+pub fn SiiData::production_week(Self) -> Int
+pub fn SiiData::production_weekday(Self) -> Int
+pub fn SiiData::production_year(Self) -> Int
 pub fn SiiData::supports_aoe(Self) -> Bool
 pub fn SiiData::supports_coe(Self) -> Bool
 pub fn SiiData::supports_eoe(Self) -> Bool
@@ -330,6 +353,16 @@ pub(all) struct SiiDcClock {
 }
 pub impl Eq for SiiDcClock
 pub impl Show for SiiDcClock
+
+pub(all) struct SiiFmmuEx {
+  op_only : Bool
+  sm_defined : Bool
+  su_defined : Bool
+  sync_manager : Byte
+  sync_unit : Byte
+}
+pub impl Eq for SiiFmmuEx
+pub impl Show for SiiFmmuEx
 
 pub(all) struct SiiGeneral {
   group_idx : Byte
@@ -420,6 +453,16 @@ pub fn SiiStandardMetadata::eeprom_size_bytes(Self) -> UInt
 pub impl Eq for SiiStandardMetadata
 pub impl Show for SiiStandardMetadata
 
+pub(all) struct SiiSyncUnit {
+  separate_su : Bool
+  separate_frame : Bool
+  depend_on_input_state : Bool
+  frame_repeat_support : Bool
+  raw_flags : Byte
+}
+pub impl Eq for SiiSyncUnit
+pub impl Show for SiiSyncUnit
+
 pub(all) struct SiiTimeouts {
   preop_timeout_ms : UInt
   safeop_op_timeout_ms : UInt
@@ -457,6 +500,8 @@ pub(all) enum SmType {
   MailboxIn
   ProcessDataOut
   ProcessDataIn
+  DynamicProcessDataOut
+  DynamicProcessDataIn
   Unused
 }
 pub impl Eq for SmType

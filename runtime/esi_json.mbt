@@ -863,6 +863,8 @@ fn map_esi_json_sm_type(sm_type : String) -> @mailbox.SmType {
     "mailbox-in" => MailboxIn
     "process-data-out" => ProcessDataOut
     "process-data-in" => ProcessDataIn
+    "dynamic-process-data-out" => DynamicProcessDataOut
+    "dynamic-process-data-in" => DynamicProcessDataIn
     _ => Unused
   }
 }
@@ -915,6 +917,35 @@ fn build_sii_header(
       0U
     },
     mailbox_protocols: build_mailbox_protocol_mask(device.mailbox),
+    firmware_version: 0U,
+    hardware_version: 0U,
+    production_date_raw: 0U,
+    pdi_control_1: b'\x00',
+    esc_config_b0: b'\x00',
+    pdi_config_1: 0U,
+    pdi_config_1_ext: 0U,
+    esc_config_b4: 0U,
+    esc_config_b5: 0U,
+    esc_config_b6: 0U,
+    checksum_b: 0U,
+    esc_config_b_present: false,
+  }
+}
+
+///|
+fn known_sii_category_code(category : @mailbox.SiiCategory) -> UInt {
+  match category {
+    Strings => 0x0AU
+    General => 0x1EU
+    Fmmu => 0x28U
+    SyncManager => 0x29U
+    FmmuEx => 0x2AU
+    SyncUnit => 0x2BU
+    TxPdo => 0x32U
+    RxPdo => 0x33U
+    Dc => 0x3CU
+    Timeouts => 0x46U
+    Raw => 0U
   }
 }
 
@@ -949,26 +980,51 @@ fn build_sii_categories(
 ) -> Array[@mailbox.SiiCategoryEntry] {
   let categories : Array[@mailbox.SiiCategoryEntry] = []
   if not(strings.is_empty()) {
-    categories.push({ category: Strings, data: encode_sii_strings(strings) })
+    categories.push({
+      category: Strings,
+      type_code: known_sii_category_code(Strings),
+      data: encode_sii_strings(strings),
+    })
   }
-  categories.push({ category: General, data: encode_sii_general(general) })
+  categories.push({
+    category: General,
+    type_code: known_sii_category_code(General),
+    data: encode_sii_general(general),
+  })
   if not(fmmu.is_empty()) {
-    categories.push({ category: Fmmu, data: encode_sii_fmmu(fmmu) })
+    categories.push({
+      category: Fmmu,
+      type_code: known_sii_category_code(Fmmu),
+      data: encode_sii_fmmu(fmmu),
+    })
   }
   if not(sync_managers.is_empty()) {
     categories.push({
       category: SyncManager,
+      type_code: known_sii_category_code(SyncManager),
       data: encode_sii_sync_managers(sync_managers),
     })
   }
   if not(tx_pdo.is_empty()) {
-    categories.push({ category: TxPdo, data: encode_sii_pdos(tx_pdo) })
+    categories.push({
+      category: TxPdo,
+      type_code: known_sii_category_code(TxPdo),
+      data: encode_sii_pdos(tx_pdo),
+    })
   }
   if not(rx_pdo.is_empty()) {
-    categories.push({ category: RxPdo, data: encode_sii_pdos(rx_pdo) })
+    categories.push({
+      category: RxPdo,
+      type_code: known_sii_category_code(RxPdo),
+      data: encode_sii_pdos(rx_pdo),
+    })
   }
   for dc in dc_clocks {
-    categories.push({ category: Dc, data: encode_sii_dc(dc) })
+    categories.push({
+      category: Dc,
+      type_code: known_sii_category_code(Dc),
+      data: encode_sii_dc(dc),
+    })
   }
   categories
 }
@@ -1050,6 +1106,8 @@ fn encode_sii_sync_managers(sms : Array[@mailbox.SiiSmEntry]) -> Bytes {
         MailboxIn => b'\x02'
         ProcessDataOut => b'\x03'
         ProcessDataIn => b'\x04'
+        DynamicProcessDataOut => b'\x05'
+        DynamicProcessDataIn => b'\x06'
         Unused => b'\x00'
       },
     )

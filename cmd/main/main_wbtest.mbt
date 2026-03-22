@@ -1595,6 +1595,18 @@ test "cli read-sii json includes categories" {
     mailbox_tx_offset: 11U,
     mailbox_tx_size: 12U,
     mailbox_protocols: 13U,
+    firmware_version: 14U,
+    hardware_version: 15U,
+    production_date_raw: 0x5A31U,
+    pdi_control_1: b'\x16',
+    esc_config_b0: b'\x81',
+    pdi_config_1: 16U,
+    pdi_config_1_ext: 17U,
+    esc_config_b4: 18U,
+    esc_config_b5: 19U,
+    esc_config_b6: 20U,
+    checksum_b: 21U,
+    esc_config_b_present: true,
   }
   let general : @mailbox.SiiGeneral? = Some({
     group_idx: b'\x01',
@@ -1669,13 +1681,29 @@ test "cli read-sii json includes categories" {
     ],
     [],
     [
-      { category: @mailbox.General, data: Bytes::new(32) },
+      { category: @mailbox.General, type_code: 30U, data: Bytes::new(32) },
+      {
+        category: @mailbox.FmmuEx,
+        type_code: 42U,
+        data: Bytes::from_array([b'\x07', b'\x00', b'\x02', b'\x01']),
+      },
+      {
+        category: @mailbox.SyncUnit,
+        type_code: 43U,
+        data: Bytes::from_array([b'\x0F', b'\x00']),
+      },
       {
         category: @mailbox.Timeouts,
+        type_code: 70U,
         data: Bytes::from_array([
           b'\xB8', b'\x0B', b'\x10', b'\x27', b'\x88', b'\x13', b'\xC8', b'\x00',
           b'\x64', b'\x00', b'\xE8', b'\x03', b'\x00', b'\x00', b'\x00', b'\x00',
         ]),
+      },
+      {
+        category: @mailbox.Raw,
+        type_code: 80U,
+        data: Bytes::from_array([b'\x12', b'\x34', b'\x56', b'\x78']),
       },
     ],
   )
@@ -1684,10 +1712,15 @@ test "cli read-sii json includes categories" {
   assert_true(text.contains("\"aoe\": true"))
   assert_true(text.contains("\"preamble\""))
   assert_true(text.contains("\"dc_clocks\""))
+  assert_true(text.contains("\"fmmu_ex\""))
+  assert_true(text.contains("\"sync_units\""))
   assert_true(text.contains("\"timeouts\""))
   assert_true(text.contains("\"tx_pdo\""))
   assert_true(text.contains("\"strings\""))
   assert_true(text.contains("\"categories\""))
+  assert_true(text.contains("\"production_week\""))
+  assert_true(text.contains("\"esc_config_b_present\": true"))
+  assert_true(text.contains("\"known\": false"))
 }
 
 ///|

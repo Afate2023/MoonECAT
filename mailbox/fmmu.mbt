@@ -35,5 +35,7 @@ pub(all) enum SmType {
   MailboxIn
   ProcessDataOut
   ProcessDataIn
+  DynamicProcessDataOut
+  DynamicProcessDataIn
   Unused
 } derive(Eq, Show)

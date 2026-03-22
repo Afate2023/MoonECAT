@@ -781,6 +781,18 @@ test "SlaveInfo with SII data" {
     mailbox_tx_offset: 0x1080U,
     mailbox_tx_size: 128U,
     mailbox_protocols: 0xCU,
+    firmware_version: 0U,
+    hardware_version: 0U,
+    production_date_raw: 0U,
+    pdi_control_1: b'\x00',
+    esc_config_b0: b'\x00',
+    pdi_config_1: 0U,
+    pdi_config_1_ext: 0U,
+    esc_config_b4: 0U,
+    esc_config_b5: 0U,
+    esc_config_b6: 0U,
+    checksum_b: 0U,
+    esc_config_b_present: false,
   }
   let info : @protocol.SlaveInfo = {
     position: 0,

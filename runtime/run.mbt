@@ -446,12 +446,12 @@ fn map_with_process_data_lengths(
   for sm in mapping.sm_configs {
     patched_sm_configs.push(
       match sm.sm_type {
-        @mailbox.ProcessDataOut =>
+        @mailbox.ProcessDataOut | @mailbox.DynamicProcessDataOut =>
           match output_bytes {
             Some(length) => { ..sm, length: length.reinterpret_as_uint() }
             None => sm
           }
-        @mailbox.ProcessDataIn =>
+        @mailbox.ProcessDataIn | @mailbox.DynamicProcessDataIn =>
           match input_bytes {
             Some(length) => { ..sm, length: length.reinterpret_as_uint() }
             None => sm
@@ -832,7 +832,10 @@ pub fn[N : @hal.Nic] write_process_data_mapping(
   for i = 0; i < mapping.sm_configs.length(); i = i + 1 {
     let sm = mapping.sm_configs[i]
     match sm.sm_type {
-      @mailbox.ProcessDataOut | @mailbox.ProcessDataIn => {
+      @mailbox.ProcessDataOut
+      | @mailbox.ProcessDataIn
+      | @mailbox.DynamicProcessDataOut
+      | @mailbox.DynamicProcessDataIn => {
         let sm_addr = @protocol.reg_sm_base +
           i.reinterpret_as_uint() *
           @protocol.sm_entry_size.reinterpret_as_uint()

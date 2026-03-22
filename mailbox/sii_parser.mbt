@@ -79,6 +79,46 @@ let sii_std_tx_size : Int = 27
 let sii_mailbox_protocol : Int = 28
 
 ///|
+/// Firmware Version (word 32).
+let sii_firmware_version : Int = 32
+
+///|
+/// Hardware Version (word 33).
+let sii_hardware_version : Int = 33
+
+///|
+/// Production Date (word 34).
+let sii_production_date : Int = 34
+
+///|
+/// PDI1 Control / ESC Configuration B0 (word 40).
+let sii_pdi1_control : Int = 40
+
+///|
+/// PDI1 Configuration (word 41).
+let sii_pdi1_config : Int = 41
+
+///|
+/// Extended PDI1 Configuration (word 43).
+let sii_pdi1_config_ext : Int = 43
+
+///|
+/// ESC Configuration B4 (word 44).
+let sii_esc_config_b4 : Int = 44
+
+///|
+/// ESC Configuration B5 (word 45).
+let sii_esc_config_b5 : Int = 45
+
+///|
+/// ESC Configuration B6 (word 46).
+let sii_esc_config_b6 : Int = 46
+
+///|
+/// Checksum Configuration Area B (word 47).
+let sii_checksum_b : Int = 47
+
+///|
 /// Encoded EEPROM size word (word 62).
 let sii_eeprom_size : Int = 62
 
@@ -102,6 +142,12 @@ let sii_cat_fmmu : UInt = 40U
 
 ///|
 let sii_cat_sm : UInt = 41U
+
+///|
+let sii_cat_fmmux : UInt = 42U
+
+///|
+let sii_cat_sync_unit : UInt = 43U
 
 ///|
 let sii_cat_txpdo : UInt = 50U
@@ -206,11 +252,20 @@ pub fn parse_sii_preamble(data : Bytes) -> SiiPreamble raise @hal.EcError {
 ///|
 /// Parse the fixed SII header fields from raw EEPROM data.
 pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
-  // Minimum: need at least 29 words (58 bytes) for the standard header
+  // Standard header is complete at word 28. Vendor Info and Area B are optional
+  // extensions that may not be present in shorter SII reads.
   if data.length() < 58 {
     raise @hal.EcError::SiiReadFailed(
       "SII data too short: " + data.length().to_string() + " bytes",
     )
+  }
+  let config_a6 = read_sii_word(data, 6)
+  let has_vendor_info = data.length() >= 70
+  let has_config_b = data.length() >= 96
+  let pdi1_control_word = if has_config_b {
+    read_sii_word(data, sii_pdi1_control)
+  } else {
+    0U
   }
   {
     vendor_id: read_sii_dword(data, sii_vendor_id),
@@ -226,6 +281,36 @@ pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
     mailbox_tx_offset: read_sii_word(data, sii_std_tx_offset),
     mailbox_tx_size: read_sii_word(data, sii_std_tx_size),
     mailbox_protocols: read_sii_word(data, sii_mailbox_protocol),
+    firmware_version: if has_vendor_info {
+      read_sii_word(data, sii_firmware_version)
+    } else {
+      0U
+    },
+    hardware_version: if has_vendor_info {
+      read_sii_word(data, sii_hardware_version)
+    } else {
+      0U
+    },
+    production_date_raw: if has_vendor_info {
+      read_sii_word(data, sii_production_date)
+    } else {
+      0U
+    },
+    pdi_control_1: (pdi1_control_word & 0x00FFU).reinterpret_as_int().to_byte(),
+    esc_config_b0: ((pdi1_control_word >> 8) & 0x00FFU)
+    .reinterpret_as_int()
+    .to_byte(),
+    pdi_config_1: if has_config_b { read_sii_word(data, sii_pdi1_config) } else { 0U },
+    pdi_config_1_ext: if has_config_b {
+      read_sii_word(data, sii_pdi1_config_ext)
+    } else {
+      0U
+    },
+    esc_config_b4: if has_config_b { read_sii_word(data, sii_esc_config_b4) } else { 0U },
+    esc_config_b5: if has_config_b { read_sii_word(data, sii_esc_config_b5) } else { 0U },
+    esc_config_b6: if has_config_b { read_sii_word(data, sii_esc_config_b6) } else { 0U },
+    checksum_b: if has_config_b { read_sii_word(data, sii_checksum_b) } else { 0U },
+    esc_config_b_present: has_config_b && (config_a6 & 0x0001U) != 0U,
   }
 }
 
@@ -249,22 +334,25 @@ pub fn parse_sii_standard_metadata(
 /// A parsed SII category with its type tag and raw data.
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
+  type_code : UInt
   data : Bytes
 } derive(Show)
 
 ///|
 /// Convert a category type code to the SiiCategory enum.
-fn category_from_code(code : UInt) -> SiiCategory? {
+fn category_from_code(code : UInt) -> SiiCategory {
   match code {
-    c if c == sii_cat_strings => Some(Strings)
-    c if c == sii_cat_general => Some(General)
-    c if c == sii_cat_fmmu => Some(Fmmu)
-    c if c == sii_cat_sm => Some(SyncManager)
-    c if c == sii_cat_txpdo => Some(TxPdo)
-    c if c == sii_cat_rxpdo => Some(RxPdo)
-    c if c == sii_cat_dc => Some(Dc)
-    c if c == sii_cat_timeouts => Some(Timeouts)
-    _ => None
+    c if c == sii_cat_strings => Strings
+    c if c == sii_cat_general => General
+    c if c == sii_cat_fmmu => Fmmu
+    c if c == sii_cat_sm => SyncManager
+    c if c == sii_cat_fmmux => FmmuEx
+    c if c == sii_cat_sync_unit => SyncUnit
+    c if c == sii_cat_txpdo => TxPdo
+    c if c == sii_cat_rxpdo => RxPdo
+    c if c == sii_cat_dc => Dc
+    c if c == sii_cat_timeouts => Timeouts
+    _ => Raw
   }
 }
 
@@ -284,16 +372,11 @@ pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
     let cat_size_bytes = cat_size_words.reinterpret_as_int() * 2
     let cat_data_start = (word_offset + 2) * 2
     if cat_data_start + cat_size_bytes <= data.length() {
-      match category_from_code(cat_type) {
-        Some(cat) =>
-          categories.push({
-            category: cat,
-            data: Bytes::makei(cat_size_bytes, fn(i) {
-              data[cat_data_start + i]
-            }),
-          })
-        None => () // Skip unknown categories
-      }
+      categories.push({
+        category: category_from_code(cat_type),
+        type_code: cat_type,
+        data: Bytes::makei(cat_size_bytes, fn(i) { data[cat_data_start + i] }),
+      })
     }
     word_offset = word_offset + 2 + cat_size_words.reinterpret_as_int()
   }
@@ -420,6 +503,41 @@ pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
 }
 
 ///|
+/// Parse the FMMU_EX category data (ETG.2010 Table 10).
+pub fn parse_sii_fmmu_ex(data : Bytes) -> Array[SiiFmmuEx] {
+  let result : Array[SiiFmmuEx] = []
+  let mut offset = 0
+  while offset + 4 <= data.length() {
+    let flags = read_sii_word_at_byte(data, offset)
+    result.push({
+      op_only: (flags & 0x0001U) != 0U,
+      sm_defined: (flags & 0x0002U) != 0U,
+      su_defined: (flags & 0x0004U) != 0U,
+      sync_manager: data[offset + 2],
+      sync_unit: data[offset + 3],
+    })
+    offset = offset + 4
+  }
+  result
+}
+
+///|
+/// Parse the SyncUnit category data (ETG.2010 Table 14).
+pub fn parse_sii_sync_units(data : Bytes) -> Array[SiiSyncUnit] {
+  let result : Array[SiiSyncUnit] = []
+  for raw_flags in data {
+    result.push({
+      separate_su: (raw_flags.to_int() & 0x01) != 0,
+      separate_frame: (raw_flags.to_int() & 0x02) != 0,
+      depend_on_input_state: (raw_flags.to_int() & 0x04) != 0,
+      frame_repeat_support: (raw_flags.to_int() & 0x08) != 0,
+      raw_flags,
+    })
+  }
+  result
+}
+
+///|
 /// SM info from SII SM category. Each SM entry is 8 bytes.
 pub(all) struct SiiSmEntry {
   physical_start : UInt
@@ -448,6 +566,8 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
       b'\x02' => MailboxIn
       b'\x03' => ProcessDataOut
       b'\x04' => ProcessDataIn
+      b'\x05' => DynamicProcessDataOut
+      b'\x06' => DynamicProcessDataIn
       _ => Unused
     }
     result.push({

@@ -8,6 +8,7 @@ test "MailboxType display" {
 test "SiiCategory display" {
   inspect(@mailbox.SiiCategory::General, content="General")
   inspect(@mailbox.SiiCategory::TxPdo, content="TxPdo")
+  inspect(@mailbox.SiiCategory::FmmuEx, content="FmmuEx")
 }
 
 ///|
@@ -53,6 +54,10 @@ test "parse_sii_standard_metadata from fixed bytes" {
 test "SmType display" {
   inspect(@mailbox.SmType::ProcessDataIn, content="ProcessDataIn")
   inspect(@mailbox.SmType::MailboxOut, content="MailboxOut")
+  inspect(
+    @mailbox.SmType::DynamicProcessDataOut,
+    content="DynamicProcessDataOut",
+  )
 }
 
 ///|
@@ -74,6 +79,55 @@ test "parse_sii_header from fixture" {
   assert_eq(sii.mailbox_tx_offset, 0x1080U)
   assert_eq(sii.mailbox_tx_size, 128U)
   assert_eq(sii.mailbox_protocols, 0x000CU) // CoE + FoE
+  assert_eq(sii.firmware_version, 0U)
+  assert_true(not(sii.esc_config_b_present))
+}
+
+///|
+test "parse_sii_header decodes vendor info and esc config area b" {
+  let bytes = Bytes::makei(128, fn(i) {
+    match i {
+      12 => b'\x01'
+      13 => b'\x00' // word 6 bit0 => area B present
+      64 => b'\x34'
+      65 => b'\x12' // firmware_version
+      66 => b'\x78'
+      67 => b'\x56' // hardware_version
+      68 => b'\x31'
+      69 => b'\x5A' // production date raw
+      80 => b'\x16'
+      81 => b'\x81' // pdi_control_1 / esc_config_b0
+      82 => b'\x22'
+      83 => b'\x11' // pdi_config_1
+      86 => b'\x44'
+      87 => b'\x33' // pdi_config_1_ext
+      88 => b'\x66'
+      89 => b'\x55' // esc_config_b4
+      90 => b'\x88'
+      91 => b'\x77' // esc_config_b5
+      92 => b'\xAA'
+      93 => b'\x99' // esc_config_b6
+      94 => b'\xCC'
+      95 => b'\xBB' // checksum_b
+      _ => b'\x00'
+    }
+  })
+  let sii = @mailbox.parse_sii_header(bytes)
+  assert_eq(sii.firmware_version, 0x1234U)
+  assert_eq(sii.hardware_version, 0x5678U)
+  assert_eq(sii.production_date_raw, 0x5A31U)
+  assert_eq(sii.production_year(), 2049)
+  assert_eq(sii.production_weekday(), 4)
+  assert_eq(sii.production_week(), 22)
+  assert_true(sii.esc_config_b_present)
+  assert_eq(sii.pdi_control_1, b'\x16')
+  assert_eq(sii.esc_config_b0, b'\x81')
+  assert_eq(sii.pdi_config_1, 0x1122U)
+  assert_eq(sii.pdi_config_1_ext, 0x3344U)
+  assert_eq(sii.esc_config_b4, 0x5566U)
+  assert_eq(sii.esc_config_b5, 0x7788U)
+  assert_eq(sii.esc_config_b6, 0x99AAU)
+  assert_eq(sii.checksum_b, 0xBBCCU)
 }
 
 ///|
@@ -191,6 +245,74 @@ test "parse_sii_timeouts decodes ETG.2010 timeout fields" {
 }
 
 ///|
+test "parse_sii_fmmu_ex decodes sync manager and sync unit bindings" {
+  let entries = @mailbox.parse_sii_fmmu_ex(
+    Bytes::from_array([
+      b'\x07', b'\x00', b'\x02', b'\x01', b'\x02', b'\x00', b'\x03', b'\x00',
+    ]),
+  )
+  assert_eq(entries.length(), 2)
+  assert_true(entries[0].op_only)
+  assert_true(entries[0].sm_defined)
+  assert_true(entries[0].su_defined)
+  assert_eq(entries[0].sync_manager, b'\x02')
+  assert_eq(entries[0].sync_unit, b'\x01')
+  assert_true(not(entries[1].op_only))
+  assert_true(entries[1].sm_defined)
+}
+
+///|
+test "parse_sii_sync_units decodes flag bits" {
+  let units = @mailbox.parse_sii_sync_units(
+    Bytes::from_array([b'\x0F', b'\x02']),
+  )
+  assert_eq(units.length(), 2)
+  assert_true(units[0].separate_su)
+  assert_true(units[0].separate_frame)
+  assert_true(units[0].depend_on_input_state)
+  assert_true(units[0].frame_repeat_support)
+  assert_true(not(units[1].separate_su))
+  assert_true(units[1].separate_frame)
+}
+
+///|
+test "parse_sii_categories preserves unknown category payload" {
+  let data = Bytes::makei(140, fn(i) {
+    match i {
+      128 => b'\x50'
+      129 => b'\x00' // type 80
+      130 => b'\x02'
+      131 => b'\x00' // 2 words = 4 bytes
+      132 => b'\x12'
+      133 => b'\x34'
+      134 => b'\x56'
+      135 => b'\x78'
+      136 => b'\xFF'
+      137 => b'\xFF'
+      _ => b'\x00'
+    }
+  })
+  let categories = @mailbox.parse_sii_categories(data)
+  assert_eq(categories.length(), 1)
+  assert_eq(categories[0].category, @mailbox.Raw)
+  assert_eq(categories[0].type_code, 80U)
+  assert_eq(categories[0].data.length(), 4)
+}
+
+///|
+test "parse_sii_sm decodes dynamic process data types" {
+  let entries = @mailbox.parse_sii_sm(
+    Bytes::from_array([
+      b'\x00', b'\x11', b'\x20', b'\x00', b'\x64', b'\x00', b'\x01', b'\x05', b'\x00',
+      b'\x12', b'\x10', b'\x00', b'\x20', b'\x00', b'\x01', b'\x06',
+    ]),
+  )
+  assert_eq(entries.length(), 2)
+  assert_eq(entries[0].sm_type, @mailbox.DynamicProcessDataOut)
+  assert_eq(entries[1].sm_type, @mailbox.DynamicProcessDataIn)
+}
+
+///|
 test "parse_sii_strings decodes utf8 text from category payload" {
   let strings = @mailbox.parse_sii_strings(
     Bytes::from_array([
@@ -225,6 +347,18 @@ test "calculate_sm_configs uses sii header for mailbox" {
     mailbox_tx_offset: 0x1080U,
     mailbox_tx_size: 128U,
     mailbox_protocols: 0xCU,
+    firmware_version: 0U,
+    hardware_version: 0U,
+    production_date_raw: 0U,
+    pdi_control_1: b'\x00',
+    esc_config_b0: b'\x00',
+    pdi_config_1: 0U,
+    pdi_config_1_ext: 0U,
+    esc_config_b4: 0U,
+    esc_config_b5: 0U,
+    esc_config_b6: 0U,
+    checksum_b: 0U,
+    esc_config_b_present: false,
   }
   let sm_entries : Array[@mailbox.SiiSmEntry] = [
     {
@@ -1177,6 +1311,18 @@ test "MailboxConfig::from_sii extracts SM addresses" {
     mailbox_tx_offset: 0x1080U,
     mailbox_tx_size: 128U,
     mailbox_protocols: 0x0CU,
+    firmware_version: 0U,
+    hardware_version: 0U,
+    production_date_raw: 0U,
+    pdi_control_1: b'\x00',
+    esc_config_b0: b'\x00',
+    pdi_config_1: 0U,
+    pdi_config_1_ext: 0U,
+    esc_config_b4: 0U,
+    esc_config_b5: 0U,
+    esc_config_b6: 0U,
+    checksum_b: 0U,
+    esc_config_b_present: false,
   }
   let cfg = @mailbox.MailboxConfig::from_sii(sii)
   assert_eq(cfg.out_address, 0x1000U)
@@ -1594,6 +1740,18 @@ test "SiiData mailbox protocol helpers detect masks" {
     mailbox_tx_offset: 0U,
     mailbox_tx_size: 0U,
     mailbox_protocols: 0x003FU,
+    firmware_version: 0U,
+    hardware_version: 0U,
+    production_date_raw: 0U,
+    pdi_control_1: b'\x00',
+    esc_config_b0: b'\x00',
+    pdi_config_1: 0U,
+    pdi_config_1_ext: 0U,
+    esc_config_b4: 0U,
+    esc_config_b5: 0U,
+    esc_config_b6: 0U,
+    checksum_b: 0U,
+    esc_config_b_present: false,
   }
   assert_true(sii.supports_aoe())
   assert_true(sii.supports_eoe())

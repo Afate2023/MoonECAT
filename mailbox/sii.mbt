@@ -5,10 +5,13 @@ pub(all) enum SiiCategory {
   General
   Fmmu
   SyncManager
+  FmmuEx
+  SyncUnit
   TxPdo
   RxPdo
   Dc
   Timeouts
+  Raw
 } derive(Eq, Show)
 
 ///|
@@ -27,7 +30,34 @@ pub(all) struct SiiData {
   mailbox_tx_offset : UInt
   mailbox_tx_size : UInt
   mailbox_protocols : UInt
+  firmware_version : UInt
+  hardware_version : UInt
+  production_date_raw : UInt
+  pdi_control_1 : Byte
+  esc_config_b0 : Byte
+  pdi_config_1 : UInt
+  pdi_config_1_ext : UInt
+  esc_config_b4 : UInt
+  esc_config_b5 : UInt
+  esc_config_b6 : UInt
+  checksum_b : UInt
+  esc_config_b_present : Bool
 } derive(Eq, Show)
+
+///|
+pub fn SiiData::production_year(self : SiiData) -> Int {
+  2000 + (self.production_date_raw & 0x7FU).reinterpret_as_int()
+}
+
+///|
+pub fn SiiData::production_weekday(self : SiiData) -> Int {
+  ((self.production_date_raw >> 7) & 0x07U).reinterpret_as_int()
+}
+
+///|
+pub fn SiiData::production_week(self : SiiData) -> Int {
+  ((self.production_date_raw >> 10) & 0x3FU).reinterpret_as_int()
+}
 
 ///|
 /// Fixed SII preamble loaded by the ESC during startup.
@@ -106,4 +136,24 @@ pub(all) struct SiiTimeouts {
   back_to_safeop_timeout_ms : UInt
   mailbox_request_timeout_ms : UInt
   mailbox_response_timeout_ms : UInt
+} derive(Eq, Show)
+
+///|
+/// Parsed SII FMMU_EX category element (ETG.2010 Table 10).
+pub(all) struct SiiFmmuEx {
+  op_only : Bool
+  sm_defined : Bool
+  su_defined : Bool
+  sync_manager : Byte
+  sync_unit : Byte
+} derive(Eq, Show)
+
+///|
+/// Parsed SII SyncUnit category element (ETG.2010 Table 14).
+pub(all) struct SiiSyncUnit {
+  separate_su : Bool
+  separate_frame : Bool
+  depend_on_input_state : Bool
+  frame_repeat_support : Bool
+  raw_flags : Byte
 } derive(Eq, Show)

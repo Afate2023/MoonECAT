@@ -71,8 +71,10 @@ pub fn apply_pdo_lengths_to_sm_configs(
     let sm = sm_configs[i]
     let patched = if sm.length == 0U {
       let total_bits = match sm.sm_type {
-        ProcessDataOut => pdo_bit_length_for_sync_manager(rx_pdos, i.to_byte())
-        ProcessDataIn => pdo_bit_length_for_sync_manager(tx_pdos, i.to_byte())
+        ProcessDataOut | DynamicProcessDataOut =>
+          pdo_bit_length_for_sync_manager(rx_pdos, i.to_byte())
+        ProcessDataIn | DynamicProcessDataIn =>
+          pdo_bit_length_for_sync_manager(tx_pdos, i.to_byte())
         _ => 0
       }
       if total_bits > 0 {
@@ -202,7 +204,12 @@ fn find_unassigned_sm(
   target : SmType,
 ) -> Int? {
   for i = 0; i < sm_configs.length(); i = i + 1 {
-    if sm_configs[i].sm_type == target && not(sm_used[i]) {
+    let matches = match (target, sm_configs[i].sm_type) {
+      (ProcessDataOut, ProcessDataOut | DynamicProcessDataOut) => true
+      (ProcessDataIn, ProcessDataIn | DynamicProcessDataIn) => true
+      _ => sm_configs[i].sm_type == target
+    }
+    if matches && not(sm_used[i]) {
       return Some(i)
     }
   }

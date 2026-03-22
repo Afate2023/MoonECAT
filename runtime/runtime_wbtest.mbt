@@ -349,13 +349,18 @@ test "active process data lengths in preop use object mapping lengths" {
 fn ds402_general_category(ds402_channels : Byte) -> @mailbox.SiiCategoryEntry {
   let payload = Array::make(20, b'\x00')
   payload[9] = ds402_channels
-  { category: @mailbox.General, data: Bytes::from_array(payload) }
+  {
+    category: @mailbox.General,
+    type_code: 30U,
+    data: Bytes::from_array(payload),
+  }
 }
 
 ///|
 fn ds402_rxpdo_category_with_leading_target() -> @mailbox.SiiCategoryEntry {
   {
     category: @mailbox.RxPdo,
+    type_code: 51U,
     data: Bytes::from_array([
       b'\x00', b'\x16', b'\x02', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x7A',
       b'\x60', b'\x00', b'\x00', b'\x00', b'\x20', b'\x00', b'\x00', b'\x40', b'\x60',
@@ -368,6 +373,7 @@ fn ds402_rxpdo_category_with_leading_target() -> @mailbox.SiiCategoryEntry {
 fn ds402_rxpdo_category_with_mode() -> @mailbox.SiiCategoryEntry {
   {
     category: @mailbox.RxPdo,
+    type_code: 51U,
     data: Bytes::from_array([
       b'\x00', b'\x16', b'\x03', b'\x02', b'\x00', b'\x00', b'\x00', b'\x00', b'\x7A',
       b'\x60', b'\x00', b'\x00', b'\x00', b'\x20', b'\x00', b'\x00', b'\x40', b'\x60',
