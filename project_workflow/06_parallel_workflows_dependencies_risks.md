@@ -28,7 +28,7 @@
 - [ ] 继续补 ENI 导入的配置工具数据模型，使 online/offline 两条配置来源在共享校验路径之外，进一步共享 SM/FMMU/PDO/诊断摘要等更完整配置语义。
 - [ ] 把已完成的 SDO Info / Complete Access / segmented 能力上浮到 CLI / 配置工具表面，形成稳定的对象字典浏览输出。
 - [ ] 补拓扑指纹与 Hot Connect group/optional segment 配置模型，使配置工具可表达“必选链路”与“可选链路”而不新增第二套校验语义。
-- [ ] 补 SII category 深度解码与稳定 JSON 结构，支撑 `read-sii`、offline config 和配置工具共用更完整的 EEPROM/ESI 语义。
+- [ ] 补 SII category 深度解码与稳定 JSON 结构，支撑 `read-sii`、offline config 和配置工具共用更完整的 EEPROM/ESI 语义。已于 2026-03-22 按 ETG.2010 补齐 `Timeouts(70)`、AoE mailbox bit、`CurrentOnEBus` signed decode 和 `esi-sii` AoE 投影保真（commit: `cdac077`），剩余主要是 `SyncUnit/FMMUX` 等类别和配置工具复用面。
 
 ### Runtime
 
