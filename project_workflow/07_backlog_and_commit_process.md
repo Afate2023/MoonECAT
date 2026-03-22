@@ -40,6 +40,7 @@
 
 最近回填：
 
+- `SII category class 导出` → `ff93f64` `feat(sii): export category classes`
 - `标准保留 SII 类别识别` → `5b8f96e` `feat(sii): recognize standard reserved categories`
 - `在线完整 EEPROM 补读链路` → `45b7217` `feat(protocol): auto-expand complete sii reads`
 - `SII 聚合模型共享到 CLI/runtime/offline mapping` → `ebbaf31` `feat(sii): share aggregated full-info model`

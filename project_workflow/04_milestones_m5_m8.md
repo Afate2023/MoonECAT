@@ -115,6 +115,7 @@
   - ✅ 2026-03-22 已进一步从“最小在线诊断入口”收口到共享聚合模型：`read-sii` / `esi-sii` / runtime startup / mailbox mapping 统一改为消费 `SiiFullInfo`，由 [mailbox/sii_parser.mbt](../mailbox/sii_parser.mbt) 的 `parse_sii_full_info` 和 [mailbox/mapping.mbt](../mailbox/mapping.mbt) 的 `calculate_slave_mapping_from_sii` 提供单次解析结果，代码提交：`ebbaf31`
   - ✅ 2026-03-23 已把 protocol 层的完整 EEPROM 补读链路公开为 [protocol/eeprom.mbt](../protocol/eeprom.mbt) 的 `read_sii_bytes` / `read_sii_bytes_ap`，在 ownership 切换和 32/64-bit chunk 兼容基础上按 EEPROM size 自动扩展初始探测窗口，`read-sii` 已切换到该入口，代码提交：`45b7217`
   - ✅ 2026-03-23 已把 `DataTypes(20)`、`Dictionary(80)`、`Hardware(90)`、`Vendor Information(100)`、`Images(110)` 从普通 `Raw` 提升为显式标准保留类别，CLI 与 offline projection 现在会稳定输出类别名和 `known=true`，同时继续保留原始 bytes，代码提交：`5b8f96e`
+  - ✅ 2026-03-23 已为全部 category 增加稳定 `category_class` 导出；其中 `Raw` 现可细分为 `standard-unknown` / `device-specific` / `vendor-specific` / `application-specific`，JSON 与文本输出一致暴露该分类，代码提交：`ff93f64`
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](../docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
@@ -191,6 +192,7 @@
 - `shared sii aggregate model`：新增 `SiiFullInfo` 聚合模型并收口 CLI/runtime/offline config/mapping 消费
 - `complete online sii byte-read chain`：新增 `read_sii_bytes` / `read_sii_bytes_ap` 并让 `read-sii` 自动扩展到完整 EEPROM 镜像
 - `standard reserved sii category recognition`：新增 20/80/90/100/110 的显式类别识别与稳定导出标题
+- `sii category class export`：新增 `category_class` 导出并把 Raw 分类细分为 standard/device/vendor/application-specific
 - `native state transition cli command`：新增 Native CLI 广播/定点 EtherCAT ESM 状态迁移入口与设计文档
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
@@ -215,6 +217,7 @@
 - `共享 SII 聚合模型` → `ebbaf31` `feat(sii): share aggregated full-info model`
 - `在线完整 EEPROM 补读链路` → `45b7217` `feat(protocol): auto-expand complete sii reads`
 - `标准保留 SII 类别识别` → `5b8f96e` `feat(sii): recognize standard reserved categories`
+- `SII category class 导出` → `ff93f64` `feat(sii): export category classes`
 - `Native EtherCAT 状态迁移 CLI 入口` → `f01a411` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `bd95053` `feat(native): add configurable run states and raw-socket error mapping`
 - `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
