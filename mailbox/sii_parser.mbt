@@ -113,6 +113,9 @@ let sii_cat_rxpdo : UInt = 51U
 let sii_cat_dc : UInt = 60U
 
 ///|
+let sii_cat_timeouts : UInt = 70U
+
+///|
 /// End marker for SII categories.
 let sii_cat_end : UInt = 0xFFFFU
 
@@ -260,6 +263,7 @@ fn category_from_code(code : UInt) -> SiiCategory? {
     c if c == sii_cat_txpdo => Some(TxPdo)
     c if c == sii_cat_rxpdo => Some(RxPdo)
     c if c == sii_cat_dc => Some(Dc)
+    c if c == sii_cat_timeouts => Some(Timeouts)
     _ => None
   }
 }
@@ -311,7 +315,7 @@ pub(all) struct SiiGeneral {
   ds402_channels : Byte
   sysman_class : Byte
   flags : Byte
-  current_on_ebus : UInt
+  current_on_ebus : Int
   physical_port_0 : Byte
   physical_port_1 : Byte
   physical_port_2 : Byte
@@ -352,7 +356,7 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
       b'\x00'
     },
     flags: data[11],
-    current_on_ebus: read_sii_word(data, 6),
+    current_on_ebus: read_sii_i16_at_byte(data, 12),
     physical_port_0: if data.length() > 16 {
       data[16] & b'\x0F'
     } else {
@@ -378,6 +382,24 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
     } else {
       0U
     },
+  }
+}
+
+///|
+/// Parse the Timeouts category data (ETG.2010 Table 13).
+pub fn parse_sii_timeouts(data : Bytes) -> SiiTimeouts raise @hal.EcError {
+  if data.length() < 16 {
+    raise @hal.EcError::EsiParseFailed(
+      "Timeouts category too short: " + data.length().to_string(),
+    )
+  }
+  {
+    preop_timeout_ms: read_sii_word_at_byte(data, 0),
+    safeop_op_timeout_ms: read_sii_word_at_byte(data, 2),
+    back_to_init_timeout_ms: read_sii_word_at_byte(data, 4),
+    back_to_safeop_timeout_ms: read_sii_word_at_byte(data, 6),
+    mailbox_request_timeout_ms: read_sii_word_at_byte(data, 8),
+    mailbox_response_timeout_ms: read_sii_word_at_byte(data, 10),
   }
 }
 

@@ -8,6 +8,7 @@ pub(all) enum SiiCategory {
   TxPdo
   RxPdo
   Dc
+  Timeouts
 } derive(Eq, Show)
 
 ///|
@@ -94,4 +95,15 @@ pub(all) struct SiiPdoEntry {
   data_type : Byte
   bit_length : Byte
   flags : UInt
+} derive(Eq, Show)
+
+///|
+/// Parsed SII timeout category (ETG.2010 Table 13), values in milliseconds.
+pub(all) struct SiiTimeouts {
+  preop_timeout_ms : UInt
+  safeop_op_timeout_ms : UInt
+  back_to_init_timeout_ms : UInt
+  back_to_safeop_timeout_ms : UInt
+  mailbox_request_timeout_ms : UInt
+  mailbox_response_timeout_ms : UInt
 } derive(Eq, Show)

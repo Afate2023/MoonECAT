@@ -174,7 +174,11 @@ fn parse_esi_document_projection(
                 ..current_device,
                 mailbox: { ..current_device.mailbox, voe: true },
               }
-            "AoE" => ()
+            "AoE" =>
+              current_device = {
+                ..current_device,
+                mailbox: { ..current_device.mailbox, aoe: true },
+              }
             "OpMode" => {
               in_dc_op_mode = true
               current_dc = empty_esi_dc_projection()
@@ -585,6 +589,7 @@ fn parse_esi_document_projection(
 fn empty_esi_mailbox_projection() -> @runtime.EsiJsonMailbox {
   {
     data_link_layer: false,
+    aoe: false,
     coe_present: false,
     coe_sdo_info: false,
     coe_pdo_assign: false,

@@ -334,6 +334,7 @@ pub impl ToJson for EsiJsonDocument
 
 pub(all) struct EsiJsonMailbox {
   data_link_layer : Bool
+  aoe : Bool
   coe_present : Bool
   coe_sdo_info : Bool
   coe_pdo_assign : Bool

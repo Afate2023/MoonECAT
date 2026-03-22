@@ -76,6 +76,11 @@ pub fn SiiGeneral::supports_identification_physical_memory(
 
 ///|
 /// Supported mailbox protocol bit helpers from the SII header mailbox protocol mask.
+pub fn SiiData::supports_aoe(self : SiiData) -> Bool {
+  (self.mailbox_protocols & 0x0001U) != 0U
+}
+
+///|
 pub fn SiiData::supports_eoe(self : SiiData) -> Bool {
   (self.mailbox_protocols & 0x0002U) != 0U
 }

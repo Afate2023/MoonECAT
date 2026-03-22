@@ -2,6 +2,9 @@
 /// ESI JSON interchange model shared between XML import tools and SII-facing consumers.
 
 ///|
+let esi_mailbox_aoe_mask : UInt = 0x0001U
+
+///|
 let esi_mailbox_coe_mask : UInt = 0x0004U
 
 ///|
@@ -19,6 +22,7 @@ let esi_mailbox_voe_mask : UInt = 0x0020U
 ///|
 pub(all) struct EsiJsonMailbox {
   data_link_layer : Bool
+  aoe : Bool
   coe_present : Bool
   coe_sdo_info : Bool
   coe_pdo_assign : Bool
@@ -281,6 +285,7 @@ fn parse_esi_json_mailbox(json : Json) -> EsiJsonMailbox raise @hal.EcError {
   guard json
     is {
       "data_link_layer": data_link_layer_json,
+      "aoe": aoe_json,
       "coe_present": coe_present_json,
       "coe_sdo_info": coe_sdo_info_json,
       "coe_pdo_assign": coe_pdo_assign_json,
@@ -298,6 +303,7 @@ fn parse_esi_json_mailbox(json : Json) -> EsiJsonMailbox raise @hal.EcError {
   }
   {
     data_link_layer: decode_esi_json_bool(data_link_layer_json),
+    aoe: decode_esi_json_bool(aoe_json),
     coe_present: decode_esi_json_bool(coe_present_json),
     coe_sdo_info: decode_esi_json_bool(coe_sdo_info_json),
     coe_pdo_assign: decode_esi_json_bool(coe_pdo_assign_json),
@@ -720,7 +726,7 @@ fn build_general_projection(
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: build_general_flags(device),
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: ports[0],
     physical_port_1: ports[1],
     physical_port_2: ports[2],
@@ -914,6 +920,7 @@ fn build_sii_header(
 
 ///|
 fn build_mailbox_protocol_mask(mailbox : EsiJsonMailbox) -> UInt {
+  (if mailbox.aoe { esi_mailbox_aoe_mask } else { 0U }) |
   (if mailbox.eoe { esi_mailbox_eoe_mask } else { 0U }) |
   (if mailbox.coe_present { esi_mailbox_coe_mask } else { 0U }) |
   (if mailbox.foe { esi_mailbox_foe_mask } else { 0U }) |
@@ -994,7 +1001,7 @@ fn encode_sii_general(general : @mailbox.SiiGeneral) -> Bytes {
   values.push(general.ds402_channels)
   values.push(general.sysman_class)
   values.push(general.flags)
-  push_u16(values, general.current_on_ebus)
+  push_i16(values, general.current_on_ebus)
   values.push(b'\x00')
   values.push(b'\x00')
   values.push(

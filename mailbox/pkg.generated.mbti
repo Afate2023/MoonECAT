@@ -66,6 +66,8 @@ pub fn parse_sii_standard_metadata(Bytes) -> SiiStandardMetadata raise @hal.EcEr
 
 pub fn parse_sii_strings(Bytes) -> Array[String]
 
+pub fn parse_sii_timeouts(Bytes) -> SiiTimeouts raise @hal.EcError
+
 pub let sii_category_start : Int
 
 // Errors
@@ -281,6 +283,7 @@ pub(all) enum SiiCategory {
   TxPdo
   RxPdo
   Dc
+  Timeouts
 }
 pub impl Eq for SiiCategory
 pub impl Show for SiiCategory
@@ -306,6 +309,7 @@ pub(all) struct SiiData {
   mailbox_tx_size : UInt
   mailbox_protocols : UInt
 }
+pub fn SiiData::supports_aoe(Self) -> Bool
 pub fn SiiData::supports_coe(Self) -> Bool
 pub fn SiiData::supports_eoe(Self) -> Bool
 pub fn SiiData::supports_foe(Self) -> Bool
@@ -340,7 +344,7 @@ pub(all) struct SiiGeneral {
   ds402_channels : Byte
   sysman_class : Byte
   flags : Byte
-  current_on_ebus : UInt
+  current_on_ebus : Int
   physical_port_0 : Byte
   physical_port_1 : Byte
   physical_port_2 : Byte
@@ -415,6 +419,17 @@ pub(all) struct SiiStandardMetadata {
 pub fn SiiStandardMetadata::eeprom_size_bytes(Self) -> UInt
 pub impl Eq for SiiStandardMetadata
 pub impl Show for SiiStandardMetadata
+
+pub(all) struct SiiTimeouts {
+  preop_timeout_ms : UInt
+  safeop_op_timeout_ms : UInt
+  back_to_init_timeout_ms : UInt
+  back_to_safeop_timeout_ms : UInt
+  mailbox_request_timeout_ms : UInt
+  mailbox_response_timeout_ms : UInt
+}
+pub impl Eq for SiiTimeouts
+pub impl Show for SiiTimeouts
 
 pub(all) struct SlaveMapping {
   sm_configs : Array[SmConfig]

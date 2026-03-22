@@ -1003,6 +1003,7 @@ fn sample_esi_json_text() -> String {
         slot_pdo_increment: 16U,
         mailbox: {
           data_link_layer: false,
+          aoe: false,
           coe_present: true,
           coe_sdo_info: true,
           coe_pdo_assign: true,
@@ -1608,7 +1609,7 @@ test "cli read-sii json includes categories" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x0A',
-    current_on_ebus: 14U,
+    current_on_ebus: 14,
     physical_port_0: b'\x01',
     physical_port_1: b'\x01',
     physical_port_2: b'\x00',
@@ -1667,12 +1668,23 @@ test "cli read-sii json includes categories" {
       },
     ],
     [],
-    [{ category: @mailbox.General, data: Bytes::new(32) }],
+    [
+      { category: @mailbox.General, data: Bytes::new(32) },
+      {
+        category: @mailbox.Timeouts,
+        data: Bytes::from_array([
+          b'\xB8', b'\x0B', b'\x10', b'\x27', b'\x88', b'\x13', b'\xC8', b'\x00',
+          b'\x64', b'\x00', b'\xE8', b'\x03', b'\x00', b'\x00', b'\x00', b'\x00',
+        ]),
+      },
+    ],
   )
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"vendor_id\": 1"))
+  assert_true(text.contains("\"aoe\": true"))
   assert_true(text.contains("\"preamble\""))
   assert_true(text.contains("\"dc_clocks\""))
+  assert_true(text.contains("\"timeouts\""))
   assert_true(text.contains("\"tx_pdo\""))
   assert_true(text.contains("\"strings\""))
   assert_true(text.contains("\"categories\""))

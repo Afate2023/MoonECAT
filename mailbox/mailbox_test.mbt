@@ -114,6 +114,17 @@ test "parse_sii_general from fixture" {
 }
 
 ///|
+test "parse_sii_general decodes signed current on EBus" {
+  let data = Bytes::from_array([
+    b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
+    b'\x00', b'\x00', b'\x00', b'\x9C', b'\xFF', b'\x00', b'\x00', b'\x00', b'\x00',
+    b'\x00', b'\x00',
+  ])
+  let general = @mailbox.parse_sii_general(data)
+  assert_eq(general.current_on_ebus, -100)
+}
+
+///|
 test "parse_sii_fmmu from fixture" {
   let eeprom = @fixtures.sample_sii_eeprom()
   let categories = @mailbox.parse_sii_categories(eeprom)
@@ -161,6 +172,22 @@ test "parse_sii_dc decodes siitool layout" {
   assert_eq(dc.assign_activate, 0x0300U)
   assert_eq(dc.name_idx, b'\x03')
   assert_eq(dc.description_idx, b'\x04')
+}
+
+///|
+test "parse_sii_timeouts decodes ETG.2010 timeout fields" {
+  let timeouts = @mailbox.parse_sii_timeouts(
+    Bytes::from_array([
+      b'\xB8', b'\x0B', b'\x10', b'\x27', b'\x88', b'\x13', b'\xC8', b'\x00', b'\x64',
+      b'\x00', b'\xE8', b'\x03', b'\x00', b'\x00', b'\x00', b'\x00',
+    ]),
+  )
+  assert_eq(timeouts.preop_timeout_ms, 3000U)
+  assert_eq(timeouts.safeop_op_timeout_ms, 10000U)
+  assert_eq(timeouts.back_to_init_timeout_ms, 5000U)
+  assert_eq(timeouts.back_to_safeop_timeout_ms, 200U)
+  assert_eq(timeouts.mailbox_request_timeout_ms, 100U)
+  assert_eq(timeouts.mailbox_response_timeout_ms, 1000U)
 }
 
 ///|
@@ -1427,7 +1454,7 @@ test "SiiGeneral::is_op_only detects flag bit 0" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x01', // bit 0 set = OpOnly
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1454,7 +1481,7 @@ test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x02', // bit 1 set = NotLRW
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1480,7 +1507,7 @@ test "SiiGeneral::supports_identification_ado detects flag bit 3" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x08', // bit 3 set = IdentificationAdo
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1505,7 +1532,7 @@ test "SiiGeneral all flags clear" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x00',
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1534,7 +1561,7 @@ test "SiiGeneral mailbox and identification helpers detect bits" {
     ds402_channels: b'\x00',
     sysman_class: b'\x00',
     flags: b'\x14',
-    current_on_ebus: 0U,
+    current_on_ebus: 0,
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1566,8 +1593,9 @@ test "SiiData mailbox protocol helpers detect masks" {
     mailbox_rx_size: 0U,
     mailbox_tx_offset: 0U,
     mailbox_tx_size: 0U,
-    mailbox_protocols: 0x003EU,
+    mailbox_protocols: 0x003FU,
   }
+  assert_true(sii.supports_aoe())
   assert_true(sii.supports_eoe())
   assert_true(sii.supports_coe())
   assert_true(sii.supports_foe())

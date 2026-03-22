@@ -2494,21 +2494,6 @@ fn flag_value(args : Array[String], flag : String) -> String? {
 }
 
 ///|
-let mailbox_eoe_mask : UInt = 0x0002U
-
-///|
-let mailbox_coe_mask : UInt = 0x0004U
-
-///|
-let mailbox_foe_mask : UInt = 0x0008U
-
-///|
-let mailbox_soe_mask : UInt = 0x0010U
-
-///|
-let mailbox_voe_mask : UInt = 0x0020U
-
-///|
 fn require_uint_flag(
   args : Array[String],
   flag : String,
@@ -2641,6 +2626,24 @@ fn collect_sii_dc(
 }
 
 ///|
+fn collect_sii_timeouts(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> @mailbox.SiiTimeouts? {
+  for entry in categories {
+    if entry.category == @mailbox.Timeouts {
+      let parsed : Result[@mailbox.SiiTimeouts, Error] = try? @mailbox.parse_sii_timeouts(
+        entry.data,
+      )
+      match parsed {
+        Ok(timeouts) => return Some(timeouts)
+        Err(_) => return None
+      }
+    }
+  }
+  None
+}
+
+///|
 fn collect_sii_pdo(
   categories : Array[@mailbox.SiiCategoryEntry],
   category : @mailbox.SiiCategory,
@@ -2654,11 +2657,6 @@ fn collect_sii_pdo(
     }
   }
   result
-}
-
-///|
-fn mailbox_protocol_supported(protocols : UInt, mask : UInt) -> Bool {
-  (protocols & mask) != 0U
 }
 
 ///|
@@ -2678,6 +2676,7 @@ fn physical_port_name(port : Byte) -> String {
     b'\x01' => "MII"
     b'\x02' => "reserved"
     b'\x03' => "EBUS"
+    b'\x04' => "Fast Hot Connect"
     _ => "unknown"
   }
 }
@@ -2790,19 +2789,17 @@ fn general_json(info : @mailbox.SiiGeneral, strings : Array[String]) -> Json {
     "name": Json::string(resolved_sii_string(strings, info.name_idx)),
     "coe_details": Json::object({
       "raw": Json::number(info.coe_details.to_uint().to_double()),
-      "enable_sdo": Json::boolean((info.coe_details & b'\x01') != b'\x00'),
-      "enable_sdo_info": Json::boolean((info.coe_details & b'\x02') != b'\x00'),
-      "enable_pdo_assign": Json::boolean(
-        (info.coe_details & b'\x04') != b'\x00',
-      ),
+      "enable_sdo": Json::boolean(info.supports_coe_sdo()),
+      "enable_sdo_info": Json::boolean(info.supports_coe_sdo_info()),
+      "enable_pdo_assign": Json::boolean(info.supports_coe_pdo_assign()),
       "enable_pdo_configuration": Json::boolean(
-        (info.coe_details & b'\x08') != b'\x00',
+        info.supports_coe_pdo_configuration(),
       ),
       "enable_upload_at_startup": Json::boolean(
-        (info.coe_details & b'\x10') != b'\x00',
+        info.supports_coe_upload_at_startup(),
       ),
       "enable_sdo_complete_access": Json::boolean(
-        (info.coe_details & b'\x20') != b'\x00',
+        info.supports_coe_complete_access(),
       ),
     }),
     "foe_supported": Json::boolean(info.foe_supported),
@@ -2813,13 +2810,15 @@ fn general_json(info : @mailbox.SiiGeneral, strings : Array[String]) -> Json {
     "sysman_class": Json::number(info.sysman_class.to_uint().to_double()),
     "flags": Json::object({
       "raw": Json::number(info.flags.to_uint().to_double()),
-      "safe_op": Json::boolean((info.flags & b'\x01') != b'\x00'),
-      "not_lrw": Json::boolean((info.flags & b'\x02') != b'\x00'),
+      "safe_op": Json::boolean(info.is_op_only()),
+      "not_lrw": Json::boolean(info.prefers_not_lrw()),
       "mailbox_data_link_layer": Json::boolean(
-        (info.flags & b'\x04') != b'\x00',
+        info.supports_mailbox_data_link_layer(),
       ),
-      "ident_al_status": Json::boolean((info.flags & b'\x08') != b'\x00'),
-      "ident_physical_memory": Json::boolean((info.flags & b'\x10') != b'\x00'),
+      "ident_al_status": Json::boolean(info.supports_identification_ado()),
+      "ident_physical_memory": Json::boolean(
+        info.supports_identification_physical_memory(),
+      ),
     }),
     "current_on_ebus": Json::number(info.current_on_ebus.to_double()),
     "physical_ports": Json::array([
@@ -2875,6 +2874,7 @@ fn read_sii_json(
   rx_pdo : Array[@mailbox.SiiPdo],
   categories : Array[@mailbox.SiiCategoryEntry],
 ) -> Json {
+  let timeouts = collect_sii_timeouts(categories)
   let categories_json = categories.map(fn(entry) {
     Json::object({
       "category": Json::string(entry.category.to_string()),
@@ -2923,6 +2923,28 @@ fn read_sii_json(
   })
   let tx_pdo_json = tx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
   let rx_pdo_json = rx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
+  let timeouts_json = match timeouts {
+    Some(value) =>
+      Json::object({
+        "preop_timeout_ms": Json::number(value.preop_timeout_ms.to_double()),
+        "safeop_op_timeout_ms": Json::number(
+          value.safeop_op_timeout_ms.to_double(),
+        ),
+        "back_to_init_timeout_ms": Json::number(
+          value.back_to_init_timeout_ms.to_double(),
+        ),
+        "back_to_safeop_timeout_ms": Json::number(
+          value.back_to_safeop_timeout_ms.to_double(),
+        ),
+        "mailbox_request_timeout_ms": Json::number(
+          value.mailbox_request_timeout_ms.to_double(),
+        ),
+        "mailbox_response_timeout_ms": Json::number(
+          value.mailbox_response_timeout_ms.to_double(),
+        ),
+      })
+    None => Json::null()
+  }
   Json::object({
     "position": Json::number(position.to_double()),
     "word_count": Json::number(word_count.to_double()),
@@ -2962,21 +2984,12 @@ fn read_sii_json(
       "mailbox_protocols": Json::number(header.mailbox_protocols.to_double()),
     }),
     "supported_mailboxes": Json::object({
-      "coe": Json::boolean(
-        mailbox_protocol_supported(header.mailbox_protocols, mailbox_coe_mask),
-      ),
-      "eoe": Json::boolean(
-        mailbox_protocol_supported(header.mailbox_protocols, mailbox_eoe_mask),
-      ),
-      "foe": Json::boolean(
-        mailbox_protocol_supported(header.mailbox_protocols, mailbox_foe_mask),
-      ),
-      "soe": Json::boolean(
-        mailbox_protocol_supported(header.mailbox_protocols, mailbox_soe_mask),
-      ),
-      "voe": Json::boolean(
-        mailbox_protocol_supported(header.mailbox_protocols, mailbox_voe_mask),
-      ),
+      "aoe": Json::boolean(header.supports_aoe()),
+      "coe": Json::boolean(header.supports_coe()),
+      "eoe": Json::boolean(header.supports_eoe()),
+      "foe": Json::boolean(header.supports_foe()),
+      "soe": Json::boolean(header.supports_soe()),
+      "voe": Json::boolean(header.supports_voe()),
     }),
     "standard_metadata": Json::object({
       "eeprom_size_raw": Json::number(standard.eeprom_size_raw.to_double()),
@@ -2990,6 +3003,7 @@ fn read_sii_json(
     "fmmu": Json::array(fmmu_json),
     "sync_managers": Json::array(sm_json),
     "dc_clocks": Json::array(dc_json),
+    "timeouts": timeouts_json,
     "tx_pdo": Json::array(tx_pdo_json),
     "rx_pdo": Json::array(rx_pdo_json),
     "categories": Json::array(categories_json),
@@ -3006,6 +3020,7 @@ fn sii_category_title(category : @mailbox.SiiCategory) -> String {
     TxPdo => "TX PDO"
     RxPdo => "RX PDO"
     Dc => "DC CLOCK"
+    Timeouts => "Timeouts"
   }
 }
 
@@ -3019,6 +3034,7 @@ fn sii_category_code(category : @mailbox.SiiCategory) -> UInt {
     TxPdo => 0x32U
     RxPdo => 0x33U
     Dc => 0x3CU
+    Timeouts => 0x46U
   }
 }
 
@@ -3105,32 +3121,32 @@ fn append_sii_general_section(
   buf.write_string("  CoE Details:\n")
   buf.write_string(
     "    Enable SDO: .................. " +
-    bool_yes_no((info.coe_details & b'\x01') != b'\x00') +
+    bool_yes_no(info.supports_coe_sdo()) +
     "\n",
   )
   buf.write_string(
     "    Enable SDO Info: ............. " +
-    bool_yes_no((info.coe_details & b'\x02') != b'\x00') +
+    bool_yes_no(info.supports_coe_sdo_info()) +
     "\n",
   )
   buf.write_string(
     "    Enable PDO Assign: ........... " +
-    bool_yes_no((info.coe_details & b'\x04') != b'\x00') +
+    bool_yes_no(info.supports_coe_pdo_assign()) +
     "\n",
   )
   buf.write_string(
     "    Enable PDO Configuration: .... " +
-    bool_yes_no((info.coe_details & b'\x08') != b'\x00') +
+    bool_yes_no(info.supports_coe_pdo_configuration()) +
     "\n",
   )
   buf.write_string(
     "    Enable Upload at Startup: .... " +
-    bool_yes_no((info.coe_details & b'\x10') != b'\x00') +
+    bool_yes_no(info.supports_coe_upload_at_startup()) +
     "\n",
   )
   buf.write_string(
     "    Enable SDO complete access: .. " +
-    bool_yes_no((info.coe_details & b'\x20') != b'\x00') +
+    bool_yes_no(info.supports_coe_complete_access()) +
     "\n",
   )
   buf.write_string(
@@ -3145,27 +3161,27 @@ fn append_sii_general_section(
   )
   buf.write_string(
     "  Flag SafeOp: ................... " +
-    bool_enabled_text((info.flags & b'\x01') != b'\x00') +
+    bool_enabled_text(info.is_op_only()) +
     "\n",
   )
   buf.write_string(
     "  Flag notLRW: ................... " +
-    bool_enabled_text((info.flags & b'\x02') != b'\x00') +
+    bool_enabled_text(info.prefers_not_lrw()) +
     "\n",
   )
   buf.write_string(
     "  Flag MBox Data Link Layer ...... " +
-    bool_enabled_text((info.flags & b'\x04') != b'\x00') +
+    bool_enabled_text(info.supports_mailbox_data_link_layer()) +
     "\n",
   )
   buf.write_string(
     "  Flag Ident AL Status ........... " +
-    bool_enabled_text((info.flags & b'\x08') != b'\x00') +
+    bool_enabled_text(info.supports_identification_ado()) +
     "\n",
   )
   buf.write_string(
     "  Flag Ident Physical Memory ..... " +
-    bool_enabled_text((info.flags & b'\x10') != b'\x00') +
+    bool_enabled_text(info.supports_identification_physical_memory()) +
     "\n\n",
   )
   buf.write_string(
@@ -3324,6 +3340,52 @@ fn append_sii_dc_section(
     " (" +
     resolved_sii_string(strings, dc.description_idx) +
     ")\n\n",
+  )
+}
+
+///|
+fn append_sii_timeouts_section(
+  buf : @buffer.Buffer,
+  entry : @mailbox.SiiCategoryEntry,
+  timeouts : @mailbox.SiiTimeouts,
+) -> Unit {
+  buf.write_string(
+    "Print Categorie: " +
+    sii_category_title(entry.category) +
+    " (" +
+    format_hex(sii_category_code(entry.category), 2) +
+    ")\n",
+  )
+  buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
+  buf.write_string(
+    "  INIT -> PREOP/BOOT Timeout ... " +
+    timeouts.preop_timeout_ms.to_string() +
+    " ms\n",
+  )
+  buf.write_string(
+    "  SAFEOP -> OP Timeout ........ " +
+    timeouts.safeop_op_timeout_ms.to_string() +
+    " ms\n",
+  )
+  buf.write_string(
+    "  Back To INIT Timeout ........ " +
+    timeouts.back_to_init_timeout_ms.to_string() +
+    " ms\n",
+  )
+  buf.write_string(
+    "  OP -> SAFEOP Timeout ........ " +
+    timeouts.back_to_safeop_timeout_ms.to_string() +
+    " ms\n",
+  )
+  buf.write_string(
+    "  Mailbox Request Timeout ..... " +
+    timeouts.mailbox_request_timeout_ms.to_string() +
+    " ms\n",
+  )
+  buf.write_string(
+    "  Mailbox Response Timeout .... " +
+    timeouts.mailbox_response_timeout_ms.to_string() +
+    " ms\n\n",
   )
 }
 
@@ -3508,38 +3570,33 @@ fn read_sii_text(
   )
   buf.write_string("Supported Mailboxes:\n")
   buf.write_string(
+    "  AoE ....................... " +
+    bool_true_false(header.supports_aoe()) +
+    "\n",
+  )
+  buf.write_string(
     "  CoE ....................... " +
-    bool_true_false(
-      mailbox_protocol_supported(header.mailbox_protocols, mailbox_coe_mask),
-    ) +
+    bool_true_false(header.supports_coe()) +
     "\n",
   )
   buf.write_string(
     "  EoE ....................... " +
-    bool_true_false(
-      mailbox_protocol_supported(header.mailbox_protocols, mailbox_eoe_mask),
-    ) +
+    bool_true_false(header.supports_eoe()) +
     "\n",
   )
   buf.write_string(
     "  FoE ....................... " +
-    bool_true_false(
-      mailbox_protocol_supported(header.mailbox_protocols, mailbox_foe_mask),
-    ) +
+    bool_true_false(header.supports_foe()) +
     "\n",
   )
   buf.write_string(
     "  SoE ....................... " +
-    bool_true_false(
-      mailbox_protocol_supported(header.mailbox_protocols, mailbox_soe_mask),
-    ) +
+    bool_true_false(header.supports_soe()) +
     "\n",
   )
   buf.write_string(
     "  VoE ....................... " +
-    bool_true_false(
-      mailbox_protocol_supported(header.mailbox_protocols, mailbox_voe_mask),
-    ) +
+    bool_true_false(header.supports_voe()) +
     "\n\n",
   )
   buf.write_string(
@@ -3582,6 +3639,15 @@ fn read_sii_text(
         )
         match parsed {
           Ok(dc) => append_sii_dc_section(buf, entry, dc, strings)
+          Err(_) => ()
+        }
+      }
+      Timeouts => {
+        let parsed : Result[@mailbox.SiiTimeouts, Error] = try? @mailbox.parse_sii_timeouts(
+          entry.data,
+        )
+        match parsed {
+          Ok(timeouts) => append_sii_timeouts_section(buf, entry, timeouts)
           Err(_) => ()
         }
       }
