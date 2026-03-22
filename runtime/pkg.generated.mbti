@@ -52,8 +52,6 @@ pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
 pub fn plan_scan_station_addresses_with_strategy(Array[ObservedSlaveAddress], ScanStationAddressStrategy) -> Array[UInt] raise @hal.EcError
 
-pub fn preferred_dc_cycle_period_from_categories(Array[@mailbox.SiiCategoryEntry]) -> Int64?
-
 pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
 
 pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) -> DiagnosisSession raise @hal.EcError
@@ -407,6 +405,7 @@ pub(all) struct EsiOfflineSiiReport {
   position : UInt
   word_count : Int
   eeprom : Bytes
+  sii : @mailbox.SiiFullInfo
   preamble : @mailbox.SiiPreamble
   standard : @mailbox.SiiStandardMetadata
   header : @mailbox.SiiData
@@ -617,6 +616,7 @@ pub(all) struct SlaveStartupPreparation {
   startup_outputs : Bytes?
   startup_mailbox_commands : Array[StartupMailboxCommand]
   mailbox_config : @mailbox.MailboxConfig
+  sii : @mailbox.SiiFullInfo
   sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
 

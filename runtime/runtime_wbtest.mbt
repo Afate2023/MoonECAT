@@ -384,6 +384,82 @@ fn ds402_rxpdo_category_with_mode() -> @mailbox.SiiCategoryEntry {
 }
 
 ///|
+fn ds402_sii_info(
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> @mailbox.SiiFullInfo {
+  let mut general : @mailbox.SiiGeneral? = None
+  for entry in categories {
+    if entry.category == @mailbox.General {
+      general = Some(
+        @mailbox.parse_sii_general(entry.data) catch {
+          _ => panic()
+        },
+      )
+      break
+    }
+  }
+  let rx_pdo : Array[@mailbox.SiiPdo] = []
+  for entry in categories {
+    if entry.category == @mailbox.RxPdo {
+      for pdo in @mailbox.parse_sii_pdo(entry.data) {
+        rx_pdo.push(pdo)
+      }
+    }
+  }
+  {
+    eeprom: Bytes::new(128),
+    preamble: {
+      pdi_control: 0U,
+      pdi_config: 0U,
+      sync_impulse_length_raw: 0U,
+      pdi_config2: 0U,
+      configured_station_alias: 0U,
+      checksum: 0U,
+      checksum_ok: true,
+    },
+    standard: { eeprom_size_raw: 0U, version: 1U },
+    header: {
+      vendor_id: 0U,
+      product_code: 0U,
+      revision: 0U,
+      serial: 0U,
+      bootstrap_rx_offset: 0U,
+      bootstrap_rx_size: 0U,
+      bootstrap_tx_offset: 0U,
+      bootstrap_tx_size: 0U,
+      mailbox_rx_offset: 0U,
+      mailbox_rx_size: 0U,
+      mailbox_tx_offset: 0U,
+      mailbox_tx_size: 0U,
+      mailbox_protocols: 0U,
+      firmware_version: 0U,
+      hardware_version: 0U,
+      production_date_raw: 0U,
+      pdi_control_1: b'\x00',
+      esc_config_b0: b'\x00',
+      pdi_config_1: 0U,
+      pdi_config_1_ext: 0U,
+      esc_config_b4: 0U,
+      esc_config_b5: 0U,
+      esc_config_b6: 0U,
+      checksum_b: 0U,
+      esc_config_b_present: false,
+    },
+    categories,
+    strings: [],
+    general,
+    timeouts: None,
+    fmmu: [],
+    fmmu_ex: [],
+    sync_managers: [],
+    sync_units: [],
+    tx_pdo: [],
+    rx_pdo,
+    dc_clocks: [],
+  }
+}
+
+///|
 pub impl @hal.Nic for StrictRunTransitionNic with open_(name) {
   ignore(name)
   StrictRunTransitionNic::new(@protocol.EsmState::Init, false, 0U)
@@ -716,10 +792,13 @@ test "derive_startup_outputs seeds ds402 shutdown controlword at mapped offset" 
     output_bytes: 6,
     input_bytes: 2,
   }
-  let outputs = derive_startup_outputs(mapping, [
-    ds402_general_category(b'\x01'),
-    ds402_rxpdo_category_with_leading_target(),
-  ])
+  let outputs = derive_startup_outputs(
+    mapping,
+    ds402_sii_info([
+      ds402_general_category(b'\x01'),
+      ds402_rxpdo_category_with_leading_target(),
+    ]),
+  )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
   assert_eq(
     seed,
@@ -735,10 +814,13 @@ test "derive_startup_outputs seeds ds402 mode byte when available" {
     output_bytes: 7,
     input_bytes: 2,
   }
-  let outputs = derive_startup_outputs(mapping, [
-    ds402_general_category(b'\x01'),
-    ds402_rxpdo_category_with_mode(),
-  ])
+  let outputs = derive_startup_outputs(
+    mapping,
+    ds402_sii_info([
+      ds402_general_category(b'\x01'),
+      ds402_rxpdo_category_with_mode(),
+    ]),
+  )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
   assert_eq(
     seed,
@@ -750,10 +832,12 @@ test "derive_startup_outputs seeds ds402 mode byte when available" {
 
 ///|
 test "derive_startup_mailbox_commands emits ds402 safeop-to-op mode command" {
-  let commands = derive_startup_mailbox_commands([
-    ds402_general_category(b'\x01'),
-    ds402_rxpdo_category_with_mode(),
-  ])
+  let commands = derive_startup_mailbox_commands(
+    ds402_sii_info([
+      ds402_general_category(b'\x01'),
+      ds402_rxpdo_category_with_mode(),
+    ]),
+  )
   assert_eq(commands.length(), 1)
   assert_eq(commands[0].transition, SafeOpToOp)
   assert_eq(commands[0].index, 0x6060U)
@@ -797,10 +881,13 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
     output_bytes: 7,
     input_bytes: 2,
   }
-  let outputs = derive_startup_outputs(mapping, [
-    ds402_general_category(b'\x01'),
-    ds402_rxpdo_category_with_mode(),
-  ])
+  let outputs = derive_startup_outputs(
+    mapping,
+    ds402_sii_info([
+      ds402_general_category(b'\x01'),
+      ds402_rxpdo_category_with_mode(),
+    ]),
+  )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
   let pdo_ctx = @protocol.PdoContext::build([(mapping, 0x1001U)], 0x1000U)
   pdo_ctx.set_slave_outputs(0x1001U, seed)
@@ -816,10 +903,12 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
       in_size: 128U,
       in_sm_index: 1,
     },
-    derive_startup_mailbox_commands([
-      ds402_general_category(b'\x01'),
-      ds402_rxpdo_category_with_mode(),
-    ]),
+    derive_startup_mailbox_commands(
+      ds402_sii_info([
+        ds402_general_category(b'\x01'),
+        ds402_rxpdo_category_with_mode(),
+      ]),
+    ),
     SafeOpToOp,
     @hal.Duration(1000L),
   )

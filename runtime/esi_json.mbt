@@ -122,6 +122,7 @@ pub(all) struct EsiOfflineSiiReport {
   position : UInt
   word_count : Int
   eeprom : Bytes
+  sii : @mailbox.SiiFullInfo
   preamble : @mailbox.SiiPreamble
   standard : @mailbox.SiiStandardMetadata
   header : @mailbox.SiiData
@@ -547,18 +548,40 @@ fn build_offline_sii_report(
     minimum_eeprom_size(categories),
   )
   let normalized_byte_size = max_uint(byte_size, 128U)
+  let eeprom = Bytes::makei(normalized_byte_size.reinterpret_as_int(), fn(_) {
+    b'\x00'
+  })
+  let preamble = build_sii_preamble(device)
+  let standard : @mailbox.SiiStandardMetadata = {
+    eeprom_size_raw: encode_eeprom_size_raw(normalized_byte_size),
+    version: 1U,
+  }
+  let header = build_sii_header(device, sync_managers)
+  let sii : @mailbox.SiiFullInfo = {
+    eeprom,
+    preamble,
+    standard,
+    header,
+    categories,
+    strings,
+    general: Some(general),
+    timeouts: None,
+    fmmu,
+    fmmu_ex: [],
+    sync_managers,
+    sync_units: [],
+    tx_pdo,
+    rx_pdo,
+    dc_clocks,
+  }
   {
     position: device_index.reinterpret_as_uint(),
     word_count: (normalized_byte_size / 2U).reinterpret_as_int(),
-    eeprom: Bytes::makei(normalized_byte_size.reinterpret_as_int(), fn(_) {
-      b'\x00'
-    }),
-    preamble: build_sii_preamble(device),
-    standard: {
-      eeprom_size_raw: encode_eeprom_size_raw(normalized_byte_size),
-      version: 1U,
-    },
-    header: build_sii_header(device, sync_managers),
+    eeprom,
+    sii,
+    preamble,
+    standard,
+    header,
     general: Some(general),
     strings,
     fmmu,

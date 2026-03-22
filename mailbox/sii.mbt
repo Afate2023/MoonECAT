@@ -157,3 +157,31 @@ pub(all) struct SiiSyncUnit {
   frame_repeat_support : Bool
   raw_flags : Byte
 } derive(Eq, Show)
+
+///|
+/// A parsed SII category with its type tag and raw data.
+pub(all) struct SiiCategoryEntry {
+  category : SiiCategory
+  type_code : UInt
+  data : Bytes
+} derive(Eq, Show)
+
+///|
+/// Aggregated SII view shared by CLI, runtime, and offline projection paths.
+pub(all) struct SiiFullInfo {
+  eeprom : Bytes
+  preamble : SiiPreamble
+  standard : SiiStandardMetadata
+  header : SiiData
+  categories : Array[SiiCategoryEntry]
+  strings : Array[String]
+  general : SiiGeneral?
+  timeouts : SiiTimeouts?
+  fmmu : Array[FmmuDirection]
+  fmmu_ex : Array[SiiFmmuEx]
+  sync_managers : Array[SiiSmEntry]
+  sync_units : Array[SiiSyncUnit]
+  tx_pdo : Array[SiiPdo]
+  rx_pdo : Array[SiiPdo]
+  dc_clocks : Array[SiiDcClock]
+} derive(Show)

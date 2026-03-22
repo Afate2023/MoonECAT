@@ -223,29 +223,23 @@ pub fn calculate_slave_mapping(
   eeprom : Bytes,
   logical_base : UInt,
 ) -> SlaveMapping raise @hal.EcError {
-  let sii_header = parse_sii_header(eeprom)
-  let categories = parse_sii_categories(eeprom)
-  // Extract FMMU and SM category data
-  let mut fmmu_dirs : Array[FmmuDirection] = []
-  let mut sm_entries : Array[SiiSmEntry] = []
-  let mut tx_pdos : Array[SiiPdo] = []
-  let mut rx_pdos : Array[SiiPdo] = []
-  for i = 0; i < categories.length(); i = i + 1 {
-    match categories[i].category {
-      Fmmu => fmmu_dirs = parse_sii_fmmu(categories[i].data)
-      SyncManager => sm_entries = parse_sii_sm(categories[i].data)
-      TxPdo => tx_pdos = parse_sii_pdo(categories[i].data)
-      RxPdo => rx_pdos = parse_sii_pdo(categories[i].data)
-      _ => ()
-    }
-  }
+  calculate_slave_mapping_from_sii(parse_sii_full_info(eeprom), logical_base)
+}
+
+///|
+pub fn calculate_slave_mapping_from_sii(
+  sii : SiiFullInfo,
+  logical_base : UInt,
+) -> SlaveMapping {
   let sm_configs = apply_pdo_lengths_to_sm_configs(
-    calculate_sm_configs(sii_header, sm_entries),
-    tx_pdos,
-    rx_pdos,
+    calculate_sm_configs(sii.header, sii.sync_managers),
+    sii.tx_pdo,
+    sii.rx_pdo,
   )
   let (fmmu_configs, output_bytes, input_bytes) = calculate_fmmu_configs(
-    fmmu_dirs, sm_configs, logical_base,
+    sii.fmmu,
+    sm_configs,
+    logical_base,
   )
   { sm_configs, fmmu_configs, output_bytes, input_bytes }
 }

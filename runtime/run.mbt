@@ -85,6 +85,7 @@ pub(all) struct SlaveStartupPreparation {
   startup_outputs : Bytes?
   startup_mailbox_commands : Array[StartupMailboxCommand]
   mailbox_config : @mailbox.MailboxConfig
+  sii : @mailbox.SiiFullInfo
   sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
 
@@ -271,16 +272,16 @@ pub fn[N : @hal.Nic] prepare_slave_startup(
   let eeprom = read_sii_with_metadata_fp(
     nic, station, eeprom_word_count, timeout,
   )
-  let sii_header = @mailbox.parse_sii_header(eeprom)
-  let mapping = @mailbox.calculate_slave_mapping(eeprom, logical_base)
-  let categories = @mailbox.parse_sii_categories(eeprom)
+  let sii = @mailbox.parse_sii_full_info(eeprom)
+  let mapping = @mailbox.calculate_slave_mapping_from_sii(sii, logical_base)
   {
     mapping,
-    dc_cycle_period_ns: preferred_dc_cycle_period_from_categories(categories),
-    startup_outputs: derive_startup_outputs(mapping, categories),
-    startup_mailbox_commands: derive_startup_mailbox_commands(categories),
-    mailbox_config: @mailbox.MailboxConfig::from_sii(sii_header),
-    sii_categories: categories,
+    dc_cycle_period_ns: preferred_dc_cycle_period(sii),
+    startup_outputs: derive_startup_outputs(mapping, sii),
+    startup_mailbox_commands: derive_startup_mailbox_commands(sii),
+    mailbox_config: @mailbox.MailboxConfig::from_sii(sii.header),
+    sii,
+    sii_categories: sii.categories,
   }
 }
 
@@ -504,12 +505,9 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
         {
           ..preparation,
           mapping,
-          startup_outputs: derive_startup_outputs(
-            mapping,
-            preparation.sii_categories,
-          ),
+          startup_outputs: derive_startup_outputs(mapping, preparation.sii),
           startup_mailbox_commands: derive_startup_mailbox_commands(
-            preparation.sii_categories,
+            preparation.sii,
           ),
         }
       }
@@ -573,17 +571,16 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
 ///|
 fn derive_startup_outputs(
   mapping : @mailbox.SlaveMapping,
-  categories : Array[@mailbox.SiiCategoryEntry],
+  sii : @mailbox.SiiFullInfo,
 ) -> Bytes? {
   if mapping.output_bytes <= 0 {
     return None
   }
-  let general = collect_sii_general(categories)
-  guard general is Some(general) else { return None }
+  guard sii.general is Some(general) else { return None }
   if general.ds402_channels == b'\x00' {
     return None
   }
-  let rx_pdos = collect_sii_pdos(categories, @mailbox.RxPdo)
+  let rx_pdos = sii.rx_pdo
   let seed = Array::make(mapping.output_bytes, b'\x00')
   let mut wrote = false
   match find_pdo_entry_byte_offset(rx_pdos, 0x6040U, b'\x00') {
@@ -618,14 +615,13 @@ fn derive_startup_outputs(
 
 ///|
 fn derive_startup_mailbox_commands(
-  categories : Array[@mailbox.SiiCategoryEntry],
+  sii : @mailbox.SiiFullInfo,
 ) -> Array[StartupMailboxCommand] {
-  let general = collect_sii_general(categories)
-  guard general is Some(general) else { return [] }
+  guard sii.general is Some(general) else { return [] }
   if general.ds402_channels == b'\x00' {
     return []
   }
-  let rx_pdos = collect_sii_pdos(categories, @mailbox.RxPdo)
+  let rx_pdos = sii.rx_pdo
   match preferred_ds402_mode_seed(rx_pdos) {
     Some(mode_value) if mode_value != b'\x00' =>
       [
@@ -682,41 +678,6 @@ pub fn[N : @hal.Nic] apply_startup_mailbox_commands(
 }
 
 ///|
-fn collect_sii_general(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> @mailbox.SiiGeneral? {
-  for category in categories {
-    if category.category == @mailbox.General {
-      let parsed : Result[@mailbox.SiiGeneral, Error] = try? @mailbox.parse_sii_general(
-        category.data,
-      )
-      match parsed {
-        Ok(general) => return Some(general)
-        Err(_) => ()
-      }
-    }
-  }
-  None
-}
-
-///|
-fn collect_sii_pdos(
-  categories : Array[@mailbox.SiiCategoryEntry],
-  target : @mailbox.SiiCategory,
-) -> Array[@mailbox.SiiPdo] {
-  let pdos : Array[@mailbox.SiiPdo] = []
-  for category in categories {
-    if category.category == target {
-      let parsed = @mailbox.parse_sii_pdo(category.data)
-      for pdo in parsed {
-        pdos.push(pdo)
-      }
-    }
-  }
-  pdos
-}
-
-///|
 fn find_pdo_entry_byte_offset(
   pdos : Array[@mailbox.SiiPdo],
   entry_index : UInt,
@@ -739,32 +700,11 @@ fn find_pdo_entry_byte_offset(
 }
 
 ///|
-pub fn preferred_dc_cycle_period_from_categories(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Int64? {
-  match preferred_sii_dc_clock(collect_sii_dc(categories)) {
+fn preferred_dc_cycle_period(sii : @mailbox.SiiFullInfo) -> Int64? {
+  match preferred_sii_dc_clock(sii.dc_clocks) {
     Some(clock) => dc_cycle_period_ns(clock)
     None => None
   }
-}
-
-///|
-fn collect_sii_dc(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.SiiDcClock] {
-  let dc_clocks : Array[@mailbox.SiiDcClock] = []
-  for category in categories {
-    if category.category == @mailbox.Dc {
-      let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
-        category.data,
-      )
-      match parsed {
-        Ok(clock) => dc_clocks.push(clock)
-        Err(_) => ()
-      }
-    }
-  }
-  dc_clocks
 }
 
 ///|

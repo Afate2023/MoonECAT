@@ -1628,59 +1628,12 @@ test "cli read-sii json includes categories" {
     physical_port_3: b'\x00',
     physical_memory_address: 0U,
   })
-  let json = read_sii_json(
-    0U,
-    128,
+  let sii : @mailbox.SiiFullInfo = {
+    eeprom: Bytes::new(256),
     preamble,
     standard,
     header,
-    general,
-    ["SlaveName"],
-    [@mailbox.FmmuDirection::Outputs],
-    [
-      {
-        physical_start: 0x1000U,
-        length: 256U,
-        control: b'\x26',
-        status: b'\x00',
-        activate: b'\x01',
-        sm_type: @mailbox.SmType::MailboxOut,
-      },
-    ],
-    [
-      {
-        cycle_time_0: 0U,
-        shift_time_0: 0U,
-        shift_time_1: 0U,
-        sync1_cycle_factor: 0,
-        assign_activate: 0x0300U,
-        sync0_cycle_factor: 0,
-        name_idx: b'\x01',
-        description_idx: b'\x01',
-      },
-    ],
-    [
-      {
-        pdo_index: 0x1A00U,
-        entry_count: b'\x01',
-        sync_manager: b'\x03',
-        synchronization: b'\x00',
-        name_idx: b'\x01',
-        flags: 0U,
-        entries: [
-          {
-            entry_index: 0x6000U,
-            subindex: b'\x01',
-            name_idx: b'\x01',
-            data_type: b'\x05',
-            bit_length: b'\x10',
-            flags: 0U,
-          },
-        ],
-      },
-    ],
-    [],
-    [
+    categories: [
       { category: @mailbox.General, type_code: 30U, data: Bytes::new(32) },
       {
         category: @mailbox.FmmuEx,
@@ -1706,7 +1659,87 @@ test "cli read-sii json includes categories" {
         data: Bytes::from_array([b'\x12', b'\x34', b'\x56', b'\x78']),
       },
     ],
-  )
+    strings: ["SlaveName"],
+    general,
+    timeouts: Some({
+      preop_timeout_ms: 3000U,
+      safeop_op_timeout_ms: 10000U,
+      back_to_init_timeout_ms: 5000U,
+      back_to_safeop_timeout_ms: 200U,
+      mailbox_request_timeout_ms: 100U,
+      mailbox_response_timeout_ms: 1000U,
+    }),
+    fmmu: [@mailbox.FmmuDirection::Outputs],
+    fmmu_ex: [
+      {
+        op_only: true,
+        sm_defined: true,
+        su_defined: true,
+        sync_manager: b'\x02',
+        sync_unit: b'\x01',
+      },
+    ],
+    sync_managers: [
+      {
+        physical_start: 0x1000U,
+        length: 256U,
+        control: b'\x26',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.SmType::MailboxOut,
+      },
+    ],
+    sync_units: [
+      {
+        separate_su: true,
+        separate_frame: true,
+        depend_on_input_state: true,
+        frame_repeat_support: true,
+        raw_flags: b'\x0F',
+      },
+      {
+        separate_su: false,
+        separate_frame: false,
+        depend_on_input_state: false,
+        frame_repeat_support: false,
+        raw_flags: b'\x00',
+      },
+    ],
+    tx_pdo: [
+      {
+        pdo_index: 0x1A00U,
+        entry_count: b'\x01',
+        sync_manager: b'\x03',
+        synchronization: b'\x00',
+        name_idx: b'\x01',
+        flags: 0U,
+        entries: [
+          {
+            entry_index: 0x6000U,
+            subindex: b'\x01',
+            name_idx: b'\x01',
+            data_type: b'\x05',
+            bit_length: b'\x10',
+            flags: 0U,
+          },
+        ],
+      },
+    ],
+    rx_pdo: [],
+    dc_clocks: [
+      {
+        cycle_time_0: 0U,
+        shift_time_0: 0U,
+        shift_time_1: 0U,
+        sync1_cycle_factor: 0,
+        assign_activate: 0x0300U,
+        sync0_cycle_factor: 0,
+        name_idx: b'\x01',
+        description_idx: b'\x01',
+      },
+    ],
+  }
+  let json = read_sii_json(0U, 128, sii)
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"vendor_id\": 1"))
   assert_true(text.contains("\"aoe\": true"))

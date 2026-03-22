@@ -1096,32 +1096,12 @@ fn[N : @hal.Nic] run_read_sii_command(
   let position = require_uint_flag(args, "--position", 0U)
   let word_count = require_int_flag(args, "--words", 128)
   let eeprom = @protocol.eeprom_read_ap(nic, position, 0U, word_count, timeout)
-  let preamble = @mailbox.parse_sii_preamble(eeprom)
-  let standard = @mailbox.parse_sii_standard_metadata(eeprom)
-  let header = @mailbox.parse_sii_header(eeprom)
-  let categories = @mailbox.parse_sii_categories(eeprom)
-  let strings = collect_sii_strings(categories)
-  let general = collect_sii_general(categories)
-  let fmmu = collect_sii_fmmu(categories)
-  let sync_managers = collect_sii_sync_managers(categories)
-  let dc_clocks = collect_sii_dc(categories)
-  let tx_pdo = collect_sii_pdo(categories, @mailbox.TxPdo)
-  let rx_pdo = collect_sii_pdo(categories, @mailbox.RxPdo)
+  let sii = @mailbox.parse_sii_full_info(eeprom)
   nic.close()
   if as_json {
-    println(
-      read_sii_json(
-        position, word_count, preamble, standard, header, general, strings, fmmu,
-        sync_managers, dc_clocks, tx_pdo, rx_pdo, categories,
-      ).stringify(indent=2),
-    )
+    println(read_sii_json(position, word_count, sii).stringify(indent=2))
   } else {
-    println(
-      read_sii_text(
-        position, word_count, eeprom, preamble, standard, header, general, strings,
-        categories,
-      ),
-    )
+    println(read_sii_text(position, word_count, sii))
   }
 }
 
@@ -2555,135 +2535,6 @@ fn parse_int_flag(flag : String, text : String) -> Int raise @hal.EcError {
 }
 
 ///|
-fn collect_sii_strings(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[String] {
-  for entry in categories {
-    if entry.category == @mailbox.Strings {
-      return @mailbox.parse_sii_strings(entry.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_general(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> @mailbox.SiiGeneral? {
-  for entry in categories {
-    if entry.category == @mailbox.General {
-      return Some(
-        @mailbox.parse_sii_general(entry.data) catch {
-          _ => return None
-        },
-      )
-    }
-  }
-  None
-}
-
-///|
-fn collect_sii_fmmu(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.FmmuDirection] {
-  for entry in categories {
-    if entry.category == @mailbox.Fmmu {
-      return @mailbox.parse_sii_fmmu(entry.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_fmmu_ex(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.SiiFmmuEx] {
-  for entry in categories {
-    if entry.category == @mailbox.FmmuEx {
-      return @mailbox.parse_sii_fmmu_ex(entry.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_sync_managers(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.SiiSmEntry] {
-  for entry in categories {
-    if entry.category == @mailbox.SyncManager {
-      return @mailbox.parse_sii_sm(entry.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_dc(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.SiiDcClock] {
-  let result : Array[@mailbox.SiiDcClock] = []
-  for entry in categories {
-    if entry.category == @mailbox.Dc {
-      let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
-        entry.data,
-      )
-      match parsed {
-        Ok(dc) => result.push(dc)
-        Err(_) => ()
-      }
-    }
-  }
-  result
-}
-
-///|
-fn collect_sii_sync_units(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> Array[@mailbox.SiiSyncUnit] {
-  for entry in categories {
-    if entry.category == @mailbox.SyncUnit {
-      return @mailbox.parse_sii_sync_units(entry.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_timeouts(
-  categories : Array[@mailbox.SiiCategoryEntry],
-) -> @mailbox.SiiTimeouts? {
-  for entry in categories {
-    if entry.category == @mailbox.Timeouts {
-      let parsed : Result[@mailbox.SiiTimeouts, Error] = try? @mailbox.parse_sii_timeouts(
-        entry.data,
-      )
-      match parsed {
-        Ok(timeouts) => return Some(timeouts)
-        Err(_) => return None
-      }
-    }
-  }
-  None
-}
-
-///|
-fn collect_sii_pdo(
-  categories : Array[@mailbox.SiiCategoryEntry],
-  category : @mailbox.SiiCategory,
-) -> Array[@mailbox.SiiPdo] {
-  let result : Array[@mailbox.SiiPdo] = []
-  for entry in categories {
-    if entry.category == category {
-      for pdo in @mailbox.parse_sii_pdo(entry.data) {
-        result.push(pdo)
-      }
-    }
-  }
-  result
-}
-
-///|
 fn resolved_sii_string(strings : Array[String], index : Byte) -> String {
   let idx = index.to_int()
   if idx <= 0 || idx > strings.length() {
@@ -2918,21 +2769,19 @@ fn pdo_json(pdo : @mailbox.SiiPdo, strings : Array[String]) -> Json {
 fn read_sii_json(
   position : UInt,
   word_count : Int,
-  preamble : @mailbox.SiiPreamble,
-  standard : @mailbox.SiiStandardMetadata,
-  header : @mailbox.SiiData,
-  general : @mailbox.SiiGeneral?,
-  strings : Array[String],
-  fmmu : Array[@mailbox.FmmuDirection],
-  sync_managers : Array[@mailbox.SiiSmEntry],
-  dc_clocks : Array[@mailbox.SiiDcClock],
-  tx_pdo : Array[@mailbox.SiiPdo],
-  rx_pdo : Array[@mailbox.SiiPdo],
-  categories : Array[@mailbox.SiiCategoryEntry],
+  sii : @mailbox.SiiFullInfo,
 ) -> Json {
-  let fmmu_ex = collect_sii_fmmu_ex(categories)
-  let sync_units = collect_sii_sync_units(categories)
-  let timeouts = collect_sii_timeouts(categories)
+  let preamble = sii.preamble
+  let standard = sii.standard
+  let header = sii.header
+  let general = sii.general
+  let strings = sii.strings
+  let fmmu = sii.fmmu
+  let sync_managers = sii.sync_managers
+  let dc_clocks = sii.dc_clocks
+  let tx_pdo = sii.tx_pdo
+  let rx_pdo = sii.rx_pdo
+  let categories = sii.categories
   let categories_json = categories.map(fn(entry) {
     Json::object({
       "category": Json::string(entry.category.to_string()),
@@ -2954,7 +2803,7 @@ fn read_sii_json(
       "description": Json::string(fmmu_usage_name(direction)),
     })
   })
-  let fmmu_ex_json = fmmu_ex.map(fn(entry) {
+  let fmmu_ex_json = sii.fmmu_ex.map(fn(entry) {
     Json::object({
       "op_only": Json::boolean(entry.op_only),
       "sm_defined": Json::boolean(entry.sm_defined),
@@ -2973,7 +2822,7 @@ fn read_sii_json(
       "sm_type": Json::string(sm.sm_type.to_string()),
     })
   })
-  let sync_units_json = sync_units.map(fn(entry) {
+  let sync_units_json = sii.sync_units.map(fn(entry) {
     Json::object({
       "separate_su": Json::boolean(entry.separate_su),
       "separate_frame": Json::boolean(entry.separate_frame),
@@ -3000,7 +2849,7 @@ fn read_sii_json(
   })
   let tx_pdo_json = tx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
   let rx_pdo_json = rx_pdo.map(fn(pdo) { pdo_json(pdo, strings) })
-  let timeouts_json = match timeouts {
+  let timeouts_json = match sii.timeouts {
     Some(value) =>
       Json::object({
         "preop_timeout_ms": Json::number(value.preop_timeout_ms.to_double()),
@@ -3660,14 +3509,15 @@ fn append_sii_raw_category_section(
 fn read_sii_text(
   position : UInt,
   word_count : Int,
-  eeprom : Bytes,
-  preamble : @mailbox.SiiPreamble,
-  standard : @mailbox.SiiStandardMetadata,
-  header : @mailbox.SiiData,
-  general : @mailbox.SiiGeneral?,
-  strings : Array[String],
-  categories : Array[@mailbox.SiiCategoryEntry],
+  sii : @mailbox.SiiFullInfo,
 ) -> String {
+  let eeprom = sii.eeprom
+  let preamble = sii.preamble
+  let standard = sii.standard
+  let header = sii.header
+  let general = sii.general
+  let strings = sii.strings
+  let categories = sii.categories
   let buf = @buffer.new(size_hint=2048)
   buf.write_string("First print preamble and config\n")
   buf.write_string(
@@ -3878,6 +3728,11 @@ fn read_sii_text(
   buf.write_string(
     "Version: .................... " + standard.version.to_string() + "\n\n",
   )
+  let fmmu = sii.fmmu
+  let fmmu_ex = sii.fmmu_ex
+  let sync_managers = sii.sync_managers
+  let sync_units = sii.sync_units
+  let mut dc_index = 0
   for entry in categories {
     match entry.category {
       Strings => append_sii_strings_section(buf, entry, strings)
@@ -3886,22 +3741,10 @@ fn read_sii_text(
           Some(info) => append_sii_general_section(buf, entry, info, strings)
           None => ()
         }
-      Fmmu =>
-        append_sii_fmmu_section(buf, entry, @mailbox.parse_sii_fmmu(entry.data))
-      FmmuEx =>
-        append_sii_fmmu_ex_section(
-          buf,
-          entry,
-          @mailbox.parse_sii_fmmu_ex(entry.data),
-        )
-      SyncManager =>
-        append_sii_sm_section(buf, entry, @mailbox.parse_sii_sm(entry.data))
-      SyncUnit =>
-        append_sii_sync_unit_section(
-          buf,
-          entry,
-          @mailbox.parse_sii_sync_units(entry.data),
-        )
+      Fmmu => append_sii_fmmu_section(buf, entry, fmmu)
+      FmmuEx => append_sii_fmmu_ex_section(buf, entry, fmmu_ex)
+      SyncManager => append_sii_sm_section(buf, entry, sync_managers)
+      SyncUnit => append_sii_sync_unit_section(buf, entry, sync_units)
       TxPdo =>
         append_sii_pdo_section(
           buf,
@@ -3916,24 +3759,16 @@ fn read_sii_text(
           @mailbox.parse_sii_pdo(entry.data),
           strings,
         )
-      Dc => {
-        let parsed : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
-          entry.data,
-        )
-        match parsed {
-          Ok(dc) => append_sii_dc_section(buf, entry, dc, strings)
-          Err(_) => ()
+      Dc =>
+        if dc_index < sii.dc_clocks.length() {
+          append_sii_dc_section(buf, entry, sii.dc_clocks[dc_index], strings)
+          dc_index = dc_index + 1
         }
-      }
-      Timeouts => {
-        let parsed : Result[@mailbox.SiiTimeouts, Error] = try? @mailbox.parse_sii_timeouts(
-          entry.data,
-        )
-        match parsed {
-          Ok(timeouts) => append_sii_timeouts_section(buf, entry, timeouts)
-          Err(_) => ()
+      Timeouts =>
+        match sii.timeouts {
+          Some(timeouts) => append_sii_timeouts_section(buf, entry, timeouts)
+          None => ()
         }
-      }
       Raw => append_sii_raw_category_section(buf, entry)
     }
   }

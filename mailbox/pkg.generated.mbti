@@ -30,6 +30,8 @@ pub fn calculate_fmmu_configs(Array[FmmuDirection], Array[SmConfig], UInt) -> (A
 
 pub fn calculate_slave_mapping(Bytes, UInt) -> SlaveMapping raise @hal.EcError
 
+pub fn calculate_slave_mapping_from_sii(SiiFullInfo, UInt) -> SlaveMapping
+
 pub fn calculate_sm_configs(SiiData, Array[SiiSmEntry]) -> Array[SmConfig]
 
 pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
@@ -53,6 +55,8 @@ pub fn parse_sii_dc(Bytes) -> SiiDcClock raise @hal.EcError
 pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
 
 pub fn parse_sii_fmmu_ex(Bytes) -> Array[SiiFmmuEx]
+
+pub fn parse_sii_full_info(Bytes) -> SiiFullInfo raise @hal.EcError
 
 pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
 
@@ -300,6 +304,7 @@ pub(all) struct SiiCategoryEntry {
   type_code : UInt
   data : Bytes
 }
+pub impl Eq for SiiCategoryEntry
 pub impl Show for SiiCategoryEntry
 
 pub(all) struct SiiData {
@@ -363,6 +368,25 @@ pub(all) struct SiiFmmuEx {
 }
 pub impl Eq for SiiFmmuEx
 pub impl Show for SiiFmmuEx
+
+pub(all) struct SiiFullInfo {
+  eeprom : Bytes
+  preamble : SiiPreamble
+  standard : SiiStandardMetadata
+  header : SiiData
+  categories : Array[SiiCategoryEntry]
+  strings : Array[String]
+  general : SiiGeneral?
+  timeouts : SiiTimeouts?
+  fmmu : Array[FmmuDirection]
+  fmmu_ex : Array[SiiFmmuEx]
+  sync_managers : Array[SiiSmEntry]
+  sync_units : Array[SiiSyncUnit]
+  tx_pdo : Array[SiiPdo]
+  rx_pdo : Array[SiiPdo]
+  dc_clocks : Array[SiiDcClock]
+}
+pub impl Show for SiiFullInfo
 
 pub(all) struct SiiGeneral {
   group_idx : Byte

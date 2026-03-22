@@ -60,34 +60,10 @@ fn read_cli_text_file(
 
 ///|
 fn offline_sii_json(report : @runtime.EsiOfflineSiiReport) -> Json {
-  read_sii_json(
-    report.position,
-    report.word_count,
-    report.preamble,
-    report.standard,
-    report.header,
-    report.general,
-    report.strings,
-    report.fmmu,
-    report.sync_managers,
-    report.dc_clocks,
-    report.tx_pdo,
-    report.rx_pdo,
-    report.categories,
-  )
+  read_sii_json(report.position, report.word_count, report.sii)
 }
 
 ///|
 fn offline_sii_text(report : @runtime.EsiOfflineSiiReport) -> String {
-  read_sii_text(
-    report.position,
-    report.word_count,
-    report.eeprom,
-    report.preamble,
-    report.standard,
-    report.header,
-    report.general,
-    report.strings,
-    report.categories,
-  )
+  read_sii_text(report.position, report.word_count, report.sii)
 }
