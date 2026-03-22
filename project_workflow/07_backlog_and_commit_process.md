@@ -40,6 +40,7 @@
 
 最近回填：
 
+- `SII 聚合模型共享到 CLI/runtime/offline mapping` → `ebbaf31` `feat(sii): share aggregated full-info model`
 - `启动恢复共享入口 + SO mailbox 启动命令 + ESC 映射诊断` → `b3b0717` `Refine startup recovery and ESC mapping diagnostics`
 - `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
 - `严格 ESM 路径接入 state/run` → `e143fce` `feat(esm): wire strict transitions into state and run`

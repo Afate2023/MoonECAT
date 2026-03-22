@@ -112,6 +112,7 @@
 - [x] **【缺口】结构化诊断输出**：scan/validate/run 提供 JSON/human-readable 双格式输出
 - [x] **【新增】在线 SII 诊断入口**：CLI 已支持最小 `read-sii` 命令，通过 Native 后端按从站位置读取 EEPROM 窗口并输出 header/general/strings/categories
   - ✅ [cmd/main/main.mbt](../cmd/main/main.mbt) + [cmd/main/main_wbtest.mbt](../cmd/main/main_wbtest.mbt)，代码提交：`26166fc`
+  - ✅ 2026-03-22 已进一步从“最小在线诊断入口”收口到共享聚合模型：`read-sii` / `esi-sii` / runtime startup / mailbox mapping 统一改为消费 `SiiFullInfo`，由 [mailbox/sii_parser.mbt](../mailbox/sii_parser.mbt) 的 `parse_sii_full_info` 和 [mailbox/mapping.mbt](../mailbox/mapping.mbt) 的 `calculate_slave_mapping_from_sii` 提供单次解析结果，代码提交：`ebbaf31`
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](../docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
@@ -185,6 +186,7 @@
 - `native slave identity recovery`：基于 SII/AP 优先回退链修复真实从站身份读取，并过滤 Native 自发回显帧
 - `native interface auto-probe + scan strategy seam`：基于接口元数据过滤候选网卡、固定超时 BRD 自动探测，并把 scan 站地址规划抽成可替换策略接口
 - `minimal read-sii cli command`：新增 Native CLI 在线 SII 读取入口与最小 JSON/文本输出
+- `shared sii aggregate model`：新增 `SiiFullInfo` 聚合模型并收口 CLI/runtime/offline config/mapping 消费
 - `native state transition cli command`：新增 Native CLI 广播/定点 EtherCAT ESM 状态迁移入口与设计文档
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查
@@ -206,6 +208,7 @@
 - `Native slave identity recovery` → `263394a` `fix(native): recover slave identity from real scans`
 - `Native interface auto-probe + scan strategy seam` → `bff2f5e` `feat(native): auto-probe interfaces and extract scan strategy`
 - `最小 read-sii CLI 入口` → `26166fc` `feat(cli): add minimal read-sii command`
+- `共享 SII 聚合模型` → `ebbaf31` `feat(sii): share aggregated full-info model`
 - `Native EtherCAT 状态迁移 CLI 入口` → `f01a411` `feat(cli): add native ethercat state transition command`
 - `Native run 可选 ESM 状态 + Raw Socket 错误分类` → `bd95053` `feat(native): add configurable run states and raw-socket error mapping`
 - `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
