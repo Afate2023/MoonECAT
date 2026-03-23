@@ -100,6 +100,21 @@ pub fn SiiOverlayCandidate::dispatch_key(self : SiiOverlayCandidate) -> String {
 }
 
 ///|
+pub fn SiiOverlayCandidate::decoder_name(self : SiiOverlayCandidate) -> String? {
+  match self.dispatch_key() {
+    _ => None
+  }
+}
+
+///|
+pub fn SiiOverlayCandidate::status_label(self : SiiOverlayCandidate) -> String {
+  match self.decoder_name() {
+    Some(_) => "registered"
+    None => "opaque"
+  }
+}
+
+///|
 pub fn SiiCategoryEntry::category_class(
   self : SiiCategoryEntry,
 ) -> SiiCategoryClass {

@@ -442,17 +442,24 @@ test "sii category entry exposes overlay candidates for extension classes" {
     Some(overlay) => {
       assert_eq(overlay.scope, @mailbox.SiiOverlayScope::VendorSpecific)
       assert_eq(overlay.dispatch_key(), "vendor-specific:1234")
+      assert_eq(overlay.decoder_name(), None)
+      assert_eq(overlay.status_label(), "opaque")
       assert_eq(overlay.data.length(), 2)
     }
     None => fail("expected vendor overlay")
   }
   match application_overlay {
-    Some(overlay) =>
+    Some(overlay) => {
       assert_eq(overlay.dispatch_key(), "application-specific:2001")
+      assert_eq(overlay.status_label(), "opaque")
+    }
     None => fail("expected application overlay")
   }
   match device_overlay {
-    Some(overlay) => assert_eq(overlay.dispatch_key(), "device-specific:0005")
+    Some(overlay) => {
+      assert_eq(overlay.dispatch_key(), "device-specific:0005")
+      assert_eq(overlay.status_label(), "opaque")
+    }
     None => fail("expected device overlay")
   }
 }

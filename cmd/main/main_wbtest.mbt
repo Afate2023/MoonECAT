@@ -1768,6 +1768,8 @@ test "cli read-sii json includes categories" {
   assert_true(text.contains("\"category_class\": \"vendor-specific\""))
   assert_true(text.contains("\"category_class\": \"application-specific\""))
   assert_true(text.contains("\"overlay_key\": \"vendor-specific:1234\""))
+  assert_true(text.contains("\"overlay_status\": \"opaque\""))
+  assert_true(text.contains("\"overlay_decoder\": null"))
   assert_true(text.contains("\"overlay_key\": \"application-specific:2001\""))
   assert_true(text.contains("\"known\": false"))
 }

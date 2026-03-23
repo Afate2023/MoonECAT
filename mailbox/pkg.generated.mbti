@@ -445,7 +445,9 @@ pub(all) struct SiiOverlayCandidate {
   type_code : UInt
   data : Bytes
 }
+pub fn SiiOverlayCandidate::decoder_name(Self) -> String?
 pub fn SiiOverlayCandidate::dispatch_key(Self) -> String
+pub fn SiiOverlayCandidate::status_label(Self) -> String
 pub impl Eq for SiiOverlayCandidate
 pub impl Show for SiiOverlayCandidate
 

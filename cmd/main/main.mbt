@@ -2787,9 +2787,18 @@ fn read_sii_json(
   let categories = sii.categories
   let categories_json = categories.map(fn(entry) {
     let category_class = entry.category_class().label()
-    let overlay_key = match entry.overlay_candidate() {
-      Some(candidate) => Json::string(candidate.dispatch_key())
-      None => Json::null()
+    let (overlay_key, overlay_status, overlay_decoder) = match
+      entry.overlay_candidate() {
+      Some(candidate) =>
+        (
+          Json::string(candidate.dispatch_key()),
+          Json::string(candidate.status_label()),
+          match candidate.decoder_name() {
+            Some(name) => Json::string(name)
+            None => Json::null()
+          },
+        )
+      None => (Json::null(), Json::null(), Json::null())
     }
     Json::object({
       "category": Json::string(entry.category.to_string()),
@@ -2797,6 +2806,8 @@ fn read_sii_json(
       "category_code": Json::number(entry.type_code.to_double()),
       "category_class": Json::string(category_class),
       "overlay_key": overlay_key,
+      "overlay_status": overlay_status,
+      "overlay_decoder": overlay_decoder,
       "known": Json::boolean(entry.category != @mailbox.Raw),
       "byte_length": Json::number(entry.data.length().to_double()),
       "preview_hex": Json::string(bytes_preview_hex(entry.data, 16)),
@@ -3508,9 +3519,18 @@ fn append_sii_raw_category_section(
   entry : @mailbox.SiiCategoryEntry,
 ) -> Unit {
   let category_class = entry.category_class().label()
-  let overlay_key = match entry.overlay_candidate() {
-    Some(candidate) => candidate.dispatch_key()
-    None => ""
+  let (overlay_key, overlay_status, overlay_decoder) = match
+    entry.overlay_candidate() {
+    Some(candidate) =>
+      (
+        candidate.dispatch_key(),
+        candidate.status_label(),
+        match candidate.decoder_name() {
+          Some(name) => name
+          None => ""
+        },
+      )
+    None => ("", "", "")
   }
   buf.write_string(
     "Print Categorie: " +
@@ -3523,6 +3543,10 @@ fn append_sii_raw_category_section(
   buf.write_string("  Class: " + category_class + "\n")
   if overlay_key != "" {
     buf.write_string("  Overlay Key: " + overlay_key + "\n")
+    buf.write_string("  Overlay Status: " + overlay_status + "\n")
+  }
+  if overlay_decoder != "" {
+    buf.write_string("  Overlay Decoder: " + overlay_decoder + "\n")
   }
   buf.write_string(
     "  Raw Preview: " + bytes_preview_hex(entry.data, 24) + "\n\n",
