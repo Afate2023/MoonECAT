@@ -403,7 +403,10 @@ test "sii category entry reports stable export classes" {
   assert_eq(device_specific.category_class(), @mailbox.DeviceSpecific)
   assert_eq(vendor_specific.category_class(), @mailbox.VendorSpecific)
   assert_eq(application_specific.category_class(), @mailbox.ApplicationSpecific)
-  assert_eq(@mailbox.VendorSpecific.label(), "vendor-specific")
+  assert_eq(
+    @mailbox.SiiCategoryClass::VendorSpecific.label(),
+    "vendor-specific",
+  )
 }
 
 ///|
