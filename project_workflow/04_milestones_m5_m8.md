@@ -117,6 +117,7 @@
   - ✅ 2026-03-23 已把 `DataTypes(20)`、`Dictionary(80)`、`Hardware(90)`、`Vendor Information(100)`、`Images(110)` 从普通 `Raw` 提升为显式标准保留类别，CLI 与 offline projection 现在会稳定输出类别名和 `known=true`，同时继续保留原始 bytes，代码提交：`5b8f96e`
   - ✅ 2026-03-23 已为全部 category 增加稳定 `category_class` 导出；其中 `Raw` 现可细分为 `standard-unknown` / `device-specific` / `vendor-specific` / `application-specific`，JSON 与文本输出一致暴露该分类，代码提交：`ff93f64`
   - ✅ 2026-03-23 已进一步补出 raw 扩展类别的 typed overlay 挂载点：公共模型新增 `overlay_candidate()` / `dispatch_key()`，CLI categories JSON 与文本 raw-section 新增 `overlay_key`，后续可直接据此挂接厂商/应用特定解析器，代码提交：`ca0a906`
+  - ✅ 2026-03-23 已把 raw overlay 输出进一步稳定为 decoder 状态合同：公共模型新增 `decoder_name()` / `status_label()`，CLI categories JSON 与文本 raw-section 新增 `overlay_status` / `overlay_decoder`，当前未注册解码器的扩展 section 会显式标记为 `opaque`，代码提交：`b024aec`
 - [x] 评估并整理 Extism 宿主接入边界。
   - ✅ [docs/EXTISM_HOST_BOUNDARY.md](../docs/EXTISM_HOST_BOUNDARY.md): 宿主能力、HAL 适配边界、错误映射与验证清单
   - ✅ [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md): Extism / WASM Host Integration 总览入口
@@ -195,6 +196,7 @@
 - `standard reserved sii category recognition`：新增 20/80/90/100/110 的显式类别识别与稳定导出标题
 - `sii category class export`：新增 `category_class` 导出并把 Raw 分类细分为 standard/device/vendor/application-specific
 - `raw category overlay hook`：新增 `overlay_candidate` / `overlay_key` 作为 typed overlay 挂载点
+- `raw category overlay decoder status`：新增 `decoder_name` / `status_label` 与 CLI `overlay_status` / `overlay_decoder`
 - `native state transition cli command`：新增 Native CLI 广播/定点 EtherCAT ESM 状态迁移入口与设计文档
 - `backend release matrix docs`：Native CLI / Native Library / Extism Plugin 交付边界、环境要求与 smoke 命令
 - `native ffi memory safety validation`：ownership 标注、句柄清理与 AddressSanitizer 检查

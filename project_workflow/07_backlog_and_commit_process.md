@@ -40,6 +40,7 @@
 
 最近回填：
 
+- `Raw SII overlay decoder 状态合同` → `b024aec` `feat(sii): expose overlay decoder status`
 - `Raw SII category overlay 挂载点` → `ca0a906` `feat(sii): add raw category overlay hook`
 - `SII category class 导出` → `ff93f64` `feat(sii): export category classes`
 - `标准保留 SII 类别识别` → `5b8f96e` `feat(sii): recognize standard reserved categories`
