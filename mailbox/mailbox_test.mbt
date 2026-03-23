@@ -407,6 +407,54 @@ test "sii category entry reports stable export classes" {
 }
 
 ///|
+test "sii category entry exposes overlay candidates for extension classes" {
+  let vendor_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 0x1234U,
+    data: Bytes::from_array([b'\xAA', b'\xBB']),
+  }
+  let application_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 0x2001U,
+    data: Bytes::from_array([b'\xCC', b'\xDD']),
+  }
+  let device_specific : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Raw,
+    type_code: 5U,
+    data: Bytes::from_array([b'\xEE', b'\xFF']),
+  }
+  let standard_known : @mailbox.SiiCategoryEntry = {
+    category: @mailbox.Dictionary,
+    type_code: 80U,
+    data: Bytes::new(0),
+  }
+  let vendor_overlay = vendor_specific.overlay_candidate()
+  let application_overlay = application_specific.overlay_candidate()
+  let device_overlay = device_specific.overlay_candidate()
+  assert_true(vendor_overlay is Some(_))
+  assert_true(application_overlay is Some(_))
+  assert_true(device_overlay is Some(_))
+  assert_true(standard_known.overlay_candidate() is None)
+  match vendor_overlay {
+    Some(overlay) => {
+      assert_eq(overlay.scope, @mailbox.SiiOverlayScope::VendorSpecific)
+      assert_eq(overlay.dispatch_key(), "vendor-specific:1234")
+      assert_eq(overlay.data.length(), 2)
+    }
+    None => fail("expected vendor overlay")
+  }
+  match application_overlay {
+    Some(overlay) =>
+      assert_eq(overlay.dispatch_key(), "application-specific:2001")
+    None => fail("expected application overlay")
+  }
+  match device_overlay {
+    Some(overlay) => assert_eq(overlay.dispatch_key(), "device-specific:0005")
+    None => fail("expected device overlay")
+  }
+}
+
+///|
 test "parse_sii_sm decodes dynamic process data types" {
   let entries = @mailbox.parse_sii_sm(
     Bytes::from_array([

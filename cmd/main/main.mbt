@@ -2790,11 +2790,16 @@ fn read_sii_json(
   let categories = sii.categories
   let categories_json = categories.map(fn(entry) {
     let category_class = entry.category_class().label()
+    let overlay_key = match entry.overlay_candidate() {
+      Some(candidate) => Json::string(candidate.dispatch_key())
+      None => Json::null()
+    }
     Json::object({
       "category": Json::string(entry.category.to_string()),
       "title": Json::string(sii_category_title(entry.category, entry.type_code)),
       "category_code": Json::number(entry.type_code.to_double()),
       "category_class": Json::string(category_class),
+      "overlay_key": overlay_key,
       "known": Json::boolean(entry.category != @mailbox.Raw),
       "byte_length": Json::number(entry.data.length().to_double()),
       "preview_hex": Json::string(bytes_preview_hex(entry.data, 16)),
@@ -3506,6 +3511,10 @@ fn append_sii_raw_category_section(
   entry : @mailbox.SiiCategoryEntry,
 ) -> Unit {
   let category_class = entry.category_class().label()
+  let overlay_key = match entry.overlay_candidate() {
+    Some(candidate) => candidate.dispatch_key()
+    None => ""
+  }
   buf.write_string(
     "Print Categorie: " +
     sii_category_title(entry.category, entry.type_code) +
@@ -3515,6 +3524,9 @@ fn append_sii_raw_category_section(
   )
   buf.write_string("  Size: " + entry.data.length().to_string() + " Bytes\n")
   buf.write_string("  Class: " + category_class + "\n")
+  if overlay_key != "" {
+    buf.write_string("  Overlay Key: " + overlay_key + "\n")
+  }
   buf.write_string(
     "  Raw Preview: " + bytes_preview_hex(entry.data, 24) + "\n\n",
   )

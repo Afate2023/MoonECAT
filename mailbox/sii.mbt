@@ -30,6 +30,21 @@ pub(all) enum SiiCategoryClass {
 } derive(Eq, Show)
 
 ///|
+/// Dispatch scope for future typed overlays on raw SII categories.
+pub(all) enum SiiOverlayScope {
+  DeviceSpecific
+  VendorSpecific
+  ApplicationSpecific
+} derive(Eq, Show)
+
+///|
+pub(all) struct SiiOverlayCandidate {
+  scope : SiiOverlayScope
+  type_code : UInt
+  data : Bytes
+} derive(Eq, Show)
+
+///|
 pub fn SiiCategoryClass::label(self : SiiCategoryClass) -> String {
   match self {
     StandardKnown => "standard-known"
@@ -38,6 +53,50 @@ pub fn SiiCategoryClass::label(self : SiiCategoryClass) -> String {
     VendorSpecific => "vendor-specific"
     ApplicationSpecific => "application-specific"
   }
+}
+
+///|
+pub fn SiiOverlayScope::label(self : SiiOverlayScope) -> String {
+  match self {
+    DeviceSpecific => "device-specific"
+    VendorSpecific => "vendor-specific"
+    ApplicationSpecific => "application-specific"
+  }
+}
+
+///|
+fn hex_digit(value : UInt) -> String {
+  match value {
+    0U => "0"
+    1U => "1"
+    2U => "2"
+    3U => "3"
+    4U => "4"
+    5U => "5"
+    6U => "6"
+    7U => "7"
+    8U => "8"
+    9U => "9"
+    10U => "A"
+    11U => "B"
+    12U => "C"
+    13U => "D"
+    14U => "E"
+    _ => "F"
+  }
+}
+
+///|
+fn format_hex4(value : UInt) -> String {
+  hex_digit((value >> 12) & 0x0FU) +
+  hex_digit((value >> 8) & 0x0FU) +
+  hex_digit((value >> 4) & 0x0FU) +
+  hex_digit(value & 0x0FU)
+}
+
+///|
+pub fn SiiOverlayCandidate::dispatch_key(self : SiiOverlayCandidate) -> String {
+  self.scope.label() + ":" + format_hex4(self.type_code)
 }
 
 ///|
@@ -57,6 +116,30 @@ pub fn SiiCategoryEntry::category_class(self : SiiCategoryEntry) -> SiiCategoryC
     return VendorSpecific
   }
   StandardUnknown
+}
+
+///|
+pub fn SiiCategoryEntry::overlay_candidate(
+  self : SiiCategoryEntry,
+) -> SiiOverlayCandidate? {
+  match self.category_class() {
+    DeviceSpecific => Some({
+      scope: SiiOverlayScope::DeviceSpecific,
+      type_code: self.type_code,
+      data: self.data,
+    })
+    VendorSpecific => Some({
+      scope: SiiOverlayScope::VendorSpecific,
+      type_code: self.type_code,
+      data: self.data,
+    })
+    ApplicationSpecific => Some({
+      scope: SiiOverlayScope::ApplicationSpecific,
+      type_code: self.type_code,
+      data: self.data,
+    })
+    _ => None
+  }
 }
 
 ///|

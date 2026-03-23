@@ -321,6 +321,7 @@ pub(all) struct SiiCategoryEntry {
   data : Bytes
 }
 pub fn SiiCategoryEntry::category_class(Self) -> SiiCategoryClass
+pub fn SiiCategoryEntry::overlay_candidate(Self) -> SiiOverlayCandidate?
 pub impl Eq for SiiCategoryEntry
 pub impl Show for SiiCategoryEntry
 
@@ -438,6 +439,24 @@ pub fn SiiGeneral::supports_identification_physical_memory(Self) -> Bool
 pub fn SiiGeneral::supports_mailbox_data_link_layer(Self) -> Bool
 pub impl Eq for SiiGeneral
 pub impl Show for SiiGeneral
+
+pub(all) struct SiiOverlayCandidate {
+  scope : SiiOverlayScope
+  type_code : UInt
+  data : Bytes
+}
+pub fn SiiOverlayCandidate::dispatch_key(Self) -> String
+pub impl Eq for SiiOverlayCandidate
+pub impl Show for SiiOverlayCandidate
+
+pub(all) enum SiiOverlayScope {
+  DeviceSpecific
+  VendorSpecific
+  ApplicationSpecific
+}
+pub fn SiiOverlayScope::label(Self) -> String
+pub impl Eq for SiiOverlayScope
+pub impl Show for SiiOverlayScope
 
 pub(all) struct SiiPdo {
   pdo_index : UInt
