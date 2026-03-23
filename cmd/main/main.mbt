@@ -1096,10 +1096,7 @@ fn[N : @hal.Nic] run_read_sii_command(
   let position = require_uint_flag(args, "--position", 0U)
   let initial_word_count = require_int_flag(args, "--words", 128)
   let eeprom = @protocol.read_sii_bytes_ap(
-    nic,
-    position,
-    initial_word_count,
-    timeout,
+    nic, position, initial_word_count, timeout,
   )
   let word_count = eeprom.length() / 4
   let sii = @mailbox.parse_sii_full_info(eeprom)

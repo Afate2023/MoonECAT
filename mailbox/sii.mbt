@@ -100,7 +100,9 @@ pub fn SiiOverlayCandidate::dispatch_key(self : SiiOverlayCandidate) -> String {
 }
 
 ///|
-pub fn SiiCategoryEntry::category_class(self : SiiCategoryEntry) -> SiiCategoryClass {
+pub fn SiiCategoryEntry::category_class(
+  self : SiiCategoryEntry,
+) -> SiiCategoryClass {
   if self.category != Raw {
     return StandardKnown
   }
@@ -123,21 +125,24 @@ pub fn SiiCategoryEntry::overlay_candidate(
   self : SiiCategoryEntry,
 ) -> SiiOverlayCandidate? {
   match self.category_class() {
-    DeviceSpecific => Some({
-      scope: SiiOverlayScope::DeviceSpecific,
-      type_code: self.type_code,
-      data: self.data,
-    })
-    VendorSpecific => Some({
-      scope: SiiOverlayScope::VendorSpecific,
-      type_code: self.type_code,
-      data: self.data,
-    })
-    ApplicationSpecific => Some({
-      scope: SiiOverlayScope::ApplicationSpecific,
-      type_code: self.type_code,
-      data: self.data,
-    })
+    DeviceSpecific =>
+      Some({
+        scope: SiiOverlayScope::DeviceSpecific,
+        type_code: self.type_code,
+        data: self.data,
+      })
+    VendorSpecific =>
+      Some({
+        scope: SiiOverlayScope::VendorSpecific,
+        type_code: self.type_code,
+        data: self.data,
+      })
+    ApplicationSpecific =>
+      Some({
+        scope: SiiOverlayScope::ApplicationSpecific,
+        type_code: self.type_code,
+        data: self.data,
+      })
     _ => None
   }
 }

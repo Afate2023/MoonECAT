@@ -263,7 +263,8 @@ fn decode_sii_total_bytes(probe : Bytes) -> Int? {
     return None
   }
   let byte_offset = sii_eeprom_size_word_offset * 2
-  let encoded = probe[byte_offset].to_uint() | (probe[byte_offset + 1].to_uint() << 8)
+  let encoded = probe[byte_offset].to_uint() |
+    (probe[byte_offset + 1].to_uint() << 8)
   Some(((encoded << 7) + 0x80U).reinterpret_as_int())
 }
 
@@ -278,10 +279,13 @@ fn required_sii_probe_word_count(initial_word_count : Int) -> Int {
 }
 
 ///|
-fn required_sii_total_word_count(initial_eeprom : Bytes, initial_word_count : Int) -> Int {
+fn required_sii_total_word_count(
+  initial_eeprom : Bytes,
+  initial_word_count : Int,
+) -> Int {
   match decode_sii_total_bytes(initial_eeprom) {
     Some(total_bytes) => {
-      let total_words = ((total_bytes + 3) / 4)
+      let total_words = (total_bytes + 3) / 4
       if total_words > initial_word_count {
         total_words
       } else {
@@ -304,8 +308,7 @@ pub fn[N : @hal.Nic] read_sii_bytes(
   let probe_word_count = required_sii_probe_word_count(initial_word_count)
   let initial_eeprom = eeprom_read(nic, station, 0U, probe_word_count, timeout)
   let total_word_count = required_sii_total_word_count(
-    initial_eeprom,
-    probe_word_count,
+    initial_eeprom, probe_word_count,
   )
   if total_word_count <= probe_word_count {
     initial_eeprom
@@ -357,15 +360,10 @@ pub fn[N : @hal.Nic] read_sii_bytes_ap(
 ) -> Bytes raise @hal.EcError {
   let probe_word_count = required_sii_probe_word_count(initial_word_count)
   let initial_eeprom = eeprom_read_ap(
-    nic,
-    position,
-    0U,
-    probe_word_count,
-    timeout,
+    nic, position, 0U, probe_word_count, timeout,
   )
   let total_word_count = required_sii_total_word_count(
-    initial_eeprom,
-    probe_word_count,
+    initial_eeprom, probe_word_count,
   )
   if total_word_count <= probe_word_count {
     initial_eeprom

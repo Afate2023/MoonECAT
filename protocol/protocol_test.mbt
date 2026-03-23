@@ -2304,7 +2304,7 @@ fn make_sii_image(byte_size : Int) -> Bytes {
   let encoded_size = if byte_size <= 0x80 {
     0U
   } else {
-    ((byte_size.reinterpret_as_uint() - 0x80U) >> 7)
+    (byte_size.reinterpret_as_uint() - 0x80U) >> 7
   }
   image[124] = (encoded_size & 0xFFU).to_byte()
   image[125] = ((encoded_size >> 8) & 0xFFU).to_byte()
