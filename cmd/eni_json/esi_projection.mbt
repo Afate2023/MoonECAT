@@ -30,6 +30,7 @@ fn parse_esi_document_projection(
   let mut in_device = false
   let mut in_module = false
   let mut in_dc_op_mode = false
+  let mut in_init_cmd = false
   let mut current_slot_index = 0
   let mut slot_module_default = false
   let mut current_text_target : String? = None
@@ -40,6 +41,7 @@ fn parse_esi_document_projection(
   let mut current_pdo : @runtime.EsiJsonPdo? = None
   let mut current_entry : @runtime.EsiJsonPdoEntry? = None
   let mut current_dc = empty_esi_dc_projection()
+  let mut current_init_command = empty_esi_init_command_projection()
 
   while true {
     let event = reader.read_event() catch {
@@ -99,7 +101,11 @@ fn parse_esi_document_projection(
               current_text_target = Some("device-type-name")
             }
             "Name" =>
-              current_text_target = if in_dc_op_mode {
+              current_text_target = if current_entry is Some(_) {
+                Some("entry-name")
+              } else if current_pdo is Some(_) {
+                Some("pdo-name")
+              } else if in_dc_op_mode {
                 Some("dc-name")
               } else {
                 Some("device-name")
@@ -178,6 +184,75 @@ fn parse_esi_document_projection(
               current_device = {
                 ..current_device,
                 mailbox: { ..current_device.mailbox, aoe: true },
+              }
+            "ProfileNo" => current_text_target = Some("profile-no")
+            "InitCmd" => {
+              in_init_cmd = true
+              current_init_command = empty_esi_init_command_projection()
+            }
+            "RxPdo" =>
+              current_pdo = Some({
+                ..empty_esi_pdo_projection("rx"),
+                sync_manager: option_uint_or(
+                  optional_numeric_xml_attr(elem, "Sm"),
+                  0U,
+                ).to_byte(),
+              })
+            "TxPdo" =>
+              current_pdo = Some({
+                ..empty_esi_pdo_projection("tx"),
+                sync_manager: option_uint_or(
+                  optional_numeric_xml_attr(elem, "Sm"),
+                  0U,
+                ).to_byte(),
+              })
+            "Index" =>
+              if in_init_cmd {
+                current_text_target = Some("initcmd-index")
+              } else if current_entry is Some(_) {
+                current_text_target = Some("entry-index")
+                match current_entry {
+                  Some(entry) =>
+                    current_entry = Some({
+                      ..entry,
+                      depend_on_slot_index: optional_bool_xml_attr(
+                        elem, "DependOnSlot",
+                      ),
+                    })
+                  None => ()
+                }
+              } else if current_pdo is Some(_) {
+                current_text_target = Some("pdo-index")
+                match current_pdo {
+                  Some(pdo) =>
+                    current_pdo = Some({
+                      ..pdo,
+                      depend_on_slot_pdo: optional_bool_xml_attr(
+                        elem, "DependOnSlot",
+                      ),
+                    })
+                  None => ()
+                }
+              }
+            "Entry" =>
+              if not(in_init_cmd) {
+                current_entry = Some(empty_esi_pdo_entry_projection())
+              }
+            "SubIndex" =>
+              current_text_target = if in_init_cmd {
+                Some("initcmd-subindex")
+              } else {
+                Some("entry-subindex")
+              }
+            "BitLen" => current_text_target = Some("entry-bitlen")
+            "DataType" => current_text_target = Some("entry-datatype")
+            "Transition" =>
+              if in_init_cmd {
+                current_text_target = Some("initcmd-transition")
+              }
+            "Data" =>
+              if in_init_cmd {
+                current_text_target = Some("initcmd-data")
               }
             "OpMode" => {
               in_dc_op_mode = true
@@ -383,6 +458,32 @@ fn parse_esi_document_projection(
                 text, "Device/Dc/OpMode/AssignActivate",
               ),
             }
+          Some("profile-no") =>
+            current_device = {
+              ..current_device,
+              profile_no: Some(
+                parse_esi_numeric(text, "Device/Profile/ProfileNo"),
+              ),
+            }
+          Some("initcmd-transition") =>
+            current_init_command = { ..current_init_command, transition: text }
+          Some("initcmd-index") =>
+            current_init_command = {
+              ..current_init_command,
+              index: parse_esi_numeric(text, "Device/Mailbox/CoE/InitCmd/Index"),
+            }
+          Some("initcmd-subindex") =>
+            current_init_command = {
+              ..current_init_command,
+              subindex: parse_esi_numeric(
+                text, "Device/Mailbox/CoE/InitCmd/SubIndex",
+              ).to_byte(),
+            }
+          Some("initcmd-data") =>
+            current_init_command = {
+              ..current_init_command,
+              data: parse_hex_bytes(text, "Device/Mailbox/CoE/InitCmd/Data"),
+            }
           Some("dc-cycle-time-sync0") =>
             current_dc = {
               ..current_dc,
@@ -537,6 +638,13 @@ fn parse_esi_document_projection(
               current_dc = empty_esi_dc_projection()
               in_dc_op_mode = false
             }
+          "InitCmd" => {
+            if current_init_command.transition != "" {
+              current_device.init_commands.push(current_init_command)
+            }
+            current_init_command = empty_esi_init_command_projection()
+            in_init_cmd = false
+          }
           "Slot" => {
             current_slot_index = current_slot_index + 1
             slot_module_default = false
@@ -548,9 +656,11 @@ fn parse_esi_document_projection(
             current_pdo = None
             current_entry = None
             current_dc = empty_esi_dc_projection()
+            current_init_command = empty_esi_init_command_projection()
             current_text_target = None
             in_device = false
             in_dc_op_mode = false
+            in_init_cmd = false
           }
           "Module" => {
             modules.push(current_module)
@@ -563,6 +673,7 @@ fn parse_esi_document_projection(
           "Id"
           | "Type"
           | "Name"
+          | "ProfileNo"
           | "Fmmu"
           | "ModuleIdent"
           | "ByteSize"
@@ -571,9 +682,11 @@ fn parse_esi_document_projection(
           | "AssignActivate"
           | "CycleTimeSync0"
           | "CycleTimeSync1"
+          | "Transition"
           | "Index"
           | "SubIndex"
           | "BitLen"
+          | "Data"
           | "DataType" => current_text_target = None
           _ => ()
         }
@@ -648,6 +761,7 @@ fn empty_esi_device_projection() -> @runtime.EsiJsonDevice {
     physics: "",
     device_name: "",
     type_name: "",
+    profile_no: None,
     slot_index_increment: 0U,
     slot_pdo_increment: 0U,
     mailbox: empty_esi_mailbox_projection(),
@@ -658,9 +772,15 @@ fn empty_esi_device_projection() -> @runtime.EsiJsonDevice {
     config_data: b"",
     bootstrap: b"",
     default_modules: [],
+    init_commands: [],
     rx_pdos: [],
     tx_pdos: [],
   }
+}
+
+///|
+fn empty_esi_init_command_projection() -> @runtime.EsiJsonInitCommand {
+  { transition: "", index: 0U, subindex: b'\x00', data: b"" }
 }
 
 ///|

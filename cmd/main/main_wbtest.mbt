@@ -999,6 +999,7 @@ fn sample_esi_json_text() -> String {
         physics: "YY",
         device_name: "RZN2 CoE Demo",
         type_name: "rzn2",
+        profile_no: Some(402U),
         slot_index_increment: 0x800U,
         slot_pdo_increment: 16U,
         mailbox: {
@@ -1063,6 +1064,14 @@ fn sample_esi_json_text() -> String {
         config_data: b"\x80\x0E\x44\xEE\x10\x00\x00\x00",
         bootstrap: b"\x00\x10\x80\x00\x80\x10\x80\x00",
         default_modules: [{ module_ident: 0x219800U, slot_index: 0 }],
+        init_commands: [
+          {
+            transition: "SO",
+            index: 0x6060U,
+            subindex: b'\x00',
+            data: Bytes::from_array([b'\x08']),
+          },
+        ],
         rx_pdos: [],
         tx_pdos: [],
       },
@@ -1172,6 +1181,7 @@ test "cli state transition report uses broadcast when station is omitted" {
   let timeout = @hal.Duration(1000L)
   let report = compute_state_transition_report(
     nic,
+    [],
     @protocol.Init,
     None,
     false,
@@ -1332,6 +1342,7 @@ test "cli state path recovers configuration error to init" {
   let timeout = @hal.Duration(1000L)
   let report = compute_station_transition_report(
     nic,
+    [],
     @protocol.EsmState::Init,
     0x1001U,
     true,

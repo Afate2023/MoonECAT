@@ -81,6 +81,14 @@ pub(all) struct EsiJsonSelectedModule {
 } derive(Eq, Show, ToJson)
 
 ///|
+pub(all) struct EsiJsonInitCommand {
+  transition : String
+  index : UInt
+  subindex : Byte
+  data : Bytes
+} derive(Eq, Show, ToJson)
+
+///|
 pub(all) struct EsiJsonDevice {
   vendor_id : UInt
   product_code : UInt
@@ -89,6 +97,7 @@ pub(all) struct EsiJsonDevice {
   physics : String
   device_name : String
   type_name : String
+  profile_no : UInt?
   slot_index_increment : UInt
   slot_pdo_increment : UInt
   mailbox : EsiJsonMailbox
@@ -99,6 +108,7 @@ pub(all) struct EsiJsonDevice {
   config_data : Bytes
   bootstrap : Bytes
   default_modules : Array[EsiJsonSelectedModule]
+  init_commands : Array[EsiJsonInitCommand]
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
 } derive(Eq, Show, ToJson)
@@ -131,6 +141,8 @@ pub(all) struct EsiOfflineSiiReport {
   fmmu : Array[@mailbox.FmmuDirection]
   sync_managers : Array[@mailbox.SiiSmEntry]
   dc_clocks : Array[@mailbox.SiiDcClock]
+  profile_no : UInt?
+  startup_mailbox_commands : Array[StartupMailboxCommand]
   tx_pdo : Array[@mailbox.SiiPdo]
   rx_pdo : Array[@mailbox.SiiPdo]
   categories : Array[@mailbox.SiiCategoryEntry]
@@ -216,6 +228,7 @@ fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
       "physics": physics_json,
       "device_name": device_name_json,
       "type_name": type_name_json,
+      "profile_no": profile_no_json,
       "slot_index_increment": slot_index_increment_json,
       "slot_pdo_increment": slot_pdo_increment_json,
       "mailbox": mailbox_json,
@@ -226,6 +239,7 @@ fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
       "config_data": config_data_json,
       "bootstrap": bootstrap_json,
       "default_modules": Array(default_modules_json),
+      "init_commands": Array(init_commands_json),
       "rx_pdos": Array(rx_pdos_json),
       "tx_pdos": Array(tx_pdos_json),
       ..
@@ -242,6 +256,7 @@ fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
     physics: decode_esi_json_string(physics_json),
     device_name: decode_esi_json_string(device_name_json),
     type_name: decode_esi_json_string(type_name_json),
+    profile_no: decode_esi_json_optional_uint(profile_no_json),
     slot_index_increment: decode_esi_json_uint(slot_index_increment_json),
     slot_pdo_increment: decode_esi_json_uint(slot_pdo_increment_json),
     mailbox: parse_esi_json_mailbox(mailbox_json),
@@ -254,8 +269,35 @@ fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
     default_modules: default_modules_json.map(item => {
       parse_esi_json_selected_module(item)
     }),
+    init_commands: init_commands_json.map(item => {
+      parse_esi_json_init_command(item)
+    }),
     rx_pdos: rx_pdos_json.map(item => parse_esi_json_pdo(item)),
     tx_pdos: tx_pdos_json.map(item => parse_esi_json_pdo(item)),
+  }
+}
+
+///|
+fn parse_esi_json_init_command(
+  json : Json,
+) -> EsiJsonInitCommand raise @hal.EcError {
+  guard json
+    is {
+      "transition": transition_json,
+      "index": index_json,
+      "subindex": subindex_json,
+      "data": data_json,
+      ..
+    } else {
+    raise @hal.EcError::EsiParseFailed(
+      "ESI JSON decode failed: invalid init command entry",
+    )
+  }
+  {
+    transition: decode_esi_json_string(transition_json),
+    index: decode_esi_json_uint(index_json),
+    subindex: decode_esi_json_byte(subindex_json),
+    data: decode_esi_json_bytes(data_json),
   }
 }
 
@@ -458,6 +500,14 @@ fn decode_esi_json_uint(json : Json) -> UInt raise @hal.EcError {
 }
 
 ///|
+fn decode_esi_json_optional_uint(json : Json) -> UInt? raise @hal.EcError {
+  if json is Null {
+    return None
+  }
+  Some(decode_esi_json_uint(json))
+}
+
+///|
 fn decode_esi_json_int(json : Json) -> Int raise @hal.EcError {
   @json.from_json(json) catch {
     err =>
@@ -540,6 +590,7 @@ fn build_offline_sii_report(
   let tx_pdo = tx_pdo_projection.map(pdo => materialize_sii_pdo(pdo, strings))
   let rx_pdo = rx_pdo_projection.map(pdo => materialize_sii_pdo(pdo, strings))
   let dc_clocks = device.dc_modes.map(dc => materialize_sii_dc(dc, strings))
+  let startup_mailbox_commands = project_esi_startup_mailbox_commands(device)
   let categories = build_sii_categories(
     fmmu, sync_managers, strings, general, tx_pdo, rx_pdo, dc_clocks,
   )
@@ -587,9 +638,39 @@ fn build_offline_sii_report(
     fmmu,
     sync_managers,
     dc_clocks,
+    profile_no: device.profile_no,
+    startup_mailbox_commands,
     tx_pdo,
     rx_pdo,
     categories,
+  }
+}
+
+///|
+fn project_esi_startup_mailbox_commands(
+  device : EsiJsonDevice,
+) -> Array[StartupMailboxCommand] {
+  let commands : Array[StartupMailboxCommand] = []
+  for command in device.init_commands {
+    match map_esi_init_transition(command.transition) {
+      Some(transition) =>
+        commands.push({
+          transition,
+          index: command.index,
+          subindex: command.subindex,
+          data: command.data,
+        })
+      None => ()
+    }
+  }
+  commands
+}
+
+///|
+fn map_esi_init_transition(transition : String) -> StartupCommandTransition? {
+  match transition {
+    "SO" => Some(SafeOpToOp)
+    _ => None
   }
 }
 
@@ -746,7 +827,11 @@ fn build_general_projection(
     } else {
       b'\x00'
     },
-    ds402_channels: b'\x00',
+    ds402_channels: if is_ds402_profile(device.profile_no) {
+      b'\x01'
+    } else {
+      b'\x00'
+    },
     sysman_class: b'\x00',
     flags: build_general_flags(device),
     current_on_ebus: 0,
@@ -755,6 +840,14 @@ fn build_general_projection(
     physical_port_2: ports[2],
     physical_port_3: ports[3],
     physical_memory_address: 0U,
+  }
+}
+
+///|
+fn is_ds402_profile(profile_no : UInt?) -> Bool {
+  match profile_no {
+    Some(402U) => true
+    _ => false
   }
 }
 

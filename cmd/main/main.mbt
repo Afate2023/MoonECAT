@@ -163,6 +163,7 @@ fn cli_main() -> Unit raise @hal.EcError {
       _ =>
         run_native_command_with_fresh_nic(
           resolve_native_cli_config(args, backend, timeout),
+          args,
           as_json,
           startup_state,
           shutdown_state,
@@ -216,6 +217,7 @@ fn run_mock_command_with_fresh_nic(
     settings,
     startup_state,
     shutdown_state,
+    None,
     progress_output,
     timeout,
   )
@@ -232,6 +234,7 @@ fn run_mock_command_with_fresh_nic(
 ///|
 fn run_native_command_with_fresh_nic(
   config : @native.NativeNicConfig,
+  args : Array[String],
   as_json : Bool,
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
@@ -244,17 +247,29 @@ fn run_native_command_with_fresh_nic(
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
   let run_nic = @native.NativeNic::open_with_config(config)
-  let preparation = if target_requires_process_data_configuration(startup_state) {
-    @runtime.build_run_startup_preparation(
-      run_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count, timeout,
-    )
+  let startup_preparation_override = if target_requires_process_data_configuration(
+      startup_state,
+    ) {
+    resolve_run_startup_preparation_override(scan_report, args)
   } else {
-    {
-      pdo_ctx: @protocol.PdoContext::build([], 0U),
-      expected_wkc: 0U,
-      dc_cycle_period_ns: None,
-      startup_mailbox_plans: [],
-    }
+    None
+  }
+  let preparation = match startup_preparation_override {
+    Some(prepared) => prepared
+    None =>
+      if target_requires_process_data_configuration(startup_state) {
+        @runtime.build_run_startup_preparation(
+          run_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count,
+          timeout,
+        )
+      } else {
+        {
+          pdo_ctx: @protocol.PdoContext::build([], 0U),
+          expected_wkc: 0U,
+          dc_cycle_period_ns: None,
+          startup_mailbox_plans: [],
+        }
+      }
   }
   let run_config = @runtime.master_config_with_optional_dc(
     preparation.dc_cycle_period_ns,
@@ -268,6 +283,7 @@ fn run_native_command_with_fresh_nic(
     settings,
     startup_state,
     shutdown_state,
+    startup_preparation_override,
     progress_output,
     timeout,
   )
@@ -291,6 +307,7 @@ fn[N : @hal.Nic] run_with_progress_output(
   settings : @runtime.RunLoopSettings,
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
+  startup_preparation_override : @runtime.RunStartupPreparation?,
   progress_output : RunProgressOutput,
   timeout : @hal.Duration,
 ) -> @runtime.RunReport raise @hal.EcError {
@@ -298,19 +315,28 @@ fn[N : @hal.Nic] run_with_progress_output(
   let ndjson_sink = CliNdjsonRunProgressSink::new()
   match progress_output {
     Silent =>
-      @runtime.run_with_states_and_settings(
-        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
+      @runtime.run_with_states_and_settings_prepared_reporting_to(
+        nic,
+        config,
+        expected,
+        pdo_ctx,
+        expected_wkc,
+        settings,
+        startup_state,
+        shutdown_state,
+        startup_preparation_override,
         timeout,
+        @runtime.NullRunProgressSink::new(),
       )
     Text =>
-      @runtime.run_with_states_and_settings_reporting_to(
+      @runtime.run_with_states_and_settings_prepared_reporting_to(
         nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
-        timeout, text_sink,
+        startup_preparation_override, timeout, text_sink,
       )
     Ndjson =>
-      @runtime.run_with_states_and_settings_reporting_to(
+      @runtime.run_with_states_and_settings_prepared_reporting_to(
         nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
-        timeout, ndjson_sink,
+        startup_preparation_override, timeout, ndjson_sink,
       )
   }
 }
@@ -323,6 +349,67 @@ fn target_requires_process_data_configuration(
 }
 
 ///|
+fn load_esi_json_text(path : String) -> String raise @hal.EcError {
+  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
+    path,
+  )
+  match content_result {
+    Ok(content) => content
+    Err(err) =>
+      raise @hal.EcError::ConfigMismatch(
+        "failed to read ESI JSON file " + path + ": " + err.to_string(),
+      )
+  }
+}
+
+///|
+fn optional_device_index_flag(args : Array[String]) -> Int raise @hal.EcError {
+  require_int_flag(args, "--device-index", 0)
+}
+
+///|
+fn optional_esi_json_startup_preparation(
+  args : Array[String],
+  logical_base : UInt,
+) -> @runtime.SlaveStartupPreparation? raise @hal.EcError {
+  match flag_value(args, "--esi-json") {
+    Some(path) =>
+      Some(
+        @runtime.startup_preparation_from_esi_json(
+          load_esi_json_text(path),
+          optional_device_index_flag(args),
+          logical_base,
+        ),
+      )
+    None => None
+  }
+}
+
+///|
+fn resolve_run_startup_preparation_override(
+  scan_report : @runtime.ScanReport,
+  args : Array[String],
+) -> @runtime.RunStartupPreparation? raise @hal.EcError {
+  match optional_esi_json_startup_preparation(args, pdo_logical_base) {
+    Some(slave_preparation) => {
+      if scan_report.slaves.length() != 1 {
+        raise @hal.EcError::ConfigMismatch(
+          "run --esi-json currently requires exactly one discovered slave",
+        )
+      }
+      let station = scan_report.slaves[0].station_address
+      Some(
+        @runtime.run_startup_preparation_from_slave_preparations(
+          [(station, slave_preparation)],
+          pdo_logical_base,
+        ),
+      )
+    }
+    None => None
+  }
+}
+
+///|
 fn[N : @hal.Nic] prepare_station_startup(
   nic : N,
   station : UInt,
@@ -332,6 +419,20 @@ fn[N : @hal.Nic] prepare_station_startup(
   @runtime.prepare_slave_startup(
     nic, station, logical_base, process_data_eeprom_word_count, timeout,
   )
+}
+
+///|
+fn[N : @hal.Nic] prepare_station_startup_from_args(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  logical_base : UInt,
+  timeout : @hal.Duration,
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
+  match optional_esi_json_startup_preparation(args, logical_base) {
+    Some(preparation) => preparation
+    None => prepare_station_startup(nic, station, logical_base, timeout)
+  }
 }
 
 ///|
@@ -443,7 +544,7 @@ fn[N : @hal.Nic] run_state_command(
   let station = optional_uint_flag(args, "--station")
   let use_path = has_flag(args, "--path")
   let report_result : Result[StateTransitionReport, @hal.EcError] = try? compute_state_transition_report(
-    nic, target, station, use_path, timeout,
+    nic, args, target, station, use_path, timeout,
   )
   nic.close()
   let report = match report_result {
@@ -494,6 +595,7 @@ fn[N : @hal.Nic] run_expected_register_command(
 ///|
 fn[N : @hal.Nic] compute_state_transition_report(
   nic : N,
+  args : Array[String],
   target : @protocol.EsmState,
   station : UInt?,
   use_path : Bool,
@@ -502,7 +604,7 @@ fn[N : @hal.Nic] compute_state_transition_report(
   match station {
     Some(configured_station) =>
       compute_station_transition_report(
-        nic, target, configured_station, use_path, timeout,
+        nic, args, target, configured_station, use_path, timeout,
       )
     None => {
       let wkc = @protocol.broadcast_state(nic, target, timeout)
@@ -523,6 +625,7 @@ fn[N : @hal.Nic] compute_state_transition_report(
 ///|
 fn[N : @hal.Nic] compute_station_transition_report(
   nic : N,
+  args : Array[String],
   target : @protocol.EsmState,
   station : UInt,
   use_path : Bool,
@@ -530,8 +633,11 @@ fn[N : @hal.Nic] compute_station_transition_report(
 ) -> StateTransitionReport raise @hal.EcError {
   let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
   if use_path && target == @protocol.Op && current != @protocol.Op {
-    let (final_snapshot, kick_wkc) = transition_station_to_op(
-      nic, station, current, timeout,
+    let initial_preparation = prepare_station_startup_from_args(
+      nic, args, station, pdo_logical_base, timeout,
+    )
+    let (final_snapshot, kick_wkc) = transition_station_to_op_with_preparation(
+      nic, station, current, initial_preparation, timeout,
     )
     return {
       mode: "station-path",
@@ -548,8 +654,8 @@ fn[N : @hal.Nic] compute_station_transition_report(
     target == @protocol.SafeOp &&
     current != @protocol.SafeOp &&
     current != @protocol.Op {
-    let preparation = prepare_station_startup(
-      nic, station, pdo_logical_base, timeout,
+    let preparation = prepare_station_startup_from_args(
+      nic, args, station, pdo_logical_base, timeout,
     )
     let final_state = transition_station_to_safeop_with_process_mapping(
       nic, station, current, preparation, timeout,
@@ -707,15 +813,13 @@ fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_op(
+fn[N : @hal.Nic] transition_station_to_op_with_preparation(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
+  initial_preparation : @runtime.SlaveStartupPreparation,
   timeout : @hal.Duration,
 ) -> (@protocol.EsmStatusSnapshot, UInt?) raise @hal.EcError {
-  let initial_preparation = prepare_station_startup(
-    nic, station, pdo_logical_base, timeout,
-  )
   let state_before_process_mapping = transition_station_to_preop_with_mailbox(
     nic, station, current, initial_preparation, timeout,
   )

@@ -266,6 +266,83 @@ pub fn[N : @hal.Nic] prepare_slave_startup(
 }
 
 ///|
+pub fn startup_preparation_from_esi_offline_report(
+  report : EsiOfflineSiiReport,
+  logical_base : UInt,
+) -> SlaveStartupPreparation {
+  let mapping = @mailbox.calculate_slave_mapping_from_sii(
+    report.sii,
+    logical_base,
+  )
+  {
+    mapping,
+    dc_cycle_period_ns: preferred_dc_cycle_period(report.sii),
+    startup_outputs: derive_startup_outputs(mapping, report.sii),
+    startup_mailbox_commands: if report.startup_mailbox_commands.length() > 0 {
+      report.startup_mailbox_commands
+    } else {
+      derive_startup_mailbox_commands(report.sii)
+    },
+    mailbox_config: @mailbox.MailboxConfig::from_sii(report.header),
+    sii: report.sii,
+    sii_categories: report.categories,
+  }
+}
+
+///|
+pub fn startup_preparation_from_esi_json(
+  json_content : String,
+  device_index : Int,
+  logical_base : UInt,
+) -> SlaveStartupPreparation raise @hal.EcError {
+  startup_preparation_from_esi_offline_report(
+    offline_sii_report_from_esi_json(json_content, device_index),
+    logical_base,
+  )
+}
+
+///|
+pub fn run_startup_preparation_from_slave_preparations(
+  slave_preparations : Array[(UInt, SlaveStartupPreparation)],
+  logical_base : UInt,
+) -> RunStartupPreparation raise @hal.EcError {
+  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  let startup_outputs : Array[(UInt, Bytes)] = []
+  let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let mut dc_cycle_period_ns : Int64? = None
+  for item in slave_preparations {
+    let (station, preparation) = item
+    slave_mappings.push((preparation.mapping, station))
+    match preparation.startup_outputs {
+      Some(outputs) => startup_outputs.push((station, outputs))
+      None => ()
+    }
+    if preparation.startup_mailbox_commands.length() > 0 {
+      startup_mailbox_plans.push({
+        station,
+        mailbox_config: preparation.mailbox_config,
+        commands: preparation.startup_mailbox_commands,
+      })
+    }
+    dc_cycle_period_ns = prefer_dc_cycle_period(
+      dc_cycle_period_ns,
+      preparation.dc_cycle_period_ns,
+    )
+  }
+  let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  for i = 0; i < startup_outputs.length(); i = i + 1 {
+    let (station, outputs) = startup_outputs[i]
+    pdo_ctx.set_slave_outputs(station, outputs)
+  }
+  {
+    pdo_ctx,
+    expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
+    dc_cycle_period_ns,
+    startup_mailbox_plans,
+  }
+}
+
+///|
 fn decode_le_u32_payload(payload : Bytes) -> UInt? {
   if payload.length() <= 0 {
     return None
@@ -381,7 +458,7 @@ fn[N : @hal.Nic] active_process_data_lengths_in_preop(
   mailbox_config : @mailbox.MailboxConfig,
   timeout : @hal.Duration,
 ) -> (Int?, Int?) raise @hal.EcError {
-  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let rmsm = @mailbox.Rmsm::new()
   let rx_assignments = assigned_pdo_indices(
     nic, station, mailbox_config, rmsm, 0x1C12U, timeout,
   )
@@ -872,7 +949,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(
   timeout : @hal.Duration,
   sink : S,
 ) -> RunReport raise @hal.EcError {
-  run_with_states_and_settings_reporting_to(
+  run_with_states_and_settings_impl(
     nic,
     config,
     expected,
@@ -881,6 +958,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(
     settings,
     @protocol.Op,
     Some(@protocol.Init),
+    None,
     timeout,
     sink,
   )
@@ -969,7 +1047,7 @@ pub fn[N : @hal.Nic] run_with_states_and_settings(
   shutdown_state : @protocol.EsmState?,
   timeout : @hal.Duration,
 ) -> RunReport raise @hal.EcError {
-  run_with_states_and_settings_reporting_to(
+  run_with_states_and_settings_prepared_reporting_to(
     nic,
     config,
     expected,
@@ -978,8 +1056,29 @@ pub fn[N : @hal.Nic] run_with_states_and_settings(
     settings,
     startup_state,
     shutdown_state,
+    None,
     timeout,
     NullRunProgressSink::new(),
+  )
+}
+
+///|
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  startup_preparation_override : RunStartupPreparation?,
+  timeout : @hal.Duration,
+  sink : S,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings_impl(
+    nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
+    startup_preparation_override, timeout, sink,
   )
 }
 
@@ -993,6 +1092,35 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
   settings : RunLoopSettings,
   startup_state : @protocol.EsmState,
   shutdown_state : @protocol.EsmState?,
+  timeout : @hal.Duration,
+  sink : S,
+) -> RunReport raise @hal.EcError {
+  run_with_states_and_settings_prepared_reporting_to(
+    nic,
+    config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    settings,
+    startup_state,
+    shutdown_state,
+    None,
+    timeout,
+    sink,
+  )
+}
+
+///|
+fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
+  nic : N,
+  config : @hal.MasterConfig,
+  expected : Array[@hal.SlaveConfig],
+  pdo_ctx : @protocol.PdoContext,
+  expected_wkc : UInt,
+  settings : RunLoopSettings,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  startup_preparation_override : RunStartupPreparation?,
   timeout : @hal.Duration,
   sink : S,
 ) -> RunReport raise @hal.EcError {
@@ -1045,19 +1173,23 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
           }
         None => ()
       }
-      let refined_preparation = build_run_startup_preparation_from_preop(
-        nic,
-        stations,
-        pdo_ctx.logical_base,
-        timeout,
-      )
-      if refined_preparation.pdo_ctx.logical_size > 0 ||
-        refined_preparation.expected_wkc > 0U ||
-        (active_pdo_ctx.logical_size <= 0 && active_expected_wkc == 0U) {
-        active_pdo_ctx = refined_preparation.pdo_ctx
-        active_expected_wkc = refined_preparation.expected_wkc
+      let resolved_preparation = match startup_preparation_override {
+        Some(prepared) => prepared
+        None =>
+          build_run_startup_preparation_from_preop(
+            nic,
+            stations,
+            pdo_ctx.logical_base,
+            timeout,
+          )
       }
-      active_startup_mailbox_plans = refined_preparation.startup_mailbox_plans
+      if resolved_preparation.pdo_ctx.logical_size > 0 ||
+        resolved_preparation.expected_wkc > 0U ||
+        (active_pdo_ctx.logical_size <= 0 && active_expected_wkc == 0U) {
+        active_pdo_ctx = resolved_preparation.pdo_ctx
+        active_expected_wkc = resolved_preparation.expected_wkc
+      }
+      active_startup_mailbox_plans = resolved_preparation.startup_mailbox_plans
       startup_preop_ready = true
     }
     let startup_fault = transition_stations_for_startup(

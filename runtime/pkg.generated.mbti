@@ -86,6 +86,8 @@ pub fn[N : @hal.Nic] restore_slave_mailbox_state(N, UInt, @protocol.EsmState, @h
 
 pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn run_startup_preparation_from_slave_preparations(Array[(UInt, SlaveStartupPreparation)], UInt) -> RunStartupPreparation raise @hal.EcError
+
 pub fn[N : @hal.Nic] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
@@ -96,6 +98,8 @@ pub fn[N : @hal.Nic] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfi
 
 pub fn[N : @hal.Nic] run_with_states_and_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration, S) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] run_with_states_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
@@ -105,6 +109,10 @@ pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
+
+pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
+
+pub fn startup_preparation_from_esi_offline_report(EsiOfflineSiiReport, UInt) -> SlaveStartupPreparation
 
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
@@ -305,6 +313,7 @@ pub(all) struct EsiJsonDevice {
   physics : String
   device_name : String
   type_name : String
+  profile_no : UInt?
   slot_index_increment : UInt
   slot_pdo_increment : UInt
   mailbox : EsiJsonMailbox
@@ -315,6 +324,7 @@ pub(all) struct EsiJsonDevice {
   config_data : Bytes
   bootstrap : Bytes
   default_modules : Array[EsiJsonSelectedModule]
+  init_commands : Array[EsiJsonInitCommand]
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
 }
@@ -329,6 +339,16 @@ pub(all) struct EsiJsonDocument {
 pub impl Eq for EsiJsonDocument
 pub impl Show for EsiJsonDocument
 pub impl ToJson for EsiJsonDocument
+
+pub(all) struct EsiJsonInitCommand {
+  transition : String
+  index : UInt
+  subindex : Byte
+  data : Bytes
+}
+pub impl Eq for EsiJsonInitCommand
+pub impl Show for EsiJsonInitCommand
+pub impl ToJson for EsiJsonInitCommand
 
 pub(all) struct EsiJsonMailbox {
   data_link_layer : Bool
@@ -414,6 +434,8 @@ pub(all) struct EsiOfflineSiiReport {
   fmmu : Array[@mailbox.FmmuDirection]
   sync_managers : Array[@mailbox.SiiSmEntry]
   dc_clocks : Array[@mailbox.SiiDcClock]
+  profile_no : UInt?
+  startup_mailbox_commands : Array[StartupMailboxCommand]
   tx_pdo : Array[@mailbox.SiiPdo]
   rx_pdo : Array[@mailbox.SiiPdo]
   categories : Array[@mailbox.SiiCategoryEntry]
