@@ -1401,6 +1401,418 @@ test "cli state transition report text includes broadcast mode and wkc" {
 }
 
 ///|
+test "cli startup diff messages capture mailbox and register mismatches" {
+  let offline_mailbox : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x08']),
+    },
+  ]
+  let online_mailbox : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x01']),
+    },
+  ]
+  let offline_expected : ExpectedEscRegisterReport = {
+    station: 0x1001U,
+    sync_managers: [
+      {
+        index: 2,
+        register_offset: 0x0810U,
+        raw_hex: "0x0000000000640001",
+        physical_start: 0x1100U,
+        length: 6U,
+        control: b'\x64',
+        status: b'\x00',
+        activate: b'\x01',
+      },
+    ],
+    fmmus: [
+      {
+        index: 0,
+        register_offset: 0x0600U,
+        raw_hex: "0x00100000060000001100000002010000",
+        logical_start: 0x1000U,
+        length: 6U,
+        logical_start_bit: b'\x00',
+        logical_end_bit: b'\x07',
+        physical_start: 0x1100U,
+        physical_start_bit: b'\x00',
+        type_register: b'\x02',
+        activate: b'\x01',
+      },
+    ],
+  }
+  let online_expected : ExpectedEscRegisterReport = {
+    station: 0x1001U,
+    sync_managers: [
+      { ..offline_expected.sync_managers[0], raw_hex: "0x0000000000260001" },
+    ],
+    fmmus: [
+      {
+        ..offline_expected.fmmus[0],
+        raw_hex: "0x00100000200000001100000002010000",
+      },
+    ],
+  }
+  let actual_esc : EscRegisterReport = {
+    station: 0x1001U,
+    al_state: @protocol.PreOp,
+    al_error_flag: true,
+    al_status_code: Some(30U),
+    sync_managers: [
+      { ..online_expected.sync_managers[0], raw_hex: "0x0000000000220001" },
+    ],
+    fmmus: [
+      {
+        ..online_expected.fmmus[0],
+        raw_hex: "0x00100000160000001100000002010000",
+      },
+    ],
+  }
+  let differences = startup_diff_messages(
+    offline_expected,
+    Some(online_expected),
+    None,
+    Some(actual_esc),
+    None,
+    offline_mailbox,
+    online_mailbox,
+  )
+  assert_eq(differences.length(), 5)
+  assert_true(differences[0].contains("mailbox[0]"))
+  assert_true(differences[1].contains("offline SM2 raw"))
+  assert_true(differences[2].contains("online SM2 raw"))
+  assert_true(differences[3].contains("offline FMMU0 raw"))
+  assert_true(differences[4].contains("online FMMU0 raw"))
+}
+
+///|
+test "cli startup diff report json includes offline online and actual sections" {
+  let report : StartupDiffReport = {
+    station: 0x1001U,
+    offline_expected: { station: 0x1001U, sync_managers: [], fmmus: [] },
+    online_expected: Some({ station: 0x1001U, sync_managers: [], fmmus: [] }),
+    online_expected_error: None,
+    actual_esc: Some({
+      station: 0x1001U,
+      al_state: @protocol.Init,
+      al_error_flag: false,
+      al_status_code: None,
+      sync_managers: [],
+      fmmus: [],
+    }),
+    actual_esc_error: None,
+    offline_mailbox_commands: [
+      {
+        transition: @runtime.SafeOpToOp,
+        index: 0x6060U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x08']),
+      },
+    ],
+    online_mailbox_commands: [],
+    differences: ["offline mailbox command count=1, online=0"],
+  }
+  let text = startup_diff_report_json(report).stringify(indent=2)
+  assert_true(text.contains("\"offline_expected\""))
+  assert_true(text.contains("\"online_expected\""))
+  assert_true(text.contains("\"online_expected_error\""))
+  assert_true(text.contains("\"actual_esc\""))
+  assert_true(text.contains("\"actual_esc_error\""))
+  assert_true(text.contains("\"offline_mailbox_commands\""))
+  assert_true(text.contains("\"differences\""))
+}
+
+///|
+test "cli startup diff messages degrade when online expected is unavailable" {
+  let offline_expected : ExpectedEscRegisterReport = {
+    station: 0x1001U,
+    sync_managers: [],
+    fmmus: [],
+  }
+  let actual_esc : EscRegisterReport = {
+    station: 0x1001U,
+    al_state: @protocol.Init,
+    al_error_flag: false,
+    al_status_code: None,
+    sync_managers: [],
+    fmmus: [],
+  }
+  let differences = startup_diff_messages(
+    offline_expected,
+    None,
+    Some("SiiReadFailed(\"failed to set EEPROM ownership for station 4097\")"),
+    Some(actual_esc),
+    None,
+    [],
+    [],
+  )
+  assert_eq(differences.length(), 1)
+  assert_true(differences[0].contains("online expected unavailable"))
+}
+
+///|
+test "cli startup diff messages degrade when actual esc is unavailable" {
+  let offline_expected : ExpectedEscRegisterReport = {
+    station: 0x1001U,
+    sync_managers: [],
+    fmmus: [],
+  }
+  let differences = startup_diff_messages(
+    offline_expected,
+    None,
+    Some("SiiReadFailed(\"failed to set EEPROM ownership for station 4097\")"),
+    None,
+    Some("EsmStateError(\"unknown ESM state: 0x0\")"),
+    [],
+    [],
+  )
+  assert_eq(differences.length(), 2)
+  assert_true(differences[0].contains("actual esc unavailable"))
+  assert_true(differences[1].contains("online expected unavailable"))
+}
+
+///|
+test "cli mailbox readback report json includes entries and mismatches" {
+  let report : MailboxReadbackReport = {
+    station: 0x1001U,
+    source: "esi-json",
+    entries: [
+      {
+        index: 0,
+        register_offset: 0x0800U,
+        expected: {
+          index: 0,
+          register_offset: 0x0800U,
+          raw_hex: "0x1000260000640001",
+          physical_start: 0x1000U,
+          length: 0x0026U,
+          control: b'\x64',
+          status: b'\x00',
+          activate: b'\x01',
+        },
+        actual: {
+          index: 0,
+          register_offset: 0x0800U,
+          raw_hex: "0x0000000000300201",
+          physical_start: 0x0000U,
+          length: 0x0000U,
+          control: b'\x30',
+          status: b'\x02',
+          activate: b'\x01',
+        },
+        matches: false,
+      },
+    ],
+    mismatches: ["SM0 expected=0x1000260000640001 actual=0x0000000000300201"],
+  }
+  let text = mailbox_readback_report_json(report).stringify(indent=2)
+  assert_true(text.contains("\"station\""))
+  assert_true(text.contains("\"source\""))
+  assert_true(text.contains("\"entries\""))
+  assert_true(text.contains("\"mismatches\""))
+  assert_true(text.contains("0x0000000000300201"))
+}
+
+///|
+test "cli mailbox readback report text highlights mismatch details" {
+  let report : MailboxReadbackReport = {
+    station: 0x1001U,
+    source: "online-sii",
+    entries: [
+      {
+        index: 1,
+        register_offset: 0x0808U,
+        expected: {
+          index: 1,
+          register_offset: 0x0808U,
+          raw_hex: "0x1180260000200001",
+          physical_start: 0x1180U,
+          length: 0x0026U,
+          control: b'\x20',
+          status: b'\x00',
+          activate: b'\x01',
+        },
+        actual: {
+          index: 1,
+          register_offset: 0x0808U,
+          raw_hex: "0x0000000000300201",
+          physical_start: 0x0000U,
+          length: 0x0000U,
+          control: b'\x30',
+          status: b'\x02',
+          activate: b'\x01',
+        },
+        matches: false,
+      },
+    ],
+    mismatches: ["SM1 expected=0x1180260000200001 actual=0x0000000000300201"],
+  }
+  let text = mailbox_readback_report_text(report)
+  assert_true(text.contains("Mailbox SyncManager Readback"))
+  assert_true(text.contains("Source: online-sii"))
+  assert_true(text.contains("SM1 @ "))
+  assert_true(text.contains("0x1180260000200001"))
+  assert_true(text.contains("0x0000000000300201"))
+  assert_true(
+    text.contains("SM1 expected=0x1180260000200001 actual=0x0000000000300201"),
+  )
+}
+
+///|
+test "cli startup trace report json includes phases and transition error" {
+  let report : StartupTraceReport = {
+    station: 0x1001U,
+    source: "esi-json",
+    initial_state: Some(@protocol.Init),
+    final_state: Some(@protocol.PreOp),
+    phases: [
+      {
+        name: "after_mailbox_write",
+        al_state: Some(@protocol.Init),
+        al_error_flag: Some(false),
+        al_status_code: None,
+        sync_managers: [
+          {
+            index: 1,
+            register_offset: 0x0808U,
+            raw_hex: "0x8010800022000100",
+            physical_start: 0x1080U,
+            length: 128U,
+            control: b'\x22',
+            status: b'\x00',
+            activate: b'\x01',
+          },
+        ],
+        fmmus: [],
+        od_objects: [
+          {
+            index: 0x1602U,
+            subindex_count: Some(2U),
+            entries: [
+              {
+                subindex: b'\x00',
+                value_hex: Some("0x02"),
+                value_u32: Some(2U),
+                error_detail: None,
+                abort_code: None,
+              },
+            ],
+            error_detail: None,
+            abort_code: None,
+          },
+        ],
+        notes: [],
+      },
+    ],
+    transition_error: Some("safeop request failed: StartupTransitionFailed"),
+  }
+  let text = startup_trace_report_json(report).stringify(indent=2)
+  assert_true(text.contains("\"phases\""))
+  assert_true(text.contains("\"after_mailbox_write\""))
+  assert_true(text.contains("\"od_objects\""))
+  assert_true(text.contains("\"transition_error\""))
+  assert_true(text.contains("\"final_state\": \"PreOp\""))
+}
+
+///|
+test "cli startup trace report text includes phase snapshots" {
+  let report : StartupTraceReport = {
+    station: 0x1001U,
+    source: "online-sii",
+    initial_state: Some(@protocol.Init),
+    final_state: Some(@protocol.PreOp),
+    phases: [
+      {
+        name: "before_safeop_request",
+        al_state: Some(@protocol.PreOp),
+        al_error_flag: Some(true),
+        al_status_code: Some(0x001EU),
+        sync_managers: [
+          {
+            index: 0,
+            register_offset: 0x0800U,
+            raw_hex: "0x0010800026020100",
+            physical_start: 0x1000U,
+            length: 128U,
+            control: b'\x26',
+            status: b'\x02',
+            activate: b'\x01',
+          },
+          {
+            index: 1,
+            register_offset: 0x0808U,
+            raw_hex: "0x8010800022000100",
+            physical_start: 0x1080U,
+            length: 128U,
+            control: b'\x22',
+            status: b'\x00',
+            activate: b'\x01',
+          },
+        ],
+        fmmus: [
+          {
+            index: 0,
+            register_offset: 0x0600U,
+            raw_hex: "0x00100000060000001100000002010000",
+            logical_start: 0x1000U,
+            length: 6U,
+            logical_start_bit: b'\x00',
+            logical_end_bit: b'\x07',
+            physical_start: 0x1100U,
+            physical_start_bit: b'\x00',
+            type_register: b'\x02',
+            activate: b'\x01',
+          },
+        ],
+        od_objects: [
+          {
+            index: 0x1C12U,
+            subindex_count: Some(1U),
+            entries: [
+              {
+                subindex: b'\x00',
+                value_hex: Some("0x01"),
+                value_u32: Some(1U),
+                error_detail: None,
+                abort_code: None,
+              },
+              {
+                subindex: b'\x01',
+                value_hex: Some("0x0216"),
+                value_u32: Some(0x1602U),
+                error_detail: None,
+                abort_code: None,
+              },
+            ],
+            error_detail: None,
+            abort_code: None,
+          },
+        ],
+        notes: ["sync manager snapshot unavailable: test"],
+      },
+    ],
+    transition_error: Some("safeop request failed: AL status code 30"),
+  }
+  let text = startup_trace_report_text(report)
+  assert_true(text.contains("Startup Trace"))
+  assert_true(text.contains("Source: online-sii"))
+  assert_true(text.contains("before_safeop_request"))
+  assert_true(text.contains("001E"))
+  assert_true(text.contains("0x8010800022000100"))
+  assert_true(text.contains("0x00100000060000001100000002010000"))
+  assert_true(text.contains("OD 0x1C12 subindex_count=1"))
+  assert_true(text.contains("sub 1: 0x0216"))
+  assert_true(text.contains("safeop request failed: AL status code 30"))
+}
+
+///|
 test "cli run report json includes shared surface telemetry" {
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },

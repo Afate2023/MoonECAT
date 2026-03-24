@@ -8,6 +8,10 @@ import {
 }
 
 // Values
+pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
@@ -643,6 +647,7 @@ pub(all) struct SlaveStartupPreparation {
 }
 
 pub(all) enum StartupCommandTransition {
+  PreOpToSafeOp
   SafeOpToOp
 }
 pub impl Eq for StartupCommandTransition

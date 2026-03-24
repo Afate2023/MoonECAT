@@ -1732,6 +1732,29 @@ test "mailbox_poll via mock loopback" {
 }
 
 ///|
+test "mailbox_poll reports deactivated mailbox sync manager" {
+  let nic = RepeatMailboxMockNic::new()
+  nic.deactivated_mailbox = true
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 64U,
+    in_sm_index: 1,
+  }
+  let result = try? @protocol.mailbox_poll(nic, 0x1001U, cfg, timeout)
+  match result {
+    Err(@hal.EcError::MailboxProtocol(message)) => {
+      assert_true(message.contains("deactivated/reset"))
+      assert_true(message.contains("control=0x102"))
+    }
+    _ => fail("expected MailboxProtocol for deactivated mailbox sync manager")
+  }
+}
+
+///|
 test "mailbox_send via mock loopback" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
@@ -1797,6 +1820,7 @@ pub struct RepeatMailboxMockNic {
   mut next_response : Bytes
   mut is_open : Bool
   mut repeat_triggered : Bool
+  mut deactivated_mailbox : Bool
   mut last_command : Byte
   mut last_offset : UInt
 }
@@ -1807,6 +1831,7 @@ fn RepeatMailboxMockNic::new() -> RepeatMailboxMockNic {
     next_response: Bytes::new(0),
     is_open: true,
     repeat_triggered: false,
+    deactivated_mailbox: false,
     last_command: b'\xFF',
     last_offset: 0U,
   }
@@ -1901,17 +1926,31 @@ pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
   self.next_response = match pdu.header.command {
     @protocol.FPRD => {
       let response_data = if self.last_offset == sm1_base_addr {
-        let status = if self.repeat_triggered { b'\x08' } else { b'\x00' }
-        let repeat_ack = if self.repeat_triggered { b'\x02' } else { b'\x00' }
-        Bytes::makei(8, fn(i) {
-          if i == 5 {
-            status
-          } else if i == 7 {
-            repeat_ack
-          } else {
-            b'\x00'
-          }
-        })
+        if self.deactivated_mailbox {
+          Bytes::makei(8, fn(i) {
+            if i == 5 {
+              b'\x30'
+            } else if i == 6 {
+              b'\x02'
+            } else if i == 7 {
+              b'\x01'
+            } else {
+              b'\x00'
+            }
+          })
+        } else {
+          let status = if self.repeat_triggered { b'\x08' } else { b'\x00' }
+          let repeat_ack = if self.repeat_triggered { b'\x02' } else { b'\x00' }
+          Bytes::makei(8, fn(i) {
+            if i == 5 {
+              status
+            } else if i == 7 {
+              repeat_ack
+            } else {
+              b'\x00'
+            }
+          })
+        }
       } else if self.last_offset == 0x1080U {
         build_ap_mailbox_sdo_upload_response(
           0x1001U,

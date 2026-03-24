@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs.
+/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -119,6 +119,54 @@ fn cli_main() -> Unit raise @hal.EcError {
           resolve_native_cli_config(args, backend, timeout),
         )
         run_expected_register_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "startup-diff" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported(
+          "startup-diff requires a native backend",
+        )
+      _ => {
+        let nic = @native.NativeNic::open_with_config(
+          resolve_native_cli_config(args, backend, timeout),
+        )
+        run_startup_diff_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "mailbox-readback" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported(
+          "mailbox-readback requires a native backend",
+        )
+      _ => {
+        let nic = @native.NativeNic::open_with_config(
+          resolve_native_cli_config(args, backend, timeout),
+        )
+        run_mailbox_readback_command(nic, args, as_json, timeout)
+      }
+    }
+    return
+  }
+
+  if command == "startup-trace" {
+    match backend {
+      Mock =>
+        raise @hal.EcError::NotSupported(
+          "startup-trace requires a native backend",
+        )
+      _ => {
+        let nic = @native.NativeNic::open_with_config(
+          resolve_native_cli_config(args, backend, timeout),
+        )
+        run_startup_trace_command(nic, args, as_json, timeout)
       }
     }
     return
@@ -475,7 +523,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -530,6 +578,18 @@ fn print_usage() -> Unit {
   )
   println(
     "  moon run cmd/main expected-regs -- --backend native --if <interface> --station 4097 --json",
+  )
+  println(
+    "  moon run cmd/main startup-diff -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --json",
+  )
+  println(
+    "  moon run cmd/main mailbox-readback -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --json",
+  )
+  println(
+    "  moon run cmd/main startup-trace -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --json",
+  )
+  println(
+    "  moon run cmd/main startup-trace -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --reset-init --json",
   )
 }
 
@@ -589,6 +649,57 @@ fn[N : @hal.Nic] run_expected_register_command(
     println(expected_esc_register_report_json(report).stringify(indent=2))
   } else {
     println(expected_esc_register_report_text(report))
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_startup_diff_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let station = require_station_flag(args)
+  let report = build_startup_diff_report(nic, args, station, timeout)
+  nic.close()
+  if as_json {
+    println(startup_diff_report_json(report).stringify(indent=2))
+  } else {
+    println(startup_diff_report_text(report))
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_mailbox_readback_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let station = require_station_flag(args)
+  let report = build_mailbox_readback_report(nic, args, station, timeout)
+  nic.close()
+  if as_json {
+    println(mailbox_readback_report_json(report).stringify(indent=2))
+  } else {
+    println(mailbox_readback_report_text(report))
+  }
+}
+
+///|
+fn[N : @hal.Nic] run_startup_trace_command(
+  nic : N,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let station = require_station_flag(args)
+  let report = build_startup_trace_report(nic, args, station, timeout)
+  nic.close()
+  if as_json {
+    println(startup_trace_report_json(report).stringify(indent=2))
+  } else {
+    println(startup_trace_report_text(report))
   }
 }
 
@@ -793,6 +904,13 @@ fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
   if preop_state == @protocol.SafeOp || preop_state == @protocol.Op {
     return preop_state
   }
+  @runtime.apply_presafeop_startup_mailbox_commands(
+    nic,
+    station,
+    preparation.mailbox_config,
+    preparation.startup_mailbox_commands,
+    timeout,
+  )
   let refined_preparation = @runtime.refine_startup_preparation_in_preop(
     nic, station, pdo_logical_base, preparation, timeout,
   )
@@ -1682,6 +1800,76 @@ struct ExpectedEscRegisterReport {
 }
 
 ///|
+struct StartupDiffReport {
+  station : UInt
+  offline_expected : ExpectedEscRegisterReport
+  online_expected : ExpectedEscRegisterReport?
+  online_expected_error : String?
+  actual_esc : EscRegisterReport?
+  actual_esc_error : String?
+  offline_mailbox_commands : Array[@runtime.StartupMailboxCommand]
+  online_mailbox_commands : Array[@runtime.StartupMailboxCommand]
+  differences : Array[String]
+}
+
+///|
+struct MailboxReadbackEntry {
+  index : Int
+  register_offset : UInt
+  expected : EscSyncManagerRegisterReport
+  actual : EscSyncManagerRegisterReport
+  matches : Bool
+}
+
+///|
+struct MailboxReadbackReport {
+  station : UInt
+  source : String
+  entries : Array[MailboxReadbackEntry]
+  mismatches : Array[String]
+}
+
+///|
+struct StartupTraceOdEntry {
+  subindex : Byte
+  value_hex : String?
+  value_u32 : UInt?
+  error_detail : String?
+  abort_code : UInt?
+}
+
+///|
+struct StartupTraceOdObject {
+  index : UInt
+  subindex_count : UInt?
+  entries : Array[StartupTraceOdEntry]
+  error_detail : String?
+  abort_code : UInt?
+}
+
+///|
+struct StartupTracePhase {
+  name : String
+  al_state : @protocol.EsmState?
+  al_error_flag : Bool?
+  al_status_code : UInt?
+  sync_managers : Array[EscSyncManagerRegisterReport]
+  fmmus : Array[EscFmmuRegisterReport]
+  od_objects : Array[StartupTraceOdObject]
+  notes : Array[String]
+}
+
+///|
+struct StartupTraceReport {
+  station : UInt
+  source : String
+  initial_state : @protocol.EsmState?
+  final_state : @protocol.EsmState?
+  phases : Array[StartupTracePhase]
+  transition_error : String?
+}
+
+///|
 fn[N : @hal.Nic] read_esc_register_report(
   nic : N,
   station : UInt,
@@ -1730,10 +1918,722 @@ fn[N : @hal.Nic] build_expected_esc_register_report(
   let refined = @runtime.refine_startup_preparation_in_preop(
     nic, station, pdo_logical_base, initial, timeout,
   )
+  build_expected_esc_register_report_from_mapping(station, refined.mapping)
+}
+
+///|
+fn build_expected_esc_register_report_from_mapping(
+  station : UInt,
+  mapping : @mailbox.SlaveMapping,
+) -> ExpectedEscRegisterReport raise @hal.EcError {
   {
     station,
-    sync_managers: expected_sync_manager_register_reports(refined.mapping),
-    fmmus: expected_fmmu_register_reports(refined.mapping),
+    sync_managers: expected_sync_manager_register_reports(mapping),
+    fmmus: expected_fmmu_register_reports(mapping),
+  }
+}
+
+///|
+fn require_esi_json_startup_preparation(
+  args : Array[String],
+  logical_base : UInt,
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
+  match optional_esi_json_startup_preparation(args, logical_base) {
+    Some(preparation) => preparation
+    None =>
+      raise @hal.EcError::ConfigMismatch(
+        "startup-diff requires --esi-json <path>",
+      )
+  }
+}
+
+///|
+fn[N : @hal.Nic] build_startup_diff_report(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  timeout : @hal.Duration,
+) -> StartupDiffReport raise @hal.EcError {
+  let offline = require_esi_json_startup_preparation(args, pdo_logical_base)
+  let offline_expected = build_expected_esc_register_report_from_mapping(
+    station,
+    offline.mapping,
+  )
+  let actual_esc_result : Result[EscRegisterReport, @hal.EcError] = try? read_esc_register_report(
+    nic, station, timeout,
+  )
+  let actual_esc = match actual_esc_result {
+    Ok(report) => Some(report)
+    Err(_) => None
+  }
+  let actual_esc_error = match actual_esc_result {
+    Ok(_) => None
+    Err(err) => Some(err.to_string())
+  }
+  let online_refined_result : Result[
+    @runtime.SlaveStartupPreparation,
+    @hal.EcError,
+  ] = try? ({
+    let online_initial = prepare_station_startup(
+      nic, station, pdo_logical_base, timeout,
+    )
+    @runtime.refine_startup_preparation_in_preop(
+      nic, station, pdo_logical_base, online_initial, timeout,
+    )
+  })
+  let online_expected = match online_refined_result {
+    Ok(preparation) =>
+      Some(
+        build_expected_esc_register_report_from_mapping(
+          station,
+          preparation.mapping,
+        ),
+      )
+    Err(_) => None
+  }
+  let online_expected_error = match online_refined_result {
+    Ok(_) => None
+    Err(err) => Some(err.to_string())
+  }
+  let online_mailbox_commands = match online_refined_result {
+    Ok(preparation) => preparation.startup_mailbox_commands
+    Err(_) => []
+  }
+  {
+    station,
+    offline_expected,
+    online_expected,
+    online_expected_error,
+    actual_esc,
+    actual_esc_error,
+    offline_mailbox_commands: offline.startup_mailbox_commands,
+    online_mailbox_commands,
+    differences: startup_diff_messages(
+      offline_expected,
+      online_expected,
+      online_expected_error,
+      actual_esc,
+      actual_esc_error,
+      offline.startup_mailbox_commands,
+      online_mailbox_commands,
+    ),
+  }
+}
+
+///|
+fn mailbox_readback_source(args : Array[String]) -> String {
+  match flag_value(args, "--esi-json") {
+    Some(_) => "esi-json"
+    None => "online-sii"
+  }
+}
+
+///|
+fn mailbox_sm_window_matches(expected : Bytes, actual : Bytes) -> Bool {
+  if expected.length() < @protocol.sm_entry_size ||
+    actual.length() < @protocol.sm_entry_size {
+    return false
+  }
+  expected[0] == actual[0] &&
+  expected[1] == actual[1] &&
+  expected[2] == actual[2] &&
+  expected[3] == actual[3] &&
+  expected[4] == actual[4] &&
+  expected[6] == actual[6]
+}
+
+///|
+fn build_mailbox_readback_mismatch(entry : MailboxReadbackEntry) -> String {
+  "SM" +
+  entry.index.to_string() +
+  " expected=" +
+  entry.expected.raw_hex +
+  " actual=" +
+  entry.actual.raw_hex
+}
+
+///|
+fn[N : @hal.Nic] build_mailbox_readback_report(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  timeout : @hal.Duration,
+) -> MailboxReadbackReport raise @hal.EcError {
+  let preparation = prepare_station_startup_from_args(
+    nic, args, station, pdo_logical_base, timeout,
+  )
+  let entries : Array[MailboxReadbackEntry] = []
+  let mismatches : Array[String] = []
+  for i = 0; i < preparation.mapping.sm_configs.length(); i = i + 1 {
+    let sm = preparation.mapping.sm_configs[i]
+    match sm.sm_type {
+      @mailbox.MailboxOut | @mailbox.MailboxIn => {
+        let register_offset = @protocol.reg_sm_base +
+          i.reinterpret_as_uint() *
+          @protocol.sm_entry_size.reinterpret_as_uint()
+        let expected_window = sm.to_bytes()
+        ignore(
+          @protocol.write_register_fp(
+            nic, station, register_offset, expected_window, timeout,
+          ),
+        )
+        let actual_window = @protocol.read_register_fp(
+            nic, station, register_offset, @protocol.sm_entry_size, timeout,
+          ).data
+        let entry = {
+          index: i,
+          register_offset,
+          expected: decode_esc_sync_manager_window(
+            i, register_offset, expected_window,
+          ),
+          actual: decode_esc_sync_manager_window(
+            i, register_offset, actual_window,
+          ),
+          matches: mailbox_sm_window_matches(expected_window, actual_window),
+        }
+        if not(entry.matches) {
+          mismatches.push(build_mailbox_readback_mismatch(entry))
+        }
+        entries.push(entry)
+      }
+      _ => ()
+    }
+  }
+  { station, source: mailbox_readback_source(args), entries, mismatches }
+}
+
+///|
+fn[N : @hal.Nic] read_sync_manager_reports(
+  nic : N,
+  station : UInt,
+  start_index : Int,
+  end_index : Int,
+  timeout : @hal.Duration,
+) -> Array[EscSyncManagerRegisterReport] raise @hal.EcError {
+  let reports : Array[EscSyncManagerRegisterReport] = []
+  for index = start_index; index <= end_index; index = index + 1 {
+    let register_offset = @protocol.reg_sm_base +
+      index.reinterpret_as_uint() *
+      @protocol.sm_entry_size.reinterpret_as_uint()
+    let window = @protocol.read_register_fp(
+        nic, station, register_offset, @protocol.sm_entry_size, timeout,
+      ).data
+    reports.push(decode_esc_sync_manager_window(index, register_offset, window))
+  }
+  reports
+}
+
+///|
+fn[N : @hal.Nic] read_fmmu_reports(
+  nic : N,
+  station : UInt,
+  start_index : Int,
+  end_index : Int,
+  timeout : @hal.Duration,
+) -> Array[EscFmmuRegisterReport] raise @hal.EcError {
+  let reports : Array[EscFmmuRegisterReport] = []
+  for index = start_index; index <= end_index; index = index + 1 {
+    let register_offset = @protocol.reg_fmmu_base +
+      index.reinterpret_as_uint() *
+      @protocol.fmmu_entry_size.reinterpret_as_uint()
+    let window = @protocol.read_register_fp(
+        nic, station, register_offset, @protocol.fmmu_entry_size, timeout,
+      ).data
+    reports.push(decode_esc_fmmu_window(index, register_offset, window))
+  }
+  reports
+}
+
+///|
+fn[N : @hal.Nic] capture_startup_trace_phase(
+  nic : N,
+  station : UInt,
+  name : String,
+  timeout : @hal.Duration,
+) -> StartupTracePhase {
+  let al_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = try? @protocol.read_al_status_snapshot(
+    nic, station, timeout,
+  )
+  let sm_result : Result[Array[EscSyncManagerRegisterReport], @hal.EcError] = try? read_sync_manager_reports(
+    nic, station, 0, 3, timeout,
+  )
+  let fmmu_result : Result[Array[EscFmmuRegisterReport], @hal.EcError] = try? read_fmmu_reports(
+    nic, station, 0, 1, timeout,
+  )
+  let notes : Array[String] = []
+  let (al_state, al_error_flag, al_status_code) = match al_result {
+    Ok(snapshot) =>
+      (
+        Some(snapshot.state),
+        Some(snapshot.error_indication),
+        snapshot.status_code,
+      )
+    Err(err) => {
+      notes.push("al snapshot unavailable: " + err.to_string())
+      (None, None, None)
+    }
+  }
+  let sync_managers = match sm_result {
+    Ok(value) => value
+    Err(err) => {
+      notes.push("sync manager snapshot unavailable: " + err.to_string())
+      []
+    }
+  }
+  let fmmus = match fmmu_result {
+    Ok(value) => value
+    Err(err) => {
+      notes.push("fmmu snapshot unavailable: " + err.to_string())
+      []
+    }
+  }
+  {
+    name,
+    al_state,
+    al_error_flag,
+    al_status_code,
+    sync_managers,
+    fmmus,
+    od_objects: [],
+    notes,
+  }
+}
+
+///|
+fn startup_trace_phase_with_notes(
+  phase : StartupTracePhase,
+  extra_notes : Array[String],
+) -> StartupTracePhase {
+  if extra_notes.is_empty() {
+    return phase
+  }
+  let notes = phase.notes
+  for note in extra_notes {
+    notes.push(note)
+  }
+  { ..phase, notes, }
+}
+
+///|
+fn startup_trace_od_indices() -> Array[UInt] {
+  [0x1602U, 0x1A02U, 0x1C12U, 0x1C13U]
+}
+
+///|
+fn startup_trace_od_entry_failure(
+  subindex : Byte,
+  err : @hal.EcError,
+) -> StartupTraceOdEntry {
+  {
+    subindex,
+    value_hex: None,
+    value_u32: None,
+    error_detail: Some(err.to_string()),
+    abort_code: match err {
+      @hal.EcError::SdoAbort(code) => Some(code)
+      _ => None
+    },
+  }
+}
+
+///|
+fn startup_trace_od_entry_success(
+  subindex : Byte,
+  payload : Bytes,
+) -> StartupTraceOdEntry {
+  {
+    subindex,
+    value_hex: Some(bytes_hex(payload)),
+    value_u32: decode_payload_u32_le(payload),
+    error_detail: None,
+    abort_code: None,
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_startup_trace_od_object(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  index : UInt,
+  timeout : @hal.Duration,
+) -> StartupTraceOdObject {
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let count_result : Result[Bytes, @hal.EcError] = try? @protocol.sdo_upload_retry(
+    nic, station, mailbox_config, rmsm, index, b'\x00', timeout,
+  )
+  match count_result {
+    Err(err) =>
+      {
+        index,
+        subindex_count: None,
+        entries: [startup_trace_od_entry_failure(b'\x00', err)],
+        error_detail: Some(err.to_string()),
+        abort_code: match err {
+          @hal.EcError::SdoAbort(code) => Some(code)
+          _ => None
+        },
+      }
+    Ok(payload) => {
+      let entries : Array[StartupTraceOdEntry] = [
+        startup_trace_od_entry_success(b'\x00', payload),
+      ]
+      let subindex_count = decode_payload_u32_le(payload)
+      match subindex_count {
+        Some(count) =>
+          for i = 1; i <= count.reinterpret_as_int(); i = i + 1 {
+            let subindex = i.to_byte()
+            let entry_result : Result[Bytes, @hal.EcError] = try? @protocol.sdo_upload_retry(
+              nic, station, mailbox_config, rmsm, index, subindex, timeout,
+            )
+            match entry_result {
+              Ok(entry_payload) =>
+                entries.push(
+                  startup_trace_od_entry_success(subindex, entry_payload),
+                )
+              Err(err) =>
+                entries.push(startup_trace_od_entry_failure(subindex, err))
+            }
+          }
+        None => ()
+      }
+      { index, subindex_count, entries, error_detail: None, abort_code: None }
+    }
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_startup_trace_od_objects(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Array[StartupTraceOdObject] {
+  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
+    nic, timeout,
+  )
+  let target_slave = match scan_result {
+    Ok(scan_report) =>
+      Some(resolve_cli_slave(scan_report, Some(station))) catch {
+        _ => None
+      }
+    Err(_) => None
+  }
+  let objects : Array[StartupTraceOdObject] = []
+  guard target_slave is Some(slave) else {
+    let err = @hal.EcError::ConfigMismatch(
+      "startup-trace od snapshot station not found in current scan: " +
+      station.to_string(),
+    )
+    for index in startup_trace_od_indices() {
+      objects.push({
+        index,
+        subindex_count: None,
+        entries: [startup_trace_od_entry_failure(b'\x00', err)],
+        error_detail: Some(err.to_string()),
+        abort_code: None,
+      })
+    }
+    return objects
+  }
+  let mailbox_session_result : Result[@runtime.MailboxSession, @hal.EcError] = try? @runtime.prepare_slave_mailbox_ap(
+    nic,
+    slave.position.reinterpret_as_uint(),
+    station,
+    timeout,
+  )
+  match mailbox_session_result {
+    Err(err) =>
+      for index in startup_trace_od_indices() {
+        objects.push({
+          index,
+          subindex_count: None,
+          entries: [startup_trace_od_entry_failure(b'\x00', err)],
+          error_detail: Some(err.to_string()),
+          abort_code: None,
+        })
+      }
+    Ok(mailbox_session) => {
+      for index in startup_trace_od_indices() {
+        objects.push(
+          read_startup_trace_od_object(
+            nic,
+            station,
+            mailbox_session.mailbox_config,
+            index,
+            timeout,
+          ),
+        )
+      }
+      if mailbox_session.original_state != @protocol.PreOp {
+        ignore(
+          try? @runtime.restore_slave_mailbox_state(
+            nic,
+            station,
+            mailbox_session.original_state,
+            timeout,
+          ),
+        )
+      }
+    }
+  }
+  objects
+}
+
+///|
+fn[N : @hal.Nic] startup_trace_phase_with_od(
+  nic : N,
+  station : UInt,
+  name : String,
+  timeout : @hal.Duration,
+) -> StartupTracePhase {
+  {
+    ..capture_startup_trace_phase(nic, station, name, timeout),
+    od_objects: read_startup_trace_od_objects(nic, station, timeout),
+  }
+}
+
+///|
+fn join_strings(items : Array[String], separator : String) -> String {
+  let mut out = ""
+  for i = 0; i < items.length(); i = i + 1 {
+    if i > 0 {
+      out = out + separator
+    }
+    out = out + items[i]
+  }
+  out
+}
+
+///|
+fn[N : @hal.Nic] startup_trace_reset_notes(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Array[String] {
+  let notes : Array[String] = []
+  let recover_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = try? @protocol.recover_al_error_for_transition(
+    nic, station, timeout,
+  )
+  match recover_result {
+    Ok(snapshot) =>
+      notes.push(
+        "recover-al-error state=" +
+        snapshot.state.to_string() +
+        " error=" +
+        snapshot.error_indication.to_string(),
+      )
+    Err(err) => notes.push("recover-al-error failed: " + err.to_string())
+  }
+  let request_init_result : Result[@protocol.EsmState, @hal.EcError] = try? @protocol.request_state(
+    nic,
+    station,
+    @protocol.Init,
+    timeout,
+  )
+  match request_init_result {
+    Ok(state) => notes.push("request-init confirmed=" + state.to_string())
+    Err(err) => {
+      notes.push("request-init failed: " + err.to_string())
+      let broadcast_result : Result[UInt, @hal.EcError] = try? @protocol.broadcast_state(
+        nic,
+        @protocol.Init,
+        timeout,
+      )
+      match broadcast_result {
+        Ok(wkc) => notes.push("broadcast-init wkc=" + wkc.to_string())
+        Err(broadcast_err) =>
+          notes.push("broadcast-init failed: " + broadcast_err.to_string())
+      }
+    }
+  }
+  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
+    nic, timeout,
+  )
+  match scan_result {
+    Ok(report) => {
+      let stations = report.slaves.map(fn(slave) {
+        slave.station_address.to_string()
+      })
+      notes.push(
+        "scan slave_count=" +
+        report.slave_count.to_string() +
+        " stations=[" +
+        join_strings(stations, ",") +
+        "]",
+      )
+    }
+    Err(err) => notes.push("scan failed: " + err.to_string())
+  }
+  notes
+}
+
+///|
+fn[N : @hal.Nic] build_startup_trace_report(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  timeout : @hal.Duration,
+) -> StartupTraceReport raise @hal.EcError {
+  let source = mailbox_readback_source(args)
+  let preparation = prepare_station_startup_from_args(
+    nic, args, station, pdo_logical_base, timeout,
+  )
+  let phases : Array[StartupTracePhase] = []
+  phases.push(capture_startup_trace_phase(nic, station, "initial", timeout))
+  if has_flag(args, "--reset-init") {
+    let reset_notes = startup_trace_reset_notes(nic, station, timeout)
+    phases.push(
+      startup_trace_phase_with_notes(
+        capture_startup_trace_phase(nic, station, "after_reset_init", timeout),
+        reset_notes,
+      ),
+    )
+  }
+  let initial_state = phases[0].al_state
+  let mut phase_state = phases[phases.length() - 1].al_state
+  let mut transition_error : String? = None
+  let needs_mailbox_path = match phase_state {
+    Some(@protocol.PreOp) | Some(@protocol.SafeOp) | Some(@protocol.Op) => false
+    _ => true
+  }
+  if needs_mailbox_path {
+    let mailbox_write_result : Result[Unit, @hal.EcError] = try? @runtime.write_mailbox_mapping(
+      nic,
+      station,
+      preparation.mapping,
+      timeout,
+    )
+    phases.push(
+      capture_startup_trace_phase(nic, station, "after_mailbox_write", timeout),
+    )
+    match mailbox_write_result {
+      Ok(_) => ()
+      Err(err) => {
+        transition_error = Some("mailbox write failed: " + err.to_string())
+        return {
+          station,
+          source,
+          initial_state,
+          final_state: phases[phases.length() - 1].al_state,
+          phases,
+          transition_error,
+        }
+      }
+    }
+    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? transition_station_to_target_strict_after_recovery(
+      nic,
+      station,
+      @protocol.PreOp,
+      timeout,
+    )
+    phases.push(
+      startup_trace_phase_with_od(nic, station, "after_preop_request", timeout),
+    )
+    match preop_result {
+      Ok(value) => phase_state = Some(value)
+      Err(err) => {
+        transition_error = Some("preop request failed: " + err.to_string())
+        return {
+          station,
+          source,
+          initial_state,
+          final_state: phases[phases.length() - 1].al_state,
+          phases,
+          transition_error,
+        }
+      }
+    }
+  }
+  let needs_process_path = match phase_state {
+    Some(@protocol.SafeOp) | Some(@protocol.Op) => false
+    _ => true
+  }
+  if needs_process_path {
+    let presafeop_mailbox_result : Result[Unit, @hal.EcError] = try? @runtime.apply_presafeop_startup_mailbox_commands(
+      nic,
+      station,
+      preparation.mailbox_config,
+      preparation.startup_mailbox_commands,
+      timeout,
+    )
+    phases.push(
+      startup_trace_phase_with_od(
+        nic, station, "after_presafeop_mailbox_commands", timeout,
+      ),
+    )
+    match presafeop_mailbox_result {
+      Ok(_) => ()
+      Err(err) => {
+        transition_error = Some(
+          "presafeop mailbox commands failed: " + err.to_string(),
+        )
+        return {
+          station,
+          source,
+          initial_state,
+          final_state: phases[phases.length() - 1].al_state,
+          phases,
+          transition_error,
+        }
+      }
+    }
+    let refined = @runtime.refine_startup_preparation_in_preop(
+      nic, station, pdo_logical_base, preparation, timeout,
+    )
+    let process_result : Result[Unit, @hal.EcError] = try? @runtime.write_process_data_mapping(
+      nic,
+      station,
+      refined.mapping,
+      timeout,
+    )
+    phases.push(
+      startup_trace_phase_with_od(
+        nic, station, "after_process_mapping_write", timeout,
+      ),
+    )
+    match process_result {
+      Ok(_) => ()
+      Err(err) => {
+        transition_error = Some(
+          "process mapping write failed: " + err.to_string(),
+        )
+        return {
+          station,
+          source,
+          initial_state,
+          final_state: phases[phases.length() - 1].al_state,
+          phases,
+          transition_error,
+        }
+      }
+    }
+    phases.push(
+      startup_trace_phase_with_od(
+        nic, station, "before_safeop_request", timeout,
+      ),
+    )
+    let safeop_result : Result[@protocol.EsmState, @hal.EcError] = try? transition_station_to_target_strict_after_recovery(
+      nic,
+      station,
+      @protocol.SafeOp,
+      timeout,
+    )
+    phases.push(
+      startup_trace_phase_with_od(nic, station, "after_safeop_request", timeout),
+    )
+    match safeop_result {
+      Ok(value) => phase_state = Some(value)
+      Err(err) =>
+        transition_error = Some("safeop request failed: " + err.to_string())
+    }
+  }
+  {
+    station,
+    source,
+    initial_state,
+    final_state: phases[phases.length() - 1].al_state,
+    phases,
+    transition_error,
   }
 }
 
@@ -2114,6 +3014,650 @@ fn expected_esc_register_report_text(
     )
   }
   buf.to_string()
+}
+
+///|
+fn startup_mailbox_command_json(
+  command : @runtime.StartupMailboxCommand,
+) -> Json {
+  Json::object({
+    "transition": Json::string(command.transition.to_string()),
+    "index": Json::number(command.index.to_double()),
+    "subindex": Json::number(command.subindex.to_uint().to_double()),
+    "data_hex": Json::string(bytes_hex(command.data)),
+  })
+}
+
+///|
+fn mailbox_readback_entry_json(entry : MailboxReadbackEntry) -> Json {
+  Json::object({
+    "index": Json::number(entry.index.to_double()),
+    "register_offset": Json::number(entry.register_offset.to_double()),
+    "expected": Json::object({
+      "index": Json::number(entry.expected.index.to_double()),
+      "register_offset": Json::number(
+        entry.expected.register_offset.to_double(),
+      ),
+      "raw_hex": Json::string(entry.expected.raw_hex),
+      "physical_start": Json::number(entry.expected.physical_start.to_double()),
+      "length": Json::number(entry.expected.length.to_double()),
+      "control": Json::number(entry.expected.control.to_uint().to_double()),
+      "status": Json::number(entry.expected.status.to_uint().to_double()),
+      "activate": Json::number(entry.expected.activate.to_uint().to_double()),
+      "enabled": Json::boolean((entry.expected.activate & b'\x01') != b'\x00'),
+    }),
+    "actual": Json::object({
+      "index": Json::number(entry.actual.index.to_double()),
+      "register_offset": Json::number(entry.actual.register_offset.to_double()),
+      "raw_hex": Json::string(entry.actual.raw_hex),
+      "physical_start": Json::number(entry.actual.physical_start.to_double()),
+      "length": Json::number(entry.actual.length.to_double()),
+      "control": Json::number(entry.actual.control.to_uint().to_double()),
+      "status": Json::number(entry.actual.status.to_uint().to_double()),
+      "activate": Json::number(entry.actual.activate.to_uint().to_double()),
+      "enabled": Json::boolean((entry.actual.activate & b'\x01') != b'\x00'),
+    }),
+    "matches": Json::boolean(entry.matches),
+  })
+}
+
+///|
+fn mailbox_readback_report_json(report : MailboxReadbackReport) -> Json {
+  Json::object({
+    "station": Json::number(report.station.to_double()),
+    "source": Json::string(report.source),
+    "entries": Json::array(report.entries.map(mailbox_readback_entry_json)),
+    "mismatches": Json::array(report.mismatches.map(item => Json::string(item))),
+  })
+}
+
+///|
+fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
+  Json::object({
+    "name": Json::string(phase.name),
+    "al_state": option_esm_state_json(phase.al_state),
+    "al_error_flag": option_bool_json(phase.al_error_flag),
+    "al_status_code": option_uint_json(phase.al_status_code),
+    "sync_managers": Json::array(
+      phase.sync_managers.map(fn(sm) {
+        Json::object({
+          "index": Json::number(sm.index.to_double()),
+          "register_offset": Json::number(sm.register_offset.to_double()),
+          "raw_hex": Json::string(sm.raw_hex),
+          "physical_start": Json::number(sm.physical_start.to_double()),
+          "length": Json::number(sm.length.to_double()),
+          "control": Json::number(sm.control.to_uint().to_double()),
+          "status": Json::number(sm.status.to_uint().to_double()),
+          "activate": Json::number(sm.activate.to_uint().to_double()),
+          "enabled": Json::boolean((sm.activate & b'\x01') != b'\x00'),
+        })
+      }),
+    ),
+    "fmmus": Json::array(
+      phase.fmmus.map(fn(fmmu) {
+        Json::object({
+          "index": Json::number(fmmu.index.to_double()),
+          "register_offset": Json::number(fmmu.register_offset.to_double()),
+          "raw_hex": Json::string(fmmu.raw_hex),
+          "logical_start": Json::number(fmmu.logical_start.to_double()),
+          "length": Json::number(fmmu.length.to_double()),
+          "logical_start_bit": Json::number(
+            fmmu.logical_start_bit.to_uint().to_double(),
+          ),
+          "logical_end_bit": Json::number(
+            fmmu.logical_end_bit.to_uint().to_double(),
+          ),
+          "physical_start": Json::number(fmmu.physical_start.to_double()),
+          "physical_start_bit": Json::number(
+            fmmu.physical_start_bit.to_uint().to_double(),
+          ),
+          "type_register": Json::number(
+            fmmu.type_register.to_uint().to_double(),
+          ),
+          "activate": Json::number(fmmu.activate.to_uint().to_double()),
+          "enabled": Json::boolean((fmmu.activate & b'\x01') != b'\x00'),
+        })
+      }),
+    ),
+    "od_objects": Json::array(
+      phase.od_objects.map(fn(obj) {
+        Json::object({
+          "index": Json::number(obj.index.to_double()),
+          "subindex_count": option_uint_json(obj.subindex_count),
+          "entries": Json::array(
+            obj.entries.map(fn(entry) {
+              Json::object({
+                "subindex": Json::number(entry.subindex.to_uint().to_double()),
+                "value_hex": option_string_json(entry.value_hex),
+                "value_u32": option_uint_json(entry.value_u32),
+                "error_detail": option_string_json(entry.error_detail),
+                "abort_code": option_uint_json(entry.abort_code),
+              })
+            }),
+          ),
+          "error_detail": option_string_json(obj.error_detail),
+          "abort_code": option_uint_json(obj.abort_code),
+        })
+      }),
+    ),
+    "notes": Json::array(phase.notes.map(item => Json::string(item))),
+  })
+}
+
+///|
+fn startup_trace_report_json(report : StartupTraceReport) -> Json {
+  Json::object({
+    "station": Json::number(report.station.to_double()),
+    "source": Json::string(report.source),
+    "initial_state": option_esm_state_json(report.initial_state),
+    "final_state": option_esm_state_json(report.final_state),
+    "transition_error": option_string_json(report.transition_error),
+    "phases": Json::array(report.phases.map(startup_trace_phase_json)),
+  })
+}
+
+///|
+fn startup_diff_report_json(report : StartupDiffReport) -> Json {
+  let online_expected_json = match report.online_expected {
+    Some(value) => expected_esc_register_report_json(value)
+    None => Json::null()
+  }
+  let actual_esc_json = match report.actual_esc {
+    Some(value) => esc_register_report_json(value)
+    None => Json::null()
+  }
+  Json::object({
+    "station": Json::number(report.station.to_double()),
+    "offline_expected": expected_esc_register_report_json(
+      report.offline_expected,
+    ),
+    "online_expected": online_expected_json,
+    "online_expected_error": option_string_json(report.online_expected_error),
+    "actual_esc": actual_esc_json,
+    "actual_esc_error": option_string_json(report.actual_esc_error),
+    "offline_mailbox_commands": Json::array(
+      report.offline_mailbox_commands.map(startup_mailbox_command_json),
+    ),
+    "online_mailbox_commands": Json::array(
+      report.online_mailbox_commands.map(startup_mailbox_command_json),
+    ),
+    "differences": Json::array(
+      report.differences.map(item => Json::string(item)),
+    ),
+  })
+}
+
+///|
+fn startup_diff_report_text(report : StartupDiffReport) -> String {
+  let buf = @buffer.new(size_hint=2048)
+  let online_error_text = match report.online_expected_error {
+    Some(err) => err
+    None => "unknown error"
+  }
+  let actual_error_text = match report.actual_esc_error {
+    Some(err) => err
+    None => "unknown error"
+  }
+  buf.write_string("Startup Plan Diff\n")
+  buf.write_string("=================\n")
+  buf.write_string("Station: " + report.station.to_string() + "\n\n")
+  buf.write_string("Offline Mailbox Commands\n")
+  buf.write_string("------------------------\n")
+  for command in report.offline_mailbox_commands {
+    buf.write_string(startup_mailbox_command_text(command) + "\n")
+  }
+  buf.write_string("\nOnline Mailbox Commands\n")
+  buf.write_string("-----------------------\n")
+  for command in report.online_mailbox_commands {
+    buf.write_string(startup_mailbox_command_text(command) + "\n")
+  }
+  buf.write_string("\nOffline Expected Registers\n")
+  buf.write_string("--------------------------\n")
+  buf.write_string(expected_esc_register_report_text(report.offline_expected))
+  buf.write_string("\n\nOnline Expected Registers\n")
+  buf.write_string("-------------------------\n")
+  match report.online_expected {
+    Some(value) => buf.write_string(expected_esc_register_report_text(value))
+    None => buf.write_string("Unavailable: " + online_error_text + "\n")
+  }
+  buf.write_string("\n\nActual ESC Registers\n")
+  buf.write_string("--------------------\n")
+  match report.actual_esc {
+    Some(value) => buf.write_string(esc_register_report_text(value))
+    None => buf.write_string("Unavailable: " + actual_error_text + "\n")
+  }
+  buf.write_string("\n\nDifferences\n")
+  buf.write_string("-----------\n")
+  if report.differences.is_empty() {
+    buf.write_string("No differences\n")
+  } else {
+    for item in report.differences {
+      buf.write_string("- " + item + "\n")
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn mailbox_readback_report_text(report : MailboxReadbackReport) -> String {
+  let buf = @buffer.new(size_hint=1024)
+  buf.write_string("Mailbox SyncManager Readback\n")
+  buf.write_string("==========================\n")
+  buf.write_string("Station: " + report.station.to_string() + "\n")
+  buf.write_string("Source: " + report.source + "\n\n")
+  for entry in report.entries {
+    buf.write_string(
+      "SM" +
+      entry.index.to_string() +
+      " @ " +
+      format_hex(entry.register_offset, 4) +
+      "\n",
+    )
+    buf.write_string(
+      "  Match: ............ " + entry.matches.to_string() + "\n",
+    )
+    buf.write_string("  Expected Raw: ..... " + entry.expected.raw_hex + "\n")
+    buf.write_string("  Actual Raw: ....... " + entry.actual.raw_hex + "\n")
+    buf.write_string(
+      "  Expected Start: ... " +
+      format_hex(entry.expected.physical_start, 4) +
+      "\n",
+    )
+    buf.write_string(
+      "  Actual Start: ..... " +
+      format_hex(entry.actual.physical_start, 4) +
+      "\n",
+    )
+    buf.write_string(
+      "  Expected Length: .. " + entry.expected.length.to_string() + "\n",
+    )
+    buf.write_string(
+      "  Actual Length: .... " + entry.actual.length.to_string() + "\n",
+    )
+    buf.write_string(
+      "  Expected Control: . " +
+      format_hex(entry.expected.control.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "  Actual Control: ... " +
+      format_hex(entry.actual.control.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "  Expected Status: .. " +
+      format_hex(entry.expected.status.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "  Actual Status: .... " +
+      format_hex(entry.actual.status.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "  Expected Activate:  " +
+      format_hex(entry.expected.activate.to_uint(), 2) +
+      "\n",
+    )
+    buf.write_string(
+      "  Actual Activate: .. " +
+      format_hex(entry.actual.activate.to_uint(), 2) +
+      "\n\n",
+    )
+  }
+  buf.write_string("Mismatches\n")
+  buf.write_string("----------\n")
+  if report.mismatches.is_empty() {
+    buf.write_string("No mismatches\n")
+  } else {
+    for item in report.mismatches {
+      buf.write_string("- " + item + "\n")
+    }
+  }
+  buf.to_string()
+}
+
+///|
+fn startup_trace_report_text(report : StartupTraceReport) -> String {
+  let buf = @buffer.new(size_hint=2048)
+  let initial_state_text = match report.initial_state {
+    Some(value) => value.to_string()
+    None => "unknown"
+  }
+  let final_state_text = match report.final_state {
+    Some(value) => value.to_string()
+    None => "unknown"
+  }
+  buf.write_string("Startup Trace\n")
+  buf.write_string("=============\n")
+  buf.write_string("Station: " + report.station.to_string() + "\n")
+  buf.write_string("Source: " + report.source + "\n")
+  buf.write_string("Initial State: " + initial_state_text + "\n")
+  buf.write_string("Final State: " + final_state_text + "\n")
+  match report.transition_error {
+    Some(err) => buf.write_string("Transition Error: " + err + "\n\n")
+    None => buf.write_string("Transition Error: none\n\n")
+  }
+  for phase in report.phases {
+    let phase_state = match phase.al_state {
+      Some(value) => value.to_string()
+      None => "unknown"
+    }
+    let phase_error = match phase.al_error_flag {
+      Some(value) => value.to_string()
+      None => "unknown"
+    }
+    let phase_status = match phase.al_status_code {
+      Some(value) => format_hex(value, 4)
+      None => "not set"
+    }
+    buf.write_string(phase.name + "\n")
+    buf.write_string(trace_separator(phase.name.length()) + "\n")
+    buf.write_string("AL State: " + phase_state + "\n")
+    buf.write_string("AL Error Flag: " + phase_error + "\n")
+    buf.write_string("AL Status Code: " + phase_status + "\n")
+    for sm in phase.sync_managers {
+      buf.write_string(
+        "SM" +
+        sm.index.to_string() +
+        " @ " +
+        format_hex(sm.register_offset, 4) +
+        ": " +
+        sm.raw_hex +
+        "\n",
+      )
+    }
+    for fmmu in phase.fmmus {
+      buf.write_string(
+        "FMMU" +
+        fmmu.index.to_string() +
+        " @ " +
+        format_hex(fmmu.register_offset, 4) +
+        ": " +
+        fmmu.raw_hex +
+        "\n",
+      )
+    }
+    for obj in phase.od_objects {
+      let count_text = match obj.subindex_count {
+        Some(value) => value.to_string()
+        None => "unknown"
+      }
+      buf.write_string(
+        "OD " +
+        format_hex(obj.index, 4) +
+        " subindex_count=" +
+        count_text +
+        "\n",
+      )
+      match obj.error_detail {
+        Some(detail) => buf.write_string("  object error: " + detail + "\n")
+        None => ()
+      }
+      for entry in obj.entries {
+        let entry_hex = match entry.value_hex {
+          Some(value) => value
+          None => "n/a"
+        }
+        buf.write_string(
+          "  sub " + entry.subindex.to_uint().to_string() + ": " + entry_hex,
+        )
+        match entry.value_u32 {
+          Some(value) => buf.write_string(" (u32=" + value.to_string() + ")")
+          None => ()
+        }
+        match entry.error_detail {
+          Some(detail) => buf.write_string(" error=" + detail)
+          None => ()
+        }
+        buf.write_string("\n")
+      }
+    }
+    for note in phase.notes {
+      buf.write_string("note: " + note + "\n")
+    }
+    buf.write_string("\n")
+  }
+  buf.to_string()
+}
+
+///|
+fn startup_mailbox_command_text(
+  command : @runtime.StartupMailboxCommand,
+) -> String {
+  command.transition.to_string() +
+  " 0x" +
+  format_hex(command.index, 4) +
+  ":" +
+  command.subindex.to_uint().to_string() +
+  " = " +
+  bytes_hex(command.data)
+}
+
+///|
+fn startup_diff_messages(
+  offline_expected : ExpectedEscRegisterReport,
+  online_expected : ExpectedEscRegisterReport?,
+  online_expected_error : String?,
+  actual_esc : EscRegisterReport?,
+  actual_esc_error : String?,
+  offline_mailbox_commands : Array[@runtime.StartupMailboxCommand],
+  online_mailbox_commands : Array[@runtime.StartupMailboxCommand],
+) -> Array[String] {
+  let differences : Array[String] = []
+  let online_error_text = match online_expected_error {
+    Some(err) => err
+    None => "unknown error"
+  }
+  let actual_error_text = match actual_esc_error {
+    Some(err) => err
+    None => "unknown error"
+  }
+  match actual_esc {
+    Some(actual) =>
+      match online_expected {
+        Some(value) => {
+          append_startup_mailbox_differences(
+            differences, "offline", offline_mailbox_commands, "online", online_mailbox_commands,
+          )
+          append_sm_differences(
+            differences,
+            "offline",
+            offline_expected.sync_managers,
+            "online",
+            value.sync_managers,
+          )
+          append_sm_differences(
+            differences,
+            "online",
+            value.sync_managers,
+            "actual",
+            actual.sync_managers,
+          )
+          append_fmmu_differences(
+            differences,
+            "offline",
+            offline_expected.fmmus,
+            "online",
+            value.fmmus,
+          )
+          append_fmmu_differences(
+            differences,
+            "online",
+            value.fmmus,
+            "actual",
+            actual.fmmus,
+          )
+        }
+        None => {
+          differences.push("online expected unavailable: " + online_error_text)
+          append_sm_differences(
+            differences,
+            "offline",
+            offline_expected.sync_managers,
+            "actual",
+            actual.sync_managers,
+          )
+          append_fmmu_differences(
+            differences,
+            "offline",
+            offline_expected.fmmus,
+            "actual",
+            actual.fmmus,
+          )
+        }
+      }
+    None => {
+      differences.push("actual esc unavailable: " + actual_error_text)
+      match online_expected {
+        Some(value) => {
+          append_startup_mailbox_differences(
+            differences, "offline", offline_mailbox_commands, "online", online_mailbox_commands,
+          )
+          append_sm_differences(
+            differences,
+            "offline",
+            offline_expected.sync_managers,
+            "online",
+            value.sync_managers,
+          )
+          append_fmmu_differences(
+            differences,
+            "offline",
+            offline_expected.fmmus,
+            "online",
+            value.fmmus,
+          )
+        }
+        None =>
+          differences.push("online expected unavailable: " + online_error_text)
+      }
+    }
+  }
+  differences
+}
+
+///|
+fn append_startup_mailbox_differences(
+  differences : Array[String],
+  left_name : String,
+  left : Array[@runtime.StartupMailboxCommand],
+  right_name : String,
+  right : Array[@runtime.StartupMailboxCommand],
+) -> Unit {
+  if left.length() != right.length() {
+    differences.push(
+      left_name +
+      " mailbox command count=" +
+      left.length().to_string() +
+      ", " +
+      right_name +
+      "=" +
+      right.length().to_string(),
+    )
+  }
+  let limit = if left.length() < right.length() {
+    left.length()
+  } else {
+    right.length()
+  }
+  for i = 0; i < limit; i = i + 1 {
+    if left[i] != right[i] {
+      differences.push(
+        left_name +
+        " mailbox[" +
+        i.to_string() +
+        "]=" +
+        startup_mailbox_command_text(left[i]) +
+        ", " +
+        right_name +
+        "=" +
+        startup_mailbox_command_text(right[i]),
+      )
+    }
+  }
+}
+
+///|
+fn append_sm_differences(
+  differences : Array[String],
+  left_name : String,
+  left : Array[EscSyncManagerRegisterReport],
+  right_name : String,
+  right : Array[EscSyncManagerRegisterReport],
+) -> Unit {
+  let limit = if left.length() < right.length() {
+    left.length()
+  } else {
+    right.length()
+  }
+  if left.length() != right.length() {
+    differences.push(
+      left_name +
+      " sync manager count=" +
+      left.length().to_string() +
+      ", " +
+      right_name +
+      "=" +
+      right.length().to_string(),
+    )
+  }
+  for i = 0; i < limit; i = i + 1 {
+    if left[i].raw_hex != right[i].raw_hex {
+      differences.push(
+        left_name +
+        " SM" +
+        left[i].index.to_string() +
+        " raw=" +
+        left[i].raw_hex +
+        ", " +
+        right_name +
+        " raw=" +
+        right[i].raw_hex,
+      )
+    }
+  }
+}
+
+///|
+fn append_fmmu_differences(
+  differences : Array[String],
+  left_name : String,
+  left : Array[EscFmmuRegisterReport],
+  right_name : String,
+  right : Array[EscFmmuRegisterReport],
+) -> Unit {
+  let limit = if left.length() < right.length() {
+    left.length()
+  } else {
+    right.length()
+  }
+  if left.length() != right.length() {
+    differences.push(
+      left_name +
+      " FMMU count=" +
+      left.length().to_string() +
+      ", " +
+      right_name +
+      "=" +
+      right.length().to_string(),
+    )
+  }
+  for i = 0; i < limit; i = i + 1 {
+    if left[i].raw_hex != right[i].raw_hex {
+      differences.push(
+        left_name +
+        " FMMU" +
+        left[i].index.to_string() +
+        " raw=" +
+        left[i].raw_hex +
+        ", " +
+        right_name +
+        " raw=" +
+        right[i].raw_hex,
+      )
+    }
+  }
 }
 
 ///|
@@ -3977,6 +5521,39 @@ fn option_uint_json(value : UInt?) -> Json {
     Some(number) => Json::number(number.to_double())
     None => Json::null()
   }
+}
+
+///|
+fn option_bool_json(value : Bool?) -> Json {
+  match value {
+    Some(flag) => Json::boolean(flag)
+    None => Json::null()
+  }
+}
+
+///|
+fn option_esm_state_json(value : @protocol.EsmState?) -> Json {
+  match value {
+    Some(state) => Json::string(state.to_string())
+    None => Json::null()
+  }
+}
+
+///|
+fn option_string_json(value : String?) -> Json {
+  match value {
+    Some(text) => Json::string(text)
+    None => Json::null()
+  }
+}
+
+///|
+fn trace_separator(length : Int) -> String {
+  let mut out = ""
+  for _i = 0; _i < length; _i = _i + 1 {
+    out = out + "-"
+  }
+  out
 }
 
 ///|

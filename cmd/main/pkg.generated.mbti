@@ -28,6 +28,10 @@ type EscSyncManagerRegisterReport
 
 type ExpectedEscRegisterReport
 
+type MailboxReadbackEntry
+
+type MailboxReadbackReport
+
 type OdBrowseQuery
 
 type OdBrowseReport
@@ -35,6 +39,16 @@ type OdBrowseReport
 type RunProgressOutput
 pub impl Eq for RunProgressOutput
 pub impl Show for RunProgressOutput
+
+type StartupDiffReport
+
+type StartupTraceOdEntry
+
+type StartupTraceOdObject
+
+type StartupTracePhase
+
+type StartupTraceReport
 
 type StateTransitionReport
 

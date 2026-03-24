@@ -109,15 +109,19 @@ pub struct ActivePdoLengthsNic {
   mut pending_mailbox_response : Bytes
   mut is_open : Bool
   mut mailbox_ready : Bool
+  mut send_timeout_poll_budget : Int
 }
 
 ///|
-fn ActivePdoLengthsNic::new() -> ActivePdoLengthsNic {
+fn ActivePdoLengthsNic::new(
+  send_timeout_transactions? : Int = 0,
+) -> ActivePdoLengthsNic {
   {
     next_response: Bytes::new(0),
     pending_mailbox_response: Bytes::new(0),
     is_open: true,
     mailbox_ready: false,
+    send_timeout_poll_budget: send_timeout_transactions * 32,
   }
 }
 
@@ -288,7 +292,12 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
   self.next_response = match pdu.header.command {
     @protocol.FPRD => {
       let response_data = if offset == sm0_status_addr {
-        mailbox_status_bytes(false)
+        if self.send_timeout_poll_budget > 0 {
+          self.send_timeout_poll_budget = self.send_timeout_poll_budget - 1
+          mailbox_status_bytes(true)
+        } else {
+          mailbox_status_bytes(false)
+        }
       } else if offset == sm1_status_addr {
         mailbox_status_bytes(self.mailbox_ready)
       } else if offset == 0x1080U {
@@ -346,8 +355,102 @@ test "active process data lengths in preop use object mapping lengths" {
 }
 
 ///|
+test "refine startup preparation in preop retries transient mailbox timeout" {
+  let nic = ActivePdoLengthsNic::new(send_timeout_transactions=1)
+  let preparation : SlaveStartupPreparation = {
+    mapping: {
+      sm_configs: [
+        {
+          physical_start: 0x1000U,
+          length: 128U,
+          control: b'\x26',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.MailboxOut,
+        },
+        {
+          physical_start: 0x1080U,
+          length: 128U,
+          control: b'\x22',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.MailboxIn,
+        },
+        {
+          physical_start: 0x1100U,
+          length: 32U,
+          control: b'\x64',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.ProcessDataOut,
+        },
+        {
+          physical_start: 0x1200U,
+          length: 16U,
+          control: b'\x20',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.ProcessDataIn,
+        },
+      ],
+      fmmu_configs: [
+        {
+          logical_start: 0x1000U,
+          length: 32U,
+          logical_start_bit: b'\x00',
+          logical_end_bit: b'\x07',
+          physical_start: 0x1100U,
+          physical_start_bit: b'\x00',
+          direction: @mailbox.Outputs,
+          activate: true,
+        },
+        {
+          logical_start: 0x1020U,
+          length: 16U,
+          logical_start_bit: b'\x00',
+          logical_end_bit: b'\x07',
+          physical_start: 0x1200U,
+          physical_start_bit: b'\x00',
+          direction: @mailbox.Inputs,
+          activate: true,
+        },
+      ],
+      output_bytes: 32,
+      input_bytes: 16,
+    },
+    dc_cycle_period_ns: None,
+    startup_outputs: None,
+    startup_mailbox_commands: [],
+    mailbox_config: {
+      out_address: 0x1000U,
+      out_size: 128U,
+      out_sm_index: 0,
+      in_address: 0x1080U,
+      in_size: 128U,
+      in_sm_index: 1,
+    },
+    sii: ds402_sii_info([]),
+    sii_categories: [],
+  }
+  let refined = refine_startup_preparation_in_preop(
+    nic,
+    0x1001U,
+    0x1000U,
+    preparation,
+    @hal.Duration(1000L),
+  )
+  assert_eq(refined.mapping.sm_configs[2].length, 6U)
+  assert_eq(refined.mapping.sm_configs[3].length, 6U)
+  assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
+  assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
+  assert_eq(refined.mapping.output_bytes, 6)
+  assert_eq(refined.mapping.input_bytes, 6)
+}
+
+///|
 fn ds402_general_category(ds402_channels : Byte) -> @mailbox.SiiCategoryEntry {
   let payload = Array::make(20, b'\x00')
+  payload[5] = b'\x0C'
   payload[9] = ds402_channels
   {
     category: @mailbox.General,
@@ -384,6 +487,19 @@ fn ds402_rxpdo_category_with_mode() -> @mailbox.SiiCategoryEntry {
 }
 
 ///|
+fn ds402_txpdo_category() -> @mailbox.SiiCategoryEntry {
+  {
+    category: @mailbox.TxPdo,
+    type_code: 50U,
+    data: Bytes::from_array([
+      b'\x00', b'\x1A', b'\x02', b'\x03', b'\x00', b'\x00', b'\x00', b'\x00', b'\x41',
+      b'\x60', b'\x00', b'\x00', b'\x00', b'\x10', b'\x00', b'\x00', b'\x64', b'\x60',
+      b'\x00', b'\x00', b'\x00', b'\x20', b'\x00', b'\x00',
+    ]),
+  }
+}
+
+///|
 fn ds402_sii_info(
   categories : Array[@mailbox.SiiCategoryEntry],
 ) -> @mailbox.SiiFullInfo {
@@ -399,10 +515,16 @@ fn ds402_sii_info(
     }
   }
   let rx_pdo : Array[@mailbox.SiiPdo] = []
+  let tx_pdo : Array[@mailbox.SiiPdo] = []
   for entry in categories {
     if entry.category == @mailbox.RxPdo {
       for pdo in @mailbox.parse_sii_pdo(entry.data) {
         rx_pdo.push(pdo)
+      }
+    }
+    if entry.category == @mailbox.TxPdo {
+      for pdo in @mailbox.parse_sii_pdo(entry.data) {
+        tx_pdo.push(pdo)
       }
     }
   }
@@ -453,7 +575,7 @@ fn ds402_sii_info(
     fmmu_ex: [],
     sync_managers: [],
     sync_units: [],
-    tx_pdo: [],
+    tx_pdo,
     rx_pdo,
     dc_clocks: [],
   }
@@ -836,13 +958,37 @@ test "derive_startup_mailbox_commands emits ds402 safeop-to-op mode command" {
     ds402_sii_info([
       ds402_general_category(b'\x01'),
       ds402_rxpdo_category_with_mode(),
+      ds402_txpdo_category(),
     ]),
   )
-  assert_eq(commands.length(), 1)
-  assert_eq(commands[0].transition, SafeOpToOp)
-  assert_eq(commands[0].index, 0x6060U)
-  assert_eq(commands[0].subindex, b'\x00')
-  assert_eq(commands[0].data, Bytes::from_array([b'\x08']))
+  assert_eq(commands.length(), 5)
+  assert_eq(commands[0].transition, PreOpToSafeOp)
+  assert_eq(commands[0].index, 0x1600U)
+  assert_eq(
+    commands[0].data,
+    Bytes::from_array([
+      b'\x03', b'\x20', b'\x00', b'\x7A', b'\x60', b'\x10', b'\x00', b'\x40', b'\x60',
+      b'\x08', b'\x00', b'\x60', b'\x60',
+    ]),
+  )
+  assert_eq(commands[1].transition, PreOpToSafeOp)
+  assert_eq(commands[1].index, 0x1A00U)
+  assert_eq(
+    commands[1].data,
+    Bytes::from_array([
+      b'\x02', b'\x10', b'\x00', b'\x41', b'\x60', b'\x20', b'\x00', b'\x64', b'\x60',
+    ]),
+  )
+  assert_eq(commands[2].transition, PreOpToSafeOp)
+  assert_eq(commands[2].index, 0x1C12U)
+  assert_eq(commands[2].data, Bytes::from_array([b'\x01', b'\x00', b'\x16']))
+  assert_eq(commands[3].transition, PreOpToSafeOp)
+  assert_eq(commands[3].index, 0x1C13U)
+  assert_eq(commands[3].data, Bytes::from_array([b'\x01', b'\x00', b'\x1A']))
+  assert_eq(commands[4].transition, SafeOpToOp)
+  assert_eq(commands[4].index, 0x6060U)
+  assert_eq(commands[4].subindex, b'\x00')
+  assert_eq(commands[4].data, Bytes::from_array([b'\x08']))
 }
 
 ///|
@@ -930,6 +1076,8 @@ pub struct StartupMappingNic {
   mut is_open : Bool
   sm_write_offsets : Array[UInt]
   fmmu_write_offsets : Array[UInt]
+  sm_windows : Array[Bytes]
+  mut deactivated_mailbox_in_readback : Bool
 }
 
 ///|
@@ -939,6 +1087,8 @@ fn StartupMappingNic::new() -> StartupMappingNic {
     is_open: true,
     sm_write_offsets: [],
     fmmu_write_offsets: [],
+    sm_windows: Array::make(8, Bytes::make(8, b'\x00')),
+    deactivated_mailbox_in_readback: false,
   }
 }
 
@@ -961,6 +1111,11 @@ pub impl @hal.Nic for StartupMappingNic with send(self, data) {
       offset <
       @protocol.reg_sm_base + 8U * @protocol.sm_entry_size.reinterpret_as_uint() {
       self.sm_write_offsets.push(offset)
+      let sm_index = ((offset - @protocol.reg_sm_base) /
+      @protocol.sm_entry_size.reinterpret_as_uint()).reinterpret_as_int()
+      if sm_index >= 0 && sm_index < self.sm_windows.length() {
+        self.sm_windows[sm_index] = pdu.data
+      }
     }
     if offset >= @protocol.reg_fmmu_base &&
       offset <
@@ -969,11 +1124,30 @@ pub impl @hal.Nic for StartupMappingNic with send(self, data) {
       self.fmmu_write_offsets.push(offset)
     }
   }
-  self.next_response = build_esm_response_frame(
-    request,
-    Bytes::new(pdu.data.length()),
-    1U,
-  )
+  self.next_response = match pdu.header.command {
+    @protocol.FPRD => {
+      let response_data = if offset >= @protocol.reg_sm_base &&
+        offset <
+        @protocol.reg_sm_base +
+        8U * @protocol.sm_entry_size.reinterpret_as_uint() {
+        let sm_index = ((offset - @protocol.reg_sm_base) /
+        @protocol.sm_entry_size.reinterpret_as_uint()).reinterpret_as_int()
+        if sm_index == 1 && self.deactivated_mailbox_in_readback {
+          Bytes::from_array([
+            b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x30', b'\x02', b'\x01',
+          ])
+        } else if sm_index >= 0 && sm_index < self.sm_windows.length() {
+          self.sm_windows[sm_index]
+        } else {
+          Bytes::new(pdu.data.length())
+        }
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_esm_response_frame(request, response_data, 1U)
+    }
+    _ => build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+  }
   data.length()
 }
 
@@ -1052,6 +1226,50 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
     @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint(),
   )
   assert_eq(nic.fmmu_write_offsets.length(), 0)
+}
+
+///|
+test "runtime mailbox mapping reports immediate readback mismatch" {
+  let nic = StartupMappingNic::new()
+  nic.deactivated_mailbox_in_readback = true
+  let mapping : @mailbox.SlaveMapping = {
+    sm_configs: [
+      {
+        physical_start: 0x1000U,
+        length: 128U,
+        control: b'\x26',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.MailboxOut,
+      },
+      {
+        physical_start: 0x1080U,
+        length: 128U,
+        control: b'\x22',
+        status: b'\x00',
+        activate: b'\x01',
+        sm_type: @mailbox.MailboxIn,
+      },
+    ],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 0,
+  }
+  let result = try? write_mailbox_mapping(
+    nic,
+    0x1001U,
+    mapping,
+    @hal.Duration(1000L),
+  )
+  match result {
+    Err(@hal.EcError::MailboxProtocol(message)) => {
+      assert_true(message.contains("readback mismatch"))
+      assert_true(message.contains("SM1"))
+      assert_true(message.contains("expected=0x"))
+      assert_true(message.contains(" actual=0x"))
+    }
+    _ => fail("expected MailboxProtocol for mailbox readback mismatch")
+  }
 }
 
 ///|

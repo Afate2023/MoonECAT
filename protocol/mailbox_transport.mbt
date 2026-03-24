@@ -33,6 +33,12 @@ let default_max_polls : Int = 1000
 let mailbox_send_wait_max_polls : Int = 32
 
 ///|
+let sm_control_deactivate_mask : UInt = 0x0100U
+
+///|
+let sm_control_repeat_request_mask : UInt = 0x0002U
+
+///|
 /// Compute the SM register window base address for a given SM index.
 fn sm_register_address(sm_index : Int) -> UInt {
   reg_sm_base +
@@ -45,6 +51,28 @@ fn mailbox_status_from_sm_window(window : Bytes) -> Bool {
     return false
   }
   (window[sm_status_offset.reinterpret_as_int()] & mb_status_bit) != b'\x00'
+}
+
+///|
+fn validate_input_mailbox_sm_window(window : Bytes) -> Unit raise @hal.EcError {
+  if window.length() < sm_register_window_size {
+    return
+  }
+  let start = read_u16_le(window, 0)
+  let length = read_u16_le(window, 2)
+  let control_word = read_u16_le(window, 6)
+  let deactivated = (control_word & sm_control_deactivate_mask) != 0U
+  let repeat_requested = (control_word & sm_control_repeat_request_mask) != 0U
+  if deactivated || (start == 0U && length == 0U && repeat_requested) {
+    raise @hal.EcError::MailboxProtocol(
+      "input mailbox SyncManager is deactivated/reset: start=0x" +
+      start.to_string(radix=16) +
+      " length=0x" +
+      length.to_string(radix=16) +
+      " control=0x" +
+      control_word.to_string(radix=16),
+    )
+  }
 }
 
 ///|
@@ -167,6 +195,7 @@ pub fn[N : @hal.Nic] mailbox_poll(
   let pdu = read_register_fp(
     nic, station, status_addr, sm_register_window_size, timeout,
   )
+  validate_input_mailbox_sm_window(pdu.data)
   if pdu.data.length() <= sm_status_offset.reinterpret_as_int() {
     return false
   }
@@ -186,6 +215,7 @@ pub fn[N : @hal.Nic] mailbox_poll_ap(
   let pdu = read_register_ap(
     nic, position, status_addr, sm_register_window_size, timeout,
   )
+  validate_input_mailbox_sm_window(pdu.data)
   if pdu.data.length() <= sm_status_offset.reinterpret_as_int() {
     return false
   }
