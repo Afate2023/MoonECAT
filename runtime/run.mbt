@@ -535,6 +535,44 @@ fn map_with_process_data_lengths(
 }
 
 ///|
+fn has_process_data_length_override(
+  output_bytes : Int?,
+  input_bytes : Int?,
+) -> Bool {
+  output_bytes is Some(_) || input_bytes is Some(_)
+}
+
+///|
+fn[N : @hal.Nic] active_process_data_lengths_after_mailbox_refresh(
+  nic : N,
+  station : UInt,
+  preparation : SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> (Int?, Int?) raise @hal.EcError {
+  write_mailbox_mapping(nic, station, preparation.mapping, timeout)
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
+  }
+  if snapshot.state != @protocol.PreOp {
+    ignore(
+      @protocol.transition_to_target_strict(
+        nic,
+        station,
+        @protocol.PreOp,
+        timeout,
+      ),
+    )
+  }
+  active_process_data_lengths_in_preop(
+    nic,
+    station,
+    preparation.mailbox_config,
+    timeout,
+  )
+}
+
+///|
 pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
   nic : N,
   station : UInt,
@@ -542,15 +580,38 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
   preparation : SlaveStartupPreparation,
   timeout : @hal.Duration,
 ) -> SlaveStartupPreparation {
-  let lengths_result : Result[(Int?, Int?), Error] = try? active_process_data_lengths_in_preop(
+  let direct_lengths_result : Result[(Int?, Int?), Error] = try? active_process_data_lengths_in_preop(
     nic,
     station,
     preparation.mailbox_config,
     timeout,
   )
+  let lengths_result : Result[(Int?, Int?), Error] = match direct_lengths_result {
+    Ok((output_bytes, input_bytes)) =>
+      if has_process_data_length_override(output_bytes, input_bytes) {
+        direct_lengths_result
+      } else {
+        try? active_process_data_lengths_after_mailbox_refresh(
+          nic,
+          station,
+          preparation,
+          timeout,
+        )
+      }
+    Err(_) =>
+      try? active_process_data_lengths_after_mailbox_refresh(
+        nic,
+        station,
+        preparation,
+        timeout,
+      )
+  }
   match lengths_result {
     Ok((output_bytes, input_bytes)) => {
-      let has_override = output_bytes is Some(_) || input_bytes is Some(_)
+      let has_override = has_process_data_length_override(
+        output_bytes,
+        input_bytes,
+      )
       if not(has_override) {
         preparation
       } else {
