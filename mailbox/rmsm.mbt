@@ -64,6 +64,21 @@ pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
 }
 
 ///|
+/// Begin a timeout retry transaction without clearing the accumulated retry
+/// budget for the surrounding operation.
+pub fn Rmsm::begin_retry_transaction(self : Rmsm) -> Byte raise @hal.EcError {
+  guard self.state is Idle else {
+    raise @hal.EcError::MailboxProtocol(
+      "RMSM: cannot begin retry transaction in state " + self.state.to_string(),
+    )
+  }
+  let cnt = self.counter.next()
+  self.state = WaitingForResponse(cnt)
+  self.awaiting_repeat_ack = false
+  cnt
+}
+
+///|
 /// Validate a received mailbox response counter.
 /// Returns true if this is a valid (new) response; false if it's a repeat.
 pub fn Rmsm::validate_response(
@@ -153,6 +168,14 @@ pub fn Rmsm::record_timeout(self : Rmsm) -> Bool {
     // Stay in WaitingForResponse; caller should resend
     true
   }
+}
+
+///|
+/// Reset the RMSM to Idle between retry attempts while preserving the retry
+/// budget already spent by the caller.
+pub fn Rmsm::reset_for_retry(self : Rmsm) -> Unit {
+  self.state = Idle
+  self.awaiting_repeat_ack = false
 }
 
 ///|

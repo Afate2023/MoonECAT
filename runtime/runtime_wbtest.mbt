@@ -110,11 +110,14 @@ pub struct ActivePdoLengthsNic {
   mut is_open : Bool
   mut mailbox_ready : Bool
   mut send_timeout_poll_budget : Int
+  mut mailbox_mapping_ready : Bool
+  sm_windows : Array[Bytes]
 }
 
 ///|
 fn ActivePdoLengthsNic::new(
   send_timeout_transactions? : Int = 0,
+  require_mailbox_mapping_refresh? : Bool = false,
 ) -> ActivePdoLengthsNic {
   {
     next_response: Bytes::new(0),
@@ -122,6 +125,8 @@ fn ActivePdoLengthsNic::new(
     is_open: true,
     mailbox_ready: false,
     send_timeout_poll_budget: send_timeout_transactions * 32,
+    mailbox_mapping_ready: not(require_mailbox_mapping_refresh),
+    sm_windows: Array::make(8, Bytes::make(8, b'\x00')),
   }
 }
 
@@ -134,6 +139,23 @@ fn mailbox_status_bytes(ready : Bool) -> Bytes {
       } else {
         b'\x00'
       }
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn mailbox_sm_window_with_status(window : Bytes, ready : Bool) -> Bytes {
+  Bytes::makei(@protocol.sm_entry_size, fn(i) {
+    if i == 5 {
+      if ready {
+        b'\x08'
+      } else {
+        b'\x00'
+      }
+    } else if i < window.length() {
+      window[i]
     } else {
       b'\x00'
     }
@@ -286,30 +308,58 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
   let request = @protocol.EcFrame::decode(data)
   let pdu = request.pdus[0]
   let offset = @protocol.address_offset(pdu.header.address)
+  let station = @protocol.address_station(pdu.header.address)
   let sm0_status_addr = @protocol.reg_sm_base
   let sm1_status_addr = @protocol.reg_sm_base +
     @protocol.sm_entry_size.reinterpret_as_uint()
+  if pdu.header.command is @protocol.FPWR {
+    if offset >= @protocol.reg_sm_base &&
+      offset <
+      @protocol.reg_sm_base + 8U * @protocol.sm_entry_size.reinterpret_as_uint() {
+      let sm_index = ((offset - @protocol.reg_sm_base) /
+      @protocol.sm_entry_size.reinterpret_as_uint()).reinterpret_as_int()
+      if sm_index >= 0 && sm_index < self.sm_windows.length() {
+        self.sm_windows[sm_index] = pdu.data
+      }
+    }
+  }
   self.next_response = match pdu.header.command {
     @protocol.FPRD => {
       let response_data = if offset == sm0_status_addr {
-        if self.send_timeout_poll_budget > 0 {
+        let ready = if self.send_timeout_poll_budget > 0 {
           self.send_timeout_poll_budget = self.send_timeout_poll_budget - 1
-          mailbox_status_bytes(true)
+          true
         } else {
-          mailbox_status_bytes(false)
+          false
         }
+        mailbox_sm_window_with_status(self.sm_windows[0], ready)
       } else if offset == sm1_status_addr {
-        mailbox_status_bytes(self.mailbox_ready)
+        mailbox_sm_window_with_status(
+          self.sm_windows[1],
+          self.mailbox_ready && self.mailbox_mapping_ready,
+        )
+      } else if offset == @protocol.reg_al_status {
+        Bytes::from_array([@protocol.PreOp.to_byte(), b'\x00'])
       } else if offset == 0x1080U {
-        self.mailbox_ready = false
-        self.pending_mailbox_response
+        if self.mailbox_mapping_ready {
+          self.mailbox_ready = false
+          self.pending_mailbox_response
+        } else {
+          Bytes::new(pdu.data.length())
+        }
       } else {
         Bytes::new(pdu.data.length())
       }
       build_esm_response_frame(request, response_data, 1U)
     }
     @protocol.FPWR => {
-      if offset == 0x1000U {
+      if station == 0x1001U &&
+        (offset == @protocol.reg_sm_base ||
+        offset ==
+        @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint()) {
+        self.mailbox_mapping_ready = true
+      }
+      if offset == 0x1000U && self.mailbox_mapping_ready {
         self.pending_mailbox_response = active_pdo_mailbox_response(pdu.data)
         self.mailbox_ready = true
       }
@@ -357,6 +407,134 @@ test "active process data lengths in preop use object mapping lengths" {
 ///|
 test "refine startup preparation in preop retries transient mailbox timeout" {
   let nic = ActivePdoLengthsNic::new(send_timeout_transactions=1)
+  let preparation : SlaveStartupPreparation = {
+    mapping: {
+      sm_configs: [
+        {
+          physical_start: 0x1000U,
+          length: 128U,
+          control: b'\x26',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.MailboxOut,
+        },
+        {
+          physical_start: 0x1080U,
+          length: 128U,
+          control: b'\x22',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.MailboxIn,
+        },
+        {
+          physical_start: 0x1100U,
+          length: 32U,
+          control: b'\x64',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.ProcessDataOut,
+        },
+        {
+          physical_start: 0x1200U,
+          length: 16U,
+          control: b'\x20',
+          status: b'\x00',
+          activate: b'\x01',
+          sm_type: @mailbox.ProcessDataIn,
+        },
+      ],
+      fmmu_configs: [
+        {
+          logical_start: 0x1000U,
+          length: 32U,
+          logical_start_bit: b'\x00',
+          logical_end_bit: b'\x07',
+          physical_start: 0x1100U,
+          physical_start_bit: b'\x00',
+          direction: @mailbox.Outputs,
+          activate: true,
+        },
+        {
+          logical_start: 0x1020U,
+          length: 16U,
+          logical_start_bit: b'\x00',
+          logical_end_bit: b'\x07',
+          physical_start: 0x1200U,
+          physical_start_bit: b'\x00',
+          direction: @mailbox.Inputs,
+          activate: true,
+        },
+      ],
+      output_bytes: 32,
+      input_bytes: 16,
+    },
+    dc_cycle_period_ns: None,
+    startup_outputs: None,
+    startup_mailbox_commands: [],
+    mailbox_config: {
+      out_address: 0x1000U,
+      out_size: 128U,
+      out_sm_index: 0,
+      in_address: 0x1080U,
+      in_size: 128U,
+      in_sm_index: 1,
+    },
+    sii: ds402_sii_info([]),
+    sii_categories: [],
+  }
+  let refined = refine_startup_preparation_in_preop(
+    nic,
+    0x1001U,
+    0x1000U,
+    preparation,
+    @hal.Duration(1000L),
+  )
+  assert_eq(refined.mapping.sm_configs[2].length, 6U)
+  assert_eq(refined.mapping.sm_configs[3].length, 6U)
+  assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
+  assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
+  assert_eq(refined.mapping.output_bytes, 6)
+  assert_eq(refined.mapping.input_bytes, 6)
+}
+
+///|
+test "process data length refresh fallback only handles mailbox bootstrap failures" {
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(Ok((None, None))),
+  )
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(
+      Err(@hal.EcError::MailboxTimeout),
+    ),
+  )
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(
+      Err(
+        @hal.EcError::MailboxProtocol(
+          "input mailbox SyncManager is deactivated/reset: start=0x0",
+        ),
+      ),
+    ),
+  )
+  assert_true(
+    not(
+      should_retry_process_data_lengths_after_mailbox_refresh(
+        Ok((Some(6), None)),
+      )
+    ),
+  )
+  assert_true(
+    not(
+      should_retry_process_data_lengths_after_mailbox_refresh(
+        Err(@hal.EcError::SdoAbort(0x06090011U)),
+      )
+    ),
+  )
+}
+
+///|
+test "refine startup preparation in preop refreshes mailbox mapping before retry" {
+  let nic = ActivePdoLengthsNic::new(require_mailbox_mapping_refresh=true)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [

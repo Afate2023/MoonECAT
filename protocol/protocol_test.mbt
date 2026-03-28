@@ -1838,6 +1838,17 @@ fn RepeatMailboxMockNic::new() -> RepeatMailboxMockNic {
 }
 
 ///|
+pub struct TimeoutMailboxMockNic {
+  mut next_response : Bytes
+  mut is_open : Bool
+}
+
+///|
+fn TimeoutMailboxMockNic::new() -> TimeoutMailboxMockNic {
+  { next_response: Bytes::new(0), is_open: true }
+}
+
+///|
 pub struct ApMailboxMockNic {
   mut next_response : Bytes
   mut is_open : Bool
@@ -1986,6 +1997,51 @@ pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
 
 ///|
 pub impl @hal.Nic for RepeatMailboxMockNic with close(self) {
+  self.is_open = false
+}
+
+///|
+pub impl @hal.Nic for TimeoutMailboxMockNic with open_(name) {
+  ignore(name)
+  TimeoutMailboxMockNic::new()
+}
+
+///|
+pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  let request = @protocol.EcFrame::decode(data)
+  let pdu = request.pdus[0]
+  let offset = @protocol.address_offset(pdu.header.address)
+  let sm0_base_addr = @protocol.reg_sm_base
+  let sm1_base_addr = @protocol.reg_sm_base +
+    @protocol.sm_entry_size.reinterpret_as_uint()
+  self.next_response = match pdu.header.command {
+    @protocol.FPRD => {
+      let response_data = if offset == sm0_base_addr || offset == sm1_base_addr {
+        Bytes::makei(8, fn(_i) { b'\x00' })
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_eeprom_response(request, response_data, 1U)
+    }
+    _ => build_eeprom_response(request, Bytes::new(pdu.data.length()), 1U)
+  }
+  data.length()
+}
+
+///|
+pub impl @hal.Nic for TimeoutMailboxMockNic with recv(self, timeout~) {
+  ignore(timeout)
+  if not(self.is_open) {
+    raise @hal.EcError::LinkDown
+  }
+  self.next_response
+}
+
+///|
+pub impl @hal.Nic for TimeoutMailboxMockNic with close(self) {
   self.is_open = false
 }
 
@@ -2150,6 +2206,31 @@ test "mailbox_recv_rmsm requests repeat and returns replayed frame" {
   assert_true(nic.repeat_triggered)
   assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
   assert_eq(mbh.counter, b'\x01')
+}
+
+///|
+test "sdo_upload_retry stops after retry budget is exhausted" {
+  let nic = TimeoutMailboxMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 64U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new(max_retries=1)
+  let result : Result[Bytes, Error] = try? @protocol.sdo_upload_retry(
+    nic,
+    0x1001U,
+    cfg,
+    rmsm,
+    0x1001U,
+    b'\x00',
+    timeout,
+  )
+  assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }
 
 ///|

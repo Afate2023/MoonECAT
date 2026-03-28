@@ -4,10 +4,19 @@
 /// Implements ETG.1500 #501 (SDO Up/Download shall).
 
 ///|
-/// Execute an SDO Download (write to slave Object Dictionary).
-/// Encodes the request, sends via mailbox, waits for response, validates.
-/// Supports expedited transfer (data ≤ 4 bytes).
-pub fn[N : @hal.Nic] sdo_download(
+fn rmsm_begin_transaction(
+  rmsm : @mailbox.Rmsm,
+  retry : Bool,
+) -> Byte raise @hal.EcError {
+  if retry {
+    rmsm.begin_retry_transaction()
+  } else {
+    rmsm.begin_transaction()
+  }
+}
+
+///|
+fn[N : @hal.Nic] sdo_download_once(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -16,31 +25,35 @@ pub fn[N : @hal.Nic] sdo_download(
   subindex : Byte,
   data : Bytes,
   timeout : @hal.Duration,
+  retry : Bool,
 ) -> Unit raise @hal.EcError {
   if data.length() > 4 {
     return sdo_download_segmented(
-      nic, station, mb_config, rmsm, index, subindex, data, timeout, false,
+      nic,
+      station,
+      mb_config,
+      rmsm,
+      index,
+      subindex,
+      data,
+      timeout,
+      false,
+      retry,
     )
   }
 
-  let counter = rmsm.begin_transaction()
+  let counter = rmsm_begin_transaction(rmsm, retry)
   let txn = @mailbox.build_sdo_download(counter, station, index, subindex, data)
   let frame = txn.encode()
-  // Send request via mailbox SM
   mailbox_send(nic, station, mb_config, frame, timeout)
-  // Wait for response
   let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  // Decode and validate
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  // Validate RMSM counter
   let _ = rmsm.validate_response(mbh.counter)
-  // Check for expected Download Response
   if resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO download: expected DownloadResponse, got " + resp.command.to_string(),
     )
   }
-  // Verify index/subindex match
   if resp.index != index || resp.subindex != subindex {
     raise @hal.EcError::MailboxProtocol(
       "SDO download: index/subindex mismatch in response",
@@ -49,10 +62,7 @@ pub fn[N : @hal.Nic] sdo_download(
 }
 
 ///|
-/// Execute an SDO Upload (read from slave Object Dictionary).
-/// Encodes the request, sends via mailbox, waits for response, returns data.
-/// Supports expedited transfer (data ≤ 4 bytes).
-pub fn[N : @hal.Nic] sdo_upload(
+fn[N : @hal.Nic] sdo_upload_once(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -60,25 +70,20 @@ pub fn[N : @hal.Nic] sdo_upload(
   index : UInt,
   subindex : Byte,
   timeout : @hal.Duration,
+  retry : Bool,
 ) -> Bytes raise @hal.EcError {
-  let counter = rmsm.begin_transaction()
+  let counter = rmsm_begin_transaction(rmsm, retry)
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
-  // Send request via mailbox SM
   mailbox_send(nic, station, mb_config, frame, timeout)
-  // Wait for response
   let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  // Decode and validate
   let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  // Validate RMSM counter
   let _ = rmsm.validate_response(mbh.counter)
-  // Check for expected Upload Response
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO upload: expected UploadResponse, got " + resp.command.to_string(),
     )
   }
-  // Verify index/subindex match
   if resp.index != index || resp.subindex != subindex {
     raise @hal.EcError::MailboxProtocol(
       "SDO upload: index/subindex mismatch in response",
@@ -89,13 +94,19 @@ pub fn[N : @hal.Nic] sdo_upload(
   }
 
   sdo_upload_collect_segmented(
-    nic, station, mb_config, rmsm, timeout, resp, "SDO upload",
+    nic,
+    station,
+    mb_config,
+    rmsm,
+    timeout,
+    resp,
+    "SDO upload",
+    retry,
   )
 }
 
 ///|
-/// Execute an SDO Upload using auto-increment mailbox transport.
-pub fn[N : @hal.Nic] sdo_upload_ap(
+fn[N : @hal.Nic] sdo_upload_ap_once(
   nic : N,
   position : UInt,
   station : UInt,
@@ -104,8 +115,9 @@ pub fn[N : @hal.Nic] sdo_upload_ap(
   index : UInt,
   subindex : Byte,
   timeout : @hal.Duration,
+  retry : Bool,
 ) -> Bytes raise @hal.EcError {
-  let counter = rmsm.begin_transaction()
+  let counter = rmsm_begin_transaction(rmsm, retry)
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send_ap(nic, position, mb_config, frame, timeout)
@@ -129,7 +141,77 @@ pub fn[N : @hal.Nic] sdo_upload_ap(
   }
 
   sdo_upload_collect_segmented_ap(
-    nic, position, station, mb_config, rmsm, timeout, resp, "SDO upload",
+    nic,
+    position,
+    station,
+    mb_config,
+    rmsm,
+    timeout,
+    resp,
+    "SDO upload",
+    retry,
+  )
+}
+
+///|
+/// Execute an SDO Download (write to slave Object Dictionary).
+/// Encodes the request, sends via mailbox, waits for response, validates.
+/// Supports expedited transfer (data ≤ 4 bytes).
+pub fn[N : @hal.Nic] sdo_download(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  data : Bytes,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  sdo_download_once(
+    nic, station, mb_config, rmsm, index, subindex, data, timeout, false,
+  )
+}
+
+///|
+/// Execute an SDO Upload (read from slave Object Dictionary).
+/// Encodes the request, sends via mailbox, waits for response, returns data.
+/// Supports expedited transfer (data ≤ 4 bytes).
+pub fn[N : @hal.Nic] sdo_upload(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  sdo_upload_once(
+    nic, station, mb_config, rmsm, index, subindex, timeout, false,
+  )
+}
+
+///|
+/// Execute an SDO Upload using auto-increment mailbox transport.
+pub fn[N : @hal.Nic] sdo_upload_ap(
+  nic : N,
+  position : UInt,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  sdo_upload_ap_once(
+    nic,
+    position,
+    station,
+    mb_config,
+    rmsm,
+    index,
+    subindex,
+    timeout,
+    false,
   )
 }
 
@@ -160,9 +242,9 @@ pub fn[N : @hal.Nic] sdo_download_retry(
     if not(rmsm.record_timeout()) {
       raise @hal.EcError::MailboxTimeout
     }
-    rmsm.reset()
-    let result = try? sdo_download(
-      nic, station, mb_config, rmsm, index, subindex, data, timeout,
+    rmsm.reset_for_retry()
+    let result = try? sdo_download_once(
+      nic, station, mb_config, rmsm, index, subindex, data, timeout, true,
     )
     match result {
       Ok(_) => return
@@ -198,9 +280,9 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
     if not(rmsm.record_timeout()) {
       raise @hal.EcError::MailboxTimeout
     }
-    rmsm.reset()
-    let result = try? sdo_upload(
-      nic, station, mb_config, rmsm, index, subindex, timeout,
+    rmsm.reset_for_retry()
+    let result = try? sdo_upload_once(
+      nic, station, mb_config, rmsm, index, subindex, timeout, true,
     )
     match result {
       Ok(data) => return data
@@ -234,9 +316,17 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
     if not(rmsm.record_timeout()) {
       raise @hal.EcError::MailboxTimeout
     }
-    rmsm.reset()
-    let retry = try? sdo_upload_ap(
-      nic, position, station, mb_config, rmsm, index, subindex, timeout,
+    rmsm.reset_for_retry()
+    let retry = try? sdo_upload_ap_once(
+      nic,
+      position,
+      station,
+      mb_config,
+      rmsm,
+      index,
+      subindex,
+      timeout,
+      true,
     )
     match retry {
       Ok(data) => return data
@@ -260,7 +350,16 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
 ) -> Unit raise @hal.EcError {
   if data.length() > 4 {
     return sdo_download_segmented(
-      nic, station, mb_config, rmsm, index, subindex, data, timeout, true,
+      nic,
+      station,
+      mb_config,
+      rmsm,
+      index,
+      subindex,
+      data,
+      timeout,
+      true,
+      false,
     )
   }
 
@@ -309,7 +408,14 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
   }
 
   sdo_upload_collect_segmented(
-    nic, station, mb_config, rmsm, timeout, resp, "SDO CA upload",
+    nic,
+    station,
+    mb_config,
+    rmsm,
+    timeout,
+    resp,
+    "SDO CA upload",
+    false,
   )
 }
 
@@ -382,6 +488,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
   timeout : @hal.Duration,
   initial : @mailbox.SdoResponse,
   context : String,
+  retry : Bool,
 ) -> Bytes raise @hal.EcError {
   let acc = @buffer.new(
     size_hint=match initial.complete_size {
@@ -396,7 +503,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
   let mut current = initial
   let mut toggle = false
   while not(current.last_segment) {
-    let seg_counter = rmsm.begin_transaction()
+    let seg_counter = rmsm_begin_transaction(rmsm, retry)
     let seg_req = @mailbox.build_sdo_upload_segment_request(
       seg_counter, station, toggle,
     )
@@ -442,6 +549,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
   timeout : @hal.Duration,
   initial : @mailbox.SdoResponse,
   context : String,
+  retry : Bool,
 ) -> Bytes raise @hal.EcError {
   let acc = @buffer.new(
     size_hint=match initial.complete_size {
@@ -456,7 +564,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
   let mut current = initial
   let mut toggle = false
   while not(current.last_segment) {
-    let seg_counter = rmsm.begin_transaction()
+    let seg_counter = rmsm_begin_transaction(rmsm, retry)
     let seg_req = @mailbox.build_sdo_upload_segment_request(
       seg_counter, station, toggle,
     )
@@ -503,6 +611,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
   data : Bytes,
   timeout : @hal.Duration,
   complete_access : Bool,
+  retry : Bool,
 ) -> Unit raise @hal.EcError {
   let total_len = data.length().reinterpret_as_uint()
   let size_payload = Bytes::from_array([
@@ -511,7 +620,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
     ((total_len >> 16) & 0xFFU).to_byte(),
     ((total_len >> 24) & 0xFFU).to_byte(),
   ])
-  let init_counter = rmsm.begin_transaction()
+  let init_counter = rmsm_begin_transaction(rmsm, retry)
   let init_txn = if complete_access {
     @mailbox.build_sdo_download_ca(
       init_counter, station, index, subindex, size_payload,
@@ -538,7 +647,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
     let chunk_len = if remain > 7 { 7 } else { remain }
     let chunk = Bytes::makei(chunk_len, fn(i) { data[offset + i] })
     let last = offset + chunk_len >= data.length()
-    let seg_counter = rmsm.begin_transaction()
+    let seg_counter = rmsm_begin_transaction(rmsm, retry)
     let seg_frame = @mailbox.build_sdo_download_segment_request(
       seg_counter, station, toggle, last, chunk,
     )
