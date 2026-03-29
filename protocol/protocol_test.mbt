@@ -2222,13 +2222,7 @@ test "sdo_upload_retry stops after retry budget is exhausted" {
   }
   let rmsm = @mailbox.Rmsm::new(max_retries=1)
   let result : Result[Bytes, Error] = try? @protocol.sdo_upload_retry(
-    nic,
-    0x1001U,
-    cfg,
-    rmsm,
-    0x1001U,
-    b'\x00',
-    timeout,
+    nic, 0x1001U, cfg, rmsm, 0x1001U, b'\x00', timeout,
   )
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }

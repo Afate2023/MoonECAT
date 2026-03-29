@@ -600,24 +600,19 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
     preparation.mailbox_config,
     timeout,
   )
-  let lengths_result : Result[(Int?, Int?), Error] =
-    if should_retry_process_data_lengths_after_mailbox_refresh(
+  let lengths_result : Result[(Int?, Int?), Error] = if should_retry_process_data_lengths_after_mailbox_refresh(
       direct_lengths_result,
     ) {
-      try? active_process_data_lengths_after_mailbox_refresh(
-        nic,
-        station,
-        preparation,
-        timeout,
-      )
-    } else {
-      direct_lengths_result
-    }
+    try? active_process_data_lengths_after_mailbox_refresh(
+      nic, station, preparation, timeout,
+    )
+  } else {
+    direct_lengths_result
+  }
   match lengths_result {
     Ok((output_bytes, input_bytes)) => {
       let has_override = has_process_data_length_override(
-        output_bytes,
-        input_bytes,
+        output_bytes, input_bytes,
       )
       if not(has_override) {
         preparation

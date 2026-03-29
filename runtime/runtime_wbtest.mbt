@@ -354,9 +354,11 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
     }
     @protocol.FPWR => {
       if station == 0x1001U &&
-        (offset == @protocol.reg_sm_base ||
-        offset ==
-        @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint()) {
+        (
+          offset == @protocol.reg_sm_base ||
+          offset ==
+          @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint()
+        ) {
         self.mailbox_mapping_ready = true
       }
       if offset == 0x1000U && self.mailbox_mapping_ready {
@@ -520,14 +522,14 @@ test "process data length refresh fallback only handles mailbox bootstrap failur
     not(
       should_retry_process_data_lengths_after_mailbox_refresh(
         Ok((Some(6), None)),
-      )
+      ),
     ),
   )
   assert_true(
     not(
       should_retry_process_data_lengths_after_mailbox_refresh(
         Err(@hal.EcError::SdoAbort(0x06090011U)),
-      )
+      ),
     ),
   )
 }

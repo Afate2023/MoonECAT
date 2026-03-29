@@ -29,16 +29,7 @@ fn[N : @hal.Nic] sdo_download_once(
 ) -> Unit raise @hal.EcError {
   if data.length() > 4 {
     return sdo_download_segmented(
-      nic,
-      station,
-      mb_config,
-      rmsm,
-      index,
-      subindex,
-      data,
-      timeout,
-      false,
-      retry,
+      nic, station, mb_config, rmsm, index, subindex, data, timeout, false, retry,
     )
   }
 
@@ -94,14 +85,7 @@ fn[N : @hal.Nic] sdo_upload_once(
   }
 
   sdo_upload_collect_segmented(
-    nic,
-    station,
-    mb_config,
-    rmsm,
-    timeout,
-    resp,
-    "SDO upload",
-    retry,
+    nic, station, mb_config, rmsm, timeout, resp, "SDO upload", retry,
   )
 }
 
@@ -141,15 +125,7 @@ fn[N : @hal.Nic] sdo_upload_ap_once(
   }
 
   sdo_upload_collect_segmented_ap(
-    nic,
-    position,
-    station,
-    mb_config,
-    rmsm,
-    timeout,
-    resp,
-    "SDO upload",
-    retry,
+    nic, position, station, mb_config, rmsm, timeout, resp, "SDO upload", retry,
   )
 }
 
@@ -203,15 +179,7 @@ pub fn[N : @hal.Nic] sdo_upload_ap(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   sdo_upload_ap_once(
-    nic,
-    position,
-    station,
-    mb_config,
-    rmsm,
-    index,
-    subindex,
-    timeout,
-    false,
+    nic, position, station, mb_config, rmsm, index, subindex, timeout, false,
   )
 }
 
@@ -318,15 +286,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
     }
     rmsm.reset_for_retry()
     let retry = try? sdo_upload_ap_once(
-      nic,
-      position,
-      station,
-      mb_config,
-      rmsm,
-      index,
-      subindex,
-      timeout,
-      true,
+      nic, position, station, mb_config, rmsm, index, subindex, timeout, true,
     )
     match retry {
       Ok(data) => return data
@@ -350,16 +310,7 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
 ) -> Unit raise @hal.EcError {
   if data.length() > 4 {
     return sdo_download_segmented(
-      nic,
-      station,
-      mb_config,
-      rmsm,
-      index,
-      subindex,
-      data,
-      timeout,
-      true,
-      false,
+      nic, station, mb_config, rmsm, index, subindex, data, timeout, true, false,
     )
   }
 
@@ -408,14 +359,7 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
   }
 
   sdo_upload_collect_segmented(
-    nic,
-    station,
-    mb_config,
-    rmsm,
-    timeout,
-    resp,
-    "SDO CA upload",
-    false,
+    nic, station, mb_config, rmsm, timeout, resp, "SDO CA upload", false,
   )
 }
 
