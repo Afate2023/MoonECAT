@@ -322,8 +322,7 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
         let intra_offset = sm_offset % sm_entry_size
         let window = self.sm_windows[sm_index]
         let i = 0U
-        while i < pdu.data.length() &&
-          intra_offset + i < window.length() {
+        while i < pdu.data.length() && intra_offset + i < window.length() {
           window[intra_offset + i] = pdu.data[i]
           i = i + 1U
         }

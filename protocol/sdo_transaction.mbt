@@ -16,6 +16,78 @@ fn rmsm_begin_transaction(
 }
 
 ///|
+/// Maximum number of stale/repeat frames to discard before giving up.
+let max_stale_retries : Int = 3
+
+///|
+/// Receive and validate an SDO response (FP addressing).
+/// Discards stale/repeat frames by re-reading until a fresh response arrives
+/// or the stale-retry budget is exhausted.
+fn[N : @hal.Nic] recv_sdo_validated_fp(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> @mailbox.SdoResponse raise @hal.EcError {
+  for attempt = 0; attempt < max_stale_retries + 1; attempt = attempt + 1 {
+    let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
+    let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+    if rmsm.validate_response(mbh.counter) {
+      return resp
+    }
+    // Stale/repeat frame: discard and re-read
+  }
+  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+}
+
+///|
+/// Receive and validate an SDO response (AP addressing).
+/// Discards stale/repeat frames by re-reading until a fresh response arrives
+/// or the stale-retry budget is exhausted.
+fn[N : @hal.Nic] recv_sdo_validated_ap(
+  nic : N,
+  position : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> @mailbox.SdoResponse raise @hal.EcError {
+  for attempt = 0; attempt < max_stale_retries + 1; attempt = attempt + 1 {
+    let response_raw = mailbox_recv_ap_rmsm(
+      nic, position, mb_config, rmsm, timeout,
+    )
+    let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+    if rmsm.validate_response(mbh.counter) {
+      return resp
+    }
+    // Stale/repeat frame: discard and re-read
+  }
+  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+}
+
+///|
+/// Receive and validate an SDO Info response (FP addressing).
+/// Discards stale/repeat frames by re-reading until a fresh response arrives
+/// or the stale-retry budget is exhausted.
+fn[N : @hal.Nic] recv_sdo_info_validated_fp(
+  nic : N,
+  station : UInt,
+  mb_config : @mailbox.MailboxConfig,
+  rmsm : @mailbox.Rmsm,
+  timeout : @hal.Duration,
+) -> @mailbox.SdoInfoResponse raise @hal.EcError {
+  for attempt = 0; attempt < max_stale_retries + 1; attempt = attempt + 1 {
+    let raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
+    let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
+    if rmsm.validate_response(mbh.counter) {
+      return info
+    }
+    // Stale/repeat frame: discard and re-read
+  }
+  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+}
+
+///|
 fn[N : @hal.Nic] sdo_download_once(
   nic : N,
   station : UInt,
@@ -37,9 +109,7 @@ fn[N : @hal.Nic] sdo_download_once(
   let txn = @mailbox.build_sdo_download(counter, station, index, subindex, data)
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
+  let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO download: expected DownloadResponse, got " + resp.command.to_string(),
@@ -67,9 +137,7 @@ fn[N : @hal.Nic] sdo_upload_once(
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
+  let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO upload: expected UploadResponse, got " + resp.command.to_string(),
@@ -105,11 +173,7 @@ fn[N : @hal.Nic] sdo_upload_ap_once(
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send_ap(nic, position, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_ap_rmsm(
-    nic, position, mb_config, rmsm, timeout,
-  )
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
+  let resp = recv_sdo_validated_ap(nic, position, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO upload: expected UploadResponse, got " + resp.command.to_string(),
@@ -320,9 +384,7 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
   )
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
+  let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO CA download: expected DownloadResponse, got " +
@@ -346,9 +408,7 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
   let txn = @mailbox.build_sdo_upload_ca(counter, station, index, subindex)
   let frame = txn.encode()
   mailbox_send(nic, station, mb_config, frame, timeout)
-  let response_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
-  let _ = rmsm.validate_response(mbh.counter)
+  let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO CA upload: expected UploadResponse, got " + resp.command.to_string(),
@@ -452,9 +512,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
       seg_counter, station, toggle,
     )
     mailbox_send(nic, station, mb_config, seg_req, timeout)
-    let seg_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
-    let _ = rmsm.validate_response(seg_mbh.counter)
+    let seg_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
       not(seg_resp.segmented) {
       raise @hal.EcError::MailboxProtocol(
@@ -513,9 +571,9 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
       seg_counter, station, toggle,
     )
     mailbox_send_ap(nic, position, mb_config, seg_req, timeout)
-    let seg_raw = mailbox_recv_ap_rmsm(nic, position, mb_config, rmsm, timeout)
-    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
-    let _ = rmsm.validate_response(seg_mbh.counter)
+    let seg_resp = recv_sdo_validated_ap(
+      nic, position, mb_config, rmsm, timeout,
+    )
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
       not(seg_resp.segmented) {
       raise @hal.EcError::MailboxProtocol(
@@ -575,9 +633,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
     )
   }
   mailbox_send(nic, station, mb_config, init_txn.encode(), timeout)
-  let init_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-  let (init_mbh, init_resp) = @mailbox.decode_sdo_response(init_raw)
-  let _ = rmsm.validate_response(init_mbh.counter)
+  let init_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if init_resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
       "SDO download segmented: expected DownloadResponse for initiate",
@@ -596,9 +652,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
       seg_counter, station, toggle, last, chunk,
     )
     mailbox_send(nic, station, mb_config, seg_frame, timeout)
-    let seg_raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-    let (seg_mbh, seg_resp) = @mailbox.decode_sdo_response(seg_raw)
-    let _ = rmsm.validate_response(seg_mbh.counter)
+    let seg_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
     if seg_resp.command != @mailbox.SdoCommand::DownloadResponse ||
       not(seg_resp.segmented) {
       raise @hal.EcError::MailboxProtocol(
@@ -632,9 +686,9 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
   let mut first = true
   let mut done = false
   while not(done) {
-    let raw = mailbox_recv_rmsm(nic, station, mb_config, rmsm, timeout)
-    let (mbh, info) = @mailbox.decode_sdo_info_response(raw)
-    let _ = rmsm.validate_response(mbh.counter)
+    let info = recv_sdo_info_validated_fp(
+      nic, station, mb_config, rmsm, timeout,
+    )
     if info.opcode != expected_opcode {
       raise @hal.EcError::MailboxProtocol(
         "SDO Info " +
