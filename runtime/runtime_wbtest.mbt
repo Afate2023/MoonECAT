@@ -331,6 +331,16 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
     }
   }
   self.next_response = match pdu.header.command {
+    @protocol.BRD =>
+      build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
+    @protocol.APRD => {
+      let response_data = if offset == @protocol.reg_station_address {
+        Bytes::from_array([b'\x01', b'\x10'])
+      } else {
+        Bytes::new(pdu.data.length())
+      }
+      build_esm_response_frame(request, response_data, 1U)
+    }
     @protocol.FPRD => {
       let response_data = if offset == sm0_status_addr {
         let ready = if self.send_timeout_poll_budget > 0 {
