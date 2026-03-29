@@ -1,7 +1,12 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <moonbit.h>
+
+#ifndef _WIN32
+#define _snprintf snprintf
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN

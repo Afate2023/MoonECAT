@@ -192,6 +192,7 @@ pub(all) struct Rmsm {
 }
 pub fn Rmsm::awaits_repeat_ack(Self) -> Bool
 pub fn Rmsm::begin_read_repeat(Self, Byte) -> Byte raise @hal.EcError
+pub fn Rmsm::begin_retry_transaction(Self) -> Byte raise @hal.EcError
 pub fn Rmsm::begin_transaction(Self) -> Byte raise @hal.EcError
 pub fn Rmsm::current_counter(Self) -> Byte
 pub fn Rmsm::is_idle(Self) -> Bool
@@ -199,6 +200,7 @@ pub fn Rmsm::new(max_retries? : Int) -> Self
 pub fn Rmsm::observe_repeat_ack(Self, Byte) -> Bool
 pub fn Rmsm::record_timeout(Self) -> Bool
 pub fn Rmsm::reset(Self) -> Unit
+pub fn Rmsm::reset_for_retry(Self) -> Unit
 pub fn Rmsm::validate_response(Self, Byte) -> Bool raise @hal.EcError
 pub impl Show for Rmsm
 

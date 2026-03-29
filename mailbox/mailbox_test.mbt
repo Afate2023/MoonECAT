@@ -1651,6 +1651,16 @@ test "Rmsm reset returns to Idle" {
   assert_true(not(rmsm.awaits_repeat_ack()))
 }
 
+///|
+test "Rmsm retry reset preserves accumulated retry budget" {
+  let rmsm = @mailbox.Rmsm::new(max_retries=1)
+  let _ = rmsm.begin_transaction()
+  assert_true(rmsm.record_timeout())
+  rmsm.reset_for_retry()
+  let _ = rmsm.begin_retry_transaction()
+  assert_true(not(rmsm.record_timeout()))
+}
+
 // ========== Emergency Message Tests ==========
 
 ///|

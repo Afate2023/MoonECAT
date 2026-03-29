@@ -111,7 +111,7 @@ pub struct ActivePdoLengthsNic {
   mut mailbox_ready : Bool
   mut send_timeout_poll_budget : Int
   mut mailbox_mapping_ready : Bool
-  require_mailbox_mapping_refresh : Bool
+  sm_windows : Array[Bytes]
 }
 
 ///|
@@ -126,7 +126,7 @@ fn ActivePdoLengthsNic::new(
     mailbox_ready: false,
     send_timeout_poll_budget: send_timeout_transactions * 32,
     mailbox_mapping_ready: not(require_mailbox_mapping_refresh),
-    require_mailbox_mapping_refresh,
+    sm_windows: Array::make(8, Bytes::make(8, b'\x00')),
   }
 }
 
@@ -139,6 +139,23 @@ fn mailbox_status_bytes(ready : Bool) -> Bytes {
       } else {
         b'\x00'
       }
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn mailbox_sm_window_with_status(window : Bytes, ready : Bool) -> Bytes {
+  Bytes::makei(@protocol.sm_entry_size, fn(i) {
+    if i == 5 {
+      if ready {
+        b'\x08'
+      } else {
+        b'\x00'
+      }
+    } else if i < window.length() {
+      window[i]
     } else {
       b'\x00'
     }
@@ -295,6 +312,24 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
   let sm0_status_addr = @protocol.reg_sm_base
   let sm1_status_addr = @protocol.reg_sm_base +
     @protocol.sm_entry_size.reinterpret_as_uint()
+  if pdu.header.command is @protocol.FPWR {
+    let sm_entry_size = @protocol.sm_entry_size.reinterpret_as_uint()
+    if offset >= @protocol.reg_sm_base &&
+      offset < @protocol.reg_sm_base + 8U * sm_entry_size {
+      let sm_offset = offset - @protocol.reg_sm_base
+      let sm_index = (sm_offset / sm_entry_size).reinterpret_as_int()
+      if sm_index >= 0 && sm_index < self.sm_windows.length() {
+        let intra_offset = sm_offset % sm_entry_size
+        let window = self.sm_windows[sm_index]
+        let i = 0U
+        while i < pdu.data.length() && intra_offset + i < window.length() {
+          window[intra_offset + i] = pdu.data[i]
+          i = i + 1U
+        }
+        self.sm_windows[sm_index] = window
+      }
+    }
+  }
   self.next_response = match pdu.header.command {
     @protocol.BRD =>
       build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
@@ -308,14 +343,18 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
     }
     @protocol.FPRD => {
       let response_data = if offset == sm0_status_addr {
-        if self.send_timeout_poll_budget > 0 {
+        let ready = if self.send_timeout_poll_budget > 0 {
           self.send_timeout_poll_budget = self.send_timeout_poll_budget - 1
-          mailbox_status_bytes(true)
+          true
         } else {
-          mailbox_status_bytes(false)
+          false
         }
+        mailbox_sm_window_with_status(self.sm_windows[0], ready)
       } else if offset == sm1_status_addr {
-        mailbox_status_bytes(self.mailbox_ready && self.mailbox_mapping_ready)
+        mailbox_sm_window_with_status(
+          self.sm_windows[1],
+          self.mailbox_ready && self.mailbox_mapping_ready,
+        )
       } else if offset == @protocol.reg_al_status {
         Bytes::from_array([@protocol.PreOp.to_byte(), b'\x00'])
       } else if offset == 0x1080U {
@@ -325,9 +364,6 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
         } else {
           Bytes::new(pdu.data.length())
         }
-      } else if offset == 0x1080U {
-        self.mailbox_ready = false
-        self.pending_mailbox_response
       } else {
         Bytes::new(pdu.data.length())
       }
@@ -335,9 +371,11 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
     }
     @protocol.FPWR => {
       if station == 0x1001U &&
-        (offset == @protocol.reg_sm_base ||
-        offset ==
-        @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint()) {
+        (
+          offset == @protocol.reg_sm_base ||
+          offset ==
+          @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint()
+        ) {
         self.mailbox_mapping_ready = true
       }
       if offset == 0x1000U && self.mailbox_mapping_ready {
@@ -476,6 +514,41 @@ test "refine startup preparation in preop retries transient mailbox timeout" {
   assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
   assert_eq(refined.mapping.output_bytes, 6)
   assert_eq(refined.mapping.input_bytes, 6)
+}
+
+///|
+test "process data length refresh fallback only handles mailbox bootstrap failures" {
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(Ok((None, None))),
+  )
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(
+      Err(@hal.EcError::MailboxTimeout),
+    ),
+  )
+  assert_true(
+    should_retry_process_data_lengths_after_mailbox_refresh(
+      Err(
+        @hal.EcError::MailboxProtocol(
+          "input mailbox SyncManager is deactivated/reset: start=0x0",
+        ),
+      ),
+    ),
+  )
+  assert_true(
+    not(
+      should_retry_process_data_lengths_after_mailbox_refresh(
+        Ok((Some(6), None)),
+      ),
+    ),
+  )
+  assert_true(
+    not(
+      should_retry_process_data_lengths_after_mailbox_refresh(
+        Err(@hal.EcError::SdoAbort(0x06090011U)),
+      ),
+    ),
+  )
 }
 
 ///|
