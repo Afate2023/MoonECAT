@@ -313,13 +313,21 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
   let sm1_status_addr = @protocol.reg_sm_base +
     @protocol.sm_entry_size.reinterpret_as_uint()
   if pdu.header.command is @protocol.FPWR {
+    let sm_entry_size = @protocol.sm_entry_size.reinterpret_as_uint()
     if offset >= @protocol.reg_sm_base &&
-      offset <
-      @protocol.reg_sm_base + 8U * @protocol.sm_entry_size.reinterpret_as_uint() {
-      let sm_index = ((offset - @protocol.reg_sm_base) /
-      @protocol.sm_entry_size.reinterpret_as_uint()).reinterpret_as_int()
+      offset < @protocol.reg_sm_base + 8U * sm_entry_size {
+      let sm_offset = offset - @protocol.reg_sm_base
+      let sm_index = (sm_offset / sm_entry_size).reinterpret_as_int()
       if sm_index >= 0 && sm_index < self.sm_windows.length() {
-        self.sm_windows[sm_index] = pdu.data
+        let intra_offset = sm_offset % sm_entry_size
+        let window = self.sm_windows[sm_index]
+        let i = 0U
+        while i < pdu.data.length() &&
+          intra_offset + i < window.length() {
+          window[intra_offset + i] = pdu.data[i]
+          i = i + 1U
+        }
+        self.sm_windows[sm_index] = window
       }
     }
   }
