@@ -16,6 +16,8 @@ pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxCon
 
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
+pub fn build_task_schedule(Int64, Array[TaskDescriptor]) -> TaskSchedule?
+
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
 
 pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
@@ -27,6 +29,8 @@ pub fn configuration_from_scan(ScanReport) -> ConfigurationModel
 pub fn configuration_to_eni_json(ConfigurationModel) -> Json
 
 pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> String
+
+pub fn cycle_timing_report(Int64, Int64, Int64, ClockDomain) -> CycleTimingReport
 
 pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
 
@@ -74,6 +78,8 @@ pub fn parse_esi_json_document(String) -> EsiJsonDocument raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
+pub fn partition_by_slave(@protocol.PdoContext) -> Array[(UInt, ProcessImageSlice)]
+
 pub fn plan_scan_station_addresses_with_strategy(Array[ObservedSlaveAddress], ScanStationAddressStrategy) -> Array[UInt] raise @hal.EcError
 
 pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
@@ -99,6 +105,8 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_fp(N, UInt, Int, @hal.Duration) -> B
 pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+
+pub fn read_slice_inputs(@protocol.ProcessImage, ProcessImageSlice) -> Bytes
 
 pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(N, UInt, UInt, SlaveStartupPreparation, @hal.Duration) -> SlaveStartupPreparation
 
@@ -136,9 +144,13 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> Sca
 
 pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
 
+pub fn slice_from_mapping(@protocol.PdoMapping, @protocol.ProcessImage) -> ProcessImageSlice?
+
 pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
 
 pub fn startup_preparation_from_esi_offline_report(EsiOfflineSiiReport, UInt) -> SlaveStartupPreparation
+
+pub fn tasks_due_at_cycle(TaskSchedule, Int64) -> Array[TaskDescriptor]
 
 pub fn topology_fingerprint(ScanReport) -> TopologyFingerprint
 
@@ -160,9 +172,25 @@ pub fn[N : @hal.Nic] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.
 
 pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> Unit
+
 // Errors
 
 // Types and methods
+pub(all) enum ClockDomain {
+  Mcu
+  Linux
+  Fpga
+  Virtual
+} derive(Eq, Show)
+
+pub(all) struct CoSimConfig {
+  cycle_period_ns : Int64
+  slave_count : Int
+  output_size : Int
+  input_size : Int
+} derive(Eq, Show)
+
 pub(all) struct ConfigurationComparisonReport {
   expected_source : ConfigurationSource
   actual_source : ConfigurationSource
@@ -233,10 +261,30 @@ pub(all) struct ConfigurationSurfaceSummary {
   difference_count : Int
 } derive(Eq, Show)
 
+pub(all) enum CycleDirective {
+  Continue
+  SkipCycle
+  StopGraceful
+} derive(Eq, Show)
+
 pub(all) struct CycleResult {
   wkc : UInt
   expected_wkc : UInt
   ok : Bool
+} derive(Eq, Show)
+
+pub(all) struct CycleSnapshot {
+  cycle : Int64
+  result : CycleResult?
+  dc_state : DcState
+  recovery_pending : Bool
+} derive(Show)
+
+pub(all) struct CycleTimingReport {
+  nominal_period_ns : Int64
+  actual_period_ns : Int64
+  jitter_ns : Int64
+  domain : ClockDomain
 } derive(Eq, Show)
 
 pub(all) enum DcState {
@@ -301,6 +349,11 @@ pub(all) struct DiagnosticSurface {
   monitor_verdicts : Array[MonitorResult]?
   overall_verdict : Verdict?
   topology_fingerprint : TopologyFingerprint?
+} derive(Eq, Show)
+
+pub(all) struct DomainTimestamp {
+  domain : ClockDomain
+  ns : Int64
 } derive(Eq, Show)
 
 pub(all) struct EsiJsonDcMode {
@@ -421,6 +474,33 @@ pub(all) struct EsiOfflineSiiReport {
   categories : Array[@mailbox.SiiCategoryEntry]
 }
 
+pub(all) struct HilCycleHook[A] {
+  adapter : A
+  session : HilSession
+}
+pub fn[A] HilCycleHook::new(A, HilSession) -> Self[A]
+pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A]
+
+pub(all) struct HilSession {
+  mut sim_time : SimTime
+  cycle_period_ns : Int64
+  schedule : TaskSchedule
+  step_log : Array[SimStepResult]
+  mut terminated : Bool
+  mut termination_reason : String
+}
+pub fn HilSession::get_sim_time(Self) -> SimTime
+pub fn HilSession::get_termination_reason(Self) -> String
+pub fn HilSession::is_terminated(Self) -> Bool
+pub fn HilSession::new(Int64, TaskSchedule) -> Self
+pub fn HilSession::step_count(Self) -> Int
+
+pub struct LoopbackCoSimAdapter {
+  mut sim_time : SimTime
+}
+pub fn LoopbackCoSimAdapter::new() -> Self
+pub impl CoSimAdapter for LoopbackCoSimAdapter
+
 pub(all) struct MailboxSession {
   original_state : @protocol.EsmState
   mailbox_config : @mailbox.MailboxConfig
@@ -430,6 +510,12 @@ pub(all) struct MonitorResult {
   name : String
   verdict : Verdict
 } derive(Eq, Show)
+
+pub struct NullCycleHook {
+  _unused : Unit
+}
+pub fn NullCycleHook::new() -> Self
+pub impl CycleHook for NullCycleHook
 
 pub struct NullRunProgressSink {
   _unused : Unit
@@ -443,6 +529,13 @@ pub(all) struct ObservedSlaveAddress {
 } derive(Eq, Show)
 
 type OperationalStartupStep derive(Eq, Show)
+
+pub(all) struct ProcessImageSlice {
+  output_offset : Int
+  output_length : Int
+  input_offset : Int
+  input_length : Int
+} derive(Eq, Show)
 
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
@@ -571,6 +664,20 @@ pub(all) enum ScanStationAddressStrategy {
   TwinCATCompatible
 } derive(Eq, Show)
 
+pub(all) enum SimStepResult {
+  Ok(SimTime)
+  Terminated(String)
+  Error(String)
+} derive(Eq, Show)
+
+pub(all) struct SimTime(Int64) derive(Compare, Eq, Show)
+pub fn SimTime::advance(Self, Int64) -> Self
+pub fn SimTime::from_ns(Int64) -> Self
+#deprecated
+pub fn SimTime::inner(Self) -> Int64
+pub fn SimTime::to_ns(Self) -> Int64
+pub fn SimTime::zero() -> Self
+
 pub(all) struct SlaveDiagnosis {
   station_address : UInt
   al_state : @protocol.EsmState?
@@ -631,6 +738,18 @@ pub(all) struct StationStartupMailboxPlan {
   commands : Array[StartupMailboxCommand]
 } derive(Eq, Show)
 
+pub(all) struct TaskDescriptor {
+  name : String
+  priority : Int
+  cycle_divisor : Int
+  slice : ProcessImageSlice
+} derive(Eq, Show)
+
+pub(all) struct TaskSchedule {
+  base_period_ns : Int64
+  tasks : Array[TaskDescriptor]
+} derive(Eq, Show)
+
 pub(all) struct Telemetry {
   mut cycles : Int64
   mut tx_frames : Int64
@@ -643,6 +762,19 @@ pub(all) struct Telemetry {
 } derive(Eq, Show)
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
+
+pub(all) struct TimebaseSync {
+  reference_domain : ClockDomain
+  local_domain : ClockDomain
+  mut offset_ns : Int64
+  mut drift_ppb : Int64
+  mut sync_count : Int64
+  mut last_sync_ns : Int64
+} derive(Eq, Show)
+pub fn TimebaseSync::new(ClockDomain, ClockDomain) -> Self
+pub fn TimebaseSync::to_local(Self, Int64) -> Int64
+pub fn TimebaseSync::to_reference(Self, Int64) -> Int64
+pub fn TimebaseSync::update(Self, Int64, Int64) -> Unit
 
 pub(all) struct TopologyFingerprint {
   slave_count : Int
@@ -701,10 +833,39 @@ pub(all) enum Verdict {
 pub fn Verdict::is_passing(Self) -> Bool
 pub fn Verdict::severity(Self) -> Int
 
+pub struct VirtualTimebase {
+  mut current_ns : Int64
+}
+pub fn VirtualTimebase::advance(Self, Int64) -> Unit
+pub fn VirtualTimebase::new() -> Self
+pub fn VirtualTimebase::set(Self, Int64) -> Unit
+pub impl Timebase for VirtualTimebase
+
 // Type aliases
 
 // Traits
+pub(open) trait CoSimAdapter {
+  init_(Self, CoSimConfig) -> Unit
+  write_outputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  step(Self, SimTime, Int64) -> SimStepResult
+  read_inputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  shutdown(Self) -> Unit
+}
+
+pub(open) trait CycleHook {
+  on_pre_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
+}
+
 pub(open) trait RunProgressSink {
   emit(Self, RunProgress) -> Unit
+}
+
+pub(open) trait Timebase {
+  domain(Self) -> ClockDomain
+  now_ns(Self) -> Int64
+  resolution_ns(Self) -> Int64
+  is_monotonic(Self) -> Bool
 }
 
