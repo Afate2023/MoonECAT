@@ -71,6 +71,37 @@ pub struct MockNic {
 pub fn MockNic::new() -> Self
 pub impl @hal.Nic for MockNic
 
+pub(all) enum NicEvent {
+  Sent(Bytes, Int)
+  Received(Bytes)
+  RecvTimeout
+  SendFailed(String)
+} derive(Eq, Show)
+
+pub(all) struct NicEventLog {
+  events : Array[NicEvent]
+} derive(Show)
+pub fn NicEventLog::append(Self, NicEvent) -> Unit
+pub fn NicEventLog::len(Self) -> Int
+pub fn NicEventLog::new() -> Self
+
+pub struct RecordingNic {
+  inner : VirtualNic
+  log : NicEventLog
+}
+pub fn RecordingNic::get_log(Self) -> NicEventLog
+pub fn RecordingNic::wrap(VirtualNic) -> Self
+pub impl @hal.Nic for RecordingNic
+
+pub struct ReplayNic {
+  log : NicEventLog
+  mut cursor : Int
+}
+pub fn ReplayNic::from_log(NicEventLog) -> Self
+pub fn ReplayNic::is_exhausted(Self) -> Bool
+pub fn ReplayNic::remaining(Self) -> Int
+pub impl @hal.Nic for ReplayNic
+
 pub struct VirtualBus {
   slaves : Array[VirtualSlave]
 } derive(Show)
