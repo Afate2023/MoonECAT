@@ -222,7 +222,8 @@ pub fn[N : @hal.Nic] clear_al_error(
       _ => None
     }
     let status_code_text = match status_code {
-      Some(code) => code.to_string()
+      Some(code) =>
+        code.to_string() + " (" + al_status_code_description(code) + ")"
       None => "unknown"
     }
     raise @hal.EcError::EsmStateError(
@@ -290,7 +291,8 @@ pub fn[N : @hal.Nic] clear_al_error_ap(
       _ => None
     }
     let status_code_text = match status_code {
-      Some(code) => code.to_string()
+      Some(code) =>
+        code.to_string() + " (" + al_status_code_description(code) + ")"
       None => "unknown"
     }
     raise @hal.EcError::EsmStateError(

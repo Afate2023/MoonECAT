@@ -76,6 +76,8 @@ pub fn parse_sii_sync_units(Bytes) -> Array[SiiSyncUnit]
 
 pub fn parse_sii_timeouts(Bytes) -> SiiTimeouts raise @hal.EcError
 
+pub fn sdo_abort_code_description(UInt) -> String
+
 pub let sii_category_start : Int
 
 // Errors

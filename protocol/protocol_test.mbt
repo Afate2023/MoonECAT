@@ -2680,3 +2680,31 @@ test "pdo_exchange with empty context" {
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
   assert_eq(wkc, 0U) // no data to exchange
 }
+
+///|
+test "al_status_code_description known codes" {
+  assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
+  assert_eq(
+    @protocol.al_status_code_description(0x001EU),
+    "Invalid input configuration",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0016U),
+    "Invalid mailbox configuration (SafeOp)",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0070U),
+    "Detected module ident list does not match",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0030U),
+    "Invalid DC SYNC configuration",
+  )
+  assert_eq(@protocol.al_status_code_description(0x0051U), "EEPROM error")
+}
+
+///|
+test "al_status_code_description unknown code" {
+  let desc = @protocol.al_status_code_description(0xABCDU)
+  assert_true(desc.contains("Unknown"))
+}

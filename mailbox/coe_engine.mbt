@@ -841,3 +841,50 @@ pub fn decode_sdo_info_oe_description_payload(
   }
   { index, subindex, value_info, data_type, bit_length, access, name }
 }
+
+///|
+/// Human-readable description of an SDO Abort Code per ETG.1000.6 Table 40.
+pub fn sdo_abort_code_description(code : UInt) -> String {
+  match code {
+    0x00000000U => "No error"
+    0x05030000U => "Toggle bit not changed"
+    0x05040000U => "SDO protocol timeout"
+    0x05040001U => "Client/Server command specifier not valid or unknown"
+    0x05040005U => "Out of memory"
+    0x06010000U => "Unsupported access to an object"
+    0x06010001U => "Attempt to read a write-only object"
+    0x06010002U => "Attempt to write a read-only object"
+    0x06010003U => "Subindex cannot be written, SI0 must be 0 for write access"
+    0x06010004U =>
+      "SDO Complete Access not supported for variable length objects"
+    0x06010005U => "Object length exceeds mailbox size"
+    0x06010006U => "Object mapped to RxPDO, SDO download blocked"
+    0x06020000U => "The object does not exist in the object dictionary"
+    0x06040041U => "The object cannot be mapped into the PDO"
+    0x06040042U =>
+      "Number and length of objects to be mapped would exceed PDO length"
+    0x06040043U => "General parameter incompatibility reason"
+    0x06040047U => "General internal incompatibility in the device"
+    0x06060000U => "Access failed due to a hardware error"
+    0x06070010U =>
+      "Data type does not match, length of service parameter does not match"
+    0x06070012U =>
+      "Data type does not match, length of service parameter too high"
+    0x06070013U =>
+      "Data type does not match, length of service parameter too low"
+    0x06090011U => "Subindex does not exist"
+    0x06090030U => "Value range of parameter exceeded"
+    0x06090031U => "Value of parameter written too high"
+    0x06090032U => "Value of parameter written too low"
+    0x06090036U => "Maximum value is less than minimum value"
+    0x08000000U => "General error"
+    0x08000020U => "Data cannot be transferred or stored to the application"
+    0x08000021U =>
+      "Data cannot be transferred or stored to the application because of local control"
+    0x08000022U =>
+      "Data cannot be transferred or stored to the application because of the present device state"
+    0x08000023U =>
+      "Object dictionary dynamic generation fails or no object dictionary is present"
+    _ => "Unknown (" + code.to_string() + ")"
+  }
+}

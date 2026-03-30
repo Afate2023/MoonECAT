@@ -2046,3 +2046,30 @@ test "SiiPdo all flags clear" {
   assert_true(!pdo.is_depend_on_slot_group())
   assert_true(!pdo.is_overwritten_by_module())
 }
+
+///|
+test "sdo_abort_code_description known codes" {
+  assert_eq(@mailbox.sdo_abort_code_description(0x00000000U), "No error")
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x06020000U),
+    "The object does not exist in the object dictionary",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x06090011U),
+    "Subindex does not exist",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x05030000U),
+    "Toggle bit not changed",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x08000022U),
+    "Data cannot be transferred or stored to the application because of the present device state",
+  )
+}
+
+///|
+test "sdo_abort_code_description unknown code" {
+  let desc = @mailbox.sdo_abort_code_description(0xDEADBEEFU)
+  assert_true(desc.contains("Unknown"))
+}

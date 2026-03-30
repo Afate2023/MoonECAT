@@ -11,6 +11,8 @@ pub fn address_offset(UInt) -> UInt
 
 pub fn address_station(UInt) -> UInt
 
+pub fn al_status_code_description(UInt) -> String
+
 pub fn[N : @hal.Nic] apply_op_only_policy(N, UInt, EsmState, Bool, Array[Int], @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] assign_station_address(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError

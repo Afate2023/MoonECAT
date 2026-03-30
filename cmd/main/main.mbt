@@ -2756,6 +2756,10 @@ fn esc_register_report_json(report : EscRegisterReport) -> Json {
     "al_state": Json::string(report.al_state.to_string()),
     "al_error_flag": Json::boolean(report.al_error_flag),
     "al_status_code": option_uint_json(report.al_status_code),
+    "al_status_code_description": match report.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "sync_managers": Json::array(
       report.sync_managers.map(fn(sm) {
         Json::object({
@@ -2861,7 +2865,11 @@ fn esc_register_report_text(report : EscRegisterReport) -> String {
   let buf = @buffer.new(size_hint=768)
   let al_error_flag_text = if report.al_error_flag { "set" } else { "clear" }
   let al_status_code_text = match report.al_status_code {
-    Some(code) => format_hex(code, 4)
+    Some(code) =>
+      format_hex(code, 4) +
+      " (" +
+      @protocol.al_status_code_description(code) +
+      ")"
     None => "not set"
   }
   buf.write_string("EtherCAT ESC Register Snapshot\n")
@@ -3078,6 +3086,10 @@ fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
     "al_state": option_esm_state_json(phase.al_state),
     "al_error_flag": option_bool_json(phase.al_error_flag),
     "al_status_code": option_uint_json(phase.al_status_code),
+    "al_status_code_description": match phase.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "sync_managers": Json::array(
       phase.sync_managers.map(fn(sm) {
         Json::object({
@@ -3132,11 +3144,21 @@ fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
                 "value_u32": option_uint_json(entry.value_u32),
                 "error_detail": option_string_json(entry.error_detail),
                 "abort_code": option_uint_json(entry.abort_code),
+                "abort_code_description": match entry.abort_code {
+                  Some(code) =>
+                    Json::string(@mailbox.sdo_abort_code_description(code))
+                  None => Json::null()
+                },
               })
             }),
           ),
           "error_detail": option_string_json(obj.error_detail),
           "abort_code": option_uint_json(obj.abort_code),
+          "abort_code_description": match obj.abort_code {
+            Some(code) =>
+              Json::string(@mailbox.sdo_abort_code_description(code))
+            None => Json::null()
+          },
         })
       }),
     ),
@@ -3348,7 +3370,11 @@ fn startup_trace_report_text(report : StartupTraceReport) -> String {
       None => "unknown"
     }
     let phase_status = match phase.al_status_code {
-      Some(value) => format_hex(value, 4)
+      Some(value) =>
+        format_hex(value, 4) +
+        " (" +
+        @protocol.al_status_code_description(value) +
+        ")"
       None => "not set"
     }
     buf.write_string(phase.name + "\n")
@@ -3679,6 +3705,10 @@ fn diagnosis_output_json(
       Some(code) => Json::number(code.to_double())
       None => Json::null()
     },
+    "al_status_code_description": match report.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "error_register": Json::number(report.error_register.to_uint().to_double()),
     "diagnosis_counter": match report.diagnosis_counter {
       Some(value) => Json::number(value.to_double())
@@ -3703,7 +3733,11 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
     None => "unknown"
   }
   let al_status_code_text = match report.al_status_code {
-    Some(code) => format_hex(code, 4)
+    Some(code) =>
+      format_hex(code, 4) +
+      " (" +
+      @protocol.al_status_code_description(code) +
+      ")"
     None => "unknown"
   }
   let diagnosis_counter_text = match report.diagnosis_counter {
@@ -3798,6 +3832,11 @@ fn od_report_json(report : OdBrowseReport) -> Json {
             Some(code) => Json::number(code.to_double())
             None => Json::null()
           },
+          "abort_code_description": match report.abort_code {
+            Some(code) =>
+              Json::string(@mailbox.sdo_abort_code_description(code))
+            None => Json::null()
+          },
         })
       None => Json::null()
     },
@@ -3820,7 +3859,13 @@ fn od_report_text(report : OdBrowseReport) -> String {
       buf.write_string("Error Category: " + category + "\n")
       match report.abort_code {
         Some(code) =>
-          buf.write_string("Abort Code: " + format_hex(code, 8) + "\n")
+          buf.write_string(
+            "Abort Code: " +
+            format_hex(code, 8) +
+            " (" +
+            @mailbox.sdo_abort_code_description(code) +
+            ")\n",
+          )
         None => ()
       }
       match report.error_detail {
@@ -5996,6 +6041,10 @@ fn state_surface_summary_json(summary : @runtime.StateSurfaceSummary) -> Json {
     },
     "al_status_code": match summary.al_status_code {
       Some(code) => Json::number(code.to_double())
+      None => Json::null()
+    },
+    "al_status_code_description": match summary.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
       None => Json::null()
     },
     "wkc": match summary.wkc {
