@@ -75,3 +75,4 @@
 - `HAL/虚拟多从站Mock` → `5535c69` `feat(hal/mock): add virtual multi-slave bus simulation`
 - `Fault injection 一等模型` → `ba7356e` `feat(hal/mock): add first-class fault injection model (B-1)`
 - `Deterministic replay 事件溯源` → `e4b03a2` `feat(hal/mock): add deterministic replay via event sourcing (B-2)`
+- `Monitor/Verdict 框架` → `7af544f` `feat(runtime): add monitor/verdict framework (B-3)`

@@ -106,7 +106,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L4-10 | Extism 宿主 host capability 打通 | ❌ | 仅 Mock 回放 |
 | L4-11 | 事件溯源 deterministic replay 最小闭环 | ✅ | `e4b03a2` NicEvent+RecordingNic+ReplayNic + 10 tests |
 | L4-12 | Fault injection 一等模型 | ✅ | `ba7356e` FaultType×5 + FaultSchedule×5 + FaultNic wrapper + 12 tests |
-| L4-13 | Monitor / Verdict 框架 | ❌ | 规划中 |
+| L4-13 | Monitor / Verdict 框架 | ✅ | `7af544f` 6 monitors + Verdict enum + run_monitors + 19 tests |
 
 **综合进度**：L1/L2 全部完成，L3 已形成最小产品面，L4 验证加固层约 54% 完成。
 
@@ -146,7 +146,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 |---|---|---|---|---|
 | B-1 | 设计并实现一等 fault injection 模型（≥3 类可控注入） | P1-1 | ✅ `ba7356e` | hal/mock/ |
 | B-2 | 引入 deterministic replay 最小闭环（事件溯源回放） | P1-2 | ✅ `e4b03a2` | hal/mock/ |
-| B-3 | 引入 monitor / verdict 框架（Pass/Warn/Fail/Block） | P1-3 | ❌ | runtime/, cmd/main/ |
+| B-3 | 引入 monitor / verdict 框架（Pass/Warn/Fail/Block） | P1-3 | ✅ `7af544f` | runtime/ |
 | B-4 | 从 loopback/mock 演进到协议级虚拟从站 | P1-4 | ✅ `5535c69` | hal/mock/, protocol/, mailbox/ |
 | B-5 | 冻结 topology fingerprint / Hot Connect 最小模型 | P1-5 | ⚠️ 模型已有 | runtime/, mailbox/ |
 | B-6 | 扩展 DiagnosticSurface 为统一事实层 | P1-6 | ⚠️ 最小已有 | runtime/, cmd/main/ |
