@@ -6,10 +6,57 @@ import {
 }
 
 // Values
+pub fn apply_frame_fault(FaultType, Bytes) -> Bytes?
 
 // Errors
 
 // Types and methods
+pub struct FaultInjector {
+  rules : Array[FaultRule]
+  mut send_count : Int
+  mut recv_count : Int
+} derive(Show)
+pub fn FaultInjector::add(Self, FaultType, FaultSchedule) -> Unit
+pub fn FaultInjector::add_rule(Self, FaultRule) -> Unit
+pub fn FaultInjector::check_recv(Self) -> FaultType?
+pub fn FaultInjector::check_send(Self) -> FaultType?
+pub fn FaultInjector::new() -> Self
+pub fn FaultInjector::reset(Self) -> Unit
+pub fn FaultInjector::total_fired(Self) -> Int
+
+pub struct FaultNic {
+  inner : VirtualNic
+  injector : FaultInjector
+}
+pub fn FaultNic::new(VirtualNic, FaultInjector) -> Self
+pub fn FaultNic::wrap(VirtualNic) -> Self
+pub impl @hal.Nic for FaultNic
+
+pub struct FaultRule {
+  fault : FaultType
+  mut schedule : FaultSchedule
+  mut active : Bool
+  mut fired_count : Int
+} derive(Show)
+pub fn FaultRule::new(FaultType, FaultSchedule) -> Self
+pub fn FaultRule::should_fire(Self, Int) -> Bool
+
+pub(all) enum FaultSchedule {
+  Always
+  Once
+  CountDown(Int)
+  AfterN(Int)
+  AtCycle(Int)
+} derive(Show)
+
+pub(all) enum FaultType {
+  RecvTimeout
+  SendFailure(String)
+  FrameCorrupt(offset~ : Int, value~ : Byte)
+  FrameDrop
+  WkcCorrupt(delta~ : Int)
+} derive(Show)
+
 pub struct MockClock {
   mut current_ns : Int64
 }
