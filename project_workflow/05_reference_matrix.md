@@ -2,6 +2,10 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 8 节。
 
+> **覆盖统计**：17 项功能对标，15 项已对齐 ✅，2 项部分完成 ⚠️（Hot Connect 实机双分支 / Extism host adapter）。  
+> 参考实现：SOEM · CherryECAT · ethercrab · GatorCAT · IGH · EtherCAT.NET · siitool  
+> 覆盖层级：L1 Foundation → L2 Protocol Core → L3 Product Surface → L4 Verification
+
 
 
 ## 8. Reference_Project实现核对矩阵（调用流 + 本地源码）

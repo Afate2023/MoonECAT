@@ -2,6 +2,16 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 1 节与第 2 节中 M1 到 M4。
 
+> **归档状态**：M1-M4 全部已完成 ✅，覆盖 **L1 Foundation** 与 **L2 Protocol Core** 早期阶段。  
+> 当前主线推进请参阅 [04_milestones_m5_m8.md](04_milestones_m5_m8.md) 与 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md)。
+
+| 里程碑 | 领域 | L 级 | 状态 |
+|:---:|---|:---:|:---:|
+| M1 | 基础骨架与包结构 | L1 | ✅ |
+| M2 | 协议编解码与帧收发 | L1 | ✅ |
+| M3 | ESM + PDO + DC 初始化 | L2 | ✅ |
+| M4 | Mailbox / CoE / SDO | L2 | ✅ |
+
 ## 1. 使用规则
 
 - 任务完成后再打勾，不能按预期完成时补充阻塞说明。
@@ -12,7 +22,7 @@
 
 ## 2. 里程碑任务
 
-### M1 基础骨架与包结构 — ✅ 已完成
+### M1 基础骨架与包结构 — ✅ 已完成 【L1】
 
 - [x] 建立稳定的 MoonBit 包结构，明确 HAL、Protocol Core、Mailbox、Runtime、CLI 的目录边界。
   - 📦 hal/, protocol/, mailbox/, runtime/, fixtures/, cmd/main/
@@ -30,7 +40,7 @@
 - `HAL 最小接口 + 错误/诊断/配置模型` → `fb12340` `feat: define platform hal contracts`
 - `最小测试骨架与夹具` → `4921fdf` `test: add minimal project test harness`
 
-### M2 HAL 与帧/PDU 最小闭环 — ✅ 已完成
+### M2 HAL 与帧/PDU 最小闭环 — ✅ 已完成 【L1】
 
 - [x] 实现 Ethernet II 与 EtherCAT 基本帧结构的编码、解码和校验。
   - 📦 EcFrame::encode/decode, EtherType 0x88A4 [ETG.1500 #107]
@@ -51,7 +61,7 @@
 - `Mock Loopback 后端` → `641fc49` `feat: add mock loopback hal`
 - `帧/PDU 收发闭环测试` → `5ab7859` `test: cover frame and pdu roundtrip`
 
-### M3 拓扑发现、SII/ESI、配置计算 — ✅ 已完成
+### M3 拓扑发现、SII/ESI、配置计算 — ✅ 已完成 【L2】
 
 - [x] 实现基础从站发现流程和拓扑结果对象。
   - 📦 count_slaves(BRD), SlaveInfo, ScanReport [ETG.1500 #301]
@@ -77,7 +87,7 @@
 - `按站地址位置校验与边界测试` → `a6069bb` `fix: validate slaves by configured position and add boundary tests`
 - `SII/ESI 规范修正` → `2006272` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
 
-### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成
+### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成 【L2】
 
 - [x] 实现 ESM 状态流转和错误回退路径。
   - 📦 EsmState 5 状态 + can_transition + request_state + transition_through [ETG.1500 #104]

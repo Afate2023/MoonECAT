@@ -2,20 +2,32 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 9 节与第 10 节。
 
+> **权威来源**：三条主线（A/B/C）完整路线图与 L1-L4 成熟度审计已整合进 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md)。本文件维护 **可执行 Backlog** 与提交方式规范。
+
 ## 9. 主线 Backlog 与完成判定
 
-当前主线 backlog（按依赖顺序）：
+当前主线 backlog（按优先级 P0→P2 排列，对齐 08 文件三条主线）：
 
-1. **拓扑变化 / Hot Connect**：把显式设备标识扩展成稳定的拓扑差异与 Hot Connect 分组能力，并补 optional/multiple-slave 场景的 Native 实机证据。
-2. **Native 后端首版收口**：在现有真实链路闭环基础上，补齐错误语义冻结与 AddressSanitizer/等价内存安全检查命令。
-3. **Extism / WASM 产品化**：在现有 envelope + Mock 回放基础上，补宿主入口、bytes-only 输入、共享内存路径与最小集成回放。
-4. **SII 全量产品面**：把 `read-sii` 从最小在线诊断入口扩展到稳定 category 深读、字符串解码一致性与配置工具可复用 JSON。
+### P0 · 主线 A — Native Runtime Baseline
 
-主线完成判定：
+1. **Native 后端首版收口**：在现有真实链路闭环基础上，补齐错误语义冻结与 AddressSanitizer / 等价内存安全检查命令。
+2. **SII 全量产品面**：`read-sii` 深度解码框架已闭环 ✅（含 overlay hook、category class、decoder 状态合同）；后续仅剩厂商样本挂接。
 
-- [x] 0.3、0.4、0.5 三个拆解节的验收标准全部完成。
-- [x] `scan`、`validate`、`state`、`diagnosis`、对象字典浏览与配置差异报告形成统一 CLI / JSON 输出规范。
-- [ ] Native 与 Extism 两条产品面共享同一配置对象、诊断对象和错误分类。
+### P1 · 主线 B — Verification Runtime
+
+3. **拓扑变化 / Hot Connect**：显式标识 + 别名 + 4-tuple + 可选组分级已落地，仍缺 optional/mandatory 双分支实机证据。
+4. **事件溯源验证引擎**：定义 EventStream 采集边界 → Replay 幂等性 → Monitor/Verdict 最小合同（新增，源自 08 文件主线 B）。
+
+### P2 · 主线 C — HIL-Ready Runtime Boundary
+
+5. **Extism / WASM 产品化**：在现有 envelope + Mock 回放基础上，补宿主入口、bytes-only 输入、共享内存路径与最小集成回放。
+6. **HIL 测试拓扑定义**：至少 1 从站 + 1 实时 NIC 的最小硬件在环验证流程（新增，源自 08 文件主线 C）。
+
+主线完成判定（以 L1-L4 成熟度为标尺）：
+
+- [x] **L1-L2 全量完成**：0.3、0.4、0.5 三个拆解节验收标准全部完成；Class B 17/17 = 100%。
+- [x] **L3 产品面闭合**：`scan`、`validate`、`state`、`diagnosis`、OD 浏览与配置差异报告形成统一 CLI / JSON 输出规范。
+- [ ] **L4 验证加固**：Native 与 Extism 两条产品面共享同一配置对象、诊断对象和错误分类；事件溯源 Replay 幂等性验证通过。
 - [x] [MoonECAT项目申报书.md](../MoonECAT项目申报书.md) 中 Phase 2、Phase 3、Phase 4 的证据项全部从“进行中/未开始”更新为已完成或已验证。
 
 ## 10. 提交执行方式
