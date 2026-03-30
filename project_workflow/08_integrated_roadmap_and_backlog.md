@@ -104,7 +104,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L4-08 | Linux Raw Socket 实机闭环 | ❌ | 待验证 |
 | L4-09 | AddressSanitizer / 等价内存安全检查 | ❌ | 未执行 |
 | L4-10 | Extism 宿主 host capability 打通 | ❌ | 仅 Mock 回放 |
-| L4-11 | 事件溯源 deterministic replay 最小闭环 | ❌ | 规划中 |
+| L4-11 | 事件溯源 deterministic replay 最小闭环 | ✅ | `e4b03a2` NicEvent+RecordingNic+ReplayNic + 10 tests |
 | L4-12 | Fault injection 一等模型 | ✅ | `ba7356e` FaultType×5 + FaultSchedule×5 + FaultNic wrapper + 12 tests |
 | L4-13 | Monitor / Verdict 框架 | ❌ | 规划中 |
 
@@ -145,7 +145,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | 编号 | 任务 | 对应 BACKLOG | 状态 | 涉及目录 |
 |---|---|---|---|---|
 | B-1 | 设计并实现一等 fault injection 模型（≥3 类可控注入） | P1-1 | ✅ `ba7356e` | hal/mock/ |
-| B-2 | 引入 deterministic replay 最小闭环（事件溯源回放） | P1-2 | ❌ | runtime/, fixtures/ |
+| B-2 | 引入 deterministic replay 最小闭环（事件溯源回放） | P1-2 | ✅ `e4b03a2` | hal/mock/ |
 | B-3 | 引入 monitor / verdict 框架（Pass/Warn/Fail/Block） | P1-3 | ❌ | runtime/, cmd/main/ |
 | B-4 | 从 loopback/mock 演进到协议级虚拟从站 | P1-4 | ✅ `5535c69` | hal/mock/, protocol/, mailbox/ |
 | B-5 | 冻结 topology fingerprint / Hot Connect 最小模型 | P1-5 | ⚠️ 模型已有 | runtime/, mailbox/ |
