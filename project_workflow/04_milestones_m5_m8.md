@@ -49,6 +49,8 @@
 - `Segmented Transfer（下载）+ CA 分段续传` → `9266591` `feat: complete segmented sdo and CA continuation`
 - `SDO Info OD/OE + 运行态 DC 补偿联动实现`（含 SDO Info 完整收口） → `0971f77` `feat: complete sdo info and runtime dc compensation`
 - `格式与接口同步` → `a969b5e` `chore: sync formatted sources and mbti after info`
+- `SDO validate_response 误判丢帧修复（Merge PR #1）` → `5d54aca` `Handle validate_response false return: discard stale frames and re-read in SDO transactions`
+- `Mailbox retry 事务方法与 SDO 超时修复` → `fe1e2ef` `feat(mailbox): add retry transaction methods and enhance SDO upload/download handling, fix moon test timeout`
 
 ### M6 网络配置增强 — ✅ 已完成
 
@@ -71,6 +73,9 @@
 - `Station Alias Addressing` → `fbb3745` `feat: implement IRQ consumption and alias addressing path`
 - `Error Register / Diagnosis Object 接口` → `9541967` `feat: wire cli commands and add diagnosis interface`
 - `真实设备 diagnosis 传输与 runtime helper 稳定化` → `fa72af8` `Fix real-device diagnosis transport and runtime helpers`
+- `显式标识强化校验` → `9284ede` `feat: strengthen explicit identification validation`
+- `AP 邮箱诊断路径` → `b70b5e2` `feat(protocol): add AP mailbox diagnosis path`
+- `Diagnosis AL State / Error Flag / Status Code 增强` → `2fdf472` `feat(diagnosis): enhance diagnosis reporting with AL state, error flag, and status code`
 
 ### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
 
@@ -124,6 +129,7 @@
 - [ ] **【新增】Native 后端首版**：以 Linux Raw Socket 为优先落地点，Windows Npcap 保持同一 HAL 契约与诊断语义。
   - 规划文档： [docs/NATIVE_BACKEND_PLAN.md](../docs/NATIVE_BACKEND_PLAN.md)
   - 当前状态：已创建 [hal/native/moon.pkg](../hal/native/moon.pkg) Native 包，包含 `native-stub`、native / wasm-gc 双 target 文件、Windows Npcap 与 Linux Raw Socket FFI 包装、统一 `NativeNic`、结构化 `list-if` 输出与最小测试；`moon run cmd/main list-if -- --backend native-windows-npcap --json` 已在本机 Npcap 1.8.4 下跑通（commit: `4eabaf7`），空总线 `scan/validate/run` smoke 与运行稳定化已完成（commit: `1a38d47`），Realtek USB GbE 真实从站扫描已恢复非零身份字段（commit: `263394a`），CLI 已新增 Native `state` 命令用于广播/定点 EtherCAT 从站状态机迁移，`run` 已支持可选 startup/shutdown ESM 状态，Linux Raw Socket 的 MoonBit/C 双层错误码已细化 link-down / privilege / missing-interface / timeout 诊断（commit: `bd95053` 及后续收口）；2026-03-16 又补齐了基于接口元数据的自动候选筛选、固定超时 BRD 探测，以及 scan 站地址规划策略切面（commit: `bff2f5e`），现在在省略 `--if` 的情况下也能自动落到 Realtek USB GbE 并完成真实单从站扫描。随后补齐了 Native 自动选卡 / 省略 `--station` 广播语义的 CLI 覆盖（commit: `5c4dd51`），并把严格 ESM 路径、AL 错误清除和 state/run 统一状态迁移接到实机路径上（commit: `e143fce`）；2026-03-18 再按 EtherCAT Compendium 重排 `run --startup-state op` 的启动阶段、补充基于 AL Status Code 的恢复策略，并把 startup mapping 扩展为同时写入 mailbox `SM0/SM1` 与 PDO SyncManager/FMMU，使真实单从站链路重新稳定进入 `Op`（commit: `a4cb887`）。2026-03-19 又补齐了基于 EEPROM 元数据的完整 SII 补读、`Init -> PreOp` mailbox/diagnosis 严格恢复路径，以及零长度 PDO SM 的位宽回填，当前在新伺服上已重新验证 `state --path --state preop`、`diagnosis` 与 `od` 可用（commit: `e763563`）。2026-03-20 继续补齐了配置类 AL 错误的共享恢复入口、SO 窗口启动 mailbox 命令框架、`esc-regs` / `expected-regs` CLI 诊断入口，以及对 ESC SyncManager/FMMU activation 字段的保真处理（commit: `b3b0717`）；当前 `PreOp + AL 0x001E` 不再在清错阶段误抛异常，而会稳定暴露为真实的 `PreOp -> SafeOp` 输入映射不匹配，后续仍需让 SafeOp 过程映射优先采用 CoE 激活 PDO。Raw Socket 完善项与 Npcap 实机 run/ESM 设计见 [docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md](../docs/NATIVE_REAL_STATE_TRANSITION_DESIGN.md)
+  - ✅ 2026-03-30 已修复 [runtime/runtime_wbtest.mbt](../runtime/runtime_wbtest.mbt) 中 `ActivePdoLengthsNic` 白盒测试桩的 `sm_windows` 类型与初始化问题：内部 mailbox SM 窗口改为可变 `Array[Byte]`，仅在响应边界投影为 `Bytes`，从而同时消除 `Bytes` 不可写与 `Int/UInt` 索引不匹配导致的编译失败，并避免写循环里的额外 `Bytes` 重建分配（commit: `5658372`，验证：`moon check runtime`、`moon test runtime/runtime_wbtest.mbt`）。
   - ✅ 参考 [References/EtherCAT_Compendium/EtherCAT_Compendium.md](../References/EtherCAT_Compendium/EtherCAT_Compendium.md) §3.9 Working Counter、§7 EtherCAT State Machine、§7.4 AL Status Codes：Native `diagnosis` 现已在进入 PreOp 前抓取单站 `AL Status(0x0130)` / Error Flag / `AL Status Code(0x0134)` 快照，并与 CoE `0x1001` / `0x10F3` 一并输出，便于 WKC 或 ESM 异常后的逐站定位
   - 目标范围：真实网卡收发、时钟/休眠、可选抓包与文件输出；不把平台专属逻辑带入 `protocol/`、`mailbox/`、`runtime/`
   - 建议目录：`hal/native/` 或按平台拆分 `hal/linux/`、`hal/windows/`
@@ -228,6 +234,7 @@
 - `Native 自动选卡 + 省略站号广播覆盖` → `5c4dd51` `test(cli): cover native auto-select and broadcast state`
 - `严格 ESM 路径接入 state/run` → `e143fce` `feat(esm): wire strict transitions into state and run`
 - `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `a4cb887` `fix(runtime): stabilize native op startup sequencing`
+- `ActivePdoLengthsNic sm_windows 类型/初始化修复` → `5658372` `fix(runtime): update sm_windows type and initialization for ActivePdoLengthsNic`
 - `启动恢复共享入口 + SO mailbox 启动命令 + ESC 映射诊断` → `b3b0717` `Refine startup recovery and ESC mapping diagnostics`
 - `Native mailbox diagnosis CLI 入口` → `36cfe87` `feat(cli): add native diagnosis command`
 - `真实设备 diagnosis 传输与 runtime helper 稳定化` → `fa72af8` `Fix real-device diagnosis transport and runtime helpers`
@@ -241,3 +248,28 @@
 - `接口与格式同步` → `a969b5e` `chore: sync formatted sources and mbti after info`
 - `Extism 宿主接入边界整理` → `137f80a` `docs: refresh remaining items and define Extism host boundary`
 - `Native run 长跑控制、连续超时故障与 CLI 周期参数` → `71f178e` `feat(runtime): add long-run controls and timeout faults`
+- `Npcap 接口列举独立命令` → `6682636` `feat(native): add npcap interface listing command`
+- `Linux Raw Socket errno 细化分类` → `2058971` `fix(native): classify linux raw-socket errno codes in C stub`
+- `platform stub stdio.h 修复（Linux 编译）` → `cef8362` `fix(platform_stub): include stdio.h for snprintf definition, fix linux error`
+- `AP 与 RX noise 诊断加固` → `75b35a4` `fix(native): harden diagnosis against AP and rx noise`
+- `诊断超时控制 CLI 入口` → `da2c54b` `feat(cli): add diagnosis timeout controls`
+- `startup prep 下沉到 runtime` → `82f6b7e` `refactor(runtime): sink startup prep from cli`
+- `SafeOp 前过程数据准备` → `f5644c5` `feat(cli): prepare process data before safeop`
+- `Op 启动与 SII DC 准备联动` → `75328b7` `feat(cli): wire op startup with sii dc prep`
+- `NDJSON 运行进度与独立 scan CSA 规划` → `0bda199` `feat(runtime): add ndjson run progress and isolated scan CSA planning`
+- `run ndjson 故障汇总脚本` → `23c85c1` `feat(scripts): summarize run ndjson faults`
+- `SII 字符串 UTF-8 默认解码` → `033b859` `fix(sii): decode strings as utf8 by default`
+- `read-sii TxPDO/RxPDO 详情渲染` → `462bed5` `feat(cli): render sii txpdo and rxpdo details`
+- `read-sii 输出增强至 siitool 对齐` → `c853946` `feat(cli): enrich read-sii output toward siitool parity`
+- `SII category label 消歧` → `41e1442` `test(mailbox): disambiguate category class label`
+- `统一配置对象模型` → `d2ba48d` `feat(runtime): add unified configuration model`
+- `最小 ENI XML 投影` → `fa82594` `feat(runtime): add minimal ENI XML projection`
+- `ENI 配置差异分级` → `6f4241a` `feat(cli): add ENI-backed validation grading`
+- `ENI 验证摘要扩展` → `121cafa` `feat(runtime): expand ENI validation summaries`
+- `ESI XML → JSON 共享桥` → `1e23be5` `feat(esi): route xml import through shared json bridge`
+- `ESI XML 投影到 SII 视图` → `3330009` `feat(cli): project esi xml into sii view`
+- `ESI JSON 接入启动流` → `76a40c7` `Wire ESI JSON into startup flow`
+- `统一诊断表面投影` → `d7e6c6a` `feat(runtime): unify diagnostic surface across products`
+- `Hot Connect 拓扑分级` → `0a602b2` `feat(runtime): add hot-connect topology grading`
+- `Preop 映射修复与 mailbox 刷新重试` → `013da5a` `Retry preop mapping refinement after mailbox refresh`
+- `启动期诊断与 mailbox 校验` → `136466b` `Add startup diagnostics and mailbox validation`

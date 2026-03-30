@@ -52,3 +52,11 @@
 - `Native run Op 启动顺序 + mailbox SM 启动映射修复` → `a4cb887` `fix(runtime): stabilize native op startup sequencing`
 - `Native run 长跑控制 + 连续超时故障 + CLI 周期参数` → `71f178e` `feat(runtime): add long-run controls and timeout faults`
 - `Native 自动选卡探测 + scan 站地址策略切面` → `bff2f5e` `feat(native): auto-probe interfaces and extract scan strategy`
+- `ActivePdoLengthsNic sm_windows 类型/初始化修复` → `5658372` `fix(runtime): update sm_windows type and initialization for ActivePdoLengthsNic`
+- [历史回填] M1 包结构/HAL/测试骨架 hash 补齐 → `daf1957`/`fb12340`/`4921fdf`
+- [历史回填] M3 按站地址位置校验边界测试 → `a6069bb`
+- [历史回填] M5 SDO validate_response 丢帧修复 + mailbox retry → `5d54aca`/`fe1e2ef`
+- [历史回填] M6 Identification 强化 + AP 诊断 + Diagnosis 增强 → `9284ede`/`b70b5e2`/`2fdf472`
+- [历史回填] M8 Native 后端: Npcap 列举/errno 分类/stdio.h/AP noise/startup prep/process data/DC prep/ndjson/preop retry/启动诊断 → `6682636`/`2058971`/`cef8362`/`75b35a4`/`82f6b7e`/`f5644c5`/`75328b7`/`0bda199`/`23c85c1`/`013da5a`/`136466b`
+- [历史回填] M8 SII: UTF-8 解码/TxRxPDO 渲染/siitool 对齐/category label → `033b859`/`462bed5`/`c853946`/`41e1442`
+- [历史回填] M8 ENI/配置/诊断: 统一配置模型/ENI XML 投影/差异分级/摘要扩展/ESI JSON 桥/ESI SII 视图/ESI 启动接入/诊断超时/统一诊断/Hot Connect → `d2ba48d`/`fa82594`/`6f4241a`/`121cafa`/`1e23be5`/`3330009`/`76a40c7`/`da2c54b`/`d7e6c6a`/`0a602b2`

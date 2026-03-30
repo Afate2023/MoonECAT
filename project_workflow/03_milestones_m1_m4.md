@@ -26,9 +26,9 @@
   - 📦 [fixtures/fixtures.mbt](../fixtures/fixtures.mbt) + 各包 *_test.mbt (~163 tests)
 
 提交映射（选项 → commit）：
-- `包结构边界 + Library/CLI 入口占位` → `feat: scaffold moonecat package layout`
-- `HAL 最小接口 + 错误/诊断/配置模型` → `feat: define platform hal contracts`
-- `最小测试骨架与夹具` → `test: add minimal project test harness`
+- `包结构边界 + Library/CLI 入口占位` → `daf1957` `feat: scaffold moonecat package layout`
+- `HAL 最小接口 + 错误/诊断/配置模型` → `fb12340` `feat: define platform hal contracts`
+- `最小测试骨架与夹具` → `4921fdf` `test: add minimal project test harness`
 
 ### M2 HAL 与帧/PDU 最小闭环 — ✅ 已完成
 
@@ -74,6 +74,7 @@
 - `FMMU/SM 自动配置计算` → `bfbe7d5` `feat: calculate fmmu and sync manager mapping`
 - `发现与配置夹具测试` → `b38f38c` `test: add discovery and config fixture coverage`
 - `网络一致性 4-tuple 校验` → `3a08bff` `fix(validate): compare full identity 4-tuple`
+- `按站地址位置校验与边界测试` → `a6069bb` `fix: validate slaves by configured position and add boundary tests`
 - `SII/ESI 规范修正` → `2006272` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
 
 ### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成
