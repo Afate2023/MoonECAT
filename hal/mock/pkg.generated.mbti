@@ -24,6 +24,34 @@ pub struct MockNic {
 pub fn MockNic::new() -> Self
 pub impl @hal.Nic for MockNic
 
+pub struct VirtualBus {
+  slaves : Array[VirtualSlave]
+} derive(Show)
+pub fn VirtualBus::get_slave(Self, Int) -> VirtualSlave?
+pub fn VirtualBus::new(Array[VirtualSlave]) -> Self
+pub fn VirtualBus::process_frame(Self, Bytes) -> Bytes raise @hal.EcError
+pub fn VirtualBus::slave_count(Self) -> Int
+
+pub struct VirtualNic {
+  bus : VirtualBus
+  rx_buffer : Array[Bytes]
+  mut is_open : Bool
+}
+pub fn VirtualNic::new(VirtualBus) -> Self
+pub fn VirtualNic::with_slaves(Array[VirtualSlave]) -> Self
+pub impl @hal.Nic for VirtualNic
+
+pub struct VirtualSlave {
+  position : Int
+  registers : FixedArray[Byte]
+  sii_eeprom : Bytes
+  mut al_state : Byte
+  mut station_address : UInt
+} derive(Show)
+pub fn VirtualSlave::new(Int, @hal.SlaveIdentity, Bytes) -> Self
+pub fn VirtualSlave::read_reg(Self, Int, Int) -> Bytes
+pub fn VirtualSlave::write_reg(Self, Int, Bytes) -> Unit
+
 // Type aliases
 
 // Traits
