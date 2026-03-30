@@ -42,6 +42,8 @@ pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> Diagnosti
 
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
+pub fn fingerprint_match(TopologyFingerprint, TopologyFingerprint) -> TopologyFingerprintMatch
+
 pub fn master_config_with_optional_dc(Int64?) -> @hal.MasterConfig
 
 pub fn monitor_consecutive_timeouts(Runtime) -> MonitorResult
@@ -131,6 +133,10 @@ pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N
 pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
 
 pub fn startup_preparation_from_esi_offline_report(EsiOfflineSiiReport, UInt) -> SlaveStartupPreparation
+
+pub fn topology_fingerprint(ScanReport) -> TopologyFingerprint
+
+pub fn topology_fingerprint_from_config(ConfigurationModel) -> TopologyFingerprint
 
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
@@ -624,6 +630,17 @@ pub(all) struct Telemetry {
 } derive(Eq, Show)
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
+
+pub(all) struct TopologyFingerprint {
+  slave_count : Int
+  identity_hash : Int64
+} derive(Eq, Show)
+
+pub(all) enum TopologyFingerprintMatch {
+  Identical
+  SlaveCountChanged(expected~ : Int, actual~ : Int)
+  IdentityChanged
+} derive(Eq, Show)
 
 pub(all) enum ValidateDifferenceCategory {
   Topology
