@@ -4210,8 +4210,8 @@ fn physical_port_name(port : Byte) -> String {
 ///|
 fn fmmu_usage_name(direction : @mailbox.FmmuDirection) -> String {
   match direction {
-    Outputs => "used for Outputs"
-    Inputs => "used for Inputs"
+    Outputs | DynamicOutputs => "used for Outputs"
+    Inputs | DynamicInputs => "used for Inputs"
     MailboxState => "used for SyncM mailbox status (MBoxStat)"
   }
 }

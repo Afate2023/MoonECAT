@@ -104,3 +104,58 @@ pub fn SiiData::supports_soe(self : SiiData) -> Bool {
 pub fn SiiData::supports_voe(self : SiiData) -> Bool {
   (self.mailbox_protocols & 0x0020U) != 0U
 }
+
+///|
+/// PDO flags bit 0: PDO is mandatory.
+pub fn SiiPdo::is_mandatory(self : SiiPdo) -> Bool {
+  (self.flags & 0x0001U) != 0U
+}
+
+///|
+/// PDO flags bit 1: PDO is mapped by default.
+pub fn SiiPdo::is_default(self : SiiPdo) -> Bool {
+  (self.flags & 0x0002U) != 0U
+}
+
+///|
+/// PDO flags bit 4: PDO has fixed content (entries cannot be changed).
+pub fn SiiPdo::is_fixed_content(self : SiiPdo) -> Bool {
+  (self.flags & 0x0010U) != 0U
+}
+
+///|
+/// PDO flags bit 5: PDO has virtual content.
+pub fn SiiPdo::is_virtual_content(self : SiiPdo) -> Bool {
+  (self.flags & 0x0020U) != 0U
+}
+
+///|
+/// PDO flags bit 8: Module alignment for PDO.
+pub fn SiiPdo::is_module_align(self : SiiPdo) -> Bool {
+  (self.flags & 0x0100U) != 0U
+}
+
+///|
+/// PDO flags bit 9: PDO index depends on slot.
+pub fn SiiPdo::is_depend_on_slot(self : SiiPdo) -> Bool {
+  (self.flags & 0x0200U) != 0U
+}
+
+///|
+/// PDO flags bit 10: PDO index depends on slot group.
+pub fn SiiPdo::is_depend_on_slot_group(self : SiiPdo) -> Bool {
+  (self.flags & 0x0400U) != 0U
+}
+
+///|
+/// PDO flags bit 11: PDO is overwritten by module.
+pub fn SiiPdo::is_overwritten_by_module(self : SiiPdo) -> Bool {
+  (self.flags & 0x0800U) != 0U
+}
+
+///|
+/// Extract the identification method from the SII General flags (bits 3-4).
+/// Returns 0 = none, 1 = IdentALSts, 2 = IdentPhyM, 3 = both.
+pub fn SiiGeneral::identification_method(self : SiiGeneral) -> Int {
+  (self.flags.to_int() >> 3) & 0x03
+}

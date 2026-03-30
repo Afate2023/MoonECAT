@@ -67,9 +67,7 @@ pub(all) enum NativeBackendKind {
   Auto
   LinuxRawSocket
   WindowsNpcap
-}
-pub impl Eq for NativeBackendKind
-pub impl Show for NativeBackendKind
+} derive(Eq, Show)
 
 pub(all) struct NativeInterfaceInfo {
   name : String
@@ -79,28 +77,22 @@ pub(all) struct NativeInterfaceInfo {
   connected : Bool
   wireless : Bool
   index : Int?
-}
-pub impl Eq for NativeInterfaceInfo
-pub impl Show for NativeInterfaceInfo
+} derive(Eq, Show)
 
 pub(all) struct NativeInterfaceListing {
   backend : NativeBackendKind
   interfaces : Array[NativeInterfaceInfo]
-}
-pub impl Eq for NativeInterfaceListing
-pub impl Show for NativeInterfaceListing
+} derive(Eq, Show)
 
 pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int
   mut is_open : Bool
   mut last_sent : Bytes
-}
+} derive(Eq, Show)
 pub fn NativeNic::new(NativeNicConfig) -> Self
 pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError
 pub impl @hal.Nic for NativeNic
-pub impl Eq for NativeNic
-pub impl Show for NativeNic
 
 pub(all) struct NativeNicConfig {
   interface_name : String
@@ -108,9 +100,7 @@ pub(all) struct NativeNicConfig {
   snaplen : Int
   promisc : Bool
   timeout_ms : Int
-}
-pub impl Eq for NativeNicConfig
-pub impl Show for NativeNicConfig
+} derive(Eq, Show)
 
 // Type aliases
 

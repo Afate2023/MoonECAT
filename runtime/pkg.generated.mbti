@@ -140,9 +140,7 @@ pub(all) struct ConfigurationComparisonReport {
   total_found : Int
   differences : Array[ConfigurationDifference]
   all_ok : Bool
-}
-pub impl Eq for ConfigurationComparisonReport
-pub impl Show for ConfigurationComparisonReport
+} derive(Eq, Show)
 
 pub(all) enum ConfigurationDifference {
   Missing(position~ : Int)
@@ -153,9 +151,7 @@ pub(all) enum ConfigurationDifference {
   IdentityMismatch(position~ : Int, expected~ : @hal.SlaveIdentity?, actual~ : @hal.SlaveIdentity?)
   IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   ProcessDataSummaryMismatch(position~ : Int, expected~ : ConfigurationProcessDataSummary, actual~ : ConfigurationProcessDataSummary)
-}
-pub impl Eq for ConfigurationDifference
-pub impl Show for ConfigurationDifference
+} derive(Eq, Show)
 
 pub(all) struct ConfigurationMailboxProtocols {
   aoe : Bool
@@ -164,17 +160,13 @@ pub(all) struct ConfigurationMailboxProtocols {
   foe : Bool
   soe : Bool
   voe : Bool
-}
-pub impl Eq for ConfigurationMailboxProtocols
-pub impl Show for ConfigurationMailboxProtocols
+} derive(Eq, Show)
 
 pub(all) struct ConfigurationModel {
   source : ConfigurationSource
   total_slaves : Int
   slaves : Array[ConfigurationSlave]
-}
-pub impl Eq for ConfigurationModel
-pub impl Show for ConfigurationModel
+} derive(Eq, Show)
 
 pub(all) struct ConfigurationProcessDataSummary {
   sync_manager_count : Int
@@ -184,9 +176,7 @@ pub(all) struct ConfigurationProcessDataSummary {
   mailbox_protocols : ConfigurationMailboxProtocols?
   dc_op_mode_count : Int
   dc_assign_activate_count : Int
-}
-pub impl Eq for ConfigurationProcessDataSummary
-pub impl Show for ConfigurationProcessDataSummary
+} derive(Eq, Show)
 
 pub(all) struct ConfigurationSlave {
   position : Int
@@ -196,17 +186,13 @@ pub(all) struct ConfigurationSlave {
   identification : UInt?
   process_data_summary : ConfigurationProcessDataSummary?
   presence : @hal.SlavePresence
-}
-pub impl Eq for ConfigurationSlave
-pub impl Show for ConfigurationSlave
+} derive(Eq, Show)
 
 pub(all) enum ConfigurationSource {
   OnlineScan
   OfflineConfig
   EniImport
-}
-pub impl Eq for ConfigurationSource
-pub impl Show for ConfigurationSource
+} derive(Eq, Show)
 
 pub(all) struct ConfigurationSurfaceSummary {
   slave_count : Int
@@ -215,25 +201,20 @@ pub(all) struct ConfigurationSurfaceSummary {
   actual_source : ConfigurationSource?
   validation_grade : ValidateGrade?
   difference_count : Int
-}
-pub impl Eq for ConfigurationSurfaceSummary
-pub impl Show for ConfigurationSurfaceSummary
+} derive(Eq, Show)
 
 pub(all) struct CycleResult {
   wkc : UInt
   expected_wkc : UInt
   ok : Bool
-}
-pub impl Eq for CycleResult
-pub impl Show for CycleResult
+} derive(Eq, Show)
 
 pub(all) enum DcState {
   Disabled
   Measuring
   Locked
   Drifting(Int64)
-}
-pub impl Show for DcState
+} derive(Show)
 
 pub(all) struct DiagnosisSession {
   original_state : @protocol.EsmState
@@ -252,26 +233,20 @@ pub(all) enum DiagnosticCategory {
   Configuration
   RuntimeMetrics
   StateTransition
-}
-pub impl Eq for DiagnosticCategory
-pub impl Show for DiagnosticCategory
+} derive(Eq, Show)
 
 pub(all) struct DiagnosticIssue {
   source : DiagnosticSourceLayer
   category : DiagnosticCategory
   level : DiagnosticLevel
   detail : String
-}
-pub impl Eq for DiagnosticIssue
-pub impl Show for DiagnosticIssue
+} derive(Eq, Show)
 
 pub(all) enum DiagnosticLevel {
   Block
   Degrade
   Info
-}
-pub impl Eq for DiagnosticLevel
-pub impl Show for DiagnosticLevel
+} derive(Eq, Show)
 
 pub(all) enum DiagnosticSourceLayer {
   Registers
@@ -280,9 +255,7 @@ pub(all) enum DiagnosticSourceLayer {
   Configuration
   RuntimeTelemetry
   StateTransition
-}
-pub impl Eq for DiagnosticSourceLayer
-pub impl Show for DiagnosticSourceLayer
+} derive(Eq, Show)
 
 pub(all) struct DiagnosticSurface {
   station_address : UInt?
@@ -293,9 +266,7 @@ pub(all) struct DiagnosticSurface {
   runtime_metrics : RuntimeMetricsSummary?
   issues : Array[DiagnosticIssue]
   overall_level : DiagnosticLevel
-}
-pub impl Eq for DiagnosticSurface
-pub impl Show for DiagnosticSurface
+} derive(Eq, Show)
 
 pub(all) struct EsiJsonDcMode {
   name : String
@@ -304,10 +275,7 @@ pub(all) struct EsiJsonDcMode {
   cycle_time_sync0 : UInt
   sync0_factor : Int
   sync1_factor : Int
-}
-pub impl Eq for EsiJsonDcMode
-pub impl Show for EsiJsonDcMode
-pub impl ToJson for EsiJsonDcMode
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonDevice {
   vendor_id : UInt
@@ -331,28 +299,19 @@ pub(all) struct EsiJsonDevice {
   init_commands : Array[EsiJsonInitCommand]
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
-}
-pub impl Eq for EsiJsonDevice
-pub impl Show for EsiJsonDevice
-pub impl ToJson for EsiJsonDevice
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonDocument {
   devices : Array[EsiJsonDevice]
   modules : Array[EsiJsonModule]
-}
-pub impl Eq for EsiJsonDocument
-pub impl Show for EsiJsonDocument
-pub impl ToJson for EsiJsonDocument
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonInitCommand {
   transition : String
   index : UInt
   subindex : Byte
   data : Bytes
-}
-pub impl Eq for EsiJsonInitCommand
-pub impl Show for EsiJsonInitCommand
-pub impl ToJson for EsiJsonInitCommand
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonMailbox {
   data_link_layer : Bool
@@ -366,20 +325,14 @@ pub(all) struct EsiJsonMailbox {
   foe : Bool
   soe : Bool
   voe : Bool
-}
-pub impl Eq for EsiJsonMailbox
-pub impl Show for EsiJsonMailbox
-pub impl ToJson for EsiJsonMailbox
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonModule {
   module_ident : UInt
   module_name : String
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
-}
-pub impl Eq for EsiJsonModule
-pub impl Show for EsiJsonModule
-pub impl ToJson for EsiJsonModule
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonPdo {
   direction : String
@@ -388,10 +341,7 @@ pub(all) struct EsiJsonPdo {
   sync_manager : Byte
   name : String
   entries : Array[EsiJsonPdoEntry]
-}
-pub impl Eq for EsiJsonPdo
-pub impl Show for EsiJsonPdo
-pub impl ToJson for EsiJsonPdo
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonPdoEntry {
   base_index : UInt
@@ -400,18 +350,12 @@ pub(all) struct EsiJsonPdoEntry {
   bit_length : Byte
   name : String
   data_type_name : String
-}
-pub impl Eq for EsiJsonPdoEntry
-pub impl Show for EsiJsonPdoEntry
-pub impl ToJson for EsiJsonPdoEntry
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonSelectedModule {
   module_ident : UInt
   slot_index : Int
-}
-pub impl Eq for EsiJsonSelectedModule
-pub impl Show for EsiJsonSelectedModule
-pub impl ToJson for EsiJsonSelectedModule
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiJsonSmEntry {
   physical_start : UInt
@@ -420,10 +364,7 @@ pub(all) struct EsiJsonSmEntry {
   status : Byte
   enable : Bool
   sm_type : String
-}
-pub impl Eq for EsiJsonSmEntry
-pub impl Show for EsiJsonSmEntry
-pub impl ToJson for EsiJsonSmEntry
+} derive(Eq, Show, ToJson)
 
 pub(all) struct EsiOfflineSiiReport {
   position : UInt
@@ -459,22 +400,16 @@ pub impl RunProgressSink for NullRunProgressSink
 pub(all) struct ObservedSlaveAddress {
   position : UInt
   current_station_address : UInt
-}
-pub impl Eq for ObservedSlaveAddress
-pub impl Show for ObservedSlaveAddress
+} derive(Eq, Show)
 
-type OperationalStartupStep
-pub impl Eq for OperationalStartupStep
-pub impl Show for OperationalStartupStep
+type OperationalStartupStep derive(Eq, Show)
 
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
   TimeoutRecoveryRequired(observed_timeouts~ : Int64, consecutive_timeouts~ : Int)
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)
-}
-pub impl Eq for RunFault
-pub impl Show for RunFault
+} derive(Eq, Show)
 
 pub(all) struct RunLoopSettings {
   cycles : Int
@@ -482,18 +417,14 @@ pub(all) struct RunLoopSettings {
   cycle_period_ns : Int64?
   output_period_ns : Int64?
   max_consecutive_timeouts : Int
-}
+} derive(Eq, Show)
 pub fn RunLoopSettings::fixed_cycles(Int) -> Self
 pub fn RunLoopSettings::until_fault() -> Self
-pub impl Eq for RunLoopSettings
-pub impl Show for RunLoopSettings
 
 pub(all) enum RunMode {
   FreeRun
   DcSync
-}
-pub impl Eq for RunMode
-pub impl Show for RunMode
+} derive(Eq, Show)
 
 pub(all) enum RunPhase {
   Scanning
@@ -502,9 +433,7 @@ pub(all) enum RunPhase {
   Operational
   Stopping
   Done
-}
-pub impl Eq for RunPhase
-pub impl Show for RunPhase
+} derive(Eq, Show)
 
 pub(all) struct RunProgress {
   cycles_completed : Int64
@@ -515,8 +444,7 @@ pub(all) struct RunProgress {
   output_period_ns : Int
   telemetry : Telemetry
   consecutive_timeouts : Int
-}
-pub impl Show for RunProgress
+} derive(Show)
 
 pub(all) struct RunReport {
   scan : ScanReport
@@ -529,9 +457,8 @@ pub(all) struct RunReport {
   telemetry : Telemetry
   final_phase : RunPhase
   fault : RunFault?
-}
+} derive(Show)
 pub fn RunReport::format(Self) -> String
-pub impl Show for RunReport
 
 pub(all) struct RunStartupPreparation {
   pdo_ctx : @protocol.PdoContext
@@ -554,7 +481,7 @@ pub(all) struct Runtime {
   mut dc_reference_station : UInt?
   mut dc_stations : Array[UInt]
   mut dc_cycle_counter : Int
-}
+} derive(Show)
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
 pub fn Runtime::get_telemetry(Self) -> Telemetry
 pub fn[N : @hal.Nic] Runtime::init_dc(Self, N, Array[UInt], @hal.Duration) -> Bool raise @hal.EcError
@@ -572,7 +499,6 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(Self, N, @hal.Durat
 pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(Self, N, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
 pub fn Runtime::set_timeout_threshold(Self, Int) -> Unit
-pub impl Show for Runtime
 
 pub(all) struct RuntimeMetricsSummary {
   cycles : Int64
@@ -583,9 +509,7 @@ pub(all) struct RuntimeMetricsSummary {
   wkc_errors : Int64
   irq_events : Int64
   dc_delay_updates : Int64
-}
-pub impl Eq for RuntimeMetricsSummary
-pub impl Show for RuntimeMetricsSummary
+} derive(Eq, Show)
 
 pub(all) enum RuntimeState {
   Idle
@@ -594,23 +518,18 @@ pub(all) enum RuntimeState {
   Running(RunMode)
   Stopping
   Error(@hal.EcError)
-}
-pub impl Show for RuntimeState
+} derive(Show)
 
 pub(all) struct ScanReport {
   slave_count : Int
   slaves : Array[SlaveReport]
-}
+} derive(Eq, Show)
 pub fn ScanReport::format(Self) -> String
-pub impl Eq for ScanReport
-pub impl Show for ScanReport
 
 pub(all) enum ScanStationAddressStrategy {
   PreserveExistingUniqueNonZero
   TwinCATCompatible
-}
-pub impl Eq for ScanStationAddressStrategy
-pub impl Show for ScanStationAddressStrategy
+} derive(Eq, Show)
 
 pub(all) struct SlaveDiagnosis {
   station_address : UInt
@@ -619,9 +538,7 @@ pub(all) struct SlaveDiagnosis {
   al_status_code : UInt?
   error_register : Byte
   diagnosis_counter : UInt?
-}
-pub impl Eq for SlaveDiagnosis
-pub impl Show for SlaveDiagnosis
+} derive(Eq, Show)
 
 pub(all) struct SlaveReport {
   position : Int
@@ -632,9 +549,7 @@ pub(all) struct SlaveReport {
   revision : UInt
   serial : UInt
   identification : UInt
-}
-pub impl Eq for SlaveReport
-pub impl Show for SlaveReport
+} derive(Eq, Show)
 
 pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
@@ -649,22 +564,16 @@ pub(all) struct SlaveStartupPreparation {
 pub(all) enum StartupCommandTransition {
   PreOpToSafeOp
   SafeOpToOp
-}
-pub impl Eq for StartupCommandTransition
-pub impl Show for StartupCommandTransition
+} derive(Eq, Show)
 
 pub(all) struct StartupMailboxCommand {
   transition : StartupCommandTransition
   index : UInt
   subindex : Byte
   data : Bytes
-}
-pub impl Eq for StartupMailboxCommand
-pub impl Show for StartupMailboxCommand
+} derive(Eq, Show)
 
-type StartupRecoveryStrategy
-pub impl Eq for StartupRecoveryStrategy
-pub impl Show for StartupRecoveryStrategy
+type StartupRecoveryStrategy derive(Eq, Show)
 
 pub(all) struct StateSurfaceSummary {
   target_state : @protocol.EsmState?
@@ -674,17 +583,13 @@ pub(all) struct StateSurfaceSummary {
   al_error_flag : Bool?
   al_status_code : UInt?
   wkc : UInt?
-}
-pub impl Eq for StateSurfaceSummary
-pub impl Show for StateSurfaceSummary
+} derive(Eq, Show)
 
 pub(all) struct StationStartupMailboxPlan {
   station : UInt
   mailbox_config : @mailbox.MailboxConfig
   commands : Array[StartupMailboxCommand]
-}
-pub impl Eq for StationStartupMailboxPlan
-pub impl Show for StationStartupMailboxPlan
+} derive(Eq, Show)
 
 pub(all) struct Telemetry {
   mut cycles : Int64
@@ -695,28 +600,22 @@ pub(all) struct Telemetry {
   mut wkc_errors : Int64
   mut irq_events : Int64
   mut dc_delay_updates : Int64
-}
+} derive(Eq, Show)
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
-pub impl Eq for Telemetry
-pub impl Show for Telemetry
 
 pub(all) enum ValidateDifferenceCategory {
   Topology
   Identity
   Configuration
   Informational
-}
-pub impl Eq for ValidateDifferenceCategory
-pub impl Show for ValidateDifferenceCategory
+} derive(Eq, Show)
 
 pub(all) enum ValidateGrade {
   Pass
   Warn
   Block
-}
-pub impl Eq for ValidateGrade
-pub impl Show for ValidateGrade
+} derive(Eq, Show)
 
 pub(all) struct ValidateReport {
   expected_source : ConfigurationSource
@@ -727,9 +626,8 @@ pub(all) struct ValidateReport {
   differences : Array[ConfigurationDifference]
   all_ok : Bool
   grade : ValidateGrade
-}
+} derive(Show)
 pub fn ValidateReport::format(Self) -> String
-pub impl Show for ValidateReport
 
 pub(all) enum ValidationResult {
   Ok
@@ -741,8 +639,7 @@ pub(all) enum ValidationResult {
   Missing(position~ : Int)
   OptionalMissing(position~ : Int, group_id~ : UInt?)
   Extra(position~ : Int)
-}
-pub impl Show for ValidationResult
+} derive(Show)
 
 // Type aliases
 

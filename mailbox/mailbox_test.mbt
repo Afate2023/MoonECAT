@@ -16,6 +16,8 @@ test "FmmuDirection display" {
   inspect(@mailbox.FmmuDirection::Outputs, content="Outputs")
   inspect(@mailbox.FmmuDirection::Inputs, content="Inputs")
   inspect(@mailbox.FmmuDirection::MailboxState, content="MailboxState")
+  inspect(@mailbox.FmmuDirection::DynamicOutputs, content="DynamicOutputs")
+  inspect(@mailbox.FmmuDirection::DynamicInputs, content="DynamicInputs")
 }
 
 ///|
@@ -1776,6 +1778,7 @@ test "SiiGeneral::is_op_only detects flag bit 0" {
     sysman_class: b'\x00',
     flags: b'\x01', // bit 0 set = OpOnly
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1803,6 +1806,7 @@ test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
     sysman_class: b'\x00',
     flags: b'\x02', // bit 1 set = NotLRW
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1829,6 +1833,7 @@ test "SiiGeneral::supports_identification_ado detects flag bit 3" {
     sysman_class: b'\x00',
     flags: b'\x08', // bit 3 set = IdentificationAdo
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1854,6 +1859,7 @@ test "SiiGeneral all flags clear" {
     sysman_class: b'\x00',
     flags: b'\x00',
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1883,6 +1889,7 @@ test "SiiGeneral mailbox and identification helpers detect bits" {
     sysman_class: b'\x00',
     flags: b'\x14',
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1934,4 +1941,108 @@ test "SiiData mailbox protocol helpers detect masks" {
   assert_true(sii.supports_foe())
   assert_true(sii.supports_soe())
   assert_true(sii.supports_voe())
+}
+
+///|
+test "parse_sii_fmmu handles dynamic outputs and inputs" {
+  let fmmu_dirs = @mailbox.parse_sii_fmmu(
+    Bytes::from_array([b'\x05', b'\x06', b'\x01', b'\x02']),
+  )
+  assert_eq(fmmu_dirs.length(), 4)
+  assert_eq(fmmu_dirs[0], @mailbox.FmmuDirection::DynamicOutputs)
+  assert_eq(fmmu_dirs[1], @mailbox.FmmuDirection::DynamicInputs)
+  assert_eq(fmmu_dirs[2], @mailbox.FmmuDirection::Outputs)
+  assert_eq(fmmu_dirs[3], @mailbox.FmmuDirection::Inputs)
+}
+
+///|
+test "parse_sii_general populates group_idx_dup" {
+  let data = Bytes::makei(20, fn(i) {
+    match i {
+      0 => b'\x01' // group_idx
+      14 => b'\x07' // group_idx_dup
+      _ => b'\x00'
+    }
+  })
+  let general = @mailbox.parse_sii_general(data)
+  assert_eq(general.group_idx, b'\x01')
+  assert_eq(general.group_idx_dup, b'\x07')
+}
+
+///|
+test "SiiGeneral identification_method extracts bits 3-4" {
+  // bits 3-4 = 0b00 => method 0
+  let gen0 : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
+    flags: b'\x00',
+    current_on_ebus: 0,
+    group_idx_dup: b'\x00',
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
+  }
+  assert_eq(gen0.identification_method(), 0)
+  // bit 3 set = 0x08 => method 1 (IdentALSts)
+  let gen1 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x08' }
+  assert_eq(gen1.identification_method(), 1)
+  // bit 4 set = 0x10 => method 2 (IdentPhyM)
+  let gen2 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x10' }
+  assert_eq(gen2.identification_method(), 2)
+  // bits 3+4 set = 0x18 => method 3 (both)
+  let gen3 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x18' }
+  assert_eq(gen3.identification_method(), 3)
+}
+
+///|
+test "SiiPdo flag helpers" {
+  let pdo : @mailbox.SiiPdo = {
+    pdo_index: 0x1600U,
+    entry_count: b'\x01',
+    sync_manager: b'\x02',
+    synchronization: b'\x00',
+    name_idx: b'\x00',
+    flags: 0x0B33U, // bits 0,1,4,5,8,9,11 set
+    entries: [],
+  }
+  assert_true(pdo.is_mandatory()) // bit 0
+  assert_true(pdo.is_default()) // bit 1
+  assert_true(pdo.is_fixed_content()) // bit 4
+  assert_true(pdo.is_virtual_content()) // bit 5
+  assert_true(pdo.is_module_align()) // bit 8
+  assert_true(pdo.is_depend_on_slot()) // bit 9
+  assert_true(!pdo.is_depend_on_slot_group()) // bit 10 NOT set
+  assert_true(pdo.is_overwritten_by_module()) // bit 11
+}
+
+///|
+test "SiiPdo all flags clear" {
+  let pdo : @mailbox.SiiPdo = {
+    pdo_index: 0x1A00U,
+    entry_count: b'\x00',
+    sync_manager: b'\x00',
+    synchronization: b'\x00',
+    name_idx: b'\x00',
+    flags: 0x0000U,
+    entries: [],
+  }
+  assert_true(!pdo.is_mandatory())
+  assert_true(!pdo.is_default())
+  assert_true(!pdo.is_fixed_content())
+  assert_true(!pdo.is_virtual_content())
+  assert_true(!pdo.is_module_align())
+  assert_true(!pdo.is_depend_on_slot())
+  assert_true(!pdo.is_depend_on_slot_group())
+  assert_true(!pdo.is_overwritten_by_module())
 }

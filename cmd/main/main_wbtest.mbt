@@ -2045,6 +2045,7 @@ test "cli read-sii json includes categories" {
     sysman_class: b'\x00',
     flags: b'\x0A',
     current_on_ebus: 14,
+    group_idx_dup: b'\x01',
     physical_port_0: b'\x01',
     physical_port_1: b'\x01',
     physical_port_2: b'\x00',

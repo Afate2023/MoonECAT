@@ -835,6 +835,10 @@ fn build_general_projection(
     sysman_class: b'\x00',
     flags: build_general_flags(device),
     current_on_ebus: 0,
+    group_idx_dup: intern_sii_string(
+      strings,
+      preferred_device_group_name(device),
+    ),
     physical_port_0: ports[0],
     physical_port_1: ports[1],
     physical_port_2: ports[2],
@@ -968,6 +972,8 @@ fn map_esi_json_fmmu_direction(direction : String) -> @mailbox.FmmuDirection {
   match direction {
     "outputs" => Outputs
     "inputs" => Inputs
+    "dynamic-outputs" => DynamicOutputs
+    "dynamic-inputs" => DynamicInputs
     _ => MailboxState
   }
 }
@@ -1206,6 +1212,8 @@ fn encode_sii_fmmu(fmmu : Array[@mailbox.FmmuDirection]) -> Bytes {
         Outputs => b'\x01'
         Inputs => b'\x02'
         MailboxState => b'\x03'
+        DynamicOutputs => b'\x05'
+        DynamicInputs => b'\x06'
       },
     )
   }

@@ -278,25 +278,19 @@ pub(all) enum AddressMode {
   AutoIncrement
   ConfiguredStation(UInt)
   Logical(UInt)
-}
-pub impl Eq for AddressMode
-pub impl Show for AddressMode
+} derive(Eq, Show)
 
 pub(all) enum AddressType {
   AutoIncrement
   Configured
   Broadcast
   Logical
-}
-pub impl Eq for AddressType
-pub impl Show for AddressType
+} derive(Eq, Show)
 
 pub(all) struct DcInitResult {
   reference_station : UInt
   configured_count : Int
-}
-pub impl Eq for DcInitResult
-pub impl Show for DcInitResult
+} derive(Eq, Show)
 
 pub(all) enum EcCommand {
   NOP
@@ -314,21 +308,17 @@ pub(all) enum EcCommand {
   LRW
   ARMW
   FRMW
-}
+} derive(Eq, Show)
 pub fn EcCommand::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EcCommand::to_byte(Self) -> Byte
-pub impl Eq for EcCommand
-pub impl Show for EcCommand
 
 pub(all) struct EcFrame {
   dst_mac : FixedArray[Byte]
   src_mac : FixedArray[Byte]
   pdus : Array[Pdu]
-}
+} derive(Eq, Show)
 pub fn EcFrame::decode(Bytes) -> Self raise @hal.EcError
 pub fn EcFrame::encode(Self) -> Bytes
-pub impl Eq for EcFrame
-pub impl Show for EcFrame
 
 pub(all) enum EsmState {
   Init
@@ -336,20 +326,16 @@ pub(all) enum EsmState {
   SafeOp
   Op
   Boot
-}
+} derive(Eq, Show)
 pub fn EsmState::can_transition(Self, Self) -> Bool
 pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
-pub impl Eq for EsmState
-pub impl Show for EsmState
 
 pub(all) struct EsmStatusSnapshot {
   state : EsmState
   error_indication : Bool
   status_code : UInt?
-}
-pub impl Eq for EsmStatusSnapshot
-pub impl Show for EsmStatusSnapshot
+} derive(Eq, Show)
 
 pub(all) struct EsmTimeoutPolicy {
   init : @hal.Duration?
@@ -357,40 +343,34 @@ pub(all) struct EsmTimeoutPolicy {
   safeop : @hal.Duration?
   op : @hal.Duration?
   boot : @hal.Duration?
-}
-pub impl Eq for EsmTimeoutPolicy
-pub impl Show for EsmTimeoutPolicy
+} derive(Eq, Show)
 
 pub(all) struct FrameBuilder {
   mut next_index : Int
   pending : Array[Pdu]
   mut pending_size : Int
-}
+} derive(Show)
 pub fn FrameBuilder::add(Self, EcCommand, UInt, Bytes) -> Byte raise @hal.EcError
 pub fn FrameBuilder::build(Self) -> EcFrame
 pub fn FrameBuilder::is_empty(Self) -> Bool
 pub fn FrameBuilder::length(Self) -> Int
 pub fn FrameBuilder::new() -> Self
 pub fn FrameBuilder::reset(Self) -> Unit
-pub impl Show for FrameBuilder
 
 pub(all) struct PdoContext {
   image : ProcessImage
   mappings : Array[PdoMapping]
   logical_base : UInt
   logical_size : Int
-}
+} derive(Show)
 pub fn PdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
 pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError
 pub fn PdoContext::set_slave_outputs(Self, UInt, Bytes) -> Unit raise @hal.EcError
-pub impl Show for PdoContext
 
 pub(all) struct PdoExchangeResult {
   wkc : UInt
   irq : UInt
-}
-pub impl Eq for PdoExchangeResult
-pub impl Show for PdoExchangeResult
+} derive(Eq, Show)
 
 pub(all) struct PdoMapping {
   station : UInt
@@ -400,17 +380,13 @@ pub(all) struct PdoMapping {
   input_logical : UInt
   input_offset : Int
   input_length : Int
-}
-pub impl Eq for PdoMapping
-pub impl Show for PdoMapping
+} derive(Eq, Show)
 
 pub(all) struct Pdu {
   header : PduHeader
   data : Bytes
   wkc : UInt
-}
-pub impl Eq for Pdu
-pub impl Show for Pdu
+} derive(Eq, Show)
 
 pub(all) struct PduHeader {
   command : EcCommand
@@ -418,24 +394,20 @@ pub(all) struct PduHeader {
   address : UInt
   len_flags : UInt
   irq : UInt
-}
-pub impl Eq for PduHeader
-pub impl Show for PduHeader
+} derive(Eq, Show)
 
 pub(all) struct ProcessImage {
   mut outputs : Bytes
   mut inputs : Bytes
   output_size : Int
   input_size : Int
-}
+} derive(Show)
 pub fn ProcessImage::new(Int, Int) -> Self
-pub impl Show for ProcessImage
 
 pub(all) struct ScanResult {
   slave_count : Int
   slaves : Array[SlaveInfo]
-}
-pub impl Show for ScanResult
+} derive(Show)
 
 pub(all) struct SlaveInfo {
   position : Int
@@ -444,8 +416,7 @@ pub(all) struct SlaveInfo {
   mut al_status : EsmState
   dl_status : UInt
   mut sii : @mailbox.SiiData?
-}
-pub impl Show for SlaveInfo
+} derive(Show)
 
 // Type aliases
 
