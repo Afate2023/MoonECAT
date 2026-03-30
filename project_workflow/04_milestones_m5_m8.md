@@ -23,6 +23,7 @@
   - ✅ [protocol/mailbox_transport.mbt](../protocol/mailbox_transport.mbt): mailbox_poll SM status bit
 - [x] **【缺口】Emergency Message 接收**：解码 CoE Emergency 帧并分发到应用 [ETG.1500 #505 shall]
   - ✅ [mailbox/emergency.mbt](../mailbox/emergency.mbt): decode_emergency/decode_emergency_frame
+  - ✅ [runtime/runtime.mbt](../runtime/runtime.mbt): poll_emergencies 主循环集成 + configure_emergency_stations → `d0fa1c7`
 - [x] SDO 分段传输 (Segmented Transfer) [ETG.1500 #502 should]
   - ✅ [protocol/sdo_transaction.mbt](../protocol/sdo_transaction.mbt): 分段上传循环拼接（toggle / last segment）
   - ✅ [mailbox/coe_engine.mbt](../mailbox/coe_engine.mbt): 分段上传起始/分段响应解码
@@ -52,6 +53,7 @@
 - `SDO validate_response 误判丢帧修复（Merge PR #1）` → `5d54aca` `Handle validate_response false return: discard stale frames and re-read in SDO transactions`
 - `Mailbox retry 事务方法与 SDO 超时修复` → `fe1e2ef` `feat(mailbox): add retry transaction methods and enhance SDO upload/download handling, fix moon test timeout`
 - `AL Status Code / SDO Abort Code 描述表` → `d19db2d` `feat(protocol): add AL Status Code and SDO Abort Code description tables per ETG.1000.6`
+- `Emergency 主动轮询运行态集成` → `d0fa1c7` `feat(runtime): integrate Emergency mailbox polling into PDO cycle per ETG1000.6`
 
 ### M6 网络配置增强 — ✅ 已完成
 

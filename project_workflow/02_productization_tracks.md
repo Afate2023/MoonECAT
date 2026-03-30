@@ -105,5 +105,5 @@
 > 来源：对照 ETG.1000.4/5/6、ETG.1500、EtherCAT Compendium 逐项与当前代码交叉验证。以下为已确认的精细化缺口，不影响 Class B 强制功能覆盖率（17/17 = 100%），但影响实机可用性或诊断深度。
 
 - [x] **PreferNotLRW SII 标志**：`PdoContext` 增加 `block_lrw` 字段，`pdo_exchange_result` 自动分派 LRD+LWR 或 LRW；runtime 三条启动路径均从 SII General flags 推导设置。WKC 按 SOEM 惯例对 LWR 做 ×2 归一化。→ `0021a62`
-- [ ] **Emergency 主动轮询**：`decode_emergency` / `decode_emergency_frame` 已在 [mailbox/emergency.mbt](../mailbox/emergency.mbt) 实现，但 runtime 主循环中没有主动轮询 Emergency mailbox 的逻辑（Feature 505 解码可用但运行态未集成）。
+- [x] **Emergency 主动轮询**：Runtime 增加 `emergency_stations` 字段和 `configure_emergency_stations()`、`poll_emergencies()` 方法；PDO 交换后逐站轮询 SM Input 状态，解码 CoE Emergency 帧并计入 `Telemetry.emergency_events`；`run()` 从 startup mailbox plans 自动配置轮询目标；CLI JSON 三处输出均含 `emergency_events`。→ `d0fa1c7`
 - [ ] **SM Watchdog 验证**：SafeOp→Op 转换前未显式检查 SM Watchdog timer 配置或 SM interrupt 状态，依赖从站自行拒绝。
