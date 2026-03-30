@@ -78,6 +78,7 @@ pub(all) struct RuntimeMetricsSummary {
   wkc_errors : Int64
   irq_events : Int64
   dc_delay_updates : Int64
+  emergency_events : Int64
 } derive(Eq, Show)
 
 ///|
@@ -624,6 +625,7 @@ fn runtime_metrics_summary(telemetry : Telemetry) -> RuntimeMetricsSummary {
     wkc_errors: telemetry.wkc_errors,
     irq_events: telemetry.irq_events,
     dc_delay_updates: telemetry.dc_delay_updates,
+    emergency_events: telemetry.emergency_events,
   }
 }
 

@@ -481,7 +481,9 @@ pub(all) struct Runtime {
   mut dc_reference_station : UInt?
   mut dc_stations : Array[UInt]
   mut dc_cycle_counter : Int
+  mut emergency_stations : Array[(UInt, @mailbox.MailboxConfig)]
 } derive(Show)
+pub fn Runtime::configure_emergency_stations(Self, Array[(UInt, @mailbox.MailboxConfig)]) -> Unit
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
 pub fn Runtime::get_telemetry(Self) -> Telemetry
 pub fn[N : @hal.Nic] Runtime::init_dc(Self, N, Array[UInt], @hal.Duration) -> Bool raise @hal.EcError
@@ -509,6 +511,7 @@ pub(all) struct RuntimeMetricsSummary {
   wkc_errors : Int64
   irq_events : Int64
   dc_delay_updates : Int64
+  emergency_events : Int64
 } derive(Eq, Show)
 
 pub(all) enum RuntimeState {
@@ -600,6 +603,7 @@ pub(all) struct Telemetry {
   mut wkc_errors : Int64
   mut irq_events : Int64
   mut dc_delay_updates : Int64
+  mut emergency_events : Int64
 } derive(Eq, Show)
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit

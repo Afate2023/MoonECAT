@@ -8,6 +8,7 @@ test "Telemetry initializes to zero" {
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
   assert_eq(t.dc_delay_updates, 0L)
+  assert_eq(t.emergency_events, 0L)
 }
 
 ///|
@@ -990,6 +991,7 @@ test "Recovery: Telemetry reset clears all counters" {
   t.retries = 3L
   t.wkc_errors = 10L
   t.dc_delay_updates = 8L
+  t.emergency_events = 2L
   t.reset()
   assert_eq(t.cycles, 0L)
   assert_eq(t.tx_frames, 0L)
@@ -998,6 +1000,54 @@ test "Recovery: Telemetry reset clears all counters" {
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
   assert_eq(t.dc_delay_updates, 0L)
+  assert_eq(t.emergency_events, 0L)
+}
+
+///|
+test "Emergency: configure_emergency_stations sets station list" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  assert_eq(rt.emergency_stations.length(), 0)
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1800U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  rt.configure_emergency_stations([(0x1001U, mb_config)])
+  assert_eq(rt.emergency_stations.length(), 1)
+  let (station, _cfg) = rt.emergency_stations[0]
+  assert_eq(station, 0x1001U)
+}
+
+///|
+test "Emergency: telemetry starts at zero and accumulates" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let tel = rt.get_telemetry()
+  assert_eq(tel.emergency_events, 0L)
+}
+
+///|
+test "Emergency: no stations configured means no polling overhead" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let success = rt.run_cycles(nic, 5, @hal.Duration(1000L))
+  assert_eq(success, 5)
+  let tel = rt.get_telemetry()
+  assert_eq(tel.emergency_events, 0L)
 }
 
 ///|
@@ -2518,6 +2568,7 @@ test "RunReport format with cycles and telemetry" {
     wkc_errors: 3L,
     irq_events: 4L,
     dc_delay_updates: 2L,
+    emergency_events: 0L,
   }
   let report : @runtime.RunReport = {
     scan: { slave_count: 2, slaves: [] },
@@ -2741,6 +2792,7 @@ test "RunReport format includes timeout recovery fault" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Operational,
     fault: Some(
@@ -2783,6 +2835,7 @@ test "diagnostic surface from run includes runtime fault issues" {
       wkc_errors: 5L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Operational,
     fault: Some(

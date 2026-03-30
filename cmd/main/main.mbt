@@ -5828,6 +5828,7 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       "wkc_errors": Json::number(tel.wkc_errors.to_double()),
       "irq_events": Json::number(tel.irq_events.to_double()),
       "dc_delay_updates": Json::number(tel.dc_delay_updates.to_double()),
+      "emergency_events": Json::number(tel.emergency_events.to_double()),
     }),
     "surface": diagnostic_surface_json(
       @runtime.diagnostic_surface_from_run(report),
@@ -5866,6 +5867,9 @@ fn run_progress_json(progress : @runtime.RunProgress) -> Json {
       "irq_events": Json::number(progress.telemetry.irq_events.to_double()),
       "dc_delay_updates": Json::number(
         progress.telemetry.dc_delay_updates.to_double(),
+      ),
+      "emergency_events": Json::number(
+        progress.telemetry.emergency_events.to_double(),
       ),
     }),
     "consecutive_timeouts": Json::number(
@@ -6094,6 +6098,7 @@ fn runtime_metrics_summary_json(
     "wkc_errors": Json::number(summary.wkc_errors.to_double()),
     "irq_events": Json::number(summary.irq_events.to_double()),
     "dc_delay_updates": Json::number(summary.dc_delay_updates.to_double()),
+    "emergency_events": Json::number(summary.emergency_events.to_double()),
   })
 }
 

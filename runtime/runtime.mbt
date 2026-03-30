@@ -55,6 +55,8 @@ pub(all) struct Runtime {
   mut dc_stations : Array[UInt]
   /// Per-cycle counter for periodic delay re-estimation.
   mut dc_cycle_counter : Int
+  /// Stations with mailbox support for Emergency polling.
+  mut emergency_stations : Array[(UInt, @mailbox.MailboxConfig)]
 } derive(Show)
 
 ///|
@@ -73,6 +75,7 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     dc_reference_station: None,
     dc_stations: [],
     dc_cycle_counter: 0,
+    emergency_stations: [],
   }
 }
 
@@ -146,6 +149,47 @@ pub fn Runtime::set_state(self : Runtime, new_state : RuntimeState) -> Unit {
 }
 
 ///|
+/// Configure stations eligible for Emergency mailbox polling during PDO cycles.
+pub fn Runtime::configure_emergency_stations(
+  self : Runtime,
+  stations : Array[(UInt, @mailbox.MailboxConfig)],
+) -> Unit {
+  self.emergency_stations = stations
+}
+
+///|
+/// Poll all configured emergency stations for unsolicited mailbox data.
+/// Returns the number of Emergency messages received this cycle.
+fn[N : @hal.Nic] Runtime::poll_emergencies(
+  self : Runtime,
+  nic : N,
+  timeout : @hal.Duration,
+) -> Int {
+  let mut count = 0
+  for item in self.emergency_stations {
+    let (station, mb_config) = item
+    let has_data = @protocol.mailbox_poll(nic, station, mb_config, timeout) catch {
+      _ => false
+    }
+    if has_data {
+      let frame = @protocol.mailbox_recv(
+        nic,
+        station,
+        mb_config,
+        timeout,
+        max_polls=1,
+      ) catch {
+        _ => continue
+      }
+      // Try to decode as CoE Emergency; ignore non-Emergency mailbox data.
+      let _ = @mailbox.decode_emergency_frame(frame) catch { _ => continue }
+      count = count + 1
+    }
+  }
+  count
+}
+
+///|
 /// Execute one PDO cycle in the runtime loop.
 /// Updates telemetry and tracks consecutive errors.
 pub fn[N : @hal.Nic] Runtime::run_cycle(
@@ -193,6 +237,14 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
   self.telemetry.rx_frames = self.telemetry.rx_frames + 1L
   if pdo_result.irq != 0U {
     self.telemetry.irq_events = self.telemetry.irq_events + 1L
+  }
+  // Poll unsolicited Emergency mailbox after PDO exchange.
+  if self.emergency_stations.length() > 0 {
+    let emg_count = self.poll_emergencies(nic, timeout)
+    if emg_count > 0 {
+      self.telemetry.emergency_events = self.telemetry.emergency_events +
+        emg_count.to_int64()
+    }
   }
   self.consecutive_timeouts = 0
   let ok = wkc >= self.expected_wkc
@@ -245,6 +297,7 @@ pub fn Runtime::get_telemetry(self : Runtime) -> Telemetry {
     wkc_errors: self.telemetry.wkc_errors,
     irq_events: self.telemetry.irq_events,
     dc_delay_updates: self.telemetry.dc_delay_updates,
+    emergency_events: self.telemetry.emergency_events,
   }
 }
 

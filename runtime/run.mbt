@@ -1487,6 +1487,12 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
 
   let rt = Runtime::new(run_config)
   rt.configure_pdo(active_pdo_ctx, active_expected_wkc)
+  // Configure emergency polling for all stations with mailbox support.
+  let emg_stations : Array[(UInt, @mailbox.MailboxConfig)] = []
+  for plan in active_startup_mailbox_plans {
+    emg_stations.push((plan.station, plan.mailbox_config))
+  }
+  rt.configure_emergency_stations(emg_stations)
 
   let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
   rt.set_timeout_threshold(settings.max_consecutive_timeouts)

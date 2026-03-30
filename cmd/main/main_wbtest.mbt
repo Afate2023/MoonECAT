@@ -1840,6 +1840,7 @@ test "cli run report json includes shared surface telemetry" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Done,
     fault: Some(
@@ -1885,6 +1886,7 @@ test "cli run report ndjson wraps summary payload" {
       wkc_errors: 1L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Done,
     fault: None,
@@ -1914,6 +1916,7 @@ test "cli run progress json includes telemetry snapshot" {
       wkc_errors: 3L,
       irq_events: 4L,
       dc_delay_updates: 5L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 2,
   }).stringify()
@@ -1942,6 +1945,7 @@ test "cli run progress json emits null requested cycles for until-fault mode" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 0,
   }).stringify()
@@ -1967,6 +1971,7 @@ test "cli run progress text formats key counters" {
       wkc_errors: 2L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 1,
   })
