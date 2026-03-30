@@ -77,3 +77,4 @@
 - `Deterministic replay 事件溯源` → `e4b03a2` `feat(hal/mock): add deterministic replay via event sourcing (B-2)`
 - `Monitor/Verdict 框架` → `7af544f` `feat(runtime): add monitor/verdict framework (B-3)`
 - `Topology fingerprint 冻结` → `164014a` `feat(runtime): freeze topology fingerprint model (B-5)`
+- `DiagnosticSurface 统一事实层` → `07e7333` `feat(runtime): unify DiagnosticSurface with Verdict and TopologyFingerprint (B-6)`
