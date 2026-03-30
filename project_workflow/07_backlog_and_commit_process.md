@@ -72,3 +72,4 @@
 - [历史回填] M8 Native 后端: Npcap 列举/errno 分类/stdio.h/AP noise/startup prep/process data/DC prep/ndjson/preop retry/启动诊断 → `6682636`/`2058971`/`cef8362`/`75b35a4`/`82f6b7e`/`f5644c5`/`75328b7`/`0bda199`/`23c85c1`/`013da5a`/`136466b`
 - [历史回填] M8 SII: UTF-8 解码/TxRxPDO 渲染/siitool 对齐/category label → `033b859`/`462bed5`/`c853946`/`41e1442`
 - [历史回填] M8 ENI/配置/诊断: 统一配置模型/ENI XML 投影/差异分级/摘要扩展/ESI JSON 桥/ESI SII 视图/ESI 启动接入/诊断超时/统一诊断/Hot Connect → `d2ba48d`/`fa82594`/`6f4241a`/`121cafa`/`1e23be5`/`3330009`/`76a40c7`/`da2c54b`/`d7e6c6a`/`0a602b2`
+- `HAL/虚拟多从站Mock` → `5535c69` `feat(hal/mock): add virtual multi-slave bus simulation`
