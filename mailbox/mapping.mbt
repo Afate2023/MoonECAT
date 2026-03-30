@@ -209,7 +209,7 @@ fn find_unassigned_sm(
       (ProcessDataIn, ProcessDataIn | DynamicProcessDataIn) => true
       _ => sm_configs[i].sm_type == target
     }
-    if matches && not(sm_used[i]) {
+    if matches && !sm_used[i] {
       return Some(i)
     }
   }

@@ -19,7 +19,7 @@ pub impl @hal.Nic for MockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for MockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.buffer.push(data)
@@ -29,7 +29,7 @@ pub impl @hal.Nic for MockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for MockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   if self.buffer.is_empty() {

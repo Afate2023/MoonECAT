@@ -88,7 +88,7 @@ pub fn[N : @hal.Nic] apply_op_only_policy(
   output_sm_indices : Array[Int],
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  if not(op_only) {
+  if !op_only {
     return
   }
   let enable = target is Op

@@ -207,7 +207,7 @@ pub fn[N : @hal.Nic] clear_al_error(
   timeout : @hal.Duration,
 ) -> EsmStatusSnapshot raise @hal.EcError {
   let snapshot = read_al_status_snapshot(nic, station, timeout)
-  if not(snapshot.error_indication) {
+  if !snapshot.error_indication {
     return snapshot
   }
   let cleared_status = request_state_control_fp(
@@ -255,7 +255,7 @@ pub fn[N : @hal.Nic] recover_al_error_for_transition(
   timeout : @hal.Duration,
 ) -> EsmStatusSnapshot raise @hal.EcError {
   let snapshot = read_al_status_snapshot(nic, station, timeout)
-  if not(snapshot.error_indication) {
+  if !snapshot.error_indication {
     return snapshot
   }
   if should_rollback_al_error_to_init(snapshot.status_code) &&
@@ -275,7 +275,7 @@ pub fn[N : @hal.Nic] clear_al_error_ap(
   timeout : @hal.Duration,
 ) -> EsmStatusSnapshot raise @hal.EcError {
   let snapshot = read_al_status_snapshot_ap(nic, position, timeout)
-  if not(snapshot.error_indication) {
+  if !snapshot.error_indication {
     return snapshot
   }
   let cleared_status = request_state_control_ap(
@@ -527,7 +527,7 @@ pub fn[N : @hal.Nic] transition_through(
   let mut current = path[0]
   for i = 1; i < path.length(); i = i + 1 {
     let target = path[i]
-    if not(current.can_transition(target)) {
+    if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
         from=current.to_string(),
         to=target.to_string(),
@@ -562,7 +562,7 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
   let mut current = path[0]
   for i = 1; i < path.length(); i = i + 1 {
     let target = path[i]
-    if not(current.can_transition(target)) {
+    if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
         from=current.to_string(),
         to=target.to_string(),
@@ -594,7 +594,7 @@ pub fn[N : @hal.Nic] transition_through_ap(
   let mut current = path[0]
   for i = 1; i < path.length(); i = i + 1 {
     let target = path[i]
-    if not(current.can_transition(target)) {
+    if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
         from=current.to_string(),
         to=target.to_string(),

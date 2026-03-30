@@ -123,7 +123,7 @@ fn[N : @hal.Nic] mailbox_repeat_read_fp(
     let poll_window = read_register_fp(
       nic, station, sm_addr, sm_register_window_size, timeout,
     )
-    if not(ack_seen) {
+    if !ack_seen {
       ack_seen = rmsm.observe_repeat_ack(
         read_sm_window_pdi_control_byte(poll_window.data),
       )
@@ -170,7 +170,7 @@ fn[N : @hal.Nic] mailbox_repeat_read_ap(
     let poll_window = read_register_ap(
       nic, position, sm_addr, sm_register_window_size, timeout,
     )
-    if not(ack_seen) {
+    if !ack_seen {
       ack_seen = rmsm.observe_repeat_ack(
         read_sm_window_pdi_control_byte(poll_window.data),
       )

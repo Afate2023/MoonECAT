@@ -249,7 +249,7 @@ pub fn compare_configurations(
   }
 
   for found in actual.slaves {
-    if not(has_configuration_position(expected.slaves, found.position)) {
+    if !has_configuration_position(expected.slaves, found.position) {
       differences.push(Extra(position=found.position))
       all_ok = false
     }

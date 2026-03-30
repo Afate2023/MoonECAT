@@ -50,9 +50,7 @@ test "EsmState valid transitions" {
   assert_true(@protocol.EsmState::SafeOp.can_transition(@protocol.EsmState::Op))
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::SafeOp))
   // Invalid transition
-  assert_true(
-    not(@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op)),
-  )
+  assert_true(!@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op))
 }
 
 ///|
@@ -405,7 +403,7 @@ pub impl @hal.Nic for NoiseMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for NoiseMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response = data
@@ -415,7 +413,7 @@ pub impl @hal.Nic for NoiseMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   if self.emit_noise {
@@ -879,9 +877,7 @@ test "ESM state transitions - Op to SafeOp only" {
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::PreOp))
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Init))
   // Op cannot go to Boot
-  assert_true(
-    not(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot)),
-  )
+  assert_true(!@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot))
 }
 
 ///|
@@ -1004,7 +1000,7 @@ pub impl @hal.Nic for EsmControlNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmControlNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1054,7 +1050,7 @@ pub impl @hal.Nic for EsmControlNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmControlNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1108,7 +1104,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1149,7 +1145,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmRollbackToInitNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1205,7 +1201,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1252,7 +1248,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmOpNeedsPdoNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1303,7 +1299,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1357,7 +1353,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmOpFailureSnapshotNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1499,7 +1495,7 @@ test "clear_al_error stabilizes state before caller chooses next target" {
   let timeout = @hal.Duration(1000L)
   let cleared = @protocol.clear_al_error(nic, 0x1001U, timeout)
   assert_eq(cleared.state, @protocol.EsmState::SafeOp)
-  assert_true(not(cleared.error_indication))
+  assert_true(!cleared.error_indication)
   assert_eq(cleared.status_code, None)
   let final_state = @protocol.transition_to_target_strict(
     nic,
@@ -1528,7 +1524,7 @@ test "recover_al_error_for_transition rolls configuration error back to init" {
     nic, 0x1001U, timeout,
   )
   assert_eq(recovered.state, @protocol.EsmState::Init)
-  assert_true(not(recovered.error_indication))
+  assert_true(!recovered.error_indication)
   assert_eq(recovered.status_code, None)
   assert_eq(nic.control_writes.length(), 2)
   assert_eq(
@@ -1925,7 +1921,7 @@ pub impl @hal.Nic for RepeatMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1989,7 +1985,7 @@ pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2008,7 +2004,7 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2034,7 +2030,7 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for TimeoutMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2053,7 +2049,7 @@ pub impl @hal.Nic for ApMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2112,7 +2108,7 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for ApMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2337,7 +2333,7 @@ pub impl @hal.Nic for EepromMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EepromMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2383,7 +2379,7 @@ pub impl @hal.Nic for EepromMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EepromMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response

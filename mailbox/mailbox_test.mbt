@@ -80,7 +80,7 @@ test "parse_sii_header from fixture" {
   assert_eq(sii.mailbox_tx_size, 128U)
   assert_eq(sii.mailbox_protocols, 0x000CU) // CoE + FoE
   assert_eq(sii.firmware_version, 0U)
-  assert_true(not(sii.esc_config_b_present))
+  assert_true(!sii.esc_config_b_present)
 }
 
 ///|
@@ -163,7 +163,7 @@ test "parse_sii_general from fixture" {
   assert_true(general.supports_coe_sdo())
   assert_true(general.supports_coe_sdo_info())
   assert_true(general.supports_coe_pdo_assign())
-  assert_true(not(general.supports_coe_pdo_configuration()))
+  assert_true(!general.supports_coe_pdo_configuration())
   assert_eq(general.soe_channels, b'\x00')
 }
 
@@ -257,7 +257,7 @@ test "parse_sii_fmmu_ex decodes sync manager and sync unit bindings" {
   assert_true(entries[0].su_defined)
   assert_eq(entries[0].sync_manager, b'\x02')
   assert_eq(entries[0].sync_unit, b'\x01')
-  assert_true(not(entries[1].op_only))
+  assert_true(!entries[1].op_only)
   assert_true(entries[1].sm_defined)
 }
 
@@ -271,7 +271,7 @@ test "parse_sii_sync_units decodes flag bits" {
   assert_true(units[0].separate_frame)
   assert_true(units[0].depend_on_input_state)
   assert_true(units[0].frame_repeat_support)
-  assert_true(not(units[1].separate_su))
+  assert_true(!units[1].separate_su)
   assert_true(units[1].separate_frame)
 }
 
@@ -1093,7 +1093,7 @@ test "decode_sdo_response roundtrip with download response" {
   assert_eq(resp.index, 0x6040U)
   assert_eq(resp.subindex, b'\x00')
   assert_eq(resp.command, @mailbox.SdoCommand::DownloadResponse)
-  assert_true(not(resp.segmented))
+  assert_true(!resp.segmented)
 }
 
 ///|
@@ -1131,7 +1131,7 @@ test "decode_sdo_response supports initiate segmented upload response" {
   let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
   assert_eq(resp.command, @mailbox.SdoCommand::UploadResponse)
   assert_true(resp.segmented)
-  assert_true(not(resp.last_segment))
+  assert_true(!resp.last_segment)
   assert_true(resp.complete_size is Some(8U))
 }
 
@@ -1521,7 +1521,7 @@ test "MailboxConfig::is_valid returns false for zero sizes" {
     in_size: 0U,
     in_sm_index: 1,
   }
-  assert_true(not(cfg.is_valid()))
+  assert_true(!cfg.is_valid())
 }
 
 // ========== RMSM Tests ==========
@@ -1538,7 +1538,7 @@ test "Rmsm begin_transaction transitions to WaitingForResponse" {
   let rmsm = @mailbox.Rmsm::new()
   let cnt = rmsm.begin_transaction()
   assert_true(cnt >= b'\x01' && cnt <= b'\x07')
-  assert_true(not(rmsm.is_idle()))
+  assert_true(!rmsm.is_idle())
 }
 
 ///|
@@ -1599,7 +1599,7 @@ test "Rmsm validate_response detects repeat frame" {
   let cnt2 = rmsm.begin_transaction()
   ignore(cnt2)
   let is_new = rmsm.validate_response(cnt1)
-  assert_true(not(is_new)) // Repeat detected
+  assert_true(!is_new) // Repeat detected
 }
 
 ///|
@@ -1619,10 +1619,10 @@ test "Rmsm observe_repeat_ack completes when toggle matches" {
   let rmsm = @mailbox.Rmsm::new()
   let _ = rmsm.begin_transaction()
   ignore(rmsm.begin_read_repeat(b'\x00'))
-  assert_true(not(rmsm.observe_repeat_ack(b'\x00')))
+  assert_true(!rmsm.observe_repeat_ack(b'\x00'))
   assert_true(rmsm.awaits_repeat_ack())
   assert_true(rmsm.observe_repeat_ack(b'\x02'))
-  assert_true(not(rmsm.awaits_repeat_ack()))
+  assert_true(!rmsm.awaits_repeat_ack())
 }
 
 ///|
@@ -1638,7 +1638,7 @@ test "Rmsm record_timeout allows retries up to max" {
   let _ = rmsm.begin_transaction()
   assert_true(rmsm.record_timeout())
   assert_true(rmsm.record_timeout())
-  assert_true(not(rmsm.record_timeout())) // Third retry exceeds max
+  assert_true(!rmsm.record_timeout()) // Third retry exceeds max
 }
 
 ///|
@@ -1648,7 +1648,7 @@ test "Rmsm reset returns to Idle" {
   ignore(rmsm.begin_read_repeat(b'\x00'))
   rmsm.reset()
   assert_true(rmsm.is_idle())
-  assert_true(not(rmsm.awaits_repeat_ack()))
+  assert_true(!rmsm.awaits_repeat_ack())
 }
 
 ///|
@@ -1658,7 +1658,7 @@ test "Rmsm retry reset preserves accumulated retry budget" {
   assert_true(rmsm.record_timeout())
   rmsm.reset_for_retry()
   let _ = rmsm.begin_retry_transaction()
-  assert_true(not(rmsm.record_timeout()))
+  assert_true(!rmsm.record_timeout())
 }
 
 // ========== Emergency Message Tests ==========
@@ -1783,8 +1783,8 @@ test "SiiGeneral::is_op_only detects flag bit 0" {
     physical_memory_address: 0U,
   }
   assert_true(gen.is_op_only())
-  assert_true(not(gen.prefers_not_lrw()))
-  assert_true(not(gen.supports_identification_ado()))
+  assert_true(!gen.prefers_not_lrw())
+  assert_true(!gen.supports_identification_ado())
 }
 
 ///|
@@ -1809,7 +1809,7 @@ test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
     physical_port_3: b'\x00',
     physical_memory_address: 0U,
   }
-  assert_true(not(gen.is_op_only()))
+  assert_true(!gen.is_op_only())
   assert_true(gen.prefers_not_lrw())
 }
 
@@ -1860,11 +1860,11 @@ test "SiiGeneral all flags clear" {
     physical_port_3: b'\x00',
     physical_memory_address: 0U,
   }
-  assert_true(not(gen.is_op_only()))
-  assert_true(not(gen.prefers_not_lrw()))
-  assert_true(not(gen.supports_identification_ado()))
-  assert_true(not(gen.supports_mailbox_data_link_layer()))
-  assert_true(not(gen.supports_identification_physical_memory()))
+  assert_true(!gen.is_op_only())
+  assert_true(!gen.prefers_not_lrw())
+  assert_true(!gen.supports_identification_ado())
+  assert_true(!gen.supports_mailbox_data_link_layer())
+  assert_true(!gen.supports_identification_physical_memory())
 }
 
 ///|

@@ -1572,7 +1572,7 @@ fn select_native_cli_config_from_listing(
   }
   let notes : Array[String] = []
   for interface in listing.interfaces {
-    if not(@native.native_interface_is_probe_candidate(interface)) {
+    if !@native.native_interface_is_probe_candidate(interface) {
       notes.push(
         interface.name + "(" + skipped_native_interface_reason(interface) + ")",
       )
@@ -1623,10 +1623,10 @@ fn skipped_native_interface_reason(
   if interface.wireless {
     return "wireless"
   }
-  if not(interface.up) {
+  if !interface.up {
     return "down"
   }
-  if not(interface.connected) {
+  if !interface.connected {
     return "disconnected"
   }
   "filtered"
@@ -2091,7 +2091,7 @@ fn[N : @hal.Nic] build_mailbox_readback_report(
           ),
           matches: mailbox_sm_window_matches(expected_window, actual_window),
         }
-        if not(entry.matches) {
+        if !entry.matches {
           mismatches.push(build_mailbox_readback_mismatch(entry))
         }
         entries.push(entry)
@@ -4049,10 +4049,10 @@ fn resolve_run_loop_settings(
   let output_period_ns = optional_duration_flag_ns(
     args, "--output-period-ms", 1_000_000L,
   )
-  if progress_ndjson && not(as_json) {
+  if progress_ndjson && !as_json {
     raise @hal.EcError::ConfigMismatch("--progress-ndjson requires --json")
   }
-  if as_json && not(progress_ndjson) {
+  if as_json && !progress_ndjson {
     match output_period_ns {
       Some(_) =>
         raise @hal.EcError::ConfigMismatch(

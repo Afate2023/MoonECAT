@@ -849,7 +849,7 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
   )
   let sii = @mailbox.parse_sii_header(eeprom)
   let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
-  if not(mailbox_config.is_valid()) {
+  if !mailbox_config.is_valid() {
     raise @hal.EcError::ConfigMismatch(
       "diagnosis requires mailbox-capable slave at station " +
       station.to_string(),
@@ -901,7 +901,7 @@ pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
   )
   let sii = @mailbox.parse_sii_header(eeprom)
   let mailbox_config = @mailbox.MailboxConfig::from_sii(sii)
-  if not(mailbox_config.is_valid()) {
+  if !mailbox_config.is_valid() {
     raise @hal.EcError::ConfigMismatch(
       "mailbox access requires mailbox-capable slave at station " +
       station.to_string(),

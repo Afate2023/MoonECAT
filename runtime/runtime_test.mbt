@@ -167,7 +167,7 @@ pub impl @hal.Nic for SiiIdentityNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for SiiIdentityNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -222,7 +222,7 @@ pub impl @hal.Nic for SiiIdentityNic with send(self, data) {
 ///|
 pub impl @hal.Nic for SiiIdentityNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -266,7 +266,7 @@ pub impl @hal.Nic for ScanStationNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for ScanStationNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -334,7 +334,7 @@ pub impl @hal.Nic for ScanStationNic with send(self, data) {
 ///|
 pub impl @hal.Nic for ScanStationNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -364,7 +364,7 @@ pub impl @hal.Nic for TimeoutNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for TimeoutNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   data.length()
@@ -373,7 +373,7 @@ pub impl @hal.Nic for TimeoutNic with send(self, data) {
 ///|
 pub impl @hal.Nic for TimeoutNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   raise @hal.EcError::RecvTimeout
@@ -500,7 +500,7 @@ pub impl @hal.Nic for ConfirmedRunNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for ConfirmedRunNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -585,7 +585,7 @@ pub impl @hal.Nic for ConfirmedRunNic with send(self, data) {
 ///|
 pub impl @hal.Nic for ConfirmedRunNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -885,7 +885,7 @@ test "Recovery: run_cycles records RecvTimeout and continues" {
   assert_eq(t.timeouts, 4L)
   assert_eq(t.cycles, 4L)
   assert_eq(t.rx_frames, 0L)
-  assert_true(not(rt.needs_recovery()))
+  assert_true(!rt.needs_recovery())
 }
 
 ///|
@@ -1048,9 +1048,7 @@ test "Free-run: ESM can_transition validates allowed transitions" {
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::SafeOp))
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Init))
   // Invalid skip
-  assert_true(
-    not(@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op)),
-  )
+  assert_true(!@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op))
 }
 
 ///|

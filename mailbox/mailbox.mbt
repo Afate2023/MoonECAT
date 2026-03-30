@@ -87,7 +87,7 @@ pub fn MailboxRepeatState::is_acknowledged(self : MailboxRepeatState) -> Bool {
 ///|
 /// Toggle the MainDevice repeat request state for a mailbox-read replay.
 pub fn MailboxRepeatState::toggle_request(self : MailboxRepeatState) -> Bool {
-  not(self.request)
+  !self.request
 }
 
 ///|

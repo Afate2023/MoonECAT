@@ -148,7 +148,7 @@ fn[N : @hal.Nic] sdo_upload_once(
       "SDO upload: index/subindex mismatch in response",
     )
   }
-  if not(resp.segmented) {
+  if !resp.segmented {
     return resp.data
   }
 
@@ -184,7 +184,7 @@ fn[N : @hal.Nic] sdo_upload_ap_once(
       "SDO upload: index/subindex mismatch in response",
     )
   }
-  if not(resp.segmented) {
+  if !resp.segmented {
     return resp.data
   }
 
@@ -271,7 +271,7 @@ pub fn[N : @hal.Nic] sdo_download_retry(
   }
   // Retry loop
   for ;; {
-    if not(rmsm.record_timeout()) {
+    if !rmsm.record_timeout() {
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
@@ -309,7 +309,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
   }
   // Retry loop
   for ;; {
-    if not(rmsm.record_timeout()) {
+    if !rmsm.record_timeout() {
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
@@ -345,7 +345,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
     Err(e) => raise e
   }
   for ;; {
-    if not(rmsm.record_timeout()) {
+    if !rmsm.record_timeout() {
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
@@ -414,7 +414,7 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
       "SDO CA upload: expected UploadResponse, got " + resp.command.to_string(),
     )
   }
-  if not(resp.segmented) {
+  if !resp.segmented {
     return resp.data
   }
 
@@ -506,7 +506,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
 
   let mut current = initial
   let mut toggle = false
-  while not(current.last_segment) {
+  while !current.last_segment {
     let seg_counter = rmsm_begin_transaction(rmsm, retry)
     let seg_req = @mailbox.build_sdo_upload_segment_request(
       seg_counter, station, toggle,
@@ -514,7 +514,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
     mailbox_send(nic, station, mb_config, seg_req, timeout)
     let seg_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
-      not(seg_resp.segmented) {
+      !seg_resp.segmented {
       raise @hal.EcError::MailboxProtocol(
         context + ": expected segmented UploadResponse",
       )
@@ -526,7 +526,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
       acc.write_byte(b)
     }
     current = seg_resp
-    toggle = not(toggle)
+    toggle = !toggle
   }
 
   let out = acc.to_bytes()
@@ -565,7 +565,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
 
   let mut current = initial
   let mut toggle = false
-  while not(current.last_segment) {
+  while !current.last_segment {
     let seg_counter = rmsm_begin_transaction(rmsm, retry)
     let seg_req = @mailbox.build_sdo_upload_segment_request(
       seg_counter, station, toggle,
@@ -575,7 +575,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
       nic, position, mb_config, rmsm, timeout,
     )
     if seg_resp.command != @mailbox.SdoCommand::UploadResponse ||
-      not(seg_resp.segmented) {
+      !seg_resp.segmented {
       raise @hal.EcError::MailboxProtocol(
         context + ": expected segmented UploadResponse",
       )
@@ -587,7 +587,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
       acc.write_byte(b)
     }
     current = seg_resp
-    toggle = not(toggle)
+    toggle = !toggle
   }
 
   let out = acc.to_bytes()
@@ -654,7 +654,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
     mailbox_send(nic, station, mb_config, seg_frame, timeout)
     let seg_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
     if seg_resp.command != @mailbox.SdoCommand::DownloadResponse ||
-      not(seg_resp.segmented) {
+      !seg_resp.segmented {
       raise @hal.EcError::MailboxProtocol(
         "SDO download segmented: expected segmented DownloadResponse",
       )
@@ -665,7 +665,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
       )
     }
     offset += chunk_len
-    toggle = not(toggle)
+    toggle = !toggle
   }
 }
 
@@ -685,7 +685,7 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
   let acc = @buffer.new(size_hint=64)
   let mut first = true
   let mut done = false
-  while not(done) {
+  while !done {
     let info = recv_sdo_info_validated_fp(
       nic, station, mb_config, rmsm, timeout,
     )
@@ -714,7 +714,7 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
     for b in payload {
       acc.write_byte(b)
     }
-    done = not(info.incomplete)
+    done = !info.incomplete
   }
   acc.to_bytes()
 }

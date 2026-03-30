@@ -223,7 +223,7 @@ fn parse_eni_slave_projection(
           continue
         }
 
-        if not(in_slave) {
+        if !in_slave {
           continue
         }
 

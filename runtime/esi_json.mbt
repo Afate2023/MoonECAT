@@ -1100,7 +1100,7 @@ fn build_sii_categories(
   dc_clocks : Array[@mailbox.SiiDcClock],
 ) -> Array[@mailbox.SiiCategoryEntry] {
   let categories : Array[@mailbox.SiiCategoryEntry] = []
-  if not(strings.is_empty()) {
+  if !strings.is_empty() {
     categories.push({
       category: Strings,
       type_code: known_sii_category_code(Strings),
@@ -1112,28 +1112,28 @@ fn build_sii_categories(
     type_code: known_sii_category_code(General),
     data: encode_sii_general(general),
   })
-  if not(fmmu.is_empty()) {
+  if !fmmu.is_empty() {
     categories.push({
       category: Fmmu,
       type_code: known_sii_category_code(Fmmu),
       data: encode_sii_fmmu(fmmu),
     })
   }
-  if not(sync_managers.is_empty()) {
+  if !sync_managers.is_empty() {
     categories.push({
       category: SyncManager,
       type_code: known_sii_category_code(SyncManager),
       data: encode_sii_sync_managers(sync_managers),
     })
   }
-  if not(tx_pdo.is_empty()) {
+  if !tx_pdo.is_empty() {
     categories.push({
       category: TxPdo,
       type_code: known_sii_category_code(TxPdo),
       data: encode_sii_pdos(tx_pdo),
     })
   }
-  if not(rx_pdo.is_empty()) {
+  if !rx_pdo.is_empty() {
     categories.push({
       category: RxPdo,
       type_code: known_sii_category_code(RxPdo),

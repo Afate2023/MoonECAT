@@ -23,7 +23,7 @@ pub impl @hal.Nic for VirtualNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for VirtualNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   // Process the frame through the virtual bus
@@ -35,7 +35,7 @@ pub impl @hal.Nic for VirtualNic with send(self, data) {
 ///|
 pub impl @hal.Nic for VirtualNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   if self.rx_buffer.is_empty() {
