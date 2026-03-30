@@ -364,6 +364,7 @@ pub(all) struct PdoContext {
   mappings : Array[PdoMapping]
   logical_base : UInt
   logical_size : Int
+  mut block_lrw : Bool
 } derive(Show)
 pub fn PdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
 pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError

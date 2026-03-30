@@ -2586,6 +2586,7 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2642,6 +2643,7 @@ test "run with empty bus skips ESM broadcasts" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2673,6 +2675,7 @@ test "run confirms op via per-station transition without broadcast" {
       mappings: [],
       logical_base: 0U,
       logical_size: 0,
+      block_lrw: false,
     },
     0U,
     1,
@@ -2820,6 +2823,7 @@ test "run with mock loopback: validation fails when slaves expected but not foun
     mappings: [],
     logical_base: 0U,
     logical_size: 128,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2845,6 +2849,7 @@ test "replay integration minimal flow: scan->validate->run->stop" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,

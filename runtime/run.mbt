@@ -189,6 +189,15 @@ pub fn master_config_with_optional_dc(
 }
 
 ///|
+/// Check if any slave in the SII info set the PreferNotLRW flag.
+fn sii_prefers_not_lrw(sii : @mailbox.SiiFullInfo) -> Bool {
+  match sii.general {
+    Some(general) => general.prefers_not_lrw()
+    None => false
+  }
+}
+
+///|
 pub fn[N : @hal.Nic] build_run_startup_preparation(
   nic : N,
   scan_report : ScanReport,
@@ -201,6 +210,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for slave in scan_report.slaves {
     let preparation = prepare_slave_startup(
       nic,
@@ -210,6 +220,9 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       timeout,
     )
     slave_mappings.push((preparation.mapping, slave.station_address))
+    if sii_prefers_not_lrw(preparation.sii) {
+      any_not_lrw = true
+    }
     match preparation.startup_outputs {
       Some(outputs) => startup_outputs.push((slave.station_address, outputs))
       None => ()
@@ -230,6 +243,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       preparation.mapping.input_bytes.reinterpret_as_uint()
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)
@@ -311,9 +325,13 @@ pub fn run_startup_preparation_from_slave_preparations(
   let startup_outputs : Array[(UInt, Bytes)] = []
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for item in slave_preparations {
     let (station, preparation) = item
     slave_mappings.push((preparation.mapping, station))
+    if sii_prefers_not_lrw(preparation.sii) {
+      any_not_lrw = true
+    }
     match preparation.startup_outputs {
       Some(outputs) => startup_outputs.push((station, outputs))
       None => ()
@@ -331,6 +349,7 @@ pub fn run_startup_preparation_from_slave_preparations(
     )
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)
@@ -649,6 +668,7 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for station in stations {
     let initial = prepare_slave_startup(
       nic, station, current_logical_base, startup_eeprom_word_count, timeout,
@@ -657,6 +677,9 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
       nic, station, current_logical_base, initial, timeout,
     )
     slave_mappings.push((refined.mapping, station))
+    if sii_prefers_not_lrw(refined.sii) {
+      any_not_lrw = true
+    }
     match refined.startup_outputs {
       Some(outputs) => startup_outputs.push((station, outputs))
       None => ()
@@ -677,6 +700,7 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
       refined.mapping.input_bytes.reinterpret_as_uint()
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)

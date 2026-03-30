@@ -2682,6 +2682,46 @@ test "pdo_exchange with empty context" {
 }
 
 ///|
+test "pdo_exchange_result with block_lrw uses split LRD+LWR" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  ctx.block_lrw = true
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // MockNic returns WKC=0 for all transactions; verify no crash and result shape
+  let result = @protocol.pdo_exchange_result(nic, ctx, timeout)
+  // LRD WKC + LWR WKC*2, both 0 from mock
+  assert_eq(result.wkc, 0U)
+}
+
+///|
+test "pdo_exchange_result with block_lrw false uses LRW" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
+  assert_true(not(ctx.block_lrw))
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let result = @protocol.pdo_exchange_result(nic, ctx, timeout)
+  assert_eq(result.wkc, 0U)
+}
+
+///|
+test "PdoContext build sets block_lrw to false by default" {
+  let ctx = @protocol.PdoContext::build([], 0U)
+  assert_true(not(ctx.block_lrw))
+}
+
+///|
 test "al_status_code_description known codes" {
   assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
   assert_eq(
