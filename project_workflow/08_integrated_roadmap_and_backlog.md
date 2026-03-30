@@ -173,11 +173,11 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 
 | 编号 | 任务 | 对应 BACKLOG | 状态 | 涉及目录 |
 |---|---|---|---|---|
-| C-1 | 抽象 runtime hook：process image / cycle / event / fault | P2-1 | ❌ | runtime/, protocol/ |
-| C-2 | 冻结 multiple tasks / process-image partitioning 接口模型 | P2-2 | ❌ | runtime/ |
-| C-3 | 定义外部 plant/controller co-sim adapter contract | P2-3 | ❌ | runtime/, plugin/ |
-| C-4 | 实现最小 communication-closed-loop HIL PoC | P2-4 | ❌ | runtime/, cmd/main/ |
-| C-5 | 定义 MCU + Linux 协同 HIL 的时基合同 | P2-5 | ❌ | runtime/, hal/ |
+| C-1 | 抽象 runtime hook：process image / cycle / event / fault | P2-1 | ✅ `2b9c98f` | runtime/ |
+| C-2 | 冻结 multiple tasks / process-image partitioning 接口模型 | P2-2 | ✅ `2b9c98f` | runtime/ |
+| C-3 | 定义外部 plant/controller co-sim adapter contract | P2-3 | ✅ `2b9c98f` | runtime/ |
+| C-4 | 实现最小 communication-closed-loop HIL PoC | P2-4 | ✅ `2b9c98f` | runtime/ |
+| C-5 | 定义 MCU + Linux 协同 HIL 的时基合同 | P2-5 | ✅ `2b9c98f` | runtime/ |
 
 **C-1 至 C-5 统一设计原则**：
 

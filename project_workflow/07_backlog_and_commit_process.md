@@ -78,3 +78,4 @@
 - `Monitor/Verdict 框架` → `7af544f` `feat(runtime): add monitor/verdict framework (B-3)`
 - `Topology fingerprint 冻结` → `164014a` `feat(runtime): freeze topology fingerprint model (B-5)`
 - `DiagnosticSurface 统一事实层` → `07e7333` `feat(runtime): unify DiagnosticSurface with Verdict and TopologyFingerprint (B-6)`
+- `HIL-Ready Runtime Boundary (C-1~C-5)` → `2b9c98f` `feat(runtime): add HIL-ready runtime boundary abstractions (C-1~C-5)`
