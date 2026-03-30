@@ -111,7 +111,7 @@ pub struct ActivePdoLengthsNic {
   mut mailbox_ready : Bool
   mut send_timeout_poll_budget : Int
   mut mailbox_mapping_ready : Bool
-  sm_windows : Array[Bytes]
+  sm_windows : Array[Array[Byte]]
 }
 
 ///|
@@ -126,7 +126,7 @@ fn ActivePdoLengthsNic::new(
     mailbox_ready: false,
     send_timeout_poll_budget: send_timeout_transactions * 32,
     mailbox_mapping_ready: not(require_mailbox_mapping_refresh),
-    sm_windows: Array::make(8, Bytes::make(8, b'\x00')),
+    sm_windows: Array::makei(8, fn(_i) { Array::make(8, b'\x00') }),
   }
 }
 
@@ -146,7 +146,7 @@ fn mailbox_status_bytes(ready : Bool) -> Bytes {
 }
 
 ///|
-fn mailbox_sm_window_with_status(window : Bytes, ready : Bool) -> Bytes {
+fn mailbox_sm_window_with_status(window : Array[Byte], ready : Bool) -> Bytes {
   Bytes::makei(@protocol.sm_entry_size, fn(i) {
     if i == 5 {
       if ready {
@@ -319,12 +319,12 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
       let sm_offset = offset - @protocol.reg_sm_base
       let sm_index = (sm_offset / sm_entry_size).reinterpret_as_int()
       if sm_index >= 0 && sm_index < self.sm_windows.length() {
-        let intra_offset = sm_offset % sm_entry_size
+        let intra_offset = (sm_offset % sm_entry_size).reinterpret_as_int()
         let window = self.sm_windows[sm_index]
-        let i = 0U
+        let mut i = 0
         while i < pdu.data.length() && intra_offset + i < window.length() {
           window[intra_offset + i] = pdu.data[i]
-          i = i + 1U
+          i = i + 1
         }
         self.sm_windows[sm_index] = window
       }
