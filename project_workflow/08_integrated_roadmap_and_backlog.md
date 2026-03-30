@@ -148,7 +148,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | B-2 | 引入 deterministic replay 最小闭环（事件溯源回放） | P1-2 | ✅ `e4b03a2` | hal/mock/ |
 | B-3 | 引入 monitor / verdict 框架（Pass/Warn/Fail/Block） | P1-3 | ✅ `7af544f` | runtime/ |
 | B-4 | 从 loopback/mock 演进到协议级虚拟从站 | P1-4 | ✅ `5535c69` | hal/mock/, protocol/, mailbox/ |
-| B-5 | 冻结 topology fingerprint / Hot Connect 最小模型 | P1-5 | ⚠️ 模型已有 | runtime/, mailbox/ |
+| B-5 | 冻结 topology fingerprint / Hot Connect 最小模型 | P1-5 | ✅ `164014a` | runtime/ |
 | B-6 | 扩展 DiagnosticSurface 为统一事实层 | P1-6 | ⚠️ 最小已有 | runtime/, cmd/main/ |
 
 **B-1 首批 fault 类型**：recv timeout burst、send failure、WKC mismatch、missing slave、AL status mismatch、state transition timeout、mailbox timeout
