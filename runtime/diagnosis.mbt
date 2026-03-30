@@ -33,6 +33,7 @@ pub(all) enum DiagnosticSourceLayer {
   Configuration
   RuntimeTelemetry
   StateTransition
+  Monitor
 } derive(Eq, Show)
 
 ///|
@@ -45,6 +46,7 @@ pub(all) enum DiagnosticCategory {
   Configuration
   RuntimeMetrics
   StateTransition
+  MonitorVerdict
 } derive(Eq, Show)
 
 ///|
@@ -98,6 +100,9 @@ pub(all) struct DiagnosticSurface {
   runtime_metrics : RuntimeMetricsSummary?
   issues : Array[DiagnosticIssue]
   overall_level : DiagnosticLevel
+  monitor_verdicts : Array[MonitorResult]?
+  overall_verdict : Verdict?
+  topology_fingerprint : TopologyFingerprint?
 } derive(Eq, Show)
 
 ///|
@@ -369,6 +374,9 @@ pub fn diagnostic_surface_from_slave_diagnosis(
     runtime_metrics: None,
     issues,
     overall_level: highest_diagnostic_level(issues, Info),
+    monitor_verdicts: None,
+    overall_verdict: None,
+    topology_fingerprint: None,
   }
 }
 
@@ -398,6 +406,9 @@ pub fn diagnostic_surface_from_validate(
     runtime_metrics: None,
     issues,
     overall_level: highest_diagnostic_level(issues, baseline),
+    monitor_verdicts: None,
+    overall_verdict: None,
+    topology_fingerprint: None,
   }
 }
 
@@ -428,6 +439,9 @@ pub fn diagnostic_surface_from_run(report : RunReport) -> DiagnosticSurface {
       issues,
       highest_diagnostic_level(base.issues, base.overall_level),
     ),
+    monitor_verdicts: None,
+    overall_verdict: None,
+    topology_fingerprint: None,
   }
 }
 
@@ -579,6 +593,9 @@ pub fn diagnostic_surface_from_state_transition(
     runtime_metrics: None,
     issues,
     overall_level: highest_diagnostic_level(issues, Info),
+    monitor_verdicts: None,
+    overall_verdict: None,
+    topology_fingerprint: None,
   }
 }
 
@@ -705,6 +722,81 @@ fn runtime_metrics_issues(
     })
   }
   issues
+}
+
+///|
+/// Convert a Verdict severity to a DiagnosticLevel.
+pub fn verdict_to_diagnostic_level(v : Verdict) -> DiagnosticLevel {
+  match v {
+    Pass => Info
+    Warn(_) => Info
+    Fail(_) => Degrade
+    Block(_) => Block
+  }
+}
+
+///|
+/// Convert a non-Pass MonitorResult into a DiagnosticIssue.
+/// Returns None for Pass verdicts.
+pub fn monitor_result_to_issue(r : MonitorResult) -> DiagnosticIssue? {
+  match r.verdict {
+    Pass => None
+    Warn(msg) =>
+      Some({
+        source: Monitor,
+        category: MonitorVerdict,
+        level: Info,
+        detail: r.name + ": " + msg,
+      })
+    Fail(msg) =>
+      Some({
+        source: Monitor,
+        category: MonitorVerdict,
+        level: Degrade,
+        detail: r.name + ": " + msg,
+      })
+    Block(msg) =>
+      Some({
+        source: Monitor,
+        category: MonitorVerdict,
+        level: Block,
+        detail: r.name + ": " + msg,
+      })
+  }
+}
+
+///|
+/// Enrich an existing DiagnosticSurface with monitor verdicts.
+/// Monitor-originated issues are appended to the issue list and
+/// the overall level is recomputed.
+pub fn enrich_surface_with_monitors(
+  surface : DiagnosticSurface,
+  results : Array[MonitorResult],
+  verdict : Verdict,
+) -> DiagnosticSurface {
+  let issues = surface.issues.copy()
+  for r in results {
+    match monitor_result_to_issue(r) {
+      Some(issue) => issues.push(issue)
+      None => ()
+    }
+  }
+  {
+    ..surface,
+    issues,
+    overall_level: highest_diagnostic_level(issues, surface.overall_level),
+    monitor_verdicts: Some(results),
+    overall_verdict: Some(verdict),
+  }
+}
+
+///|
+/// Enrich an existing DiagnosticSurface with a topology fingerprint.
+pub fn enrich_surface_with_fingerprint(
+  surface : DiagnosticSurface,
+  fingerprint : TopologyFingerprint,
+) -> DiagnosticSurface {
+  { ..surface, topology_fingerprint: Some(fingerprint) }
 }
 
 ///|

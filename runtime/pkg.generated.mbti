@@ -40,6 +40,10 @@ pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @prot
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
+pub fn enrich_surface_with_fingerprint(DiagnosticSurface, TopologyFingerprint) -> DiagnosticSurface
+
+pub fn enrich_surface_with_monitors(DiagnosticSurface, Array[MonitorResult], Verdict) -> DiagnosticSurface
+
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
 pub fn fingerprint_match(TopologyFingerprint, TopologyFingerprint) -> TopologyFingerprintMatch
@@ -53,6 +57,8 @@ pub fn monitor_cycle_success_rate(Runtime, Int) -> MonitorResult
 pub fn monitor_dc_drift(Runtime) -> MonitorResult
 
 pub fn monitor_pdo_configured(Runtime) -> MonitorResult
+
+pub fn monitor_result_to_issue(MonitorResult) -> DiagnosticIssue?
 
 pub fn monitor_startup_state(Runtime) -> MonitorResult
 
@@ -145,6 +151,8 @@ pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> Validat
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
 pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
+
+pub fn verdict_to_diagnostic_level(Verdict) -> DiagnosticLevel
 
 pub fn worst_verdict(Array[MonitorResult]) -> Verdict
 
@@ -255,6 +263,7 @@ pub(all) enum DiagnosticCategory {
   Configuration
   RuntimeMetrics
   StateTransition
+  MonitorVerdict
 } derive(Eq, Show)
 
 pub(all) struct DiagnosticIssue {
@@ -277,6 +286,7 @@ pub(all) enum DiagnosticSourceLayer {
   Configuration
   RuntimeTelemetry
   StateTransition
+  Monitor
 } derive(Eq, Show)
 
 pub(all) struct DiagnosticSurface {
@@ -288,6 +298,9 @@ pub(all) struct DiagnosticSurface {
   runtime_metrics : RuntimeMetricsSummary?
   issues : Array[DiagnosticIssue]
   overall_level : DiagnosticLevel
+  monitor_verdicts : Array[MonitorResult]?
+  overall_verdict : Verdict?
+  topology_fingerprint : TopologyFingerprint?
 } derive(Eq, Show)
 
 pub(all) struct EsiJsonDcMode {
