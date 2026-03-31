@@ -122,7 +122,7 @@
 
 ### 协议层缺失
 
-- [ ] **FoE 基础协议**：MailboxType 已声明 FoE，SII 已解析 `foe_supported` 标志，但无 FoE Read/Write/Data/Ack/Error/Busy 帧编解码和事务函数。至少需实现 FoE Download（固件写入）+ Upload（固件读取）的基础帧构造与响应解析。[ETG.1500 #701 Class A shall, Class B shall if FoE support; ETG.1000.6 §5.8]
+- [x] **FoE 基础协议**：FoE 帧编解码层（`mailbox/foe.mbt`）+ 事务状态机（`protocol/foe_transaction.mbt`）已完成。支持 FoeOpCode (Read/Write/Data/Ack/Error/Busy)、FoeErrorCode (15 标准码)、FoeResponse 解析，以及 `foe_download`/`foe_upload` (FP+AP) 多包传输含 RMSM 计数器管理和 Busy 重试。commit: `4923f4b` [ETG.1500 #701 Class A shall; ETG.1000.6 §5.8]
 
 ### DC 同步扩展
 
