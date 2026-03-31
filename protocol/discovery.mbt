@@ -320,6 +320,21 @@ pub fn[N : @hal.Nic] read_station_alias(
 }
 
 ///|
+/// Write station alias register (0x0012) using configured station addressing.
+pub fn[N : @hal.Nic] write_station_alias(
+  nic : N,
+  station : UInt,
+  alias : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let buf = Bytes::from_array([
+    (alias & 0xFFU).to_byte(),
+    ((alias >> 8) & 0xFFU).to_byte(),
+  ])
+  let _ = write_register_fp(nic, station, reg_station_alias, buf, timeout)
+}
+
+///|
 /// Set DL Control Bit24 to enable alias addressing for one slave.
 pub fn[N : @hal.Nic] enable_alias_addressing(
   nic : N,

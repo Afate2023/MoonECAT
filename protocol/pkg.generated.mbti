@@ -315,6 +315,10 @@ pub fn[N : @hal.Nic] write_register_ap(N, UInt, UInt, Bytes, @hal.Duration) -> P
 
 pub fn[N : @hal.Nic] write_register_fp(N, UInt, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
 
+pub fn[N : @hal.Nic] write_sm_watchdog_config(N, UInt, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] write_station_alias(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
 // Errors
 
 // Types and methods

@@ -161,6 +161,41 @@ pub fn[N : @hal.Nic] read_sm_watchdog_config(
 }
 
 ///|
+/// Write SM Watchdog configuration to ESC registers.
+/// Configures watchdog divider (0x0400), PDI watchdog time (0x0410),
+/// and process data watchdog time (0x0420).
+pub fn[N : @hal.Nic] write_sm_watchdog_config(
+  nic : N,
+  station : UInt,
+  divider : UInt,
+  pdi_time : UInt,
+  pdata_time : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let div_buf = Bytes::from_array([
+    (divider & 0xFFU).to_byte(),
+    ((divider >> 8) & 0xFFU).to_byte(),
+  ])
+  let _ = write_register_fp(
+    nic, station, reg_watchdog_divider, div_buf, timeout,
+  )
+  let pdi_buf = Bytes::from_array([
+    (pdi_time & 0xFFU).to_byte(),
+    ((pdi_time >> 8) & 0xFFU).to_byte(),
+  ])
+  let _ = write_register_fp(
+    nic, station, reg_watchdog_time_pdi, pdi_buf, timeout,
+  )
+  let pd_buf = Bytes::from_array([
+    (pdata_time & 0xFFU).to_byte(),
+    ((pdata_time >> 8) & 0xFFU).to_byte(),
+  ])
+  let _ = write_register_fp(
+    nic, station, reg_watchdog_time_pdata, pd_buf, timeout,
+  )
+}
+
+///|
 /// Per-port error counters from ESC DL registers.
 pub(all) struct PortErrorCounters {
   /// Frame errors (invalid FCS / length) detected on this port.

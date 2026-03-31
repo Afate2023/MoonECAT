@@ -38,6 +38,8 @@ pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
 
+pub fn decode_eoe_response(Bytes) -> EoeResponse raise @hal.EcError
+
 pub fn decode_foe_response(Bytes) -> (MailboxHeader, FoeResponse) raise @hal.EcError
 
 pub fn decode_sdo_info_od_description_payload(Bytes) -> SdoInfoObjectDescription raise @hal.EcError
@@ -50,6 +52,14 @@ pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise
 
 pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
 
+pub fn decode_soe_response(Bytes) -> SoeResponse raise @hal.EcError
+
+pub fn encode_eoe_fragment(Byte, UInt, Bool, UInt, UInt, UInt, Bytes) -> Bytes
+
+pub fn encode_eoe_get_ip_req(Byte, UInt) -> Bytes
+
+pub fn encode_eoe_set_ip_req(Byte, UInt, Bytes, Bytes, Bytes) -> Bytes
+
 pub fn encode_foe_ack(Byte, UInt) -> Bytes
 
 pub fn encode_foe_data(Byte, UInt, Bytes) -> Bytes
@@ -57,6 +67,10 @@ pub fn encode_foe_data(Byte, UInt, Bytes) -> Bytes
 pub fn encode_foe_read(Byte, UInt, String) -> Bytes
 
 pub fn encode_foe_write(Byte, UInt, String) -> Bytes
+
+pub fn encode_soe_read_req(Byte, UInt, Byte, UInt) -> Bytes
+
+pub fn encode_soe_write_req(Byte, UInt, Byte, UInt, Bytes) -> Bytes
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
@@ -90,6 +104,8 @@ pub fn sdo_abort_code_description(UInt) -> String
 
 pub let sii_category_start : Int
 
+pub fn soe_element_flags(Array[SoeElementFlag]) -> Byte
+
 // Errors
 
 // Types and methods
@@ -108,6 +124,38 @@ pub(all) struct EmergencyMessage {
   error_register : Byte
   data : Bytes
 } derive(Eq, Show)
+
+pub(all) enum EoeFrameType {
+  FragData
+  InitRespTimestamp
+  SetIpReq
+  SetIpResp
+  SetAddrFilterReq
+  SetAddrFilterResp
+  GetIpReq
+  GetIpResp
+  GetAddrFilterReq
+  GetAddrFilterResp
+} derive(Eq, Show)
+pub fn EoeFrameType::from_uint(UInt) -> Self raise @hal.EcError
+pub fn EoeFrameType::to_uint(Self) -> UInt
+
+pub(all) enum EoeResponse {
+  EoeFragment(frame_type~ : EoeFrameType, last_fragment~ : Bool, frag_number~ : UInt, frame_offset~ : UInt, frame_number~ : UInt, data~ : Bytes)
+  EoeIpResponse(result~ : EoeResult, data~ : Bytes)
+} derive(Eq, Show)
+
+pub(all) enum EoeResult {
+  Success
+  UnspecifiedError
+  UnsupportedFrameType
+  NoIpSupport
+  NoDhcpSupport
+  NoFilterSupport
+  Unknown(UInt)
+} derive(Eq, Show)
+pub fn EoeResult::from_uint(UInt) -> Self
+pub fn EoeResult::to_uint(Self) -> UInt
 
 pub(all) struct FmmuConfig {
   logical_start : UInt
@@ -559,6 +607,36 @@ pub(all) enum SmType {
   DynamicProcessDataOut
   DynamicProcessDataIn
   Unused
+} derive(Eq, Show)
+
+pub(all) enum SoeElementFlag {
+  DataState
+  Name
+  Attribute
+  Unit
+  Min
+  Max
+  Value
+  Default
+} derive(Eq, Show)
+pub fn SoeElementFlag::to_byte(Self) -> Byte
+
+pub(all) enum SoeOpCode {
+  ReadReq
+  ReadRes
+  WriteReq
+  WriteRes
+  Notification
+  Emergency
+} derive(Eq, Show)
+pub fn SoeOpCode::from_uint(UInt) -> Self raise @hal.EcError
+pub fn SoeOpCode::to_uint(Self) -> UInt
+
+pub(all) enum SoeResponse {
+  SoeReadData(drive_no~ : UInt, element_flags~ : Byte, idn~ : UInt, incomplete~ : Bool, data~ : Bytes)
+  SoeWriteAck(drive_no~ : UInt, element_flags~ : Byte, idn~ : UInt)
+  SoeError(drive_no~ : UInt, idn~ : UInt, error_code~ : UInt)
+  SoeNotification(drive_no~ : UInt, idn~ : UInt, data~ : Bytes)
 } derive(Eq, Show)
 
 // Type aliases
