@@ -126,7 +126,7 @@
 
 ### DC 同步扩展
 
-- [ ] **SYNC1 独立配置**：`dc_configure_sync0` 仅写入 activation byte 0x03（SYNC0 cyclic + enable），SII 已解析 `sync1_cycle_factor`，`reg_dc_cycle1` 寄存器常量已定义，但无 `dc_configure_sync1` 函数。需要支持 activation bit 2（0x07 = SYNC0+SYNC1）并写入 `reg_dc_cycle1`。[EtherCAT Compendium §5.5]
+- [x] **SYNC1 独立配置**：`dc_configure_sync0` 已扩展可选参数 `sync1_cycle_ns`，当 >0 时写入 `reg_dc_cycle1`(0x09A4) 并将 activation byte 从 0x03 改为 0x07（cyclic+SYNC0+SYNC1）。向后兼容，默认值 0U 不改变现有行为。commit: `1acf07d` [EtherCAT Compendium §5.5]
 
 ### 低优先级（may/should，不阻塞 Class B）
 

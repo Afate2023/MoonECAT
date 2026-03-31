@@ -58,6 +58,7 @@
 - `SII Timeout → ESM 转换策略接线` → `d6d26bf` `feat(protocol,runtime): wire SII timeout category to ESM transition policy per ETG.2010`
 - `DL/Ph Error Counters 寄存器读取` → `a20f955` `feat(protocol,runtime): add DL/Ph Error Counters read (ESC 0x0300-0x0313) per ETG1000.4`
 - `FoE 基础协议` → `4923f4b` `feat(mailbox,protocol): add FoE basic protocol (ETG1000.6 §5.8)`
+- `SYNC1 独立配置` → `1acf07d` `feat(protocol): add SYNC1 configuration to dc_configure_sync0 per EtherCAT Compendium §5.5`
 
 ### M6 网络配置增强 — ✅ 已完成
 
