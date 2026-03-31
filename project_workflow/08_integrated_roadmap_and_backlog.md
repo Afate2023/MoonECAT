@@ -180,7 +180,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | B-9 | VirtualSlave 邮箱仿真（CoE SDO upload/download + Emergency 注入） | P1 | ✅ | hal/mock/, mailbox/ |
 | B-10 | 协议偏差注入（畸形帧、PDU 长度越界、WKC 篡改位置可控） | P1 | ✅ | hal/mock/, protocol/ |
 | B-11 | Monitor 可组合注册 + 用户自定义 monitor trait | P1 | ✅ | runtime/ |
-| B-12 | CLI `replay` 命令（从 NDJSON trace 文件回放并输出 verdict） | P1 | ❌ | cmd/main/, hal/mock/ |
+| B-12 | CLI `replay` 命令（从 NDJSON trace 文件回放并输出 verdict） | P1 | ✅ | cmd/main/：replay, scenario, jitter-profile, auto-tune 4 条 CLI 命令，commit `6213ee6` |
 | B-13 | Wasm-GC fuzzing 最小框架（随机 Event 生成 + crash oracle） | P2 | ✅ | hal/mock/, runtime/ |
 | B-14 | 验证报告生成器（HTML/Markdown 格式，含 verdict 时间线 + fault 注入点标注） | P2 | ✅ | runtime/, cmd/main/ |
 
@@ -448,7 +448,7 @@ MoonECAT CLI 按操作语义分为五个层级：
 |---|---|---|---|
 | **MA — Native Runtime Baseline** | 主线 A | A-1 ~ A-6 | L4 验证加固 |
 | **MB1 — Verification Runtime 基础** | 主线 B 阶段一 | B-1 ~ B-6 | ✅ L4 验证加固 |
-| **MB2 — Verification Runtime 深度** | 主线 B 阶段二 | B-7 ~ B-14 | ✅ L4 场景覆盖（B-12 CLI 除外） |
+| **MB2 — Verification Runtime 深度** | 主线 B 阶段二 | B-7 ~ B-14 | ✅ B-7~B-14 全部完成，含 B-12 CLI replay/scenario/jitter-profile/auto-tune |
 | **MC1 — HIL-Ready Boundary 合同** | 主线 C 阶段一 | C-1 ~ C-8 | ✅ 全部完成 |
 | **MC2 — HIL-Ready Boundary 实战** | 主线 C 阶段二 | C-9 ~ C-14 | ✅ 全部完成 |
 | **MD — Remote Capability** | 主线 D | D-1 ~ D-10 | L3 远程闭环 |
