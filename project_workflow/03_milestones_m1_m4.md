@@ -103,6 +103,7 @@
   - 📦 [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) (~13 tests)
 - [x] **【缺口】pdo_exchange 实体循环**：完成 LRW/LRD/LWR 实际收发，使 run_cycle 能驱动真实 PDO 交换 [ETG.1500 #201]
   - ✅ 代码审查确认 pdo_exchange 已完整实现 (LRW + logical addressing)
+  - ✅ 2026-04-01 按 SOES 的 FMMU / process-data 模型继续补齐 [hal/mock/virtual_slave.mbt](../hal/mock/virtual_slave.mbt)、[hal/mock/virtual_bus.mbt](../hal/mock/virtual_bus.mbt) 与 [hal/mock/virtual_bus_test.mbt](../hal/mock/virtual_bus_test.mbt)，使 VirtualBus 在 mock 多从站场景下实际执行 LRD/LWR/LRW 逻辑寻址、单从站/多从站 PDO 交换和 Init→Op 生命周期回归（commit: `e1fee13`，验证：`moon test --target wasm-gc hal/mock` = `48/48`、`moon test --target wasm-gc hal hal/mock protocol mailbox fixtures` = `310/310`、`moon test --target wasm-gc .` = `2/2`）
 - [x] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
   - ✅ [protocol/esm_extensions.mbt](../protocol/esm_extensions.mbt) : read_device_emulation + request_state_aware
 - [x] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
@@ -115,6 +116,7 @@
 提交映射（选项 → commit）：
 - `ESM 状态流转与回退` → `b4019b1` `feat: add esm transition engine`
 - `PDO 周期交换主循环` → `cfd6f14` `feat: add pdo runtime loop`
+- `Mock FMMU 逻辑 PDO 路由与多从站回归` → `e1fee13` `feat(mock): add FMMU logical PDO routing`
 - `运行时调度与 telemetry` → `ddc6158` `feat: add runtime scheduler and telemetry`
 - `Free Run 与恢复路径测试` → `3ccd459` `test: cover free-run and recovery paths`
 - `Device Emulation + OpOnly 扩展` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`

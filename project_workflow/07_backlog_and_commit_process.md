@@ -52,6 +52,7 @@
 
 最近回填：
 
+- `Mock FMMU 逻辑 PDO 路由与多从站回归` → `e1fee13` `feat(mock): add FMMU logical PDO routing`
 - `Raw SII overlay decoder 状态合同` → `b024aec` `feat(sii): expose overlay decoder status`
 - `Raw SII category overlay 挂载点` → `ca0a906` `feat(sii): add raw category overlay hook`
 - `SII category class 导出` → `ff93f64` `feat(sii): export category classes`

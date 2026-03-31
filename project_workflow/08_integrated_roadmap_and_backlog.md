@@ -147,7 +147,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | B-1 | 设计并实现一等 fault injection 模型（≥3 类可控注入） | P1-1 | ✅ `ba7356e` | runtime/, protocol/, hal/ |
 | B-2 | 引入 deterministic replay 最小闭环（事件溯源回放） | P1-2 | ✅ `e4b03a2` | runtime/, fixtures/ |
 | B-3 | 引入 monitor / verdict 框架（Pass/Warn/Fail/Block） | P1-3 | ✅ `7af544f` | runtime/, cmd/main/ |
-| B-4 | 从 loopback/mock 演进到协议级虚拟从站 | P1-4 | ✅ `5535c69` | hal/mock/, protocol/, mailbox/ |
+| B-4 | 从 loopback/mock 演进到协议级虚拟从站 | P1-4 | ✅ `5535c69` / `e1fee13` | hal/mock/, protocol/, mailbox/ |
 | B-5 | 冻结 topology fingerprint / Hot Connect 最小模型 | P1-5 | ✅ `164014a` | runtime/, mailbox/ |
 | B-6 | 扩展 DiagnosticSurface 为统一事实层 | P1-6 | ✅ `07e7333` | runtime/, cmd/main/ |
 
@@ -164,7 +164,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 - ✅ 7 类 fault 可控注入（FaultInjector + FaultNic）
 - ✅ 事件溯源回放闭环（RecordingNic → ReplayNic）
 - ✅ `run` 输出显式 verdict（Pass/Warn/Fail/Block）
-- ✅ VirtualSlave 可完成 `scan → state → run`（VirtualBus 多从站仿真）
+- ✅ VirtualSlave 可完成 `scan → state → run`（VirtualBus 多从站仿真）；2026-04-01 再按 SOES 风格补齐 FMMU logical addressing / process-data 路由，覆盖单从站与多从站 LRD/LWR/LRW、Init→Op 生命周期和 PDO 回归（commit: `e1fee13`，验证：`moon test --target wasm-gc hal/mock` = `48/48`、`moon test --target wasm-gc hal hal/mock protocol mailbox fixtures` = `310/310`、`moon test --target wasm-gc .` = `2/2`）
 - ✅ topology fingerprint 冻结（TopologyFingerprint + SlavePresence）
 
 ### 主线 C：HIL-Ready Runtime Boundary（P2 优先级）
