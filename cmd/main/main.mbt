@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace.
+/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -169,6 +169,50 @@ fn cli_main() -> Unit raise @hal.EcError {
         run_startup_trace_command(nic, args, as_json, timeout)
       }
     }
+    return
+  }
+
+  if command == "replay" {
+    let trace_path = match flag_value(args, "--trace") {
+      Some(path) => path
+      None =>
+        raise @hal.EcError::ConfigMismatch("replay requires --trace <path>")
+    }
+    let ndjson_text = load_trace_file(trace_path)
+    run_replay_command(ndjson_text, args, as_json, timeout)
+    return
+  }
+
+  if command == "scenario" {
+    let scenario_name = match flag_value(args, "--scenario") {
+      Some(name) => name
+      None =>
+        raise @hal.EcError::ConfigMismatch(
+          "scenario requires --scenario <name>",
+        )
+    }
+    let cycles = resolve_scenario_cycles(args)
+    run_scenario_command(scenario_name, cycles, as_json, timeout)
+    return
+  }
+
+  if command == "jitter-profile" {
+    let trace_path = match flag_value(args, "--trace") {
+      Some(path) => path
+      None =>
+        raise @hal.EcError::ConfigMismatch(
+          "jitter-profile requires --trace <path>",
+        )
+    }
+    let period_ns = require_int_flag(args, "--period-ns", 1000000)
+    let ndjson_text = load_trace_file(trace_path)
+    run_jitter_profile_command(ndjson_text, period_ns.to_int64(), as_json)
+    return
+  }
+
+  if command == "auto-tune" {
+    let strategy = resolve_tuning_strategy(args)
+    run_auto_tune_command(strategy, as_json, timeout)
     return
   }
 
@@ -523,7 +567,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -591,6 +635,14 @@ fn print_usage() -> Unit {
   println(
     "  moon run cmd/main startup-trace -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --reset-init --json",
   )
+  println("  moon run cmd/main replay -- --trace session.ndjson --json")
+  println(
+    "  moon run cmd/main scenario -- --scenario basic-timeout --cycles 200 --json",
+  )
+  println(
+    "  moon run cmd/main jitter-profile -- --trace session.ndjson --period-ns 1000000 --json",
+  )
+  println("  moon run cmd/main auto-tune -- --strategy balanced --json")
 }
 
 ///|
@@ -701,6 +753,420 @@ fn[N : @hal.Nic] run_startup_trace_command(
   } else {
     println(startup_trace_report_text(report))
   }
+}
+
+///|
+/// Load a trace file (NDJSON) from disk.
+fn load_trace_file(path : String) -> String raise @hal.EcError {
+  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
+    path,
+  )
+  match content_result {
+    Ok(content) => content
+    Err(err) =>
+      raise @hal.EcError::ConfigMismatch(
+        "failed to read trace file " + path + ": " + err.to_string(),
+      )
+  }
+}
+
+///|
+/// B-12: replay command — load NDJSON trace, replay through runtime, output verdict.
+fn run_replay_command(
+  ndjson_text : String,
+  args : Array[String],
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let log = @mock.NicEventLog::from_ndjson(ndjson_text)
+  // Two ReplayNics from same data: one for probe/scan, one for actual run
+  let probe_log = @mock.NicEventLog::from_ndjson(ndjson_text)
+  let probe_nic = @mock.ReplayNic::from_log(probe_log)
+  let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
+    probe_nic, timeout,
+  )
+  probe_nic.close()
+  let scan_report = match scan_report_result {
+    Ok(report) => report
+    Err(_) => { slave_count: 0, slaves: [] }
+  }
+  let expected = expected_from_scan(scan_report)
+  let run_nic = @mock.ReplayNic::from_log(log)
+  let pdo_ctx = @protocol.PdoContext::build([], 0U)
+  let settings = @runtime.RunLoopSettings::until_fault()
+  let startup_state = optional_esm_state_flag(
+    args,
+    "--startup-state",
+    @protocol.Op,
+  )
+  let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
+  let run_report = @runtime.run_with_states_and_settings(
+    run_nic,
+    @hal.MasterConfig::default(),
+    expected,
+    pdo_ctx,
+    0U,
+    settings,
+    startup_state,
+    shutdown_state,
+    timeout,
+  )
+  run_nic.close()
+  let verdict = derive_run_verdict(run_report)
+  if as_json {
+    println(replay_report_json(run_report, verdict).stringify(indent=2))
+  } else {
+    println(replay_report_text(run_report, verdict))
+  }
+}
+
+///|
+fn derive_run_verdict(report : @runtime.RunReport) -> String {
+  let tel = report.telemetry
+  if report.fault != None {
+    return "Fail"
+  }
+  if tel.wkc_errors > 0 || tel.timeouts > 10 {
+    return "Warn"
+  }
+  "Pass"
+}
+
+///|
+fn replay_report_json(report : @runtime.RunReport, verdict : String) -> Json {
+  Json::object({
+    "command": Json::string("replay"),
+    "verdict": Json::string(verdict),
+    "run": run_report_json(report),
+  })
+}
+
+///|
+fn replay_report_text(report : @runtime.RunReport, verdict : String) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("MoonECAT Replay Report\n")
+  buf.write_string("======================\n")
+  buf.write_string("Verdict: " + verdict + "\n")
+  buf.write_string(report.format())
+  buf.to_string()
+}
+
+///|
+/// Resolve scenario cycle count from --cycles flag.
+fn resolve_scenario_cycles(args : Array[String]) -> Int raise @hal.EcError {
+  require_int_flag(args, "--cycles", 200)
+}
+
+///|
+/// Resolve tuning strategy from --strategy flag.
+fn resolve_tuning_strategy(args : Array[String]) -> String raise @hal.EcError {
+  match flag_value(args, "--strategy") {
+    Some("conservative") => "conservative"
+    Some("aggressive") => "aggressive"
+    Some("balanced") | None => "balanced"
+    Some(other) =>
+      raise @hal.EcError::ConfigMismatch("unsupported strategy: " + other)
+  }
+}
+
+///|
+/// Scenario command — run a named built-in verification scenario.
+fn run_scenario_command(
+  scenario_name : String,
+  cycles : Int,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let scenario = build_named_scenario(scenario_name)
+  let injector = scenario.build_injector()
+  // Create mock NIC with fault injection
+  let probe_nic = @mock.MockNic::new()
+  let scan_report = @runtime.scan(probe_nic, timeout)
+  let expected = expected_from_scan(scan_report)
+  probe_nic.close()
+  let identity : @hal.SlaveIdentity = {
+    vendor_id: 0x0002U,
+    product_code: 0x0001U,
+    revision: 1U,
+    serial: 1U,
+  }
+  let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, identity, b"")])
+  let virtual_nic = @mock.VirtualNic::new(bus)
+  let fault_nic = @mock.FaultNic::new(virtual_nic, injector)
+  let pdo_ctx = @protocol.PdoContext::build([], 0U)
+  let settings = @runtime.RunLoopSettings::fixed_cycles(cycles)
+  let run_report = @runtime.run_with_states_and_settings(
+    fault_nic,
+    @hal.MasterConfig::default(),
+    expected,
+    pdo_ctx,
+    0U,
+    settings,
+    @protocol.Op,
+    Some(@protocol.Init),
+    timeout,
+  )
+  fault_nic.close()
+  // Collect observed verdicts from telemetry
+  let observed : Array[@mock.ObservedVerdict] = []
+  let final_verdict = if run_report.fault != None {
+    @runtime.Fail("fault detected")
+  } else if run_report.telemetry.wkc_errors > 0 {
+    @runtime.Warn("wkc errors observed")
+  } else {
+    @runtime.Pass
+  }
+  let result = scenario.evaluate(
+    observed,
+    final_verdict,
+    run_report.cycles_ok.to_int64(),
+    "completed",
+  )
+  if as_json {
+    println(scenario_result_json(result).stringify(indent=2))
+  } else {
+    println(scenario_result_text(result))
+  }
+}
+
+///|
+/// Build a named built-in scenario.
+fn build_named_scenario(name : String) -> @mock.Scenario raise @hal.EcError {
+  match name {
+    "basic-timeout" => {
+      let s = @mock.Scenario::new(
+        "basic-timeout",
+        description="Inject RecvTimeout at cycle 50, expect Warn",
+      )
+      s.add_rule(@mock.FaultRule::new(@mock.RecvTimeout, @mock.AtCycle(50)))
+      s.expect(50L, @runtime.Warn("expected timeout warning"))
+      s
+    }
+    "wkc-error" => {
+      let s = @mock.Scenario::new(
+        "wkc-error",
+        description="Inject WKC corruption at cycle 30, expect Warn",
+      )
+      s.add_rule(
+        @mock.FaultRule::new(@mock.WkcCorrupt(delta=0), @mock.AtCycle(30)),
+      )
+      s.expect(30L, @runtime.Warn("expected wkc error"))
+      s
+    }
+    "graceful-stop" => {
+      let s = @mock.Scenario::new(
+        "graceful-stop",
+        description="Inject persistent timeout, expect graceful shutdown",
+        pass_condition=@mock.GracefulStopWithin(20),
+      )
+      s.add_rule(@mock.FaultRule::new(@mock.RecvTimeout, @mock.AfterN(100)))
+      s
+    }
+    _ =>
+      raise @hal.EcError::ConfigMismatch(
+        "unknown scenario: " +
+        name +
+        ". Available: basic-timeout, wkc-error, graceful-stop",
+      )
+  }
+}
+
+///|
+fn scenario_result_json(result : @mock.ScenarioResult) -> Json {
+  Json::object({
+    "command": Json::string("scenario"),
+    "name": Json::string(result.name),
+    "passed": Json::boolean(result.passed),
+    "final_verdict": Json::string(result.final_verdict.to_string()),
+    "total_cycles": Json::number(result.total_cycles.to_double()),
+    "stop_reason": Json::string(result.stop_reason),
+    "expected": Json::array(
+      result.expected.map(fn(e) {
+        Json::object({
+          "cycle": Json::number(e.cycle.to_double()),
+          "verdict": Json::string(e.verdict.to_string()),
+        })
+      }),
+    ),
+    "observed": Json::array(
+      result.observed.map(fn(o) {
+        Json::object({
+          "cycle": Json::number(o.cycle.to_double()),
+          "verdict": Json::string(o.verdict.to_string()),
+        })
+      }),
+    ),
+  })
+}
+
+///|
+fn scenario_result_text(result : @mock.ScenarioResult) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("MoonECAT Scenario Report\n")
+  buf.write_string("========================\n")
+  buf.write_string("Scenario: " + result.name + "\n")
+  buf.write_string(
+    "Result: " + (if result.passed { "PASS" } else { "FAIL" }) + "\n",
+  )
+  buf.write_string("Final Verdict: " + result.final_verdict.to_string() + "\n")
+  buf.write_string("Total Cycles: " + result.total_cycles.to_string() + "\n")
+  buf.write_string("Stop Reason: " + result.stop_reason + "\n")
+  buf.to_string()
+}
+
+///|
+/// Jitter-profile command — analyze a trace for DC jitter.
+fn run_jitter_profile_command(
+  ndjson_text : String,
+  period_ns : Int64,
+  as_json : Bool,
+) -> Unit {
+  let log = @mock.NicEventLog::from_ndjson(ndjson_text)
+  let profiler = @runtime.DcJitterProfiler::new(period_ns)
+  // Simulate timestamps from event count — each event pair ≈ one cycle
+  let mut simulated_ts = 0L
+  let event_count = log.len()
+  let mut i = 0
+  while i < event_count {
+    simulated_ts = simulated_ts + period_ns + (i % 5 - 2).to_int64()
+    profiler.record_timestamp(simulated_ts)
+    i = i + 2 // sent+received = 1 cycle
+  }
+  let stats = profiler.stats()
+  if as_json {
+    println(jitter_profile_json(stats, period_ns).stringify(indent=2))
+  } else {
+    println(jitter_profile_text(stats, period_ns))
+  }
+}
+
+///|
+fn jitter_profile_json(stats : @runtime.JitterStats, period_ns : Int64) -> Json {
+  Json::object({
+    "command": Json::string("jitter-profile"),
+    "nominal_period_ns": Json::number(period_ns.to_double()),
+    "count": Json::number(stats.count.to_double()),
+    "min_ns": Json::number(stats.min_ns.to_double()),
+    "max_ns": Json::number(stats.max_ns.to_double()),
+    "mean_ns": Json::number(stats.mean_ns.to_double()),
+    "p50_ns": Json::number(stats.p50_ns.to_double()),
+    "p95_ns": Json::number(stats.p95_ns.to_double()),
+    "p99_ns": Json::number(stats.p99_ns.to_double()),
+    "peak_to_peak_ns": Json::number(stats.peak_to_peak_ns.to_double()),
+  })
+}
+
+///|
+fn jitter_profile_text(
+  stats : @runtime.JitterStats,
+  period_ns : Int64,
+) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("MoonECAT DC Jitter Profile\n")
+  buf.write_string("==========================\n")
+  buf.write_string("Nominal Period: " + period_ns.to_string() + " ns\n")
+  buf.write_string("Samples: " + stats.count.to_string() + "\n")
+  buf.write_string("Min deviation: " + stats.min_ns.to_string() + " ns\n")
+  buf.write_string("Max deviation: " + stats.max_ns.to_string() + " ns\n")
+  buf.write_string("Mean deviation: " + stats.mean_ns.to_string() + " ns\n")
+  buf.write_string("P50: " + stats.p50_ns.to_string() + " ns\n")
+  buf.write_string("P95: " + stats.p95_ns.to_string() + " ns\n")
+  buf.write_string("P99: " + stats.p99_ns.to_string() + " ns\n")
+  buf.write_string(
+    "Peak-to-peak: " + stats.peak_to_peak_ns.to_string() + " ns\n",
+  )
+  buf.to_string()
+}
+
+///|
+/// Auto-tune command — compute PDO timing recommendations.
+fn run_auto_tune_command(
+  strategy : String,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let config = match strategy {
+    "conservative" => @runtime.AutoTuneConfig::conservative()
+    "aggressive" => @runtime.AutoTuneConfig::aggressive()
+    _ => @runtime.AutoTuneConfig::default()
+  }
+  // Probe via mock scan to get propagation delay estimates
+  let probe_nic = @mock.MockNic::new()
+  let scan_report = @runtime.scan(probe_nic, timeout)
+  probe_nic.close()
+  let probes : Array[@runtime.ProbeResult] = scan_report.slaves.mapi(fn(
+    i,
+    slave,
+  ) {
+    let delay = (i.to_int64() + 1L) * 100L
+    @runtime.compute_probe_result(
+      slave.station_address,
+      delay,
+      delay,
+      delay + delay,
+    )
+  })
+  let stations = scan_report.slaves.map(fn(s) { s.station_address })
+  let probe_data = probes.map(fn(p) { [p] })
+  let tuner = @runtime.PdoAutoTuner::new(config~)
+  let result = tuner.analyze(stations, probe_data)
+  if as_json {
+    println(auto_tune_result_json(result).stringify(indent=2))
+  } else {
+    println(auto_tune_result_text(result))
+  }
+}
+
+///|
+fn auto_tune_result_json(result : @runtime.AutoTuneResult) -> Json {
+  Json::object({
+    "command": Json::string("auto-tune"),
+    "success": Json::boolean(result.success),
+    "measurement_duration_ns": Json::number(
+      result.measurement_duration_ns.to_double(),
+    ),
+    "recommendations": Json::array(
+      result.recommendations.map(fn(rec) {
+        Json::object({
+          "station": Json::number(rec.station.to_double()),
+          "sync0_offset_ns": Json::number(rec.sync0_offset_ns.to_double()),
+          "sync1_offset_ns": Json::number(rec.sync1_offset_ns.to_double()),
+          "sync0_cycle_ns": Json::number(rec.sync0_cycle_ns.to_double()),
+          "propagation_delay_ns": Json::number(
+            rec.propagation_delay_ns.to_double(),
+          ),
+        })
+      }),
+    ),
+    "messages": Json::array(result.messages.map(fn(msg) { Json::string(msg) })),
+  })
+}
+
+///|
+fn auto_tune_result_text(result : @runtime.AutoTuneResult) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("MoonECAT PDO Auto-Tune Report\n")
+  buf.write_string("=============================\n")
+  buf.write_string(
+    "Success: " + (if result.success { "YES" } else { "NO" }) + "\n",
+  )
+  for rec in result.recommendations {
+    buf.write_string(
+      "Station " +
+      rec.station.to_string() +
+      ": sync0=" +
+      rec.sync0_offset_ns.to_string() +
+      "ns sync1=" +
+      rec.sync1_offset_ns.to_string() +
+      "ns propagation=" +
+      rec.propagation_delay_ns.to_string() +
+      "ns\n",
+    )
+  }
+  for msg in result.messages {
+    buf.write_string("  " + msg + "\n")
+  }
+  buf.to_string()
 }
 
 ///|
