@@ -14,6 +14,10 @@ pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.Mai
 
 pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] bridge_eoe_cycle(EoeSwitch, QueueEndpoint, N, @hal.Duration) -> (Int, Int)
+
+pub fn build_master_od(MasterIdentity, ScanReport?, Telemetry?, DiagnosticSurface?) -> MasterObjectDictionary
+
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
@@ -30,6 +34,8 @@ pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> St
 
 pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
 
+pub fn default_master_identity() -> MasterIdentity
+
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
 pub fn diagnostic_surface_from_run(RunReport) -> DiagnosticSurface
@@ -39,6 +45,8 @@ pub fn diagnostic_surface_from_slave_diagnosis(ScanReport, SlaveDiagnosis) -> Di
 pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @protocol.EsmState?, @protocol.EsmState?, Bool?, UInt?, UInt?) -> DiagnosticSurface
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
+
+pub fn eoe_max_fragment_size(@mailbox.MailboxConfig) -> Int
 
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
@@ -268,6 +276,74 @@ pub(all) struct DiagnosticSurface {
   overall_level : DiagnosticLevel
 } derive(Eq, Show)
 
+pub(all) struct EoeEndpointFrame {
+  station : UInt
+  data : Bytes
+} derive(Eq, Show)
+
+type EoeReassemblyBuffer derive(Show)
+
+pub(all) struct EoeReceivedFrame {
+  station : UInt
+  data : Bytes
+} derive(Eq, Show)
+
+pub(all) struct EoeRelay {
+  stats : EoeRelayStats
+  mut active : Bool
+} derive(Show)
+pub fn EoeRelay::format_text(Self) -> String
+pub fn EoeRelay::new() -> Self
+pub fn[N : @hal.Nic] EoeRelay::relay_cycle(Self, EoeSwitch, N, @hal.Duration, (EoeRelayFrame) -> Bool, () -> EoeRelayFrame?) -> (Int, Int)
+pub fn EoeRelay::set_active(Self, Bool) -> Unit
+pub fn EoeRelay::to_json(Self) -> Json
+
+pub(all) enum EoeRelayDirection {
+  HostToSlave
+  SlaveToHost
+} derive(Eq, Show)
+
+pub(all) struct EoeRelayFrame {
+  direction : EoeRelayDirection
+  station : UInt
+  data : Bytes
+} derive(Eq, Show)
+
+pub(all) struct EoeRelayStats {
+  mut tx_relayed : Int64
+  mut rx_relayed : Int64
+  mut dropped : Int64
+} derive(Eq, Show)
+pub fn EoeRelayStats::new() -> Self
+pub fn EoeRelayStats::to_json(Self) -> Json
+
+pub(all) struct EoeStationContext {
+  station : UInt
+  mb_config : @mailbox.MailboxConfig
+  reassembly : Array[EoeReassemblyBuffer?]
+  mut tx_frame_number : UInt
+  mut mb_counter : Byte
+} derive(Show)
+
+pub(all) struct EoeSwitch {
+  mut stations : Array[EoeStationContext]
+  rx_queue : Array[EoeReceivedFrame]
+  mut tx_fragments : Int64
+  mut rx_fragments : Int64
+  mut rx_frames_complete : Int64
+  mut rx_errors : Int64
+} derive(Show)
+pub fn EoeSwitch::add_station(Self, UInt, @mailbox.MailboxConfig) -> Unit
+pub fn EoeSwitch::drain_rx(Self) -> Array[EoeReceivedFrame]
+pub fn EoeSwitch::format_text(Self) -> String
+pub fn[N : @hal.Nic] EoeSwitch::get_ip(Self, N, UInt, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
+pub fn EoeSwitch::new() -> Self
+pub fn[N : @hal.Nic] EoeSwitch::poll(Self, N, @hal.Duration) -> Int
+pub fn EoeSwitch::process_received(Self, UInt, Bytes) -> Bool
+pub fn[N : @hal.Nic] EoeSwitch::send_frame(Self, N, UInt, Bytes, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic] EoeSwitch::set_ip(Self, N, UInt, Bytes, Bytes, Bytes, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
+pub fn EoeSwitch::to_json(Self) -> Json
+
 pub(all) struct EsiJsonDcMode {
   name : String
   description : String
@@ -391,6 +467,55 @@ pub(all) struct MailboxSession {
   mailbox_config : @mailbox.MailboxConfig
 }
 
+pub(all) struct MasterIdentity {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+} derive(Eq, Show)
+
+pub(all) struct MasterObjectDictionary {
+  entries : Array[MasterOdEntry]
+} derive(Eq, Show)
+pub fn MasterObjectDictionary::entries_at(Self, UInt) -> Array[MasterOdEntry]
+pub fn MasterObjectDictionary::format_text(Self) -> String
+pub fn MasterObjectDictionary::indices(Self) -> Array[UInt]
+pub fn MasterObjectDictionary::lookup(Self, UInt, Byte) -> MasterOdEntry?
+pub fn MasterObjectDictionary::to_json(Self) -> Json
+
+pub(all) enum MasterOdAccess {
+  ReadOnly
+  ReadWrite
+} derive(Eq, Show)
+
+pub(all) enum MasterOdDataType {
+  Unsigned8
+  Unsigned16
+  Unsigned32
+  Integer32
+  VisibleString
+  OctetString
+} derive(Eq, Show)
+
+pub(all) struct MasterOdEntry {
+  index : UInt
+  subindex : Byte
+  name : String
+  data_type : MasterOdDataType
+  access : MasterOdAccess
+  value : MasterOdValue
+} derive(Eq, Show)
+
+pub(all) enum MasterOdValue {
+  U8(Byte)
+  U16(UInt)
+  U32(UInt)
+  I32(Int)
+  Str(String)
+  Raw(Bytes)
+} derive(Eq, Show)
+pub fn MasterOdValue::format(Self) -> String
+
 pub struct NullRunProgressSink {
   _unused : Unit
 }
@@ -403,6 +528,23 @@ pub(all) struct ObservedSlaveAddress {
 } derive(Eq, Show)
 
 type OperationalStartupStep derive(Eq, Show)
+
+pub(all) struct QueueEndpoint {
+  tx_pending : Array[EoeEndpointFrame]
+  rx_pending : Array[EoeEndpointFrame]
+  max_depth : Int
+  mut up : Bool
+} derive(Show)
+pub fn QueueEndpoint::consume_rx(Self) -> EoeEndpointFrame?
+pub fn QueueEndpoint::is_up(Self) -> Bool
+pub fn QueueEndpoint::new(max_depth? : Int) -> Self
+pub fn QueueEndpoint::read_frame(Self) -> Bytes?
+pub fn QueueEndpoint::rx_depth(Self) -> Int
+pub fn QueueEndpoint::set_up(Self, Bool) -> Unit
+pub fn QueueEndpoint::submit_tx(Self, UInt, Bytes) -> Bool
+pub fn QueueEndpoint::to_json(Self) -> Json
+pub fn QueueEndpoint::tx_depth(Self) -> Int
+pub fn QueueEndpoint::write_frame(Self, Bytes) -> Bool
 
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
@@ -483,6 +625,7 @@ pub(all) struct Runtime {
   mut dc_stations : Array[UInt]
   mut dc_cycle_counter : Int
   mut emergency_stations : Array[(UInt, @mailbox.MailboxConfig)]
+  eoe_switch : EoeSwitch
 } derive(Show)
 pub fn Runtime::configure_emergency_stations(Self, Array[(UInt, @mailbox.MailboxConfig)]) -> Unit
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
@@ -656,6 +799,12 @@ pub(all) enum ValidationResult {
 // Type aliases
 
 // Traits
+pub(open) trait EoeEndpoint {
+  read_frame(Self) -> Bytes?
+  write_frame(Self, Bytes) -> Bool
+  is_up(Self) -> Bool
+}
+
 pub(open) trait RunProgressSink {
   emit(Self, RunProgress) -> Unit
 }

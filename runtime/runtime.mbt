@@ -57,6 +57,8 @@ pub(all) struct Runtime {
   mut dc_cycle_counter : Int
   /// Stations with mailbox support for Emergency polling.
   mut emergency_stations : Array[(UInt, @mailbox.MailboxConfig)]
+  /// EoE Virtual Switch engine.
+  eoe_switch : EoeSwitch
 } derive(Show)
 
 ///|
@@ -76,6 +78,7 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     dc_stations: [],
     dc_cycle_counter: 0,
     emergency_stations: [],
+    eoe_switch: EoeSwitch::new(),
   }
 }
 
@@ -245,6 +248,10 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
       self.telemetry.emergency_events = self.telemetry.emergency_events +
         emg_count.to_int64()
     }
+  }
+  // Poll EoE stations for incoming Ethernet-over-EtherCAT frames.
+  if self.eoe_switch.stations.length() > 0 {
+    let _eoe_count = self.eoe_switch.poll(nic, timeout)
   }
   self.consecutive_timeouts = 0
   let ok = wkc >= self.expected_wkc
