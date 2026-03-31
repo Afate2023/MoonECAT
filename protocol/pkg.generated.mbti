@@ -73,6 +73,10 @@ pub fn[N : @hal.Nic] eeprom_read_ap(N, UInt, UInt, Int, @hal.Duration) -> Bytes 
 
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] eeprom_write_word(N, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] eeprom_write_word_ap(N, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn esm_default_timeout(EsmState) -> @hal.Duration

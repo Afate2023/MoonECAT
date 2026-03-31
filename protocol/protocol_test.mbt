@@ -3006,3 +3006,20 @@ test "foe_upload_ap rejects small mailbox" {
   )
   assert_true(result is Err(_))
 }
+
+// ========== EEPROM Write Tests ==========
+
+///|
+test "eeprom_write_word via mock" {
+  let nic = EepromMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // Mock returns status 0x0000 (not busy, no NACK) → should succeed
+  @protocol.eeprom_write_word(nic, 0x1001U, 0x0010U, 0xABCDU, timeout)
+}
+
+///|
+test "eeprom_write_word_ap via mock" {
+  let nic = EepromMockNic::new()
+  let timeout = @hal.Duration(1000L)
+  @protocol.eeprom_write_word_ap(nic, 0U, 0x0020U, 0x1234U, timeout)
+}
