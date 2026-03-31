@@ -118,7 +118,7 @@
 
 ### DLL 诊断层
 
-- [ ] **DL/Ph Error Counters 寄存器读取**：ESC 0x0300-0x030D（RX Error Counter×4 端口、Forwarded RX Error Counter×4、ECAT Processing Unit Error Counter、PDI Error Counter、Lost Link Counter×4）完全未定义。需新增寄存器常量和 `read_dl_error_counters()` 函数，返回 `DlErrorCounters` 结构体。Runtime diagnosis 应在 `read_slave_diagnosis` 中接入。[ETG.1000.4 §6.4, EtherCAT Compendium §3.3]
+- [x] **DL/Ph Error Counters 寄存器读取**：ESC 0x0300-0x0313（RX Error Counter×4 端口、Forwarded RX Error Counter×4、ECAT Processing Unit Error Counter、PDI Error Counter、Lost Link Counter×4）。已新增 5 组寄存器常量、`PortErrorCounters`/`DlErrorCounters` 结构体、`read_dl_error_counters` (FP) / `read_dl_error_counters_ap` (AP)，并接入 `SlaveDiagnosis` 和 CLI diagnosis JSON/text 输出。commit: `a20f955` [ETG.1000.4 §6.4, EtherCAT Compendium §3.3]
 
 ### 协议层缺失
 

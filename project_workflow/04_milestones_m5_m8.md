@@ -56,6 +56,7 @@
 - `Emergency 主动轮询运行态集成` → `d0fa1c7` `feat(runtime): integrate Emergency mailbox polling into PDO cycle per ETG1000.6`
 - `SM Watchdog 寄存器读取与 SafeOp→Op 验证步骤` → `b77ae87` `feat(protocol): add SM Watchdog register read and SafeOp->Op validation step per ETG1000.4`
 - `SII Timeout → ESM 转换策略接线` → `d6d26bf` `feat(protocol,runtime): wire SII timeout category to ESM transition policy per ETG.2010`
+- `DL/Ph Error Counters 寄存器读取` → `a20f955` `feat(protocol,runtime): add DL/Ph Error Counters read (ESC 0x0300-0x0313) per ETG1000.4`
 
 ### M6 网络配置增强 — ✅ 已完成
 
