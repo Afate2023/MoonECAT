@@ -23,7 +23,7 @@ pub fn broadcast_address(UInt) -> UInt
 
 pub let broadcast_mac : FixedArray[Byte]
 
-pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration) -> UInt raise @hal.EcError
+pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration, ack_error? : Bool) -> UInt raise @hal.EcError
 
 pub fn build_shutdown_path(EsmState) -> Array[EsmState]
 
@@ -41,17 +41,29 @@ pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_check_support(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_compensate_cycle(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_configure_linear(N, Array[UInt], UInt, @hal.Duration, static_sync_iterations? : Int) -> DcInitResult? raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int, sync1_cycle_ns? : UInt) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_deactivate_sync(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_deactivate_sync_all(N, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_latch_times(N, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_read_port_times(N, UInt, @hal.Duration) -> DcPortTimes raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_read_receive_time(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_read_sof(N, UInt, @hal.Duration) -> UInt64 raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_read_sync_window(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_read_system_time_64(N, UInt, @hal.Duration) -> UInt64 raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(N, UInt, Array[UInt], @hal.Duration, smoothing_num? : UInt, smoothing_den? : UInt) -> Unit raise @hal.EcError
 
@@ -189,6 +201,8 @@ pub let reg_dc_cycle1 : UInt
 
 pub let reg_dc_sof : UInt
 
+pub let reg_dc_speed_count : UInt
+
 pub let reg_dc_start0 : UInt
 
 pub let reg_dc_sync_act : UInt
@@ -209,7 +223,13 @@ pub let reg_dc_time2 : UInt
 
 pub let reg_dc_time3 : UInt
 
+pub let reg_dc_time_filter : UInt
+
 pub let reg_dl_control : UInt
+
+pub let reg_dl_information : UInt
+
+pub let reg_dl_port : UInt
 
 pub let reg_dl_status : UInt
 
@@ -218,6 +238,8 @@ pub let reg_ecat_pu_error_counter : UInt
 pub let reg_fmmu_base : UInt
 
 pub let reg_fwd_rx_error_counter : UInt
+
+pub let reg_irq_mask : UInt
 
 pub let reg_lost_link_counter : UInt
 
@@ -285,6 +307,8 @@ pub fn[N : @hal.Nic] sdo_upload_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.
 
 pub fn[N : @hal.Nic] sdo_upload_retry_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] set_slaves_to_default(N, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] set_sm_enable(N, UInt, Int, Bool, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let sm_entry_size : Int
@@ -338,6 +362,13 @@ pub(all) enum AddressType {
 pub(all) struct DcInitResult {
   reference_station : UInt
   configured_count : Int
+} derive(Eq, Show)
+
+pub(all) struct DcPortTimes {
+  port0 : UInt
+  port1 : UInt
+  port2 : UInt
+  port3 : UInt
 } derive(Eq, Show)
 
 pub(all) struct DlErrorCounters {

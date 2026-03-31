@@ -13,8 +13,16 @@ pub let reg_build : UInt = 0x0002U
 pub let reg_dl_status : UInt = 0x0110U
 
 ///|
+/// DL Information register: supported features (DC, FMMU count, SM count, etc.).
+pub let reg_dl_information : UInt = 0x0008U
+
+///|
 /// DL Control register.
 pub let reg_dl_control : UInt = 0x0100U
+
+///|
+/// DL Port control register (forwarding / loop-back per port).
+pub let reg_dl_port : UInt = 0x0101U
 
 ///|
 /// DL Control bit used to enable station alias addressing.
@@ -31,6 +39,10 @@ pub let reg_al_status_code : UInt = 0x0134U
 ///|
 /// AL Control register: request ESM state transition.
 pub let reg_al_control : UInt = 0x0120U
+
+///|
+/// IRQ Mask register (0x0200).
+pub let reg_irq_mask : UInt = 0x0200U
 
 ///|
 /// Configured Station Address register.
@@ -147,6 +159,14 @@ pub let reg_dc_system_delay : UInt = 0x0928U
 ///|
 /// DC sync window/system difference register.
 pub let reg_dc_system_diff : UInt = 0x092CU
+
+///|
+/// DC speed counter start register (0x0930).
+pub let reg_dc_speed_count : UInt = 0x0930U
+
+///|
+/// DC time loop filter register (0x0934).
+pub let reg_dc_time_filter : UInt = 0x0934U
 
 ///|
 /// DC control unit register.

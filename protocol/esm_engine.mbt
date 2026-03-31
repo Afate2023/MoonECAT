@@ -847,10 +847,125 @@ pub fn[N : @hal.Nic] broadcast_state(
   nic : N,
   target : EsmState,
   timeout : @hal.Duration,
+  ack_error? : Bool = false,
 ) -> UInt raise @hal.EcError {
   let target_byte = target.to_byte()
-  let buf = Bytes::from_array([target_byte, b'\x00'])
+  let control = if ack_error { target_byte | b'\x10' } else { target_byte }
+  let buf = Bytes::from_array([control, b'\x00'])
   let addr = broadcast_address(reg_al_control)
   let pdu = transact_pdu(nic, EcCommand::BWR, addr, buf, timeout)
   pdu.wkc
+}
+
+///|
+/// Reset all slaves to a known default state before scanning.
+///
+/// Broadcasts zero-writes to FMMU, SM, DC, CRC, IRQ, and EEPROM registers,
+/// matching the sequence used by SOEM `ecx_set_slaves_to_default`.
+/// This ensures a clean slate regardless of any previous master session state.
+pub fn[N : @hal.Nic] set_slaves_to_default(
+  nic : N,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let zbuf48 = Bytes::new(48)
+  let zbuf32 = Bytes::new(32)
+  let zbuf8 = Bytes::new(8)
+  let zbuf4 = Bytes::new(4)
+  // Deactivate loop-manual forwarding
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dl_port),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Set IRQ mask (0x0004 = AL Status Change Event)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_irq_mask),
+    Bytes::from_array([b'\x04', b'\x00']),
+    timeout,
+  )
+  // Reset CRC / RX error counters (8 bytes at 0x0300)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_rx_error_counter),
+    zbuf8,
+    timeout,
+  )
+  // Reset FMMU0..2 (3 * 16 = 48 bytes at 0x0600)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_fmmu_base),
+    zbuf48,
+    timeout,
+  )
+  // Reset SM0..3 (4 * 8 = 32 bytes at 0x0800)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sm_base),
+    zbuf32,
+    timeout,
+  )
+  // Deactivate DC sync
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_sync_act),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Clear DC system time (4 bytes)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_system_time),
+    zbuf4,
+    timeout,
+  )
+  // DC speed counter start = 0x1000
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_speed_count),
+    Bytes::from_array([b'\x00', b'\x10']),
+    timeout,
+  )
+  // DC time loop filter = 0x0C00
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_time_filter),
+    Bytes::from_array([b'\x00', b'\x0C']),
+    timeout,
+  )
+  // Clear station alias
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_station_alias),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Reset all slaves to Init + Ack
+  let _ = broadcast_state(nic, Init, timeout, ack_error=true)
+  // Force EEPROM from PDI, then set to master
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sii_config),
+    Bytes::from_array([b'\x02']),
+    timeout,
+  )
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sii_config),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
 }
