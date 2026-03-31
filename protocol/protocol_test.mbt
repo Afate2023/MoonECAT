@@ -2676,3 +2676,304 @@ test "pdo_exchange with empty context" {
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
   assert_eq(wkc, 0U) // no data to exchange
 }
+
+// ============================================================
+// C-8: Zero-copy codec and PDO tests
+// ============================================================
+
+///|
+test "encode_lrw_frame_into produces valid EtherCAT frame" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\xAA', b'\xBB', b'\xCC', b'\xDD']
+  let len = @protocol.encode_lrw_frame_into(
+    buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0x1000U,
+    data, 0, 4,
+  )
+  // Minimum: 14 (eth) + 2 (ecat) + 10 (pdu hdr) + 4 (data) + 2 (wkc) = 32
+  assert_eq(len, 32)
+  // EtherType should be 0x88A4
+  assert_eq(buf[12], b'\x88')
+  assert_eq(buf[13], b'\xA4')
+  // Command should be LRW (0x0C)
+  assert_eq(buf[16], b'\x0C')
+  // Index should be 0x01
+  assert_eq(buf[17], b'\x01')
+  // Data payload
+  assert_eq(buf[26], b'\xAA')
+  assert_eq(buf[27], b'\xBB')
+  assert_eq(buf[28], b'\xCC')
+  assert_eq(buf[29], b'\xDD')
+}
+
+///|
+test "encode_pdu_frame_into produces valid frame for any command" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x11', b'\x22']
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::FPRD,
+    b'\x05',
+    0x2000U,
+    data,
+    0,
+    2,
+  )
+  assert_eq(len, 30) // 14 + 2 + 10 + 2 + 2
+  // Command byte for FPRD = 0x04
+  assert_eq(buf[16], b'\x04')
+  assert_eq(buf[17], b'\x05') // index
+}
+
+///|
+test "encode_zero_data_frame_into fills data with zeros" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\xFF')
+  let len = @protocol.encode_zero_data_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::LRD,
+    b'\x01',
+    0U,
+    8,
+  )
+  assert_eq(len, 36) // 14 + 2 + 10 + 8 + 2
+  // Data region (bytes 26..33) should be all zeros
+  for i in 26..<34 {
+    assert_eq(buf[i], b'\x00')
+  }
+}
+
+///|
+test "encode/decode_pdu_response roundtrip" {
+  let tx_buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x01', b'\x02', b'\x03', b'\x04']
+  let len = @protocol.encode_lrw_frame_into(
+    tx_buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0U, data,
+    0, 4,
+  )
+  // Simulate slave setting WKC=3 at the end
+  let wkc_offset = len - 2
+  tx_buf[wkc_offset] = b'\x03'
+  tx_buf[wkc_offset + 1] = b'\x00'
+  // Decode
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let (wkc, _irq) = @protocol.decode_pdu_response_from(
+    tx_buf, len, target, 0, 4,
+  )
+  assert_eq(wkc, 3U)
+  assert_eq(target[0], b'\x01')
+  assert_eq(target[1], b'\x02')
+  assert_eq(target[2], b'\x03')
+  assert_eq(target[3], b'\x04')
+}
+
+///|
+test "decode_pdu_response_slice skips output echo" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  // Build a frame with 4 bytes output + 2 bytes input = 6 bytes data
+  let data : FixedArray[Byte] = [
+    b'\xA1', b'\xA2', b'\xA3', b'\xA4', b'\xB1', b'\xB2',
+  ]
+  let len = @protocol.encode_lrw_frame_into(
+    buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0U, data,
+    0, 6,
+  )
+  // Decode, skipping first 4 bytes (output echo), reading 2 bytes (inputs)
+  let target : FixedArray[Byte] = FixedArray::make(2, b'\x00')
+  let (wkc, _irq) = @protocol.decode_pdu_response_slice(
+    buf, len, 4, // skip
+     target, 0, 2,
+  )
+  assert_eq(wkc, 0U)
+  assert_eq(target[0], b'\xB1')
+  assert_eq(target[1], b'\xB2')
+}
+
+///|
+test "decode_pdu_wkc_only extracts WKC" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::LWR,
+    b'\x01',
+    0U,
+    data,
+    0,
+    2,
+  )
+  // Set WKC to 5
+  buf[len - 2] = b'\x05'
+  buf[len - 1] = b'\x00'
+  let wkc = @protocol.decode_pdu_wkc_only(buf, len)
+  assert_eq(wkc, 5U)
+}
+
+///|
+test "decode_pdu_response_from rejects short frame" {
+  let buf : FixedArray[Byte] = FixedArray::make(10, b'\x00')
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 10, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_from rejects wrong ethertype" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  // Set wrong ethertype
+  buf[12] = b'\x08'
+  buf[13] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext build and set/get slave data" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  assert_eq(ctx.image.output_size, 4)
+  assert_eq(ctx.image.input_size, 2)
+  // Set outputs
+  let out_data : FixedArray[Byte] = [b'\x11', b'\x22', b'\x33', b'\x44']
+  ctx.set_slave_outputs(0x1001U, out_data)
+  assert_eq(ctx.image.outputs[0], b'\x11')
+  assert_eq(ctx.image.outputs[3], b'\x44')
+  // Simulate input data
+  ctx.image.inputs[0] = b'\xAA'
+  ctx.image.inputs[1] = b'\xBB'
+  let inputs = ctx.get_slave_inputs(0x1001U)
+  assert_eq(inputs[0], b'\xAA')
+  assert_eq(inputs[1], b'\xBB')
+}
+
+///|
+test "MutablePdoContext set_slave_outputs rejects wrong length" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let bad_data : FixedArray[Byte] = [b'\x01', b'\x02']
+  let result = try? ctx.set_slave_outputs(0x1001U, bad_data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext set_slave_outputs unknown station" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let result = try? ctx.set_slave_outputs(0x9999U, data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "pdo_exchange_zero_copy with empty context" {
+  let ctx = @protocol.MutablePdoContext::build([], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
+  assert_eq(result.wkc, 0U)
+  assert_eq(result.irq, 0U)
+}
+
+///|
+test "pdo_exchange_zero_copy via MockZeroCopyNic loopback" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  // Set outputs
+  let out_data : FixedArray[Byte] = [b'\xDE', b'\xAD', b'\xBE', b'\xEF']
+  ctx.set_slave_outputs(0x1001U, out_data)
+  // Exchange - MockZeroCopyNic loops back TX to RX
+  let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
+  // WKC is 0 because loopback doesn't modify WKC
+  assert_eq(result.wkc, 0U)
+}
+
+///|
+test "pdo_read_zero_copy via MockZeroCopyNic" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 4,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_write_zero_copy via MockZeroCopyNic" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  // Set outputs
+  for i in 0..<4 {
+    ctx.image.outputs[i] = (i + 1).to_byte()
+  }
+  let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_read_zero_copy with empty inputs returns 0" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_write_zero_copy with empty outputs returns 0" {
+  let ctx = @protocol.MutablePdoContext::build([], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
+}

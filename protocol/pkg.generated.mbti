@@ -55,6 +55,12 @@ pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(N, UInt, Array[UInt], @hal
 
 pub fn[N : @hal.Nic] dc_static_sync(N, UInt, Int, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn decode_pdu_response_from(FixedArray[Byte], Int, FixedArray[Byte], Int, Int) -> (UInt, UInt) raise @hal.EcError
+
+pub fn decode_pdu_response_slice(FixedArray[Byte], Int, Int, FixedArray[Byte], Int, Int) -> (UInt, UInt) raise @hal.EcError
+
+pub fn decode_pdu_wkc_only(FixedArray[Byte], Int) -> UInt raise @hal.EcError
+
 pub fn default_esm_timeout_policy() -> EsmTimeoutPolicy
 
 pub let default_master_mac : FixedArray[Byte]
@@ -72,6 +78,12 @@ pub fn[N : @hal.Nic] eeprom_read_ap(N, UInt, UInt, Int, @hal.Duration) -> Bytes 
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn encode_lrw_frame_into(FixedArray[Byte], FixedArray[Byte], FixedArray[Byte], Byte, UInt, FixedArray[Byte], Int, Int) -> Int
+
+pub fn encode_pdu_frame_into(FixedArray[Byte], FixedArray[Byte], FixedArray[Byte], EcCommand, Byte, UInt, FixedArray[Byte], Int, Int) -> Int
+
+pub fn encode_zero_data_frame_into(FixedArray[Byte], FixedArray[Byte], FixedArray[Byte], EcCommand, Byte, UInt, Int) -> Int
 
 pub fn esm_default_timeout(EsmState) -> @hal.Duration
 
@@ -113,9 +125,15 @@ pub fn[N : @hal.Nic] pdo_exchange(N, PdoContext, @hal.Duration) -> UInt raise @h
 
 pub fn[N : @hal.Nic] pdo_exchange_result(N, PdoContext, @hal.Duration) -> PdoExchangeResult raise @hal.EcError
 
+pub fn[N : @hal.ZeroCopyNic] pdo_exchange_zero_copy(N, MutablePdoContext, @hal.Duration) -> PdoExchangeResult raise @hal.EcError
+
 pub fn[N : @hal.Nic] pdo_read(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.ZeroCopyNic] pdo_read_zero_copy(N, MutablePdoContext, @hal.Duration) -> UInt raise @hal.EcError
+
 pub fn[N : @hal.Nic] pdo_write(N, PdoContext, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.ZeroCopyNic] pdo_write_zero_copy(N, MutablePdoContext, @hal.Duration) -> UInt raise @hal.EcError
 
 pub let pdu_header_len : Int
 
@@ -356,6 +374,16 @@ pub fn FrameBuilder::is_empty(Self) -> Bool
 pub fn FrameBuilder::length(Self) -> Int
 pub fn FrameBuilder::new() -> Self
 pub fn FrameBuilder::reset(Self) -> Unit
+
+pub(all) struct MutablePdoContext {
+  image : @hal.MutableProcessImage
+  mappings : Array[PdoMapping]
+  logical_base : UInt
+  logical_size : Int
+} derive(Show)
+pub fn MutablePdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
+pub fn MutablePdoContext::get_slave_inputs(Self, UInt) -> FixedArray[Byte] raise @hal.EcError
+pub fn MutablePdoContext::set_slave_outputs(Self, UInt, FixedArray[Byte]) -> Unit raise @hal.EcError
 
 pub(all) struct PdoContext {
   image : ProcessImage
