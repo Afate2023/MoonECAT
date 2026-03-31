@@ -106,4 +106,4 @@
 
 - [x] **PreferNotLRW SII 标志**：`PdoContext` 增加 `block_lrw` 字段，`pdo_exchange_result` 自动分派 LRD+LWR 或 LRW；runtime 三条启动路径均从 SII General flags 推导设置。WKC 按 SOEM 惯例对 LWR 做 ×2 归一化。→ `0021a62`
 - [x] **Emergency 主动轮询**：Runtime 增加 `emergency_stations` 字段和 `configure_emergency_stations()`、`poll_emergencies()` 方法；PDO 交换后逐站轮询 SM Input 状态，解码 CoE Emergency 帧并计入 `Telemetry.emergency_events`；`run()` 从 startup mailbox plans 自动配置轮询目标；CLI JSON 三处输出均含 `emergency_events`。→ `d0fa1c7`
-- [ ] **SM Watchdog 验证**：SafeOp→Op 转换前未显式检查 SM Watchdog timer 配置或 SM interrupt 状态，依赖从站自行拒绝。
+- [x] **SM Watchdog 验证**：新增 5 个 Watchdog ESC 寄存器常量（0x0400-0x0442）、`SmWatchdogConfig` 结构体及 `read_sm_watchdog_config()` 读取函数；`ValidateSmWatchdog` 步骤插入 SafeOp→Op 启动序列（WarmupProcessData 之后、TransitionToOp 之前），逐站读取看门狗配置作诊断快照，不阻塞状态转换（ESC 自身通过 AL Status Code 0x001B 强制执行看门狗故障）。→ `b77ae87`

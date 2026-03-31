@@ -54,6 +54,7 @@
 - `Mailbox retry 事务方法与 SDO 超时修复` → `fe1e2ef` `feat(mailbox): add retry transaction methods and enhance SDO upload/download handling, fix moon test timeout`
 - `AL Status Code / SDO Abort Code 描述表` → `d19db2d` `feat(protocol): add AL Status Code and SDO Abort Code description tables per ETG.1000.6`
 - `Emergency 主动轮询运行态集成` → `d0fa1c7` `feat(runtime): integrate Emergency mailbox polling into PDO cycle per ETG1000.6`
+- `SM Watchdog 寄存器读取与 SafeOp→Op 验证步骤` → `b77ae87` `feat(protocol): add SM Watchdog register read and SafeOp->Op validation step per ETG1000.4`
 
 ### M6 网络配置增强 — ✅ 已完成
 
