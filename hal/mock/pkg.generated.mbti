@@ -71,6 +71,18 @@ pub struct MockNic {
 pub fn MockNic::new() -> Self
 pub impl @hal.Nic for MockNic
 
+pub(all) struct MockZeroCopyNic {
+  pool : @hal.FramePool
+  mut rx_queue : FixedArray[Int]
+  mut rx_head : Int
+  mut rx_tail : Int
+  mut rx_count : Int
+  rx_capacity : Int
+  mut is_open : Bool
+}
+pub fn MockZeroCopyNic::new(@hal.FramePool) -> Self
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic
+
 pub(all) enum NicEvent {
   Sent(Bytes, Int)
   Received(Bytes)

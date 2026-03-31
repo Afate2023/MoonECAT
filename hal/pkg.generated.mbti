@@ -2,6 +2,8 @@
 package "afate/MoonECAT/hal"
 
 // Values
+pub let default_pool_capacity : Int
+
 pub let ethercat_ethertype : Int
 
 pub let max_frame_size : Int
@@ -25,8 +27,7 @@ pub(all) suberror EcError {
   ConfigMismatch(String)
   NotSupported(String)
   Internal(String)
-}
-pub impl Show for EcError
+} derive(Show)
 
 // Types and methods
 pub(all) struct DiagnosticEvent {
@@ -34,16 +35,60 @@ pub(all) struct DiagnosticEvent {
   severity : Severity
   source : String
   message : String
-}
+} derive(Show)
 pub fn DiagnosticEvent::new(Timestamp, Severity, String, String) -> Self
-pub impl Show for DiagnosticEvent
 
-pub(all) struct Duration(Int64)
+pub(all) struct Duration(Int64) derive(Compare, Eq, Show)
 #deprecated
 pub fn Duration::inner(Self) -> Int64
-pub impl Compare for Duration
-pub impl Eq for Duration
-pub impl Show for Duration
+
+pub(all) struct FramePool {
+  id : Int
+  frames : FixedArray[FixedArray[Byte]]
+  states : FixedArray[FrameState]
+  lengths : FixedArray[Int]
+  capacity : Int
+  frame_size : Int
+  mut next_scan : Int
+}
+pub fn FramePool::acquire(Self) -> FrameRef raise EcError
+pub fn FramePool::acquire_rx(Self) -> FrameRef raise EcError
+pub fn FramePool::buffer(Self, FrameRef) -> FixedArray[Byte]
+pub fn FramePool::data_length(Self, FrameRef) -> Int
+pub fn FramePool::free_count(Self) -> Int
+pub fn FramePool::mark_filled(Self, FrameRef, Int) -> FrameRef
+pub fn FramePool::mark_received(Self, FrameRef, Int) -> FrameRef
+pub fn FramePool::mark_sending(Self, FrameRef) -> Unit
+pub fn FramePool::mark_sent(Self, FrameRef) -> Unit
+pub fn FramePool::new(capacity? : Int, frame_size? : Int, id? : Int) -> Self
+pub fn FramePool::read_byte(Self, FrameRef, Int) -> Byte
+pub fn FramePool::read_bytes(Self, FrameRef, Int, FixedArray[Byte], Int, Int) -> Unit
+pub fn FramePool::read_u16_le(Self, FrameRef, Int) -> Int
+pub fn FramePool::read_u32_le(Self, FrameRef, Int) -> Int
+pub fn FramePool::release(Self, FrameRef) -> Unit
+pub fn FramePool::reset(Self) -> Unit
+pub fn FramePool::state(Self, FrameRef) -> FrameState
+pub fn FramePool::write_byte(Self, FrameRef, Int, Byte) -> Unit
+pub fn FramePool::write_bytes(Self, FrameRef, Int, FixedArray[Byte], Int, Int) -> Unit
+pub fn FramePool::write_u16_le(Self, FrameRef, Int, Int) -> Unit
+pub fn FramePool::write_u32_le(Self, FrameRef, Int, Int) -> Unit
+
+pub(all) struct FrameRef {
+  pool_id : Int
+  slot : Int
+  offset : Int
+  length : Int
+} derive(Eq, Show)
+
+pub(all) enum FrameState {
+  Free
+  Acquired
+  Filled
+  Sending
+  Sent
+  Receiving
+  Received
+} derive(Eq, Show)
 
 pub(all) struct MasterConfig {
   interface_name : String
@@ -51,25 +96,28 @@ pub(all) struct MasterConfig {
   recv_timeout_ns : Int64
   max_retries : Int
   dc_enabled : Bool
-}
+} derive(Eq, Show)
 pub fn MasterConfig::default() -> Self
-pub impl Eq for MasterConfig
-pub impl Show for MasterConfig
+
+pub(all) struct MutableProcessImage {
+  outputs : FixedArray[Byte]
+  inputs : FixedArray[Byte]
+  output_size : Int
+  input_size : Int
+} derive(Show)
+pub fn MutableProcessImage::clear_inputs(Self) -> Unit
+pub fn MutableProcessImage::new(Int, Int) -> Self
 
 pub(all) struct NicHandle {
   id : Int
-}
-pub impl Eq for NicHandle
-pub impl Show for NicHandle
+} derive(Eq, Show)
 
 pub(all) enum Severity {
   Debug
   Info
   Warn
   Error
-}
-pub impl Eq for Severity
-pub impl Show for Severity
+} derive(Eq, Show)
 
 pub(all) struct SlaveConfig {
   position : UInt
@@ -78,32 +126,23 @@ pub(all) struct SlaveConfig {
   expected_alias_address : UInt?
   configured_address : UInt
   presence : SlavePresence
-}
-pub impl Eq for SlaveConfig
-pub impl Show for SlaveConfig
+} derive(Eq, Show)
 
 pub(all) struct SlaveIdentity {
   vendor_id : UInt
   product_code : UInt
   revision : UInt
   serial : UInt
-}
-pub impl Eq for SlaveIdentity
-pub impl Show for SlaveIdentity
+} derive(Eq, Show)
 
 pub(all) enum SlavePresence {
   Mandatory
   Optional(group_id~ : UInt?)
-}
-pub impl Eq for SlavePresence
-pub impl Show for SlavePresence
+} derive(Eq, Show)
 
-pub(all) struct Timestamp(Int64)
+pub(all) struct Timestamp(Int64) derive(Compare, Eq, Show)
 #deprecated
 pub fn Timestamp::inner(Self) -> Int64
-pub impl Compare for Timestamp
-pub impl Eq for Timestamp
-pub impl Show for Timestamp
 
 // Type aliases
 
@@ -126,6 +165,18 @@ pub(open) trait Nic {
   open_(String) -> Self raise EcError
   send(Self, Bytes) -> Int raise EcError
   recv(Self, timeout~ : Duration) -> Bytes raise EcError
+  close(Self) -> Unit
+}
+
+pub(open) trait ZeroCopyNic {
+  open_(String, FramePool) -> Self raise EcError
+  acquire_tx(Self) -> FrameRef raise EcError
+  tx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  submit(Self, FrameRef, length~ : Int) -> Unit raise EcError
+  recv(Self, timeout~ : Duration) -> FrameRef raise EcError
+  rx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  rx_length(Self, FrameRef) -> Int
+  release(Self, FrameRef) -> Unit
   close(Self) -> Unit
 }
 

@@ -30,33 +30,33 @@ pub fn MockZeroCopyNic::new(pool : @hal.FramePool) -> MockZeroCopyNic {
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with open_(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with open_(
   _name : String,
-  pool : @hal.FramePool
+  pool : @hal.FramePool,
 ) -> MockZeroCopyNic raise @hal.EcError {
   MockZeroCopyNic::new(pool)
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with acquire_tx(
-  self : MockZeroCopyNic
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with acquire_tx(
+  self : MockZeroCopyNic,
 ) -> @hal.FrameRef raise @hal.EcError {
   self.pool.acquire()
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with tx_buffer(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with tx_buffer(
   self : MockZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
   self.pool.buffer(fref)
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
-  length~ : Int
+  length~ : Int,
 ) -> Unit raise @hal.EcError {
   // Loopback: copy the sent frame into an RX slot
   let tx_buf = self.pool.buffer(fref)
@@ -78,9 +78,9 @@ impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with recv(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with recv(
   self : MockZeroCopyNic,
-  timeout~ : @hal.Duration
+  timeout~ : @hal.Duration,
 ) -> @hal.FrameRef raise @hal.EcError {
   let _ = timeout
   if self.rx_count == 0 {
@@ -89,40 +89,41 @@ impl @hal.ZeroCopyNic for MockZeroCopyNic with recv(
   let slot = self.rx_queue[self.rx_head]
   self.rx_head = (self.rx_head + 1) % self.rx_capacity
   self.rx_count = self.rx_count - 1
-  let length = self.pool.data_length(
-    { pool_id: self.pool.id, slot, offset: 0, length: 0 },
-  )
+  let length = self.pool.data_length({
+    pool_id: self.pool.id,
+    slot,
+    offset: 0,
+    length: 0,
+  })
   { pool_id: self.pool.id, slot, offset: 0, length }
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_buffer(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_buffer(
   self : MockZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
   self.pool.buffer(fref)
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_length(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_length(
   self : MockZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> Int {
   self.pool.data_length(fref)
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with release(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with release(
   self : MockZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> Unit {
   self.pool.release(fref)
 }
 
 ///|
-impl @hal.ZeroCopyNic for MockZeroCopyNic with close(
-  self : MockZeroCopyNic
-) -> Unit {
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with close(self : MockZeroCopyNic) -> Unit {
   self.is_open = false
   self.pool.reset()
 }
