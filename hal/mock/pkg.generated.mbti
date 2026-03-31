@@ -3,14 +3,38 @@ package "afate/MoonECAT/hal/mock"
 
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/runtime",
 }
 
 // Values
 pub fn apply_frame_fault(FaultType, Bytes) -> Bytes?
 
+pub fn apply_protocol_deviation(ProtocolDeviation, Bytes) -> Bytes
+
+pub fn fuzz_campaign(Int64, Int, Int, FuzzOracle) -> Array[FuzzResult]
+
+pub fn fuzz_run(Int64, Int, FuzzOracle) -> FuzzResult
+
+pub fn nic_event_from_json(String) -> NicEvent?
+
+pub fn nic_event_to_json(NicEvent) -> String
+
 // Errors
 
 // Types and methods
+pub(all) struct EmergencyEvent {
+  error_code : UInt
+  error_register : Byte
+  data : Bytes
+  at_cycle : Int64
+  mut emitted : Bool
+} derive(Show)
+
+pub(all) struct ExpectedVerdict {
+  cycle : Int64
+  verdict : @runtime.Verdict
+} derive(Eq, Show)
+
 pub struct FaultInjector {
   rules : Array[FaultRule]
   mut send_count : Int
@@ -68,6 +92,28 @@ pub(all) struct FmmuEntry {
   activate : Bool
 } derive(Show)
 
+pub(all) struct FuzzOracle {
+  check : () -> Bool
+}
+
+pub(all) struct FuzzResult {
+  seed : Int64
+  event_count : Int
+  crashed : Bool
+  crash_at : Int
+  error_msg : String
+} derive(Show)
+
+pub(all) struct FuzzRng {
+  mut state : Int64
+} derive(Show)
+pub fn FuzzRng::generate_event_log(Self, Int) -> NicEventLog
+pub fn FuzzRng::new(Int64) -> Self
+pub fn FuzzRng::next(Self) -> Int64
+pub fn FuzzRng::next_bytes(Self, Int) -> Bytes
+pub fn FuzzRng::next_int(Self, Int) -> Int
+pub fn FuzzRng::next_nic_event(Self) -> NicEvent
+
 pub struct MockClock {
   mut current_ns : Int64
 }
@@ -105,8 +151,38 @@ pub(all) struct NicEventLog {
   events : Array[NicEvent]
 } derive(Show)
 pub fn NicEventLog::append(Self, NicEvent) -> Unit
+pub fn NicEventLog::from_ndjson(String) -> Self
 pub fn NicEventLog::len(Self) -> Int
 pub fn NicEventLog::new() -> Self
+pub fn NicEventLog::to_ndjson(Self) -> String
+pub fn NicEventLog::to_ndjson_with_header(Self, slave_count? : Int, fingerprint? : String) -> String
+
+pub(all) struct ObservedVerdict {
+  cycle : Int64
+  verdict : @runtime.Verdict
+} derive(Eq, Show)
+
+pub(all) enum OdAccess {
+  ReadOnly
+  ReadWrite
+  WriteOnly
+} derive(Eq, Show)
+
+pub(all) struct OdEntry {
+  index : UInt
+  subindex : Byte
+  data : Bytes
+  access : OdAccess
+} derive(Show)
+
+pub(all) enum ProtocolDeviation {
+  TruncateFrame(Int)
+  PadFrame(offset~ : Int, count~ : Int)
+  CorruptEcatLength(delta~ : Int)
+  CorruptPduData(pdu_index~ : Int, offset~ : Int, value~ : Byte)
+  InvalidPduCommand(pdu_index~ : Int, command~ : Byte)
+  ZeroFrame
+} derive(Show)
 
 pub struct RecordingNic {
   inner : VirtualNic
@@ -125,6 +201,35 @@ pub fn ReplayNic::is_exhausted(Self) -> Bool
 pub fn ReplayNic::remaining(Self) -> Int
 pub impl @hal.Nic for ReplayNic
 
+pub(all) struct Scenario {
+  name : String
+  description : String
+  rules : Array[FaultRule]
+  expected_verdicts : Array[ExpectedVerdict]
+  pass_condition : ScenarioPassCondition
+} derive(Show)
+pub fn Scenario::add_rule(Self, FaultRule) -> Unit
+pub fn Scenario::build_injector(Self) -> FaultInjector
+pub fn Scenario::evaluate(Self, Array[ObservedVerdict], @runtime.Verdict, Int64, String) -> ScenarioResult
+pub fn Scenario::expect(Self, Int64, @runtime.Verdict) -> Unit
+pub fn Scenario::new(String, description? : String, pass_condition? : ScenarioPassCondition) -> Self
+
+pub(all) enum ScenarioPassCondition {
+  AllMatch
+  GracefulStopWithin(Int)
+  FinalVerdictAtMost(@runtime.Verdict)
+} derive(Show)
+
+pub(all) struct ScenarioResult {
+  name : String
+  passed : Bool
+  expected : Array[ExpectedVerdict]
+  observed : Array[ObservedVerdict]
+  final_verdict : @runtime.Verdict
+  total_cycles : Int64
+  stop_reason : String
+} derive(Show)
+
 pub struct VirtualBus {
   slaves : Array[VirtualSlave]
 } derive(Show)
@@ -132,6 +237,22 @@ pub fn VirtualBus::get_slave(Self, Int) -> VirtualSlave?
 pub fn VirtualBus::new(Array[VirtualSlave]) -> Self
 pub fn VirtualBus::process_frame(Self, Bytes) -> Bytes raise @hal.EcError
 pub fn VirtualBus::slave_count(Self) -> Int
+
+pub(all) struct VirtualMailbox {
+  od : Array[OdEntry]
+  outbox : Array[Bytes]
+  inbox : Array[Bytes]
+  mut counter : Int
+  emergencies : Array[EmergencyEvent]
+} derive(Show)
+pub fn VirtualMailbox::add_emergency(Self, UInt, Byte, data? : Bytes, at_cycle? : Int64) -> Unit
+pub fn VirtualMailbox::add_od(Self, UInt, Byte, Bytes, access? : OdAccess) -> Unit
+pub fn VirtualMailbox::emit_emergencies(Self, Int64) -> Array[Bytes]
+pub fn VirtualMailbox::find_od(Self, UInt, Byte) -> OdEntry?
+pub fn VirtualMailbox::handle_sdo_download(Self, UInt, Byte, Bytes) -> Bytes
+pub fn VirtualMailbox::handle_sdo_upload(Self, UInt, Byte) -> Bytes?
+pub fn VirtualMailbox::new() -> Self
+pub fn VirtualMailbox::next_counter(Self) -> Int
 
 pub struct VirtualNic {
   bus : VirtualBus

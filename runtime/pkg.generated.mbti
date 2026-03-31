@@ -506,6 +506,20 @@ pub(all) struct MailboxSession {
   mailbox_config : @mailbox.MailboxConfig
 }
 
+pub(all) struct MonitorFn {
+  run : (Runtime) -> MonitorResult
+}
+
+pub(all) struct MonitorRegistry {
+  monitors : Array[(String, MonitorFn)]
+}
+pub fn MonitorRegistry::len(Self) -> Int
+pub fn MonitorRegistry::new() -> Self
+pub fn MonitorRegistry::register(Self, String, MonitorFn) -> Unit
+pub fn MonitorRegistry::run(Self, Runtime) -> (Array[MonitorResult], Verdict)
+pub fn MonitorRegistry::unregister(Self, String) -> Unit
+pub fn MonitorRegistry::with_defaults() -> Self
+
 pub(all) struct MonitorResult {
   name : String
   verdict : Verdict
@@ -536,6 +550,14 @@ pub(all) struct ProcessImageSlice {
   input_offset : Int
   input_length : Int
 } derive(Eq, Show)
+
+pub(all) struct ReportEntry {
+  cycle : Int64
+  timestamp_ns : Int64
+  event_type : String
+  detail : String
+  verdict : Verdict
+} derive(Show)
 
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
@@ -832,6 +854,23 @@ pub(all) enum Verdict {
 } derive(Eq, Show)
 pub fn Verdict::is_passing(Self) -> Bool
 pub fn Verdict::severity(Self) -> Int
+
+pub(all) struct VerificationReport {
+  title : String
+  summary_verdict : Verdict
+  total_cycles : Int64
+  duration_ns : Int64
+  monitor_results : Array[MonitorResult]
+  timeline : Array[ReportEntry]
+  fault_injections : Array[String]
+  metadata : Array[(String, String)]
+} derive(Show)
+pub fn VerificationReport::add_event(Self, Int64, String, String, Verdict) -> Unit
+pub fn VerificationReport::add_fault(Self, String) -> Unit
+pub fn VerificationReport::add_meta(Self, String, String) -> Unit
+pub fn VerificationReport::new(String) -> Self
+pub fn VerificationReport::to_json(Self) -> String
+pub fn VerificationReport::to_markdown(Self) -> String
 
 pub struct VirtualTimebase {
   mut current_ns : Int64
