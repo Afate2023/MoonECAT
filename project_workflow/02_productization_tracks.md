@@ -133,7 +133,7 @@
 - [x] **EEPROM 数据写入**：已实现 `eeprom_write_word` (FP) / `eeprom_write_word_ap` (AP) word 级 16-bit 写入。写入流程遵循 SOEM 参考：① 获取 Master 所有权 → ② 写 16-bit 数据到 `reg_sii_data`(0x0508) → ③ 发送写命令 `0x0201` + 地址到 `reg_sii_control`(0x0502) → ④ 等待 busy 清除 → ⑤ 恢复 PDI 所有权。含 NACK 重试（≤3 次）和错误清除。commit: `c0f4f6a` [ETG.1500 #305 Write may]
 - [x] **Watchdog 写入配置**：新增 `write_sm_watchdog_config(nic, station, divider, pdi_time, pdata_time, timeout)` 写入 3 个看门狗寄存器（0x0400 divider、0x0410 PDI、0x0420 PData），补全 §0.8 中仅有只读 `read_sm_watchdog_config` 的缺口。commit: `d7004dd` [ETG.1000.4 §6.3 shall basic]
 - [x] **Station Alias 写入**：新增 `write_station_alias(nic, station, alias, timeout)` 写入 2 字节到 `reg_station_alias`(0x0012)，补全仅有 `read_station_alias` 的缺口。commit: `d7004dd` [ETG.1000.4 §5 may]
-- [x] **EoE 基础协议**：EoE 帧编解码层 (`mailbox/eoe.mbt`) 已完成。支持 `EoeFrameType` 枚举（FragData..GetAddrFilterResp）、`EoeResult` 枚举（Success/UnspecifiedError/UnsupportedFrameType/NoIpSupport/NoDhcpSupport/NoFilterSupport）、`encode_eoe_fragment`/`encode_eoe_set_ip_req`/`encode_eoe_get_ip_req` 编码函数、`decode_eoe_response` → `EoeResponse`（Fragment | IpResponse）解码。commit: `d7004dd` [ETG.1000.6 §5.7; ETG.1500 shall if EoE slaves]
+- [x] **EoE 基础协议**：EoE 帧编解码层 (`mailbox/eoe.mbt`) 已完成。支持 `EoeFrameType` 枚举（FragData..GetAddrFilterResp）、`EoeResult` 枚举（Success/UnspecifiedError/UnsupportedFrameType/NoIpSupport/NoDhcpSupport/NoFilterSupport）、`encode_eoe_fragment`/`encode_eoe_set_ip_req`/`encode_eoe_get_ip_req` 编码函数、`decode_eoe_response` → `EoeResponse`（Fragment | IpResponse）解码。commit: `d7004dd` [ETG.1000.6 §5.7; ETG.1500 shall if EoE slaves]。后续在此基础上实现了完整 EoE Virtual Switch 引擎（`eoe_switch.mbt` + `eoe_endpoint.mbt` + `eoe_relay.mbt`）与异步桥接包（`eoe_async/`），详见 §0.11。
 - [x] **SoE 基础协议**：SoE 帧编解码层 (`mailbox/soe.mbt`) 已完成。支持 `SoeOpCode` 枚举（ReadReq..Emergency）、`SoeElementFlag` 枚举（DataState..Default）及 `soe_element_flags` 组合、`encode_soe_read_req`/`encode_soe_write_req` 编码函数、`decode_soe_response` → `SoeResponse`（ReadData | WriteAck | Error | Notification）。commit: `d7004dd` [ETG.1000.6 §5.6; ETG.1500 should if SoE slaves]
 
 ### 延后设计决策（may/optimization，无参考实现支持或非运行时关键）
@@ -201,21 +201,70 @@
 | 404 | Mailbox polling | shall | ✅ **本次修复：MailboxState FMMU 映射** |
 | 501–504 | SDO Up/Down/Seg/CA/Info | shall | ✅ 全部已实现 |
 | 505 | Emergency | shall | ✅ 解码 + 主动轮询 |
-| 601 | EoE Protocol | shall | ✅ 帧编解码 |
-| 602 | Virtual Switch | shall(A) | ⚠️ L2 路由未实现（延后） |
+| 601 | EoE Protocol | shall | ✅ 帧编解码 + Virtual Switch 引擎 |
+| 602 | Virtual Switch | shall(A) | ✅ EoeSwitch 引擎 + endpoint/relay/async bridge；L2 路由延后 |
 | 701–703 | FoE + Boot | shall | ✅ download/upload + Boot state |
 | 801 | SoE Services | shall(A) | ✅ 帧编解码 |
 | 1101 | DC support | shall | ✅ 完整 DC |
 | 1102 | Continuous Prop Delay | should | ✅ dc_reestimate_propagation_delays |
 | 1103 | Sync window monitoring | should | ✅ **本次修复：broadcast BRD 0x092C** |
+| 1301 | Master OD | should(A)/may(B) | ✅ build_master_od + CLI master-od |
 
 ### 本次修复
 
 - [x] **DC 广播同步窗口监测（#1103）**：新增 `dc_broadcast_sync_window()` 使用 BRD 读取 0x092C，返回所有 DC 从站的 ORed System Time Difference + WKC；新增 `dc_check_sync_window()` 提供阈值比较便捷接口，处理有符号二补数转换。commit: `bc08348` [ETG.1500 §5.13.3]
 - [x] **FMMU MailboxState 映射（#404）**：修改 `calculate_fmmu_configs()` 不再跳过 MailboxState 方向，当 SII 声明 MailboxState FMMU 时，映射 SM1（输入邮箱）状态字节（SM_base + idx*8 + 5）到逻辑地址空间为 1 字节只读 FMMU；修复 `FmmuConfig::to_bytes` 中 MailboxState 方向字节从 0x00（无访问）改为 0x01（读访问）。commit: `bc08348` [ETG.1500 §5.6.4]
 
+### EoE Virtual Switch 引擎（#601/#602）
+
+2026-04-01 在 §0.9 EoE 帧编解码基础上，分三阶段实现 EoE Virtual Switch 引擎与异步桥接：
+
+- [x] **Phase 1 — EoeSwitch 核心引擎**：[runtime/eoe_switch.mbt](../runtime/eoe_switch.mbt) 实现多站 EoE 虚拟交换机，含分片发送（`send_frame`）、多片重组（`process_received`）、mailbox 轮询（`poll`）、接收队列排空（`drain_rx`）、IP 配置（`set_ip/get_ip`）。`eoe_max_fragment_size()` 按 32 字节对齐计算最大分片。Runtime 集成：`Runtime.eoe_switch` 字段在 `run_cycle()` 中自动轮询。commit: `3222e4c`
+- [x] **Phase 2 — QueueEndpoint + bridge_eoe_cycle**：[runtime/eoe_endpoint.mbt](../runtime/eoe_endpoint.mbt) 实现同步队列端点（`QueueEndpoint`）与一次性桥接函数 `bridge_eoe_cycle(sw, ep, nic, timeout) -> (rx, tx)`，供无 async 运行时的嵌入式环境使用。commit: `3222e4c`
+- [x] **Phase 3 — EoeRelay 嵌入式中继**：[runtime/eoe_relay.mbt](../runtime/eoe_relay.mbt) 实现基于回调的同步中继 `EoeRelay::relay_cycle(sw, nic, timeout, rx_handler, tx_provider)`，适用于裸机/RTOS 等无队列环境。commit: `3222e4c`
+- [x] **Async Bridge**：[eoe_async/eoe_async.mbt](../eoe_async/eoe_async.mbt) 引入 `moonbitlang/async` v0.16.8 依赖，实现 `EoeAsyncBridge`：async Queue TX/RX 通道 + 后台 `poll_loop` 任务，提供 `send()`/`recv()` 异步 API 与 `try_send()`/`try_recv()` 同步回退。独立包隔离，避免 MSVC 要求影响 runtime 测试。commit: `d52808d`
+
+验证：32 个 EoE 相关测试（runtime 包，wasm-gc/native），4 个 async bridge 同步测试（wasm-gc）。`moon test` 全量通过。
+
+### Master OD (#1301)
+
+2026-04-01 实现主站对象字典。[runtime/master_od.mbt](../runtime/master_od.mbt) 新增 `build_master_od()` 构造 CoE 风格 OD，覆盖标准对象 0x1000-0x10FF（DeviceType、ErrorRegister、ManufacturerDeviceName、Identity 等），支持 ScanReport / Telemetry / DiagnosticSurface 可选注入；`MasterObjectDictionary` 提供 `format_text()` / `to_json()` / `indices()` 产品面 API。CLI 新增 `master-od` 命令含 `--json` 支持。commit: `d280dde`
+
 ### 延后项（审计确认，当前不阻塞）
 
-- [ ] **EoE Virtual Switch (#602)**：EoE 帧编解码已完成，但 L2 虚拟交换（帧路由/端口映射）需要完整的网络栈集成，为独立大特性。
-- [ ] **Master OD (#1301)**：主站对象字典为 should(A)/may(B)，当前未实现本地 0x1000–0x1FFF 对象字典，诊断信息通过 DiagnosticSurface 统一暴露。
+- [ ] **EoE L2 路由 (#602 完整)**：EoeSwitch 引擎已实现站间收发与分片/重组，但跨站 L2 帧路由（基于 MAC 地址的端口转发表）尚未实现。延后理由：需要完整的网络栈集成（ARP/DHCP/TAP），为独立大特性。[ETG.1000.6 §5.7]
 - [ ] **AoE (#901)**：ADS over EtherCAT 为 should，Beckhoff 特有协议，优先级低。
+
+## 延后项汇总（2026-04-01 整理）
+
+> 以下汇总散落在 §0.6–§0.11 各节中的所有延后项，按领域分类，方便后续统一排期。
+
+### 协议层延后
+
+| 来源 | 条目 | 分级 | 延后理由 |
+|---|---|---|---|
+| §0.11 | **EoE L2 路由 (#602 完整)** | shall(A) | EoeSwitch 引擎已实现站间收发与分片/重组，但跨站 L2 帧路由（基于 MAC 地址的端口转发表）需要完整的网络栈集成（ARP/DHCP/TAP），为独立大特性。 |
+| §0.11 | **AoE (#901)** | should | Beckhoff 特有 ADS over EtherCAT 协议，优先级低，需具体设备样本。 |
+| §0.9 | **VoE** | may | 仅有 `MailboxType::VoE`(0x0F) 类型定义，无帧编解码和事务。厂商专属协议，on-demand。 |
+| §0.9 | **Slave-to-Slave 通信** | — | ENI 复制映射配置与 runtime 数据搬运均缺失。无参考实现支持（SOEM 无、ethercrab 无），属 Safety Master 范畴。 |
+| §0.9 | **Mailbox Status Bit FMMU 映射轮询** | optimization | 当前通过直接寄存器读取检查 SM status bit，功能等价完整；FMMU 映射到 cyclic PDO 的优化路径 SOEM/ethercrab 均不实现。 |
+| §0.9 | **帧重复发送** | may | SII `frame_repeat_support` 标志已解析和 CLI 输出，传输层已有重试机制。SOEM/ethercrab 均不基于 SII 标志做帧重复。 |
+
+### DC 深度延后
+
+| 来源 | 条目 | 延后理由 |
+|---|---|---|
+| §0.10 | **拓扑感知传播延迟算法** | `dc_configure_linear` 使用简单差值，对分支/星型拓扑不准确。需利用已实现的 `dc_read_port_times` 4 端口数据实现 SOEM 风格 entry port 检测、parent-child 遍历、累积延迟。需拓扑模型配合，当前无分支拓扑实机目标。 |
+| §0.10 | **AssignActivate → CUC 写入接线** | SII `assign_activate` 已解析但未自动写入 0x0980。需与拓扑感知 DC init 流程一同设计。 |
+| §0.10 | **Sync 收敛验证调用** | `dc_read_sync_window()` 存在但未在 DC init 后自动调用验证时钟同步收敛。运行时诊断层已可手动调用。 |
+| §0.9 | **DC LATCH0/LATCH1 输入事件捕获** | 未实现外部 LATCH 信号寄存器读写（0x09AE-0x09B7）。仅服务外部传感器时间戳采集用例，当前无实机目标。 |
+
+### 产品面延后
+
+| 来源 | 条目 | 延后理由 |
+|---|---|---|
+| §0.6 | **Hot Connect 实机分支证据** | replay/fixture 级回放已补齐；仍缺"optional slave 缺失仍可启动"和"mandatory slave 缺失阻塞启动"两条实机分支证据。 |
+| §0.7 | **Native AddressSanitizer 文档化** | 把 ASan/等价内存安全检查固定成文档化命令，覆盖句柄泄漏、重复 close、错误 ownership 标注三类风险。 |
+| §0.7 | **Extism host capability adapter** | 打通 `nic_open/send/recv/close + clock_now/sleep` 最小闭环，共享内存优化保持第二阶段。能力边界停在 contract 文档。 |
+| §0.7 | **Extism 无文件系统宿主回放** | 验证 `scan/validate/run` 的 bytes 输入路径，确保插件产品面不依赖本地路径语义。 |
+| §0.7 | **Extism shared-memory transport 回放** | 补长度/所有权/回收责任回放测试，确保 run 路径不因隐式复制或悬垂缓冲区形成宿主侧事故。 |
