@@ -114,7 +114,7 @@
 
 ### 已就绪机制未接线
 
-- [ ] **SII Timeout → ESM Runtime 接线**：SII Timeouts 类别（type 41/0x29）已完整解析为 `SiiTimeouts`（preop/safeop_op/back_to_init/back_to_safeop 四个超时字段），`EsmTimeoutPolicy` 与 `transition_through_with_timeout_policy` 机制已就绪，但 runtime 全部使用固定超时版本 `transition_through`。需要在 `run()` 启动阶段将 SII 解析出的超时填入 `EsmTimeoutPolicy` 并切换到 `transition_through_with_timeout_policy`。[ETG.1500 #104 shall]
+- [x] **SII Timeout → ESM Runtime 接线**：`esm_timeout_policy_from_sii_timeouts()` 将 SII category 41 超时映射为 `EsmTimeoutPolicy`；`transition_to_target_strict_with_timeout_policy()` 支持策略感知严格转换；`RunStartupPreparation.esm_timeout_policies` 存储每站策略并贯穿 `transition_stations_for_startup` 全链路。`d6d26bf`
 
 ### DLL 诊断层
 
