@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace.
+/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -516,6 +516,19 @@ fn[N : @hal.Nic] run_command_with_nic(
         println(validate_report.format())
       }
     }
+    "master-od" => {
+      let scan_report : @runtime.ScanReport? = Some(@runtime.scan(nic, timeout)) catch {
+        _ => None
+      }
+      nic.close()
+      let identity = @runtime.default_master_identity()
+      let od = @runtime.build_master_od(identity, scan_report, None, None)
+      if as_json {
+        println(od.to_json().stringify(indent=2))
+      } else {
+        println(od.format_text())
+      }
+    }
     _ => print_usage()
   }
 }
@@ -524,7 +537,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
