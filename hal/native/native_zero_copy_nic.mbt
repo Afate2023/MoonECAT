@@ -12,7 +12,7 @@ pub(all) struct NativeZeroCopyNic {
 ///|
 pub fn NativeZeroCopyNic::new(
   config : NativeNicConfig,
-  pool : @hal.FramePool
+  pool : @hal.FramePool,
 ) -> NativeZeroCopyNic {
   {
     config,
@@ -26,7 +26,7 @@ pub fn NativeZeroCopyNic::new(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
   name : String,
-  pool : @hal.FramePool
+  pool : @hal.FramePool,
 ) -> NativeZeroCopyNic raise @hal.EcError {
   let config = default_native_config(name)
   let backend = resolve_native_backend(config.backend)
@@ -35,18 +35,12 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
     LinuxRawSocket => linux_raw_socket_open(config)
     Auto => raise native_not_supported("zero-copy open")
   }
-  {
-    config,
-    pool,
-    handle_id,
-    is_open: true,
-    resolved_backend: backend,
-  }
+  { config, pool, handle_id, is_open: true, resolved_backend: backend }
 }
 
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with acquire_tx(
-  self : NativeZeroCopyNic
+  self : NativeZeroCopyNic,
 ) -> @hal.FrameRef raise @hal.EcError {
   self.pool.acquire()
 }
@@ -54,7 +48,7 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with acquire_tx(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with tx_buffer(
   self : NativeZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
   self.pool.buffer(fref)
 }
@@ -63,17 +57,15 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with tx_buffer(
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with submit(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
-  length~ : Int
+  length~ : Int,
 ) -> Unit raise @hal.EcError {
   let buf = self.pool.buffer(fref)
   match self.resolved_backend {
     WindowsNpcap => {
       let _ = npcap_send_zero_copy(self.handle_id, buf, length)
-
     }
     LinuxRawSocket => {
       let _ = linux_send_zero_copy(self.handle_id, buf, length)
-
     }
     Auto => raise native_not_supported("zero-copy submit")
   }
@@ -84,7 +76,7 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with submit(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with recv(
   self : NativeZeroCopyNic,
-  timeout~ : @hal.Duration
+  timeout~ : @hal.Duration,
 ) -> @hal.FrameRef raise @hal.EcError {
   let _ = timeout
   let rx_ref = self.pool.acquire_rx()
@@ -101,7 +93,7 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with recv(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_buffer(
   self : NativeZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
   self.pool.buffer(fref)
 }
@@ -109,7 +101,7 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_buffer(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_length(
   self : NativeZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> Int {
   self.pool.data_length(fref)
 }
@@ -117,15 +109,13 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_length(
 ///|
 impl @hal.ZeroCopyNic for NativeZeroCopyNic with release(
   self : NativeZeroCopyNic,
-  fref : @hal.FrameRef
+  fref : @hal.FrameRef,
 ) -> Unit {
   self.pool.release(fref)
 }
 
 ///|
-impl @hal.ZeroCopyNic for NativeZeroCopyNic with close(
-  self : NativeZeroCopyNic
-) -> Unit {
+impl @hal.ZeroCopyNic for NativeZeroCopyNic with close(self : NativeZeroCopyNic) -> Unit {
   if self.is_open {
     match self.resolved_backend {
       WindowsNpcap => ffi_windows_npcap_close(self.handle_id)

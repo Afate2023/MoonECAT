@@ -1,4 +1,4 @@
-﻿///|
+///|
 /// ZeroCopyNic defines the zero-allocation network interface contract.
 ///
 /// Unlike `Nic` which allocates Bytes on every recv, ZeroCopyNic operates
@@ -44,7 +44,7 @@ pub(all) struct MutableProcessImage {
 /// Create a new MutableProcessImage with pre-allocated buffers.
 pub fn MutableProcessImage::new(
   output_size : Int,
-  input_size : Int
+  input_size : Int,
 ) -> MutableProcessImage {
   {
     outputs: FixedArray::make(output_size, b'\x00'),

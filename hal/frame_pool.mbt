@@ -1,4 +1,4 @@
-﻿///|
+///|
 /// FrameState tracks the lifecycle of a frame slot in the pool.
 /// Transitions: Free 鈫?Acquired 鈫?Filled 鈫?Sending 鈫?Sent 鈫?Free
 ///              Free 鈫?Receiving 鈫?Received 鈫?Free
@@ -46,12 +46,12 @@ pub let default_pool_capacity : Int = 16
 /// Create a new FramePool with the given capacity and frame size.
 /// All buffers are pre-allocated; no further allocation occurs during operation.
 pub fn FramePool::new(
-  capacity~ : Int = default_pool_capacity,
-  frame_size~ : Int = max_frame_size,
-  id~ : Int = 0
+  capacity? : Int = default_pool_capacity,
+  frame_size? : Int = max_frame_size,
+  id? : Int = 0,
 ) -> FramePool {
   let frames : FixedArray[FixedArray[Byte]] = FixedArray::makei(capacity, fn(
-    _i
+    _i,
   ) {
     FixedArray::make(frame_size, b'\x00')
   })
@@ -90,11 +90,11 @@ pub fn FramePool::buffer(self : FramePool, fref : FrameRef) -> FixedArray[Byte] 
 pub fn FramePool::mark_filled(
   self : FramePool,
   fref : FrameRef,
-  length : Int
+  length : Int,
 ) -> FrameRef {
   self.states[fref.slot] = Filled
   self.lengths[fref.slot] = length
-  { ..fref, length }
+  { ..fref, length, }
 }
 
 ///|
@@ -122,11 +122,11 @@ pub fn FramePool::acquire_rx(self : FramePool) -> FrameRef raise EcError {
 pub fn FramePool::mark_received(
   self : FramePool,
   fref : FrameRef,
-  length : Int
+  length : Int,
 ) -> FrameRef {
   self.states[fref.slot] = Received
   self.lengths[fref.slot] = length
-  { ..fref, length }
+  { ..fref, length, }
 }
 
 ///|
@@ -176,7 +176,7 @@ pub fn FramePool::write_byte(
   self : FramePool,
   fref : FrameRef,
   offset : Int,
-  value : Byte
+  value : Byte,
 ) -> Unit {
   self.frames[fref.slot][offset] = value
 }
@@ -186,7 +186,7 @@ pub fn FramePool::write_byte(
 pub fn FramePool::read_byte(
   self : FramePool,
   fref : FrameRef,
-  offset : Int
+  offset : Int,
 ) -> Byte {
   self.frames[fref.slot][offset]
 }
@@ -199,7 +199,7 @@ pub fn FramePool::write_bytes(
   offset : Int,
   src : FixedArray[Byte],
   src_offset : Int,
-  count : Int
+  count : Int,
 ) -> Unit {
   let buf = self.frames[fref.slot]
   for i = 0; i < count; i = i + 1 {
@@ -215,7 +215,7 @@ pub fn FramePool::read_bytes(
   offset : Int,
   dst : FixedArray[Byte],
   dst_offset : Int,
-  count : Int
+  count : Int,
 ) -> Unit {
   let buf = self.frames[fref.slot]
   for i = 0; i < count; i = i + 1 {
@@ -229,7 +229,7 @@ pub fn FramePool::write_u16_le(
   self : FramePool,
   fref : FrameRef,
   offset : Int,
-  value : Int
+  value : Int,
 ) -> Unit {
   let buf = self.frames[fref.slot]
   buf[offset] = (value & 0xFF).to_byte()
@@ -241,7 +241,7 @@ pub fn FramePool::write_u16_le(
 pub fn FramePool::read_u16_le(
   self : FramePool,
   fref : FrameRef,
-  offset : Int
+  offset : Int,
 ) -> Int {
   let buf = self.frames[fref.slot]
   buf[offset].to_int() | (buf[offset + 1].to_int() << 8)
@@ -253,7 +253,7 @@ pub fn FramePool::write_u32_le(
   self : FramePool,
   fref : FrameRef,
   offset : Int,
-  value : Int
+  value : Int,
 ) -> Unit {
   let buf = self.frames[fref.slot]
   buf[offset] = (value & 0xFF).to_byte()
@@ -267,10 +267,11 @@ pub fn FramePool::write_u32_le(
 pub fn FramePool::read_u32_le(
   self : FramePool,
   fref : FrameRef,
-  offset : Int
+  offset : Int,
 ) -> Int {
   let buf = self.frames[fref.slot]
-  buf[offset].to_int() | (buf[offset + 1].to_int() << 8) | (buf[offset + 2].to_int() << 16) | (buf[
-    offset + 3
-  ].to_int() << 24)
+  buf[offset].to_int() |
+  (buf[offset + 1].to_int() << 8) |
+  (buf[offset + 2].to_int() << 16) |
+  (buf[offset + 3].to_int() << 24)
 }

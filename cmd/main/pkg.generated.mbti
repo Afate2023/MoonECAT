@@ -10,9 +10,7 @@ import {
 // Errors
 
 // Types and methods
-type CliBackend
-pub impl Eq for CliBackend
-pub impl Show for CliBackend
+type CliBackend derive(Eq, Show)
 
 type CliNdjsonRunProgressSink
 pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
@@ -36,9 +34,7 @@ type OdBrowseQuery
 
 type OdBrowseReport
 
-type RunProgressOutput
-pub impl Eq for RunProgressOutput
-pub impl Show for RunProgressOutput
+type RunProgressOutput derive(Eq, Show)
 
 type StartupDiffReport
 

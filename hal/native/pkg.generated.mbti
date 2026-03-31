@@ -28,6 +28,10 @@ pub fn linux_raw_socket_runtime_available() -> Bool
 
 pub fn linux_raw_socket_send(Int, Bytes) -> Int raise @hal.EcError
 
+pub fn linux_recv_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
+pub fn linux_send_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
 pub fn native_backend_available(NativeBackendKind) -> Bool
 
 pub fn native_interface_is_probe_candidate(NativeInterfaceInfo) -> Bool
@@ -41,6 +45,10 @@ pub fn native_list_interfaces_json(NativeBackendKind) -> String raise @hal.EcErr
 pub fn native_list_interfaces_text(NativeBackendKind) -> String raise @hal.EcError
 
 pub fn native_stub_version() -> Int
+
+pub fn npcap_recv_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
+pub fn npcap_send_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
 
 pub fn parse_native_interface_listing(Json) -> NativeInterfaceListing raise @hal.EcError
 
@@ -67,9 +75,7 @@ pub(all) enum NativeBackendKind {
   Auto
   LinuxRawSocket
   WindowsNpcap
-}
-pub impl Eq for NativeBackendKind
-pub impl Show for NativeBackendKind
+} derive(Eq, Show)
 
 pub(all) struct NativeInterfaceInfo {
   name : String
@@ -79,28 +85,22 @@ pub(all) struct NativeInterfaceInfo {
   connected : Bool
   wireless : Bool
   index : Int?
-}
-pub impl Eq for NativeInterfaceInfo
-pub impl Show for NativeInterfaceInfo
+} derive(Eq, Show)
 
 pub(all) struct NativeInterfaceListing {
   backend : NativeBackendKind
   interfaces : Array[NativeInterfaceInfo]
-}
-pub impl Eq for NativeInterfaceListing
-pub impl Show for NativeInterfaceListing
+} derive(Eq, Show)
 
 pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int
   mut is_open : Bool
   mut last_sent : Bytes
-}
+} derive(Eq, Show)
 pub fn NativeNic::new(NativeNicConfig) -> Self
 pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError
 pub impl @hal.Nic for NativeNic
-pub impl Eq for NativeNic
-pub impl Show for NativeNic
 
 pub(all) struct NativeNicConfig {
   interface_name : String
@@ -108,9 +108,16 @@ pub(all) struct NativeNicConfig {
   snaplen : Int
   promisc : Bool
   timeout_ms : Int
+} derive(Eq, Show)
+
+pub(all) struct NativeZeroCopyNic {
+  config : NativeNicConfig
+  pool : @hal.FramePool
+  mut handle_id : Int
+  mut is_open : Bool
+  mut resolved_backend : NativeBackendKind
 }
-pub impl Eq for NativeNicConfig
-pub impl Show for NativeNicConfig
+pub fn NativeZeroCopyNic::new(NativeNicConfig, @hal.FramePool) -> Self
 
 // Type aliases
 

@@ -5,7 +5,7 @@
 extern "c" fn ffi_npcap_recv_into(
   handle_id : Int,
   buf : FixedArray[Byte],
-  max_len : Int
+  max_len : Int,
 ) -> Int = "moonecat_npcap_recv_into"
 
 ///|
@@ -14,7 +14,7 @@ extern "c" fn ffi_npcap_recv_into(
 extern "c" fn ffi_npcap_send_fixed(
   handle_id : Int,
   buf : FixedArray[Byte],
-  length : Int
+  length : Int,
 ) -> Int = "moonecat_npcap_send_fixed"
 
 ///|
@@ -23,7 +23,7 @@ extern "c" fn ffi_npcap_send_fixed(
 extern "c" fn ffi_linux_recv_into(
   handle_id : Int,
   buf : FixedArray[Byte],
-  max_len : Int
+  max_len : Int,
 ) -> Int = "moonecat_linux_recv_into"
 
 ///|
@@ -32,7 +32,7 @@ extern "c" fn ffi_linux_recv_into(
 extern "c" fn ffi_linux_send_fixed(
   handle_id : Int,
   buf : FixedArray[Byte],
-  length : Int
+  length : Int,
 ) -> Int = "moonecat_linux_send_fixed"
 
 ///|
@@ -40,7 +40,7 @@ extern "c" fn ffi_linux_send_fixed(
 pub fn npcap_send_zero_copy(
   handle_id : Int,
   buf : FixedArray[Byte],
-  length : Int
+  length : Int,
 ) -> Int raise @hal.EcError {
   let result = ffi_npcap_send_fixed(handle_id, buf, length)
   if result < 0 {
@@ -54,7 +54,7 @@ pub fn npcap_send_zero_copy(
 pub fn npcap_recv_zero_copy(
   handle_id : Int,
   buf : FixedArray[Byte],
-  max_len : Int
+  max_len : Int,
 ) -> Int raise @hal.EcError {
   let result = ffi_npcap_recv_into(handle_id, buf, max_len)
   if result < 0 {
@@ -71,7 +71,7 @@ pub fn npcap_recv_zero_copy(
 pub fn linux_send_zero_copy(
   handle_id : Int,
   buf : FixedArray[Byte],
-  length : Int
+  length : Int,
 ) -> Int raise @hal.EcError {
   let result = ffi_linux_send_fixed(handle_id, buf, length)
   if result < 0 {
@@ -85,7 +85,7 @@ pub fn linux_send_zero_copy(
 pub fn linux_recv_zero_copy(
   handle_id : Int,
   buf : FixedArray[Byte],
-  max_len : Int
+  max_len : Int,
 ) -> Int raise @hal.EcError {
   let result = ffi_linux_recv_into(handle_id, buf, max_len)
   if result < 0 {
