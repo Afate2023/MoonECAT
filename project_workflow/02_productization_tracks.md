@@ -143,3 +143,31 @@
 - [ ] **Slave-to-Slave 通信**：完全未实现，ENI 复制映射配置与 runtime 数据搬运均缺失。延后理由：无参考实现支持（SOEM 无、ethercrab 无），属 Safety Master 范畴。[ETG.1500 §5.14]
 - [ ] **VoE (Vendor-specific over EtherCAT)**：仅有 `MailboxType::VoE`(0x0F) 类型定义，无帧编解码和事务。延后理由：厂商专属协议，需具体设备样本才能验证，on-demand。[ETG.1000.6 §5.9 may]
 - [ ] **DC LATCH0/LATCH1 输入事件捕获**：未实现外部 LATCH 信号寄存器读写（0x09AE-0x09B7）。延后理由：仅服务外部传感器时间戳采集用例，当前无实机目标。[EtherCAT Compendium §5.5 may]
+
+## 0.10 ESM / DC 深度审计改进（2026-03-31）
+
+> 来源：对照 SOEM `ec_config.c`/`ec_dc.c`、ethercrab、gatorcat 参考实现，以及 ETG.1000.4/5/6 规范，对已实现的 ESM Engine 和 DC 模块进行深度质量审计并修补。
+
+### ESM Engine 改进
+
+- [x] **总线初始化寄存器清除（CRITICAL）**：新增 `set_slaves_to_default()` 函数，通过 BWR 广播清除 FMMU(0x0600, 48B)、SM(0x0800, 32B)、DC sync activation、CRC counters(0x0300, 8B)、IRQ mask(→0x0004)、Station Alias、AL Control(Init+Ack)、EEPROM config(PDI→Master)，匹配 SOEM `ecx_set_slaves_to_default` 完整序列。commit: `006c952` [ETG.1000.4 §6; SOEM ec_config.c:90]
+- [x] **broadcast_state Error Ack 位**：`broadcast_state()` 新增 `ack_error? : Bool` 可选参数，设置时写入 `target_byte | 0x10`（bit 4 = Error Ack）。原有默认行为不变。commit: `006c952` [ETG.1000.6 §5.3.2]
+
+### DC 模块改进
+
+- [x] **4 端口接收时间读取**：新增 `dc_read_port_times()` 读取 0x0900-0x090F 全部 16 字节，返回 `DcPortTimes{ port0, port1, port2, port3 }`，为拓扑感知延迟算法提供基础。commit: `006c952` [ETG.1000.4 §9.2; SOEM ec_dc.c]
+- [x] **DC 支持检测**：新增 `dc_check_support()` 检查 DL Information 寄存器(0x0008) bit 2，判断从站是否支持 DC。commit: `006c952` [ETG.1000.4 §6.1]
+- [x] **64 位系统时间**：新增 `dc_read_system_time_64()` 读取完整 8 字节 DC system time(0x0910)，避免 32 位 ~4.3 秒溢出。`dc_configure_sync0` 启动时间计算已改用 64 位。commit: `006c952` [ETG.1000.4 §9.2]
+- [x] **DCSOF 读取**：新增 `dc_read_sof()` 读取 64 位 DC receive timestamp(0x0918)，用于精确系统时间偏移计算。commit: `006c952` [SOEM ec_dc.c]
+- [x] **DC 去激活路径**：新增 `dc_deactivate_sync()` (单站) 和 `dc_deactivate_sync_all()` (广播)，为关机/错误恢复提供 DC 关闭路径。commit: `006c952`
+- [x] **le_u64 / write_u64 辅助函数**：新增 64 位小端编解码辅助函数。commit: `006c952`
+
+### 新增寄存器常量
+
+- [x] `reg_dl_information` (0x0008)、`reg_dl_port` (0x0101)、`reg_irq_mask` (0x0200)、`reg_dc_speed_count` (0x0930)、`reg_dc_time_filter` (0x0934)。commit: `006c952`
+
+### 延后项（审计确认，当前不阻塞）
+
+- [ ] **拓扑感知传播延迟算法**：当前 `dc_configure_linear` 使用 `abs_diff_u32` 简单差值，对非线性拓扑（分支/星型）不准确。需要利用已实现的 `dc_read_port_times` 4 端口数据实现 SOEM 风格的 entry port 检测、parent-child 遍历、累积延迟。延后理由：需拓扑模型配合，当前无分支拓扑实机验证目标。
+- [ ] **AssignActivate → CUC 写入接线**：SII `assign_activate` 已解析但未自动写入 0x0980。延后理由：需与拓扑感知 DC init 流程一同设计。
+- [ ] **Sync 收敛验证调用**：`dc_read_sync_window()` 存在但未在 DC init 后自动调用验证时钟同步收敛。延后理由：运行时诊断层已可手动调用。
