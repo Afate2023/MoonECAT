@@ -122,12 +122,15 @@ pub fn[N : @hal.Nic] dc_read_sync_window(
 ///|
 /// Configure SYNC0 output for one slave.
 /// Uses local DC system time low-word to choose a future aligned start tick.
+/// When `sync1_cycle_ns` > 0, also configures SYNC1 and activates both
+/// (activation byte 0x07 instead of 0x03).
 pub fn[N : @hal.Nic] dc_configure_sync0(
   nic : N,
   station : UInt,
   cycle_ns : UInt,
   timeout : @hal.Duration,
   shift_ns? : Int = 0,
+  sync1_cycle_ns? : UInt = 0U,
 ) -> Unit raise @hal.EcError {
   // Stop cyclic operation
   let _ = write_register_fp(
@@ -178,12 +181,23 @@ pub fn[N : @hal.Nic] dc_configure_sync0(
     write_u32(cycle_ns),
     timeout,
   )
-  // Activate cyclic + SYNC0
+  // Write SYNC1 cycle time if requested
+  if sync1_cycle_ns > 0U {
+    let _ = write_register_fp(
+      nic,
+      station,
+      reg_dc_cycle1,
+      write_u32(sync1_cycle_ns),
+      timeout,
+    )
+  }
+  // Activate cyclic + SYNC0 (+ SYNC1 if configured)
+  let act : Byte = if sync1_cycle_ns > 0U { b'\x07' } else { b'\x03' }
   let _ = write_register_fp(
     nic,
     station,
     reg_dc_sync_act,
-    Bytes::from_array([b'\x03']),
+    Bytes::from_array([act]),
     timeout,
   )
 }

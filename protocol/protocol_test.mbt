@@ -2685,6 +2685,20 @@ test "dc_configure_sync0 via mock" {
 }
 
 ///|
+test "dc_configure_sync0 with SYNC1 via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // SYNC1 cycle = 2x SYNC0 cycle
+  @protocol.dc_configure_sync0(
+    nic,
+    0x1001U,
+    1_000_000U,
+    timeout,
+    sync1_cycle_ns=2_000_000U,
+  )
+}
+
+///|
 test "dc_compensate_cycle via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)

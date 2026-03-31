@@ -45,7 +45,7 @@ pub fn[N : @hal.Nic] dc_compensate_cycle(N, UInt, @hal.Duration) -> Unit raise @
 
 pub fn[N : @hal.Nic] dc_configure_linear(N, Array[UInt], UInt, @hal.Duration, static_sync_iterations? : Int) -> DcInitResult? raise @hal.EcError
 
-pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int, sync1_cycle_ns? : UInt) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_latch_times(N, @hal.Duration) -> Unit raise @hal.EcError
 
