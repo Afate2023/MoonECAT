@@ -542,6 +542,7 @@ pub(all) struct SlaveDiagnosis {
   al_status_code : UInt?
   error_register : Byte
   diagnosis_counter : UInt?
+  dl_error_counters : @protocol.DlErrorCounters?
 } derive(Eq, Show)
 
 pub(all) struct SlaveReport {

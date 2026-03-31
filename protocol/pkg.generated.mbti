@@ -139,6 +139,10 @@ pub fn read_command(AddressType) -> EcCommand
 
 pub fn[N : @hal.Nic] read_device_emulation(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_dl_error_counters(N, UInt, @hal.Duration) -> DlErrorCounters raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_dl_error_counters_ap(N, UInt, @hal.Duration) -> DlErrorCounters raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
@@ -197,9 +201,19 @@ pub let reg_dl_control : UInt
 
 pub let reg_dl_status : UInt
 
+pub let reg_ecat_pu_error_counter : UInt
+
 pub let reg_fmmu_base : UInt
 
+pub let reg_fwd_rx_error_counter : UInt
+
+pub let reg_lost_link_counter : UInt
+
+pub let reg_pdi_error_counter : UInt
+
 pub let reg_revision : UInt
+
+pub let reg_rx_error_counter : UInt
 
 pub let reg_sii_address : UInt
 
@@ -310,6 +324,12 @@ pub(all) struct DcInitResult {
   configured_count : Int
 } derive(Eq, Show)
 
+pub(all) struct DlErrorCounters {
+  ports : FixedArray[PortErrorCounters]
+  ecat_pu_errors : UInt
+  pdi_errors : UInt
+} derive(Eq, Show)
+
 pub(all) enum EcCommand {
   NOP
   APRD
@@ -413,6 +433,13 @@ pub(all) struct PduHeader {
   address : UInt
   len_flags : UInt
   irq : UInt
+} derive(Eq, Show)
+
+pub(all) struct PortErrorCounters {
+  frame_errors : UInt
+  physical_errors : UInt
+  forwarded_rx_errors : UInt
+  lost_link_count : UInt
 } derive(Eq, Show)
 
 pub(all) struct ProcessImage {

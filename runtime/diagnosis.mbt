@@ -16,6 +16,8 @@ pub(all) struct SlaveDiagnosis {
   error_register : Byte
   /// Diagnosis history object counter (0x10F3:0), when available.
   diagnosis_counter : UInt?
+  /// DL/Physical layer error counters (ESC 0x0300–0x0313), when available.
+  dl_error_counters : @protocol.DlErrorCounters?
 } derive(Eq, Show)
 
 ///|
@@ -248,6 +250,11 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(
   ) catch {
     _ => None
   }
+  let dl_counters : @protocol.DlErrorCounters? = Some(
+    @protocol.read_dl_error_counters(nic, station, timeout),
+  ) catch {
+    _ => None
+  }
   {
     station_address: station,
     al_state: match al_snapshot {
@@ -264,6 +271,7 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(
     },
     error_register: err,
     diagnosis_counter: diag,
+    dl_error_counters: dl_counters,
   }
 }
 
@@ -288,6 +296,11 @@ pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
   ) catch {
     _ => None
   }
+  let dl_counters : @protocol.DlErrorCounters? = Some(
+    @protocol.read_dl_error_counters_ap(nic, position, timeout),
+  ) catch {
+    _ => None
+  }
   {
     station_address: station,
     al_state: match al_snapshot {
@@ -304,6 +317,7 @@ pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
     },
     error_register: err,
     diagnosis_counter: diag,
+    dl_error_counters: dl_counters,
   }
 }
 

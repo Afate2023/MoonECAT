@@ -3715,6 +3715,31 @@ fn diagnosis_output_json(
       Some(value) => Json::number(value.to_double())
       None => Json::null()
     },
+    "dl_error_counters": match report.dl_error_counters {
+      Some(dl) => {
+        let port_arr : Array[Json] = []
+        for i = 0; i < dl.ports.length(); i = i + 1 {
+          let p = dl.ports[i]
+          port_arr.push(
+            Json::object({
+              "port": Json::number(i.to_double()),
+              "frame_errors": Json::number(p.frame_errors.to_double()),
+              "physical_errors": Json::number(p.physical_errors.to_double()),
+              "forwarded_rx_errors": Json::number(
+                p.forwarded_rx_errors.to_double(),
+              ),
+              "lost_link_count": Json::number(p.lost_link_count.to_double()),
+            }),
+          )
+        }
+        Json::object({
+          "ports": Json::array(port_arr),
+          "ecat_pu_errors": Json::number(dl.ecat_pu_errors.to_double()),
+          "pdi_errors": Json::number(dl.pdi_errors.to_double()),
+        })
+      }
+      None => Json::null()
+    },
     "surface": diagnostic_surface_json(
       @runtime.diagnostic_surface_from_slave_diagnosis(scan, report),
     ),
@@ -3755,6 +3780,30 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
     "Error Register: " + format_hex(report.error_register.to_uint(), 2) + "\n",
   )
   buf.write_string("Diagnosis Counter: " + diagnosis_counter_text + "\n")
+  match report.dl_error_counters {
+    Some(dl) => {
+      buf.write_string("DL Error Counters:\n")
+      for i = 0; i < dl.ports.length(); i = i + 1 {
+        let p = dl.ports[i]
+        buf.write_string(
+          "  Port " +
+          i.to_string() +
+          ": frame=" +
+          p.frame_errors.to_string() +
+          " physical=" +
+          p.physical_errors.to_string() +
+          " fwd_rx=" +
+          p.forwarded_rx_errors.to_string() +
+          " lost_link=" +
+          p.lost_link_count.to_string() +
+          "\n",
+        )
+      }
+      buf.write_string("  EPU errors: " + dl.ecat_pu_errors.to_string() + "\n")
+      buf.write_string("  PDI errors: " + dl.pdi_errors.to_string() + "\n")
+    }
+    None => buf.write_string("DL Error Counters: not available\n")
+  }
   buf.to_string()
 }
 

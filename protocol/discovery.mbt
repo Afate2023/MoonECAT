@@ -85,6 +85,26 @@ pub let reg_watchdog_status_pdata : UInt = 0x0440U
 pub let reg_watchdog_counter_pdata : UInt = 0x0442U
 
 ///|
+/// RX Error Counter base register (0x0300–0x0307, 8 bytes: frame+physical per port).
+pub let reg_rx_error_counter : UInt = 0x0300U
+
+///|
+/// Forwarded RX Error Counter base register (0x0308–0x030B, 4 bytes: one per port).
+pub let reg_fwd_rx_error_counter : UInt = 0x0308U
+
+///|
+/// EtherCAT Processing Unit Error Counter register (0x030C).
+pub let reg_ecat_pu_error_counter : UInt = 0x030CU
+
+///|
+/// PDI Error Counter register (0x030D).
+pub let reg_pdi_error_counter : UInt = 0x030DU
+
+///|
+/// Lost Link Counter base register (0x0310–0x0313, 4 bytes: one per port).
+pub let reg_lost_link_counter : UInt = 0x0310U
+
+///|
 /// Sync Manager base register (SM0 starts at 0x0800, each SM is 8 bytes).
 pub let reg_sm_base : UInt = 0x0800U
 

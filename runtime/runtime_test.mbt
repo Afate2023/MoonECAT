@@ -2262,6 +2262,7 @@ test "diagnostic surface from slave diagnosis classifies register and mailbox is
     al_status_code: Some(0x0011U),
     error_register: b'\x04',
     diagnosis_counter: Some(2U),
+    dl_error_counters: None,
   })
   assert_eq(surface.overall_level, @runtime.Block)
   assert_eq(surface.issues.length(), 4)

@@ -650,6 +650,7 @@ test "cli diagnosis output json includes nullable counter" {
     al_status_code: Some(0x0016U),
     error_register: b'\x0A',
     diagnosis_counter: None,
+    dl_error_counters: None,
   }).stringify(indent=2)
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"al_state\": \"SafeOp\""))
@@ -683,6 +684,7 @@ test "cli diagnosis output json includes shared surface" {
     al_status_code: Some(0x0011U),
     error_register: b'\x04',
     diagnosis_counter: Some(2U),
+    dl_error_counters: None,
   }).stringify(indent=2)
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Block\""))
@@ -698,6 +700,7 @@ test "cli diagnosis report text includes AL snapshot fields" {
     al_status_code: Some(0x0000U),
     error_register: b'\x04',
     diagnosis_counter: Some(3U),
+    dl_error_counters: None,
   })
   assert_true(text.contains("AL State: Op"))
   assert_true(text.contains("AL Error Flag: clear"))

@@ -2692,6 +2692,49 @@ test "dc_compensate_cycle via mock" {
 }
 
 ///|
+test "read_dl_error_counters via mock returns all zeros" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let counters = @protocol.read_dl_error_counters(nic, 0x1001U, timeout)
+  assert_eq(counters.ecat_pu_errors, 0U)
+  assert_eq(counters.pdi_errors, 0U)
+  for i = 0; i < counters.ports.length(); i = i + 1 {
+    assert_eq(counters.ports[i].frame_errors, 0U)
+    assert_eq(counters.ports[i].physical_errors, 0U)
+    assert_eq(counters.ports[i].forwarded_rx_errors, 0U)
+    assert_eq(counters.ports[i].lost_link_count, 0U)
+  }
+}
+
+///|
+test "read_dl_error_counters_ap via mock returns all zeros" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let counters = @protocol.read_dl_error_counters_ap(nic, 0U, timeout)
+  assert_eq(counters.ecat_pu_errors, 0U)
+  assert_eq(counters.pdi_errors, 0U)
+  assert_eq(counters.ports.length(), 4)
+}
+
+///|
+test "DlErrorCounters struct has expected port count" {
+  let ports : FixedArray[@protocol.PortErrorCounters] = FixedArray::make(4, {
+    frame_errors: 0U,
+    physical_errors: 0U,
+    forwarded_rx_errors: 0U,
+    lost_link_count: 0U,
+  })
+  let counters : @protocol.DlErrorCounters = {
+    ports,
+    ecat_pu_errors: 5U,
+    pdi_errors: 3U,
+  }
+  assert_eq(counters.ports.length(), 4)
+  assert_eq(counters.ecat_pu_errors, 5U)
+  assert_eq(counters.pdi_errors, 3U)
+}
+
+///|
 test "dc_configure_linear returns reference station" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
