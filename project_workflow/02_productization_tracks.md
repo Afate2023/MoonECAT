@@ -171,3 +171,51 @@
 - [ ] **拓扑感知传播延迟算法**：当前 `dc_configure_linear` 使用 `abs_diff_u32` 简单差值，对非线性拓扑（分支/星型）不准确。需要利用已实现的 `dc_read_port_times` 4 端口数据实现 SOEM 风格的 entry port 检测、parent-child 遍历、累积延迟。延后理由：需拓扑模型配合，当前无分支拓扑实机验证目标。
 - [ ] **AssignActivate → CUC 写入接线**：SII `assign_activate` 已解析但未自动写入 0x0980。延后理由：需与拓扑感知 DC init 流程一同设计。
 - [ ] **Sync 收敛验证调用**：`dc_read_sync_window()` 存在但未在 DC init 后自动调用验证时钟同步收敛。延后理由：运行时诊断层已可手动调用。
+
+## 0.11 ETG.1500 Master Classes 全量审计（2026-04-01）
+
+> 来源：对照 ETG.1500 v1.0.2 Table 1 全部特性条目，逐项审查 MoonECAT 已实现功能的覆盖度与合规性，修补发现的缺口。
+
+### 审计范围
+
+读取 ETG.1500 §5.3–§5.15、§6（Feature Packs）全文，对照 Table 1 所有特性 ID 与 `shall/should/may` 分级，逐一检查 `protocol/`、`mailbox/`、`runtime/` 各包的实现状态。
+
+### 审计结果摘要（30+ features）
+
+| Feature ID | Feature | 分级 | 状态 |
+|---|---|---|---|
+| 101 | Service Commands | shall | ✅ 全部 EtherCAT 命令已实现 |
+| 102 | IRQ field | should | ✅ PdoExchangeResult.irq |
+| 103 | Device Emulation | shall | ✅ read_device_emulation, request_state_aware |
+| 104 | ESM | shall | ✅ 完整 ESM Engine + SII 超时 |
+| 105 | Error Handling | shall | ✅ DlErrorCounters, AL Status Code |
+| 107 | EtherCAT Frame Types | shall | ✅ |
+| 201 | Cyclic PDO | shall | ✅ LRW + split LRD/LWR |
+| 301 | Online scanning / ENI | shall | ✅ 双路径已实现 |
+| 302 | Compare Network config | shall | ✅ compare_configurations |
+| 303 | Explicit Device ID | should | ✅ runtime/scan + validate |
+| 304 | Station Alias | may | ✅ read/write + enable |
+| 305 | EEPROM Access | shall | ✅ read + write |
+| 401 | Mailbox | shall | ✅ send/recv/exchange |
+| 402 | Resilient Layer (RMSM) | shall | ✅ 计数器管理 |
+| 404 | Mailbox polling | shall | ✅ **本次修复：MailboxState FMMU 映射** |
+| 501–504 | SDO Up/Down/Seg/CA/Info | shall | ✅ 全部已实现 |
+| 505 | Emergency | shall | ✅ 解码 + 主动轮询 |
+| 601 | EoE Protocol | shall | ✅ 帧编解码 |
+| 602 | Virtual Switch | shall(A) | ⚠️ L2 路由未实现（延后） |
+| 701–703 | FoE + Boot | shall | ✅ download/upload + Boot state |
+| 801 | SoE Services | shall(A) | ✅ 帧编解码 |
+| 1101 | DC support | shall | ✅ 完整 DC |
+| 1102 | Continuous Prop Delay | should | ✅ dc_reestimate_propagation_delays |
+| 1103 | Sync window monitoring | should | ✅ **本次修复：broadcast BRD 0x092C** |
+
+### 本次修复
+
+- [x] **DC 广播同步窗口监测（#1103）**：新增 `dc_broadcast_sync_window()` 使用 BRD 读取 0x092C，返回所有 DC 从站的 ORed System Time Difference + WKC；新增 `dc_check_sync_window()` 提供阈值比较便捷接口，处理有符号二补数转换。commit: `bc08348` [ETG.1500 §5.13.3]
+- [x] **FMMU MailboxState 映射（#404）**：修改 `calculate_fmmu_configs()` 不再跳过 MailboxState 方向，当 SII 声明 MailboxState FMMU 时，映射 SM1（输入邮箱）状态字节（SM_base + idx*8 + 5）到逻辑地址空间为 1 字节只读 FMMU；修复 `FmmuConfig::to_bytes` 中 MailboxState 方向字节从 0x00（无访问）改为 0x01（读访问）。commit: `bc08348` [ETG.1500 §5.6.4]
+
+### 延后项（审计确认，当前不阻塞）
+
+- [ ] **EoE Virtual Switch (#602)**：EoE 帧编解码已完成，但 L2 虚拟交换（帧路由/端口映射）需要完整的网络栈集成，为独立大特性。
+- [ ] **Master OD (#1301)**：主站对象字典为 should(A)/may(B)，当前未实现本地 0x1000–0x1FFF 对象字典，诊断信息通过 DiagnosticSurface 统一暴露。
+- [ ] **AoE (#901)**：ADS over EtherCAT 为 should，Beckhoff 特有协议，优先级低。
