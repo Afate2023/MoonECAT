@@ -2073,3 +2073,168 @@ test "sdo_abort_code_description unknown code" {
   let desc = @mailbox.sdo_abort_code_description(0xDEADBEEFU)
   assert_true(desc.contains("Unknown"))
 }
+
+///|
+test "FoeOpCode roundtrip byte conversion" {
+  let ops : Array[@mailbox.FoeOpCode] = [Read, Write, Data, Ack, Error, Busy]
+  for op in ops {
+    let b = op.to_byte()
+    let decoded = @mailbox.FoeOpCode::from_byte(b)
+    assert_eq(op, decoded)
+  }
+}
+
+///|
+test "FoeOpCode from_byte invalid raises error" {
+  let result = try? @mailbox.FoeOpCode::from_byte(b'\x00')
+  assert_true(result is Err(_))
+  let result2 = try? @mailbox.FoeOpCode::from_byte(b'\xFF')
+  assert_true(result2 is Err(_))
+}
+
+///|
+test "FoeErrorCode roundtrip" {
+  let codes : Array[@mailbox.FoeErrorCode] = [
+    NotDefined,
+    NotFound,
+    AccessDenied,
+    DiskFull,
+    Illegal,
+    PacketNumberWrong,
+    AlreadyExists,
+    NoUser,
+    BootstrapOnly,
+    NotInBootstrap,
+    NoRights,
+    ProgramError,
+    InvalidChecksum,
+    InvalidFirmware,
+    FlashError,
+  ]
+  for code in codes {
+    let u = code.to_uint()
+    let decoded = @mailbox.FoeErrorCode::from_uint(u)
+    assert_eq(code, decoded)
+  }
+}
+
+///|
+test "FoeErrorCode unknown code roundtrip" {
+  let code = @mailbox.FoeErrorCode::from_uint(0x1234U)
+  assert_true(code is Unknown(_))
+  assert_eq(code.to_uint(), 0x1234U)
+}
+
+///|
+test "encode_foe_read produces valid frame" {
+  let frame = @mailbox.encode_foe_read(b'\x01', 0x12345678U, "test.bin")
+  // 6 mailbox header + 6 FoE header + 8 filename = 20 bytes
+  assert_eq(frame.length(), 20)
+  // Mailbox header: length field (LE u16 at offset 0) = 14 (FoE header + filename)
+  assert_eq(frame[0], b'\x0E') // 14 low
+  assert_eq(frame[1], b'\x00') // 14 high
+  // Mailbox type byte at offset 5: bits [3:0] = 4 (FoE), bits [7:4] = counter
+  // counter=1 → (1 << 4) | 4 = 0x14
+  assert_eq(frame[5], b'\x14')
+  // FoE OpCode at offset 6: Read = 0x01
+  assert_eq(frame[6], b'\x01')
+  // Reserved at offset 7
+  assert_eq(frame[7], b'\x00')
+  // Password (LE u32) at offset 8-11: 0x12345678
+  assert_eq(frame[8], b'\x78')
+  assert_eq(frame[9], b'\x56')
+  assert_eq(frame[10], b'\x34')
+  assert_eq(frame[11], b'\x12')
+}
+
+///|
+test "encode_foe_write produces valid frame" {
+  let frame = @mailbox.encode_foe_write(b'\x02', 0U, "fw.bin")
+  // 6 + 6 + 6 = 18 bytes
+  assert_eq(frame.length(), 18)
+  // FoE OpCode at offset 6: Write = 0x02
+  assert_eq(frame[6], b'\x02')
+}
+
+///|
+test "encode_foe_data produces valid frame" {
+  let payload = Bytes::from_array([b'\xAA', b'\xBB', b'\xCC'])
+  let frame = @mailbox.encode_foe_data(b'\x03', 1U, payload)
+  // 6 + 6 + 3 = 15 bytes
+  assert_eq(frame.length(), 15)
+  // FoE OpCode at offset 6: Data = 0x03
+  assert_eq(frame[6], b'\x03')
+  // Packet number (LE u32) at offset 8-11: 1
+  assert_eq(frame[8], b'\x01')
+  assert_eq(frame[9], b'\x00')
+  // Payload starts at offset 12
+  assert_eq(frame[12], b'\xAA')
+  assert_eq(frame[13], b'\xBB')
+  assert_eq(frame[14], b'\xCC')
+}
+
+///|
+test "encode_foe_ack produces valid frame" {
+  let frame = @mailbox.encode_foe_ack(b'\x04', 5U)
+  // 6 + 6 = 12 bytes
+  assert_eq(frame.length(), 12)
+  // FoE OpCode at offset 6: Ack = 0x04
+  assert_eq(frame[6], b'\x04')
+  // Packet number at offset 8-11: 5
+  assert_eq(frame[8], b'\x05')
+  assert_eq(frame[9], b'\x00')
+}
+
+///|
+test "decode_foe_response Data frame" {
+  // Build a FoE Data response frame manually
+  let frame = @mailbox.encode_foe_data(
+    b'\x01',
+    42U,
+    Bytes::from_array([b'\xDE', b'\xAD']),
+  )
+  let (mbh, resp) = @mailbox.decode_foe_response(frame)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::FoE)
+  match resp {
+    @mailbox.FoeResponse::FoeData(packet_number=pn, data=d) => {
+      assert_eq(pn, 42U)
+      assert_eq(d.length(), 2)
+      assert_eq(d[0], b'\xDE')
+      assert_eq(d[1], b'\xAD')
+    }
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "decode_foe_response Ack frame" {
+  let frame = @mailbox.encode_foe_ack(b'\x02', 7U)
+  let (_mbh, resp) = @mailbox.decode_foe_response(frame)
+  match resp {
+    @mailbox.FoeResponse::FoeAck(packet_number=pn) => assert_eq(pn, 7U)
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "decode_foe_response too short frame" {
+  let short = Bytes::from_array([b'\x00', b'\x01', b'\x02'])
+  let result = try? @mailbox.decode_foe_response(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_foe_response wrong mailbox type" {
+  // Build a frame with CoE type instead of FoE
+  let buf = Bytes::makei(14, fn(i) {
+    match i {
+      0 => b'\x08' // length low = 8
+      1 => b'\x00' // length high
+      5 => b'\x13' // type=CoE(3), counter=1 → (1<<4)|3 = 0x13
+      6 => b'\x03' // FoE Data opcode (but type is CoE)
+      _ => b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_foe_response(buf)
+  assert_true(result is Err(_))
+}

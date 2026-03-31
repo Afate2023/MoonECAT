@@ -2901,3 +2901,94 @@ test "al_status_code_description unknown code" {
   let desc = @protocol.al_status_code_description(0xABCDU)
   assert_true(desc.contains("Unknown"))
 }
+
+///|
+test "foe_download function exists and rejects small mailbox" {
+  // MailboxConfig with out_size too small (< 12) should be rejected
+  let nic = @mock.MockNic::new()
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 10U, // too small for FoE (need at least 13)
+    out_sm_index: 0,
+    in_address: 0x1400U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.foe_download(
+    nic,
+    0x1001U,
+    mb_config,
+    rmsm,
+    "test.bin",
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "foe_upload function exists and rejects small mailbox" {
+  let nic = @mock.MockNic::new()
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1400U,
+    in_size: 8U, // too small
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.foe_upload(
+    nic, 0x1001U, mb_config, rmsm, "test.bin", 0U, timeout,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "foe_download_ap rejects small mailbox" {
+  let nic = @mock.MockNic::new()
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 11U,
+    out_sm_index: 0,
+    in_address: 0x1400U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.foe_download_ap(
+    nic,
+    0U,
+    mb_config,
+    rmsm,
+    "fw.bin",
+    0U,
+    Bytes::new(10),
+    timeout,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "foe_upload_ap rejects small mailbox" {
+  let nic = @mock.MockNic::new()
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1400U,
+    in_size: 6U,
+    in_sm_index: 1,
+  }
+  let rmsm = @mailbox.Rmsm::new()
+  let timeout = @hal.Duration(1000L)
+  let result = try? @protocol.foe_upload_ap(
+    nic, 0U, mb_config, rmsm, "fw.bin", 0U, timeout,
+  )
+  assert_true(result is Err(_))
+}

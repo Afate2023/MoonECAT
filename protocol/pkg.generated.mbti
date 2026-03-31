@@ -87,6 +87,14 @@ pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
 
 pub let fmmu_entry_size : Int
 
+pub fn[N : @hal.Nic] foe_download(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_download_ap(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_upload(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_upload_ap(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, @hal.Duration) -> Bytes raise @hal.EcError
+
 pub fn logical_address(UInt) -> UInt
 
 pub fn[N : @hal.Nic] mailbox_exchange(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, Bytes, @hal.Duration) -> Bytes raise @hal.EcError

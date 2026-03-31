@@ -38,6 +38,8 @@ pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
 
+pub fn decode_foe_response(Bytes) -> (MailboxHeader, FoeResponse) raise @hal.EcError
+
 pub fn decode_sdo_info_od_description_payload(Bytes) -> SdoInfoObjectDescription raise @hal.EcError
 
 pub fn decode_sdo_info_od_list_payload(Bytes) -> Array[UInt]
@@ -47,6 +49,14 @@ pub fn decode_sdo_info_oe_description_payload(Bytes) -> SdoInfoEntryDescription 
 pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError
 
 pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
+
+pub fn encode_foe_ack(Byte, UInt) -> Bytes
+
+pub fn encode_foe_data(Byte, UInt, Bytes) -> Bytes
+
+pub fn encode_foe_read(Byte, UInt, String) -> Bytes
+
+pub fn encode_foe_write(Byte, UInt, String) -> Bytes
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
@@ -117,6 +127,45 @@ pub(all) enum FmmuDirection {
   MailboxState
   DynamicOutputs
   DynamicInputs
+} derive(Eq, Show)
+
+pub(all) enum FoeErrorCode {
+  NotDefined
+  NotFound
+  AccessDenied
+  DiskFull
+  Illegal
+  PacketNumberWrong
+  AlreadyExists
+  NoUser
+  BootstrapOnly
+  NotInBootstrap
+  NoRights
+  ProgramError
+  InvalidChecksum
+  InvalidFirmware
+  FlashError
+  Unknown(UInt)
+} derive(Eq, Show)
+pub fn FoeErrorCode::from_uint(UInt) -> Self
+pub fn FoeErrorCode::to_uint(Self) -> UInt
+
+pub(all) enum FoeOpCode {
+  Read
+  Write
+  Data
+  Ack
+  Error
+  Busy
+} derive(Eq, Show)
+pub fn FoeOpCode::from_byte(Byte) -> Self raise @hal.EcError
+pub fn FoeOpCode::to_byte(Self) -> Byte
+
+pub(all) enum FoeResponse {
+  FoeData(packet_number~ : UInt, data~ : Bytes)
+  FoeAck(packet_number~ : UInt)
+  FoeError(code~ : FoeErrorCode, text~ : String)
+  FoeBusy
 } derive(Eq, Show)
 
 pub(all) struct MailboxConfig {
