@@ -7,6 +7,7 @@
         "ConvertFrom-Json": true,
         "Test-Path": true,
         "New-Item": true,
-        "Out-Null": true
+        "Out-Null": true,
+        "Set-Content": true
     }
 }

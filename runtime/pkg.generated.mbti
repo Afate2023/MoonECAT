@@ -26,6 +26,8 @@ pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> Configu
 
 pub fn compute_probe_result(UInt, Int64, Int64, Int64) -> ProbeResult
 
+pub fn compute_quality_score(Array[QualityDimension]) -> (Int, Array[(String, Int)])
+
 pub fn compute_sync_offsets(AutoTuneConfig, ProbeResult) -> SyncOffsetRecommendation
 
 pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
@@ -62,7 +64,11 @@ pub fn enrich_surface_with_monitors(DiagnosticSurface, Array[MonitorResult], Ver
 
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
+pub fn estimate_cable_length(Int64) -> Double
+
 pub fn fingerprint_match(TopologyFingerprint, TopologyFingerprint) -> TopologyFingerprintMatch
+
+pub fn grade_from_score(Int) -> LinkGrade
 
 pub fn hil_session_summary(HilSession) -> HilSessionSummary
 
@@ -105,6 +111,8 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) ->
 pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(N, UInt, UInt, @hal.Duration) -> MailboxSession raise @hal.EcError
 
 pub fn[N : @hal.Nic] prepare_slave_startup(N, UInt, UInt, Int, @hal.Duration) -> SlaveStartupPreparation raise @hal.EcError
+
+pub fn quality_grade_from_score(Int) -> QualityGrade
 
 pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
@@ -159,6 +167,8 @@ pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
 
 pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
+
+pub fn score_dimension(QualityDimension) -> Int
 
 pub fn slice_from_mapping(@protocol.PdoMapping, @protocol.ProcessImage) -> ProcessImageSlice?
 
@@ -248,6 +258,18 @@ pub(all) struct CoSimConfig {
   input_size : Int
 } derive(Eq, Show)
 
+pub struct CommQualityScorer {
+  history : Array[Int]
+  mut history_pos : Int
+  history_size : Int
+  mut prev_window_avg : Int
+  mut sample_count : Int64
+}
+pub fn CommQualityScorer::new(history_size? : Int) -> Self
+pub fn CommQualityScorer::record_score(Self, Int) -> Unit
+pub fn CommQualityScorer::score_from_telemetry(Self, Int64, Int64, Int64, Int64, jitter_p99_abs_ns? : Int64, nominal_period_ns? : Int64) -> QualityScore
+pub fn CommQualityScorer::trend(Self) -> QualityTrend
+
 pub(all) struct ConfigurationComparisonReport {
   expected_source : ConfigurationSource
   actual_source : ConfigurationSource
@@ -323,6 +345,56 @@ pub(all) enum CycleDirective {
   SkipCycle
   StopGraceful
 } derive(Eq, Show)
+
+pub struct CyclePerfAnalyzer {
+  nominal_period_ns : Int64
+  deadline_tolerance_ns : Int64
+  histogram : JitterHistogram
+  mut total_cycles : Int64
+  mut min_ns : Int64
+  mut max_ns : Int64
+  mut sum_ns : Int64
+  mut sum_sq_ns : Int64
+  mut deadline_misses : Int64
+  mut total_tx : Int64
+  mut total_rx : Int64
+  mut last_ts : Int64
+  mut started : Bool
+  window : Array[Int64]
+  mut window_pos : Int
+  window_size : Int
+  mut prev_window_mean : Int64
+}
+pub fn CyclePerfAnalyzer::new(Int64, deadline_tolerance_ns? : Int64, window_size? : Int, histogram_bin_width? : Int64, histogram_bins? : Int) -> Self
+pub fn CyclePerfAnalyzer::record(Self, Int64, tx_frames? : Int, rx_frames? : Int) -> Unit
+pub fn CyclePerfAnalyzer::record_duration(Self, Int64) -> Unit
+pub fn CyclePerfAnalyzer::reset(Self) -> Unit
+pub fn CyclePerfAnalyzer::stats(Self) -> CyclePerfStats
+pub fn CyclePerfAnalyzer::trend(Self) -> PerfTrend
+
+pub(all) struct CyclePerfSample {
+  cycle : Int64
+  duration_ns : Int64
+  deadline_miss : Bool
+  tx_frames : Int
+  rx_frames : Int
+}
+
+pub(all) struct CyclePerfStats {
+  total_cycles : Int64
+  min_ns : Int64
+  max_ns : Int64
+  mean_ns : Int64
+  stddev_ns : Int64
+  deadline_misses : Int64
+  deadline_miss_rate_permille : Int
+  total_tx : Int64
+  total_rx : Int64
+  p50_ns : Int64
+  p95_ns : Int64
+  p99_ns : Int64
+}
+pub fn CyclePerfStats::to_json(Self) -> String
 
 pub(all) struct CycleResult {
   wkc : UInt
@@ -668,6 +740,14 @@ pub struct JitterStats {
   peak_to_peak_ns : Int64
 }
 
+pub enum LinkGrade {
+  Excellent
+  Good
+  Fair
+  Poor
+  Critical
+} derive(Eq, Show)
+
 pub struct LoopbackCoSimAdapter {
   mut sim_time : SimTime
 }
@@ -742,6 +822,12 @@ pub struct PdoAutoTuner {
 pub fn PdoAutoTuner::analyze(Self, Array[UInt], Array[Array[ProbeResult]]) -> AutoTuneResult
 pub fn PdoAutoTuner::new(config? : AutoTuneConfig) -> Self
 
+pub enum PerfTrend {
+  Stable
+  Improving
+  Degrading
+} derive(Eq, Show)
+
 pub struct ProbeResult {
   station : UInt
   forward_delay_ns : Int64
@@ -756,6 +842,36 @@ pub(all) struct ProcessImageSlice {
   output_length : Int
   input_offset : Int
   input_length : Int
+} derive(Eq, Show)
+
+pub(all) struct QualityDimension {
+  name : String
+  value : Int64
+  good_threshold : Int64
+  bad_threshold : Int64
+  weight : Int
+}
+
+pub enum QualityGrade {
+  Excellent
+  Good
+  Acceptable
+  Poor
+  Critical
+} derive(Eq, Show)
+
+pub(all) struct QualityScore {
+  overall : Int
+  dimensions : Array[(String, Int)]
+  trend : QualityTrend
+  grade : QualityGrade
+}
+pub fn QualityScore::to_json(Self) -> String
+
+pub enum QualityTrend {
+  Improving
+  Stable
+  Degrading
 } derive(Eq, Show)
 
 pub(all) struct ReportEntry {
@@ -916,6 +1032,30 @@ pub(all) struct SlaveDiagnosis {
   diagnosis_counter : UInt?
 } derive(Eq, Show)
 
+pub(all) struct SlaveHealthAccumulator {
+  station : UInt
+  position : Int
+  propagation_delay_ns : Int64
+  mut tx_frames : Int64
+  mut rx_frames : Int64
+  mut timeouts : Int64
+  mut wkc_errors : Int64
+}
+
+pub(all) struct SlaveHealthSnapshot {
+  station : UInt
+  position : Int
+  propagation_delay_ns : Int64
+  estimated_cable_length_m : Double
+  tx_frames : Int64
+  rx_frames : Int64
+  timeouts : Int64
+  wkc_errors : Int64
+  loss_rate_permille : Int
+  health_score : Int
+  grade : LinkGrade
+}
+
 pub(all) struct SlaveReport {
   position : Int
   station_address : UInt
@@ -1023,6 +1163,29 @@ pub(all) enum TopologyFingerprintMatch {
   SlaveCountChanged(expected~ : Int, actual~ : Int)
   IdentityChanged
 } derive(Eq, Show)
+
+pub struct TopologyHealthAnalyzer {
+  slave_stats : Array[SlaveHealthAccumulator]
+  weight_loss : Int
+  weight_timeout : Int
+  weight_wkc : Int
+}
+pub fn TopologyHealthAnalyzer::add_slave(Self, UInt, Int, Int64) -> Unit
+pub fn TopologyHealthAnalyzer::analyze(Self) -> TopologyHealthReport
+pub fn TopologyHealthAnalyzer::ingest_telemetry(Self, Int, Int64, Int64, Int64, Int64) -> Unit
+pub fn TopologyHealthAnalyzer::new(weight_loss? : Int, weight_timeout? : Int, weight_wkc? : Int) -> Self
+pub fn TopologyHealthAnalyzer::record_cycle(Self, Int, Int64, Int64, Bool, Bool) -> Unit
+
+pub(all) struct TopologyHealthReport {
+  slaves : Array[SlaveHealthSnapshot]
+  bottleneck_index : Int?
+  system_health_score : Int
+  system_grade : LinkGrade
+  max_propagation_delay_ns : Int64
+  total_cable_length_m : Double
+  warnings : Array[String]
+}
+pub fn TopologyHealthReport::to_json(Self) -> String
 
 pub enum TuningStrategy {
   Conservative
