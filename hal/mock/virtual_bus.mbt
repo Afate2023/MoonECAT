@@ -159,13 +159,46 @@ fn VirtualBus::process_pdu(
         wkc = wkc + 3U
       }
     }
-    // Logical / NOP / Multi-write — minimal handling
+    // Logical addressing commands — routed through FMMU mappings
+    @protocol.EcCommand::LRD => {
+      let logical = addr
+      for slave in self.slaves {
+        let (did_read, _) = slave.process_logical(
+          logical, data_len, out_data, out_data, true, false,
+        )
+        if did_read {
+          wkc = wkc + 1U
+        }
+      }
+    }
+    @protocol.EcCommand::LWR => {
+      let logical = addr
+      for slave in self.slaves {
+        let (_, did_write) = slave.process_logical(
+          logical, data_len, out_data, out_data, false, true,
+        )
+        if did_write {
+          wkc = wkc + 1U
+        }
+      }
+    }
+    @protocol.EcCommand::LRW => {
+      let logical = addr
+      for slave in self.slaves {
+        let (did_read, did_write) = slave.process_logical(
+          logical, data_len, out_data, out_data, true, true,
+        )
+        if did_read && did_write {
+          wkc = wkc + 3U
+        } else if did_read {
+          wkc = wkc + 1U
+        } else if did_write {
+          wkc = wkc + 1U
+        }
+      }
+    }
     @protocol.EcCommand::NOP => ()
-    @protocol.EcCommand::LRD
-    | @protocol.EcCommand::LWR
-    | @protocol.EcCommand::LRW
-    | @protocol.EcCommand::ARMW
-    | @protocol.EcCommand::FRMW => ()
+    @protocol.EcCommand::ARMW | @protocol.EcCommand::FRMW => ()
   }
   let result_data = Bytes::makei(data_len, fn(i) { out_data[i] })
   { header: pdu.header, data: result_data, wkc }

@@ -57,6 +57,17 @@ pub(all) enum FaultType {
   WkcCorrupt(delta~ : Int)
 } derive(Show)
 
+pub(all) struct FmmuEntry {
+  logical_start : UInt
+  length : UInt
+  logical_start_bit : Int
+  logical_end_bit : Int
+  physical_start : UInt
+  physical_start_bit : Int
+  direction : Int
+  activate : Bool
+} derive(Show)
+
 pub struct MockClock {
   mut current_ns : Int64
 }
@@ -137,9 +148,15 @@ pub struct VirtualSlave {
   sii_eeprom : Bytes
   mut al_state : Byte
   mut station_address : UInt
+  process_data : FixedArray[Byte]
 } derive(Show)
+pub fn VirtualSlave::active_fmmus(Self) -> Array[FmmuEntry]
+pub fn VirtualSlave::get_fmmu(Self, Int) -> FmmuEntry
 pub fn VirtualSlave::new(Int, @hal.SlaveIdentity, Bytes) -> Self
+pub fn VirtualSlave::process_logical(Self, UInt, Int, FixedArray[Byte], FixedArray[Byte], Bool, Bool) -> (Bool, Bool)
+pub fn VirtualSlave::read_process_data(Self, Int, Int) -> Bytes
 pub fn VirtualSlave::read_reg(Self, Int, Int) -> Bytes
+pub fn VirtualSlave::write_process_data(Self, Int, FixedArray[Byte], Int, Int) -> Unit
 pub fn VirtualSlave::write_reg(Self, Int, Bytes) -> Unit
 
 // Type aliases
