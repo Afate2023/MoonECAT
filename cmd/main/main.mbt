@@ -316,6 +316,7 @@ fn run_native_command_with_fresh_nic(
           expected_wkc: 0U,
           dc_cycle_period_ns: None,
           startup_mailbox_plans: [],
+          esm_timeout_policies: [],
         }
       }
   }

@@ -994,6 +994,7 @@ test "runtime startup transition recovers SafeOp configuration error to init" {
     0x1001U,
     @protocol.EsmState::Init,
     timeout,
+    @protocol.default_esm_timeout_policy(),
   )
   assert_true(ok)
   assert_eq(nic.control_writes.length(), 2)
@@ -1017,6 +1018,7 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
     0x1001U,
     @protocol.PreOp,
     timeout,
+    @protocol.default_esm_timeout_policy(),
   )
   assert_true(ok)
   assert_eq(nic.control_writes.length(), 3)
@@ -1578,4 +1580,37 @@ test "SmWatchdogValidation inactive when pdata_status false" {
   }
   assert_eq(v.watchdog_active, false)
   assert_eq(v.config.pdata_status, false)
+}
+
+///|
+test "lookup_esm_timeout_policy returns matching policy" {
+  let policy : @protocol.EsmTimeoutPolicy = {
+    init: Some(@hal.Duration(1_000_000_000L)),
+    preop: Some(@hal.Duration(2_000_000_000L)),
+    safeop: None,
+    op: Some(@hal.Duration(5_000_000_000L)),
+    boot: None,
+  }
+  let policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = [(0x1001U, policy)]
+  let found = lookup_esm_timeout_policy(policies, 0x1001U)
+  assert_eq(found, policy)
+}
+
+///|
+test "lookup_esm_timeout_policy returns default when not found" {
+  let policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = []
+  let found = lookup_esm_timeout_policy(policies, 0x1001U)
+  assert_eq(found, @protocol.default_esm_timeout_policy())
+}
+
+///|
+test "RunStartupPreparation includes esm_timeout_policies field" {
+  let prep : RunStartupPreparation = {
+    pdo_ctx: @protocol.PdoContext::build([], 0U),
+    expected_wkc: 0U,
+    dc_cycle_period_ns: None,
+    startup_mailbox_plans: [],
+    esm_timeout_policies: [(0x1001U, @protocol.default_esm_timeout_policy())],
+  }
+  assert_eq(prep.esm_timeout_policies.length(), 1)
 }

@@ -79,6 +79,8 @@ pub fn esm_default_timeout(EsmState) -> @hal.Duration
 
 pub fn esm_timeout_for(EsmState, EsmTimeoutPolicy) -> @hal.Duration
 
+pub fn esm_timeout_policy_from_sii_timeouts(@mailbox.SiiTimeouts?) -> EsmTimeoutPolicy
+
 pub let ethernet_header_len : Int
 
 pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
@@ -276,6 +278,8 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(N, UInt, Array[EsmSt
 pub fn[N : @hal.Nic] transition_to_target_strict(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
 pub fn[N : @hal.Nic] transition_to_target_strict_ap(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(N, UInt, EsmState, EsmTimeoutPolicy, @hal.Duration) -> EsmState raise @hal.EcError
 
 pub let wkc_len : Int
 

@@ -2622,6 +2622,54 @@ test "read_sm_watchdog_config via mock returns zeroed defaults" {
 }
 
 ///|
+test "esm_timeout_policy_from_sii_timeouts returns defaults when None" {
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(None)
+  assert_eq(policy, @protocol.default_esm_timeout_policy())
+  assert_eq(policy.init, None)
+  assert_eq(policy.preop, None)
+  assert_eq(policy.safeop, None)
+  assert_eq(policy.op, None)
+  assert_eq(policy.boot, None)
+}
+
+///|
+test "esm_timeout_policy_from_sii_timeouts maps SII fields correctly" {
+  let timeouts : @mailbox.SiiTimeouts = {
+    preop_timeout_ms: 2000U,
+    safeop_op_timeout_ms: 5000U,
+    back_to_init_timeout_ms: 1000U,
+    back_to_safeop_timeout_ms: 3000U,
+    mailbox_request_timeout_ms: 100U,
+    mailbox_response_timeout_ms: 200U,
+  }
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
+  // preop_timeout_ms → preop
+  assert_eq(policy.preop, Some(@hal.Duration(2_000_000_000L)))
+  // safeop_op_timeout_ms → op
+  assert_eq(policy.op, Some(@hal.Duration(5_000_000_000L)))
+  // back_to_init_timeout_ms → init
+  assert_eq(policy.init, Some(@hal.Duration(1_000_000_000L)))
+  // back_to_safeop_timeout_ms → safeop
+  assert_eq(policy.safeop, Some(@hal.Duration(3_000_000_000L)))
+  // boot is always None
+  assert_eq(policy.boot, None)
+}
+
+///|
+test "esm_timeout_policy_from_sii_timeouts zero fields remain None" {
+  let timeouts : @mailbox.SiiTimeouts = {
+    preop_timeout_ms: 0U,
+    safeop_op_timeout_ms: 0U,
+    back_to_init_timeout_ms: 0U,
+    back_to_safeop_timeout_ms: 0U,
+    mailbox_request_timeout_ms: 0U,
+    mailbox_response_timeout_ms: 0U,
+  }
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
+  assert_eq(policy, @protocol.default_esm_timeout_policy())
+}
+
+///|
 test "dc_read_sync_window via mock returns zero" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)

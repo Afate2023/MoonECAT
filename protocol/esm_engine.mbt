@@ -727,6 +727,63 @@ pub fn[N : @hal.Nic] transition_to_target_strict_ap(
 }
 
 ///|
+/// Build an EsmTimeoutPolicy from SII-parsed timeouts (ETG.2010 category 41).
+///
+/// Mapping:
+/// - preop_timeout_ms         → preop (transition TO PreOp)
+/// - safeop_op_timeout_ms     → op   (SafeOp→Op transition)
+/// - back_to_init_timeout_ms  → init (transition TO Init)
+/// - back_to_safeop_timeout_ms → safeop (transition TO SafeOp)
+/// - boot                     → None (not specified by SII)
+///
+/// Returns a default (all-None) policy when timeouts are absent.
+pub fn esm_timeout_policy_from_sii_timeouts(
+  timeouts : @mailbox.SiiTimeouts?,
+) -> EsmTimeoutPolicy {
+  match timeouts {
+    None => default_esm_timeout_policy()
+    Some(t) => {
+      let ms_to_duration = fn(ms : UInt) -> @hal.Duration? {
+        if ms == 0U {
+          None
+        } else {
+          Some(@hal.Duration(ms.reinterpret_as_int().to_int64() * 1_000_000L))
+        }
+      }
+      {
+        init: ms_to_duration(t.back_to_init_timeout_ms),
+        preop: ms_to_duration(t.preop_timeout_ms),
+        safeop: ms_to_duration(t.back_to_safeop_timeout_ms),
+        op: ms_to_duration(t.safeop_op_timeout_ms),
+        boot: None,
+      }
+    }
+  }
+}
+
+///|
+/// Strict transitions via multi-step route with per-target timeout policy.
+///
+/// Same as `transition_to_target_strict` but resolves per-step timeouts from
+/// the supplied policy, allowing SII/ESI-derived timeout overrides.
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  policy : EsmTimeoutPolicy,
+  fallback_timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, fallback_timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through_with_timeout_policy(nic, station, path, policy)
+}
+
+///|
 /// Read the current ESM state from a slave.
 pub fn[N : @hal.Nic] read_al_status(
   nic : N,

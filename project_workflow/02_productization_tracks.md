@@ -107,3 +107,30 @@
 - [x] **PreferNotLRW SII 标志**：`PdoContext` 增加 `block_lrw` 字段，`pdo_exchange_result` 自动分派 LRD+LWR 或 LRW；runtime 三条启动路径均从 SII General flags 推导设置。WKC 按 SOEM 惯例对 LWR 做 ×2 归一化。→ `0021a62`
 - [x] **Emergency 主动轮询**：Runtime 增加 `emergency_stations` 字段和 `configure_emergency_stations()`、`poll_emergencies()` 方法；PDO 交换后逐站轮询 SM Input 状态，解码 CoE Emergency 帧并计入 `Telemetry.emergency_events`；`run()` 从 startup mailbox plans 自动配置轮询目标；CLI JSON 三处输出均含 `emergency_events`。→ `d0fa1c7`
 - [x] **SM Watchdog 验证**：新增 5 个 Watchdog ESC 寄存器常量（0x0400-0x0442）、`SmWatchdogConfig` 结构体及 `read_sm_watchdog_config()` 读取函数；`ValidateSmWatchdog` 步骤插入 SafeOp→Op 启动序列（WarmupProcessData 之后、TransitionToOp 之前），逐站读取看门狗配置作诊断快照，不阻塞状态转换（ESC 自身通过 AL Status Code 0x001B 强制执行看门狗故障）。→ `b77ae87`
+
+## 0.9 协议精细化缺口第二轮（2026-03-31 审计）
+
+> 来源：对照 ETG.1000.4/5/6、ETG.1500 Table 1、EtherCAT Compendium 与代码现状交叉验证。以下缺口按实机可用性影响排序。
+
+### 已就绪机制未接线
+
+- [ ] **SII Timeout → ESM Runtime 接线**：SII Timeouts 类别（type 41/0x29）已完整解析为 `SiiTimeouts`（preop/safeop_op/back_to_init/back_to_safeop 四个超时字段），`EsmTimeoutPolicy` 与 `transition_through_with_timeout_policy` 机制已就绪，但 runtime 全部使用固定超时版本 `transition_through`。需要在 `run()` 启动阶段将 SII 解析出的超时填入 `EsmTimeoutPolicy` 并切换到 `transition_through_with_timeout_policy`。[ETG.1500 #104 shall]
+
+### DLL 诊断层
+
+- [ ] **DL/Ph Error Counters 寄存器读取**：ESC 0x0300-0x030D（RX Error Counter×4 端口、Forwarded RX Error Counter×4、ECAT Processing Unit Error Counter、PDI Error Counter、Lost Link Counter×4）完全未定义。需新增寄存器常量和 `read_dl_error_counters()` 函数，返回 `DlErrorCounters` 结构体。Runtime diagnosis 应在 `read_slave_diagnosis` 中接入。[ETG.1000.4 §6.4, EtherCAT Compendium §3.3]
+
+### 协议层缺失
+
+- [ ] **FoE 基础协议**：MailboxType 已声明 FoE，SII 已解析 `foe_supported` 标志，但无 FoE Read/Write/Data/Ack/Error/Busy 帧编解码和事务函数。至少需实现 FoE Download（固件写入）+ Upload（固件读取）的基础帧构造与响应解析。[ETG.1500 #701 Class A shall, Class B shall if FoE support; ETG.1000.6 §5.8]
+
+### DC 同步扩展
+
+- [ ] **SYNC1 独立配置**：`dc_configure_sync0` 仅写入 activation byte 0x03（SYNC0 cyclic + enable），SII 已解析 `sync1_cycle_factor`，`reg_dc_cycle1` 寄存器常量已定义，但无 `dc_configure_sync1` 函数。需要支持 activation bit 2（0x07 = SYNC0+SYNC1）并写入 `reg_dc_cycle1`。[EtherCAT Compendium §5.5]
+
+### 低优先级（may/should，不阻塞 Class B）
+
+- [ ] **EEPROM 数据写入**：当前仅有 EEPROM 所有权切换（`eeprom_write_config`），无 word 级数据写入函数。[ETG.1500 #305 Write may]
+- [ ] **Mailbox Status Bit FMMU 映射轮询**：当前通过直接寄存器读取检查 SM status bit，未实现 FMMU 映射到 cyclic PDO 的优化路径。[ETG.1500 #404 细节]
+- [ ] **帧重复发送**：SII `frame_repeat_support` 标志已解析和 CLI 输出，但 runtime 不根据此标志重复发送周期帧。[ETG.1500 #203 may]
+- [ ] **Slave-to-Slave 通信**：完全未实现，ENI 复制映射配置与 runtime 数据搬运均缺失。[ETG.1500 §5.14]
