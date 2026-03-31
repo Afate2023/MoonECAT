@@ -16,11 +16,17 @@ pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.Mai
 
 pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn average_probe(Array[ProbeResult]) -> ProbeResult
+
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
 pub fn build_task_schedule(Int64, Array[TaskDescriptor]) -> TaskSchedule?
 
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
+
+pub fn compute_probe_result(UInt, Int64, Int64, Int64) -> ProbeResult
+
+pub fn compute_sync_offsets(AutoTuneConfig, ProbeResult) -> SyncOffsetRecommendation
 
 pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
 
@@ -172,6 +178,8 @@ pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> Validat
 
 pub fn validate_multi_rate(TaskSchedule, max_hyperperiod? : Int, max_tasks_per_cycle? : Int, max_io_bytes_per_cycle? : Int) -> Array[String]
 
+pub fn validate_recommendations(AutoTuneResult, Int64) -> Array[String]
+
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
 pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
@@ -189,6 +197,30 @@ pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> 
 // Errors
 
 // Types and methods
+pub struct AutoTuneConfig {
+  probe_iterations : Int
+  probe_timeout_ns : Int64
+  strategy : TuningStrategy
+  cycle_time_ns : Int64
+  sync0_base_offset_ns : Int64
+  sync1_enabled : Bool
+  sync1_delta_ns : Int64
+  safety_margin_permille : Int
+}
+pub fn AutoTuneConfig::aggressive() -> Self
+pub fn AutoTuneConfig::conservative() -> Self
+pub fn AutoTuneConfig::default() -> Self
+
+pub struct AutoTuneResult {
+  recommendations : Array[SyncOffsetRecommendation]
+  probe_data : Array[ProbeResult]
+  reference_station : UInt
+  measurement_duration_ns : Int64
+  success : Bool
+  messages : Array[String]
+}
+pub fn AutoTuneResult::to_json(Self) -> String
+
 pub(all) enum BridgeState {
   Disconnected
   Connected
@@ -311,6 +343,26 @@ pub(all) struct CycleTimingReport {
   jitter_ns : Int64
   domain : ClockDomain
 } derive(Eq, Show)
+
+pub struct DcJitterProfiler {
+  nominal_period_ns : Int64
+  histogram : JitterHistogram
+  recent_samples : Array[JitterSample]
+  mut write_pos : Int
+  mut count : Int64
+  mut min_dev : Int64
+  mut max_dev : Int64
+  mut sum_dev : Int64
+  mut sum_sq_dev : Int64
+  mut last_timestamp_ns : Int64
+  mut started : Bool
+}
+pub fn DcJitterProfiler::is_within_tolerance(Self, Int64, Int64) -> Bool
+pub fn DcJitterProfiler::new(Int64, bin_width? : Int64, num_bins? : Int, recent_capacity? : Int) -> Self
+pub fn DcJitterProfiler::record_timestamp(Self, Int64) -> Unit
+pub fn DcJitterProfiler::reset(Self) -> Unit
+pub fn DcJitterProfiler::stats(Self) -> JitterStats
+pub fn DcJitterProfiler::to_json(Self) -> String
 
 pub(all) enum DcState {
   Disabled
@@ -585,6 +637,37 @@ pub(all) struct HilSessionSummary {
   final_sim_time_ns : Int64
 } derive(Show)
 
+pub struct JitterHistogram {
+  bin_width : Int64
+  center_index : Int
+  counts : Array[Int64]
+  mut total : Int64
+  range_min_ns : Int64
+  range_max_ns : Int64
+}
+pub fn JitterHistogram::new(bin_width? : Int64, num_bins? : Int) -> Self
+pub fn JitterHistogram::percentile(Self, Int) -> Int64
+pub fn JitterHistogram::record(Self, Int64) -> Unit
+
+pub struct JitterSample {
+  cycle : Int64
+  actual_ns : Int64
+  deviation_ns : Int64
+}
+
+pub struct JitterStats {
+  count : Int64
+  min_ns : Int64
+  max_ns : Int64
+  sum_ns : Int64
+  sum_sq_ns : Int64
+  mean_ns : Int64
+  p50_ns : Int64
+  p95_ns : Int64
+  p99_ns : Int64
+  peak_to_peak_ns : Int64
+}
+
 pub struct LoopbackCoSimAdapter {
   mut sim_time : SimTime
 }
@@ -615,6 +698,14 @@ pub(all) struct MonitorResult {
   verdict : Verdict
 } derive(Eq, Show)
 
+pub struct MultiChannelJitterProfiler {
+  channels : Array[(String, DcJitterProfiler)]
+}
+pub fn MultiChannelJitterProfiler::add_channel(Self, String, Int64, bin_width? : Int64) -> Unit
+pub fn MultiChannelJitterProfiler::new() -> Self
+pub fn MultiChannelJitterProfiler::record(Self, Int, Int64) -> Unit
+pub fn MultiChannelJitterProfiler::summary_json(Self) -> String
+
 pub(all) struct MultiRateAnalysis {
   hyperperiod : Int
   worst_case_tasks_per_cycle : Int
@@ -642,6 +733,23 @@ pub(all) struct ObservedSlaveAddress {
 } derive(Eq, Show)
 
 type OperationalStartupStep derive(Eq, Show)
+
+pub struct PdoAutoTuner {
+  config : AutoTuneConfig
+  probe_history : Array[Array[ProbeResult]]
+  mut result : AutoTuneResult?
+}
+pub fn PdoAutoTuner::analyze(Self, Array[UInt], Array[Array[ProbeResult]]) -> AutoTuneResult
+pub fn PdoAutoTuner::new(config? : AutoTuneConfig) -> Self
+
+pub struct ProbeResult {
+  station : UInt
+  forward_delay_ns : Int64
+  reverse_delay_ns : Int64
+  round_trip_ns : Int64
+  recv_time_port0 : Int64
+  recv_time_port1 : Int64
+}
 
 pub(all) struct ProcessImageSlice {
   output_offset : Int
@@ -859,6 +967,14 @@ pub(all) struct StationStartupMailboxPlan {
   commands : Array[StartupMailboxCommand]
 } derive(Eq, Show)
 
+pub struct SyncOffsetRecommendation {
+  station : UInt
+  sync0_offset_ns : Int64
+  sync1_offset_ns : Int64
+  sync0_cycle_ns : Int64
+  propagation_delay_ns : Int64
+}
+
 pub(all) struct TaskDescriptor {
   name : String
   priority : Int
@@ -907,6 +1023,12 @@ pub(all) enum TopologyFingerprintMatch {
   SlaveCountChanged(expected~ : Int, actual~ : Int)
   IdentityChanged
 } derive(Eq, Show)
+
+pub enum TuningStrategy {
+  Conservative
+  Balanced
+  Aggressive
+}
 
 pub(all) enum ValidateDifferenceCategory {
   Topology
