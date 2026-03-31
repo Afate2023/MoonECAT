@@ -131,6 +131,15 @@
 ### 低优先级（may/should，不阻塞 Class B）
 
 - [x] **EEPROM 数据写入**：已实现 `eeprom_write_word` (FP) / `eeprom_write_word_ap` (AP) word 级 16-bit 写入。写入流程遵循 SOEM 参考：① 获取 Master 所有权 → ② 写 16-bit 数据到 `reg_sii_data`(0x0508) → ③ 发送写命令 `0x0201` + 地址到 `reg_sii_control`(0x0502) → ④ 等待 busy 清除 → ⑤ 恢复 PDI 所有权。含 NACK 重试（≤3 次）和错误清除。commit: `c0f4f6a` [ETG.1500 #305 Write may]
-- [ ] **Mailbox Status Bit FMMU 映射轮询**：当前通过直接寄存器读取检查 SM status bit，未实现 FMMU 映射到 cyclic PDO 的优化路径。[ETG.1500 #404 细节]
-- [ ] **帧重复发送**：SII `frame_repeat_support` 标志已解析和 CLI 输出，但 runtime 不根据此标志重复发送周期帧。[ETG.1500 #203 may]
-- [ ] **Slave-to-Slave 通信**：完全未实现，ENI 复制映射配置与 runtime 数据搬运均缺失。[ETG.1500 §5.14]
+- [x] **Watchdog 写入配置**：新增 `write_sm_watchdog_config(nic, station, divider, pdi_time, pdata_time, timeout)` 写入 3 个看门狗寄存器（0x0400 divider、0x0410 PDI、0x0420 PData），补全 §0.8 中仅有只读 `read_sm_watchdog_config` 的缺口。commit: `d7004dd` [ETG.1000.4 §6.3 shall basic]
+- [x] **Station Alias 写入**：新增 `write_station_alias(nic, station, alias, timeout)` 写入 2 字节到 `reg_station_alias`(0x0012)，补全仅有 `read_station_alias` 的缺口。commit: `d7004dd` [ETG.1000.4 §5 may]
+- [x] **EoE 基础协议**：EoE 帧编解码层 (`mailbox/eoe.mbt`) 已完成。支持 `EoeFrameType` 枚举（FragData..GetAddrFilterResp）、`EoeResult` 枚举（Success/UnspecifiedError/UnsupportedFrameType/NoIpSupport/NoDhcpSupport/NoFilterSupport）、`encode_eoe_fragment`/`encode_eoe_set_ip_req`/`encode_eoe_get_ip_req` 编码函数、`decode_eoe_response` → `EoeResponse`（Fragment | IpResponse）解码。commit: `d7004dd` [ETG.1000.6 §5.7; ETG.1500 shall if EoE slaves]
+- [x] **SoE 基础协议**：SoE 帧编解码层 (`mailbox/soe.mbt`) 已完成。支持 `SoeOpCode` 枚举（ReadReq..Emergency）、`SoeElementFlag` 枚举（DataState..Default）及 `soe_element_flags` 组合、`encode_soe_read_req`/`encode_soe_write_req` 编码函数、`decode_soe_response` → `SoeResponse`（ReadData | WriteAck | Error | Notification）。commit: `d7004dd` [ETG.1000.6 §5.6; ETG.1500 should if SoE slaves]
+
+### 延后设计决策（may/optimization，无参考实现支持或非运行时关键）
+
+- [ ] **Mailbox Status Bit FMMU 映射轮询**：当前通过直接寄存器读取检查 SM status bit，功能等价完整；FMMU 映射到 cyclic PDO 的优化路径 SOEM/ethercrab 均不实现。延后理由：optimization only, functionally complete。[ETG.1500 #404 细节]
+- [ ] **帧重复发送**：SII `frame_repeat_support` 标志已解析和 CLI 输出，但 runtime 不根据此标志重复发送周期帧。传输层已有重试机制（transport retry）。延后理由：SOEM/ethercrab 均不基于 SII 标志做帧重复。[ETG.1500 #203 may]
+- [ ] **Slave-to-Slave 通信**：完全未实现，ENI 复制映射配置与 runtime 数据搬运均缺失。延后理由：无参考实现支持（SOEM 无、ethercrab 无），属 Safety Master 范畴。[ETG.1500 §5.14]
+- [ ] **VoE (Vendor-specific over EtherCAT)**：仅有 `MailboxType::VoE`(0x0F) 类型定义，无帧编解码和事务。延后理由：厂商专属协议，需具体设备样本才能验证，on-demand。[ETG.1000.6 §5.9 may]
+- [ ] **DC LATCH0/LATCH1 输入事件捕获**：未实现外部 LATCH 信号寄存器读写（0x09AE-0x09B7）。延后理由：仅服务外部传感器时间戳采集用例，当前无实机目标。[EtherCAT Compendium §5.5 may]
