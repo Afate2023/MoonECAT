@@ -2560,6 +2560,68 @@ test "dc_read_receive_time via mock returns zero" {
 }
 
 ///|
+test "watchdog register constants match ETG1000.4 addresses" {
+  assert_eq(@protocol.reg_watchdog_divider, 0x0400U)
+  assert_eq(@protocol.reg_watchdog_time_pdi, 0x0410U)
+  assert_eq(@protocol.reg_watchdog_time_pdata, 0x0420U)
+  assert_eq(@protocol.reg_watchdog_status_pdata, 0x0440U)
+  assert_eq(@protocol.reg_watchdog_counter_pdata, 0x0442U)
+}
+
+///|
+test "SmWatchdogConfig struct equality and derive Show" {
+  let a : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 5U,
+  }
+  let b : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 5U,
+  }
+  assert_eq(a, b)
+  // Show derive produces non-empty string
+  assert_true(a.to_string().length() > 0)
+}
+
+///|
+test "SmWatchdogConfig inequality on different pdata_time" {
+  let a : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 0U,
+  }
+  let b : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0U,
+    pdata_status: true,
+    pdata_counter: 0U,
+  }
+  assert_true(a != b)
+}
+
+///|
+test "read_sm_watchdog_config via mock returns zeroed defaults" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let config = @protocol.read_sm_watchdog_config(nic, 0x1001U, timeout)
+  // MockNic loopback echoes frame with zero-filled data area for FPRD
+  assert_eq(config.divider, 0U)
+  assert_eq(config.pdi_time, 0U)
+  assert_eq(config.pdata_time, 0U)
+  assert_eq(config.pdata_status, false)
+  assert_eq(config.pdata_counter, 0U)
+}
+
+///|
 test "dc_read_sync_window via mock returns zero" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)

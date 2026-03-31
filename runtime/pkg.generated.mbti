@@ -564,6 +564,12 @@ pub(all) struct SlaveStartupPreparation {
   sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
 
+pub(all) struct SmWatchdogValidation {
+  station : UInt
+  config : @protocol.SmWatchdogConfig
+  watchdog_active : Bool
+} derive(Eq, Show)
+
 pub(all) enum StartupCommandTransition {
   PreOpToSafeOp
   SafeOpToOp

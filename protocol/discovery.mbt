@@ -65,6 +65,26 @@ pub let reg_fmmu_base : UInt = 0x0600U
 pub let fmmu_entry_size : Int = 16
 
 ///|
+/// Watchdog Divider register (ESC clock divider for both PDI and SM watchdogs).
+pub let reg_watchdog_divider : UInt = 0x0400U
+
+///|
+/// PDI Watchdog Time register (master-to-PDI communication timeout).
+pub let reg_watchdog_time_pdi : UInt = 0x0410U
+
+///|
+/// SM (Process Data) Watchdog Time register (process data arrival timeout).
+pub let reg_watchdog_time_pdata : UInt = 0x0420U
+
+///|
+/// SM Watchdog Status register (bit 0: 0=expired, 1=active/reloaded).
+pub let reg_watchdog_status_pdata : UInt = 0x0440U
+
+///|
+/// SM Watchdog Counter register (increments on each watchdog event).
+pub let reg_watchdog_counter_pdata : UInt = 0x0442U
+
+///|
 /// Sync Manager base register (SM0 starts at 0x0800, each SM is 8 bytes).
 pub let reg_sm_base : UInt = 0x0800U
 

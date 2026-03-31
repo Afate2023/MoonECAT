@@ -96,3 +96,66 @@ pub fn[N : @hal.Nic] apply_op_only_policy(
     set_sm_enable(nic, station, output_sm_indices[i], enable, timeout)
   }
 }
+
+///|
+/// SM Watchdog configuration snapshot read from ESC registers.
+pub(all) struct SmWatchdogConfig {
+  /// Watchdog divider value (register 0x0400). Default 0x09C2 = 100µs base.
+  divider : UInt
+  /// PDI watchdog time (register 0x0410). In watchdog base-time multiples.
+  pdi_time : UInt
+  /// Process Data watchdog time (register 0x0420). In watchdog base-time multiples.
+  pdata_time : UInt
+  /// Process Data watchdog status (register 0x0440). Bit 0: 0=expired, 1=active.
+  pdata_status : Bool
+  /// Process Data watchdog counter (register 0x0442). Increments on each event.
+  pdata_counter : UInt
+} derive(Eq, Show)
+
+///|
+/// Read SM Watchdog configuration from ESC registers.
+pub fn[N : @hal.Nic] read_sm_watchdog_config(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> SmWatchdogConfig raise @hal.EcError {
+  let div_pdu = read_register_fp(nic, station, reg_watchdog_divider, 2, timeout)
+  let divider = if div_pdu.data.length() >= 2 {
+    div_pdu.data[0].to_uint() | (div_pdu.data[1].to_uint() << 8)
+  } else {
+    0U
+  }
+  let pdi_pdu = read_register_fp(
+    nic, station, reg_watchdog_time_pdi, 2, timeout,
+  )
+  let pdi_time = if pdi_pdu.data.length() >= 2 {
+    pdi_pdu.data[0].to_uint() | (pdi_pdu.data[1].to_uint() << 8)
+  } else {
+    0U
+  }
+  let pd_pdu = read_register_fp(
+    nic, station, reg_watchdog_time_pdata, 2, timeout,
+  )
+  let pdata_time = if pd_pdu.data.length() >= 2 {
+    pd_pdu.data[0].to_uint() | (pd_pdu.data[1].to_uint() << 8)
+  } else {
+    0U
+  }
+  let status_pdu = read_register_fp(
+    nic, station, reg_watchdog_status_pdata, 2, timeout,
+  )
+  let pdata_status = if status_pdu.data.length() >= 1 {
+    (status_pdu.data[0] & b'\x01') != b'\x00'
+  } else {
+    false
+  }
+  let counter_pdu = read_register_fp(
+    nic, station, reg_watchdog_counter_pdata, 1, timeout,
+  )
+  let pdata_counter = if counter_pdu.data.length() >= 1 {
+    counter_pdu.data[0].to_uint()
+  } else {
+    0U
+  }
+  { divider, pdi_time, pdata_time, pdata_status, pdata_counter }
+}

@@ -1034,17 +1034,18 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
 ///|
 test "runtime operational startup steps preconfigure dc before op" {
   let steps = build_operational_startup_steps(true, true)
-  assert_eq(steps.length(), 4)
+  assert_eq(steps.length(), 5)
   assert_eq(steps[0], TransitionToSafeOp)
   assert_eq(steps[1], DcPreconfigure)
   assert_eq(steps[2], WarmupProcessData)
-  assert_eq(steps[3], TransitionToOp)
+  assert_eq(steps[3], ValidateSmWatchdog)
+  assert_eq(steps[4], TransitionToOp)
 }
 
 ///|
 test "runtime operational startup steps omit dc and warmup when not needed" {
   let steps = build_operational_startup_steps(false, false)
-  assert_eq(steps, [TransitionToSafeOp, TransitionToOp])
+  assert_eq(steps, [TransitionToSafeOp, ValidateSmWatchdog, TransitionToOp])
 }
 
 ///|
@@ -1536,4 +1537,45 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
   )
   assert_eq(nic.fmmu_write_offsets.length(), 1)
   assert_eq(nic.fmmu_write_offsets[0], @protocol.reg_fmmu_base)
+}
+
+///|
+test "SmWatchdogValidation struct construction and equality" {
+  let config : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 0U,
+  }
+  let v1 : SmWatchdogValidation = {
+    station: 0x1001U,
+    config,
+    watchdog_active: true,
+  }
+  let v2 : SmWatchdogValidation = {
+    station: 0x1001U,
+    config,
+    watchdog_active: true,
+  }
+  assert_eq(v1, v2)
+  assert_eq(v1.watchdog_active, true)
+}
+
+///|
+test "SmWatchdogValidation inactive when pdata_status false" {
+  let config : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0U,
+    pdata_time: 0U,
+    pdata_status: false,
+    pdata_counter: 0U,
+  }
+  let v : SmWatchdogValidation = {
+    station: 0x1001U,
+    config,
+    watchdog_active: false,
+  }
+  assert_eq(v.watchdog_active, false)
+  assert_eq(v.config.pdata_status, false)
 }

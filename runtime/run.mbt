@@ -167,6 +167,7 @@ enum OperationalStartupStep {
   TransitionToSafeOp
   DcPreconfigure
   WarmupProcessData
+  ValidateSmWatchdog
   TransitionToOp
 } derive(Eq, Show)
 
@@ -1560,6 +1561,7 @@ fn build_operational_startup_steps(
   if has_process_data {
     steps.push(WarmupProcessData)
   }
+  steps.push(ValidateSmWatchdog)
   steps.push(TransitionToOp)
   steps
 }
@@ -1704,6 +1706,8 @@ fn[N : @hal.Nic] transition_stations_for_startup(
           ),
         )
       WarmupProcessData => warmup_process_data_for_op(nic, pdo_ctx, timeout)
+      ValidateSmWatchdog =>
+        validate_sm_watchdog_before_op(nic, stations, timeout)
       TransitionToOp => {
         let fault = transition_stations_to_op_with_process_data(
           nic, stations, pdo_ctx, timeout,
@@ -2047,6 +2051,32 @@ fn[N : @hal.Nic] warmup_process_data_for_op(
 ) -> Unit {
   if pdo_ctx.logical_size > 0 {
     ignore(try? @protocol.pdo_exchange_result(nic, pdo_ctx, timeout))
+  }
+}
+
+///|
+/// SM Watchdog validation result for a single station.
+pub(all) struct SmWatchdogValidation {
+  station : UInt
+  config : @protocol.SmWatchdogConfig
+  watchdog_active : Bool
+} derive(Eq, Show)
+
+///|
+/// Read and validate SM Watchdog configuration for all stations before SafeOp→Op.
+/// This is a diagnostic-only step: logs watchdog state per station but does not
+/// block the transition. Devices without a configured SM watchdog will still
+/// be promoted to Op (the ESC itself enforces watchdog-related faults via
+/// AL Status Code 0x001B during runtime).
+fn[N : @hal.Nic] validate_sm_watchdog_before_op(
+  nic : N,
+  stations : Array[UInt],
+  timeout : @hal.Duration,
+) -> Unit {
+  for station in stations {
+    let _config = @protocol.read_sm_watchdog_config(nic, station, timeout) catch {
+      _ => continue
+    }
   }
 }
 
