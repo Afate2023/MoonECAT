@@ -5,3 +5,6 @@ _build/
 
 Reference_Project/
 References/
+
+.vscode/
+trace.json
