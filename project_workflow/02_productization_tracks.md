@@ -130,7 +130,7 @@
 
 ### 低优先级（may/should，不阻塞 Class B）
 
-- [ ] **EEPROM 数据写入**：当前仅有 EEPROM 所有权切换（`eeprom_write_config`），无 word 级数据写入函数。[ETG.1500 #305 Write may]
+- [x] **EEPROM 数据写入**：已实现 `eeprom_write_word` (FP) / `eeprom_write_word_ap` (AP) word 级 16-bit 写入。写入流程遵循 SOEM 参考：① 获取 Master 所有权 → ② 写 16-bit 数据到 `reg_sii_data`(0x0508) → ③ 发送写命令 `0x0201` + 地址到 `reg_sii_control`(0x0502) → ④ 等待 busy 清除 → ⑤ 恢复 PDI 所有权。含 NACK 重试（≤3 次）和错误清除。commit: `c0f4f6a` [ETG.1500 #305 Write may]
 - [ ] **Mailbox Status Bit FMMU 映射轮询**：当前通过直接寄存器读取检查 SM status bit，未实现 FMMU 映射到 cyclic PDO 的优化路径。[ETG.1500 #404 细节]
 - [ ] **帧重复发送**：SII `frame_repeat_support` 标志已解析和 CLI 输出，但 runtime 不根据此标志重复发送周期帧。[ETG.1500 #203 may]
 - [ ] **Slave-to-Slave 通信**：完全未实现，ENI 复制映射配置与 runtime 数据搬运均缺失。[ETG.1500 §5.14]
