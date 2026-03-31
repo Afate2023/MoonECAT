@@ -444,3 +444,48 @@ pub fn[N : @hal.Nic] dc_deactivate_sync_all(
     timeout,
   )
 }
+
+///|
+/// Broadcast read DC System Time Difference (0x092C) across all slaves.
+///
+/// Per ETG.1500 §5.13.3 (#1103), a BRD to register 0x092C returns the
+/// bitwise-OR of all slaves' System Time Difference values. The master
+/// compares this against a limit to monitor DC synchronisation quality.
+///
+/// Returns the ORed 32-bit system time difference value and the working
+/// counter (number of DC slaves that responded).
+pub fn[N : @hal.Nic] dc_broadcast_sync_window(
+  nic : N,
+  timeout : @hal.Duration,
+) -> (UInt, UInt) raise @hal.EcError {
+  let pdu = transact_pdu(
+    nic,
+    EcCommand::BRD,
+    broadcast_address(reg_dc_system_diff),
+    Bytes::new(4),
+    timeout,
+  )
+  (le_u32(pdu.data), pdu.wkc)
+}
+
+///|
+/// Check whether the broadcast sync window is within an acceptable limit.
+///
+/// The `limit_ns` parameter is the maximum tolerable clock deviation in
+/// nanoseconds. Returns true when the ORed system time difference from
+/// all DC slaves is below the limit.
+pub fn[N : @hal.Nic] dc_check_sync_window(
+  nic : N,
+  limit_ns : UInt,
+  timeout : @hal.Duration,
+) -> Bool raise @hal.EcError {
+  let (diff, _wkc) = dc_broadcast_sync_window(nic, timeout)
+  // System Time Difference is a signed 32-bit value; compare magnitude.
+  let magnitude = if (diff & 0x8000_0000U) != 0U {
+    // Negative: two's complement
+    (diff ^ 0xFFFF_FFFFU) + 1U
+  } else {
+    diff
+  }
+  magnitude <= limit_ns
+}

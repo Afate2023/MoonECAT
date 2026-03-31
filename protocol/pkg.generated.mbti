@@ -41,7 +41,11 @@ pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_broadcast_sync_window(N, @hal.Duration) -> (UInt, UInt) raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_check_support(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_check_sync_window(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_compensate_cycle(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 

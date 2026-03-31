@@ -115,7 +115,32 @@ pub fn calculate_fmmu_configs(
     let target_type : SmType = match dir {
       Outputs | DynamicOutputs => ProcessDataOut
       Inputs | DynamicInputs => ProcessDataIn
-      MailboxState => continue
+      MailboxState => {
+        // ETG.1500 §5.6.4 (#404): Map SM1 status byte into the logical
+        // address space so the master can poll mailbox readiness via cyclic
+        // datagrams instead of explicit register reads.
+        let mb_in_idx = find_unassigned_sm(sm_configs, sm_used, MailboxIn)
+        match mb_in_idx {
+          Some(idx) => {
+            // SM status byte is at SM register base + 5 (status offset).
+            let sm_status_phys = 0x0800U + idx.reinterpret_as_uint() * 8U + 5U
+            fmmus.push({
+              logical_start: current_offset,
+              length: 1U,
+              logical_start_bit: b'\x00',
+              logical_end_bit: b'\x07',
+              physical_start: sm_status_phys,
+              physical_start_bit: b'\x00',
+              direction: MailboxState,
+              activate: true,
+            })
+            total_input = total_input + 1
+            current_offset = current_offset + 1U
+          }
+          None => ()
+        }
+        continue
+      }
     }
     // find matching SM
     let sm_idx = find_unassigned_sm(sm_configs, sm_used, target_type)
@@ -300,8 +325,7 @@ pub fn FmmuConfig::to_bytes(self : FmmuConfig) -> Bytes {
   // 0x01 = read access (inputs, slave→master). Per ESC register spec.
   let dir_byte : Byte = match self.direction {
     Outputs | DynamicOutputs => b'\x02'
-    Inputs | DynamicInputs => b'\x01'
-    MailboxState => b'\x00'
+    Inputs | DynamicInputs | MailboxState => b'\x01'
   }
   buf.write_byte(dir_byte)
   // Byte 12: activate
