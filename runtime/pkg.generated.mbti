@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn analyze_multi_rate(TaskSchedule) -> MultiRateAnalysis
+
 pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
@@ -34,6 +36,8 @@ pub fn cycle_timing_report(Int64, Int64, Int64, ClockDomain) -> CycleTimingRepor
 
 pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
 
+pub fn decode_step_response(Bytes, Int) -> (Byte, Bytes)
+
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
 pub fn diagnostic_surface_from_run(RunReport) -> DiagnosticSurface
@@ -44,6 +48,8 @@ pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @prot
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
+pub fn encode_step_request(Int64, Int64, Bytes, Int) -> Bytes
+
 pub fn enrich_surface_with_fingerprint(DiagnosticSurface, TopologyFingerprint) -> DiagnosticSurface
 
 pub fn enrich_surface_with_monitors(DiagnosticSurface, Array[MonitorResult], Verdict) -> DiagnosticSurface
@@ -51,6 +57,10 @@ pub fn enrich_surface_with_monitors(DiagnosticSurface, Array[MonitorResult], Ver
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
 pub fn fingerprint_match(TopologyFingerprint, TopologyFingerprint) -> TopologyFingerprintMatch
+
+pub fn hil_session_summary(HilSession) -> HilSessionSummary
+
+pub fn hil_session_to_json(HilSession) -> String
 
 pub fn master_config_with_optional_dc(Int64?) -> @hal.MasterConfig
 
@@ -160,6 +170,8 @@ pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
 pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> ValidateReport
 
+pub fn validate_multi_rate(TaskSchedule, max_hyperperiod? : Int, max_tasks_per_cycle? : Int, max_io_bytes_per_cycle? : Int) -> Array[String]
+
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
 pub fn validation_difference_grade(ConfigurationDifference) -> ValidateGrade
@@ -177,6 +189,19 @@ pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> 
 // Errors
 
 // Types and methods
+pub(all) enum BridgeState {
+  Disconnected
+  Connected
+  Terminated(String)
+  Error(String)
+} derive(Eq, Show)
+
+pub(all) enum BridgeTransport {
+  UnixSocket(String)
+  NamedPipe(String)
+  SharedMemory(name~ : String, size~ : Int)
+} derive(Show)
+
 pub(all) enum ClockDomain {
   Mcu
   Linux
@@ -356,6 +381,40 @@ pub(all) struct DomainTimestamp {
   ns : Int64
 } derive(Eq, Show)
 
+pub(all) struct DriftCompensationGains {
+  kp_num : Int64
+  kp_den : Int64
+  ki_num : Int64
+  ki_den : Int64
+} derive(Eq, Show)
+pub fn DriftCompensationGains::aggressive() -> Self
+pub fn DriftCompensationGains::conservative() -> Self
+pub fn DriftCompensationGains::default() -> Self
+
+pub(all) struct DriftCompensationReport {
+  update_count : Int64
+  last_error_ns : Int64
+  integral_error_ns : Int64
+  total_correction_ns : Int64
+  estimated_drift_ppb : Int64
+  converged : Bool
+} derive(Show)
+
+pub(all) struct DriftCompensator {
+  gains : DriftCompensationGains
+  target_offset_ns : Int64
+  mut integral_error_ns : Int64
+  mut last_error_ns : Int64
+  mut total_correction_ns : Int64
+  mut update_count : Int64
+  max_integral_ns : Int64
+  mut active : Bool
+} derive(Show)
+pub fn DriftCompensator::compensate(Self, TimebaseSync, Int64, Int64) -> Int64
+pub fn DriftCompensator::new(gains? : DriftCompensationGains, target_offset_ns? : Int64, max_integral_ns? : Int64) -> Self
+pub fn DriftCompensator::report(Self, TimebaseSync) -> DriftCompensationReport
+pub fn DriftCompensator::reset(Self) -> Unit
+
 pub(all) struct EsiJsonDcMode {
   name : String
   description : String
@@ -474,6 +533,28 @@ pub(all) struct EsiOfflineSiiReport {
   categories : Array[@mailbox.SiiCategoryEntry]
 }
 
+pub(all) struct ExternalBridgeConfig {
+  transport : BridgeTransport
+  step_timeout_ns : Int64
+  auto_launch : Bool
+  launch_command : String
+  launch_cwd : String
+} derive(Show)
+pub fn ExternalBridgeConfig::named_pipe(String) -> Self
+pub fn ExternalBridgeConfig::shared_memory(String, Int) -> Self
+pub fn ExternalBridgeConfig::unix_socket(String) -> Self
+
+pub(all) struct ExternalProcessBridge {
+  config : ExternalBridgeConfig
+  mut state : BridgeState
+  mut output_size : Int
+  mut input_size : Int
+  mut step_count : Int64
+  mut total_latency_ns : Int64
+} derive(Show)
+pub fn ExternalProcessBridge::avg_latency_ns(Self) -> Int64
+pub fn ExternalProcessBridge::new(ExternalBridgeConfig) -> Self
+
 pub(all) struct HilCycleHook[A] {
   adapter : A
   session : HilSession
@@ -494,6 +575,15 @@ pub fn HilSession::get_termination_reason(Self) -> String
 pub fn HilSession::is_terminated(Self) -> Bool
 pub fn HilSession::new(Int64, TaskSchedule) -> Self
 pub fn HilSession::step_count(Self) -> Int
+
+pub(all) struct HilSessionSummary {
+  total_steps : Int
+  ok_steps : Int
+  error_steps : Int
+  terminated : Bool
+  termination_reason : String
+  final_sim_time_ns : Int64
+} derive(Show)
 
 pub struct LoopbackCoSimAdapter {
   mut sim_time : SimTime
@@ -524,6 +614,15 @@ pub(all) struct MonitorResult {
   name : String
   verdict : Verdict
 } derive(Eq, Show)
+
+pub(all) struct MultiRateAnalysis {
+  hyperperiod : Int
+  worst_case_tasks_per_cycle : Int
+  peak_cycles : Array[Int]
+  is_harmonic : Bool
+  worst_case_output_bytes : Int
+  worst_case_input_bytes : Int
+} derive(Show)
 
 pub struct NullCycleHook {
   _unused : Unit

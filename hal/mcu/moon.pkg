@@ -1,0 +1,7 @@
+import {
+  "afate/MoonECAT/hal",
+}
+
+import {
+  "afate/MoonECAT/hal",
+} for "test"
