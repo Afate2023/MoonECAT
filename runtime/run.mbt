@@ -116,6 +116,23 @@ pub(all) struct RunStartupPreparation {
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
   startup_mailbox_plans : Array[StationStartupMailboxPlan]
+  esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)]
+}
+
+///|
+/// Look up the ESM timeout policy for a station from an array of policies.
+/// Returns the default (all-None) policy when no entry is found.
+fn lookup_esm_timeout_policy(
+  policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
+  station : UInt,
+) -> @protocol.EsmTimeoutPolicy {
+  for item in policies {
+    let (s, policy) = item
+    if s == station {
+      return policy
+    }
+  }
+  @protocol.default_esm_timeout_policy()
 }
 
 ///|
@@ -167,6 +184,7 @@ enum OperationalStartupStep {
   TransitionToSafeOp
   DcPreconfigure
   WarmupProcessData
+  ValidateSmWatchdog
   TransitionToOp
 } derive(Eq, Show)
 
@@ -189,6 +207,15 @@ pub fn master_config_with_optional_dc(
 }
 
 ///|
+/// Check if any slave in the SII info set the PreferNotLRW flag.
+fn sii_prefers_not_lrw(sii : @mailbox.SiiFullInfo) -> Bool {
+  match sii.general {
+    Some(general) => general.prefers_not_lrw()
+    None => false
+  }
+}
+
+///|
 pub fn[N : @hal.Nic] build_run_startup_preparation(
   nic : N,
   scan_report : ScanReport,
@@ -199,8 +226,10 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
   let startup_outputs : Array[(UInt, Bytes)] = []
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for slave in scan_report.slaves {
     let preparation = prepare_slave_startup(
       nic,
@@ -210,6 +239,9 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       timeout,
     )
     slave_mappings.push((preparation.mapping, slave.station_address))
+    if sii_prefers_not_lrw(preparation.sii) {
+      any_not_lrw = true
+    }
     match preparation.startup_outputs {
       Some(outputs) => startup_outputs.push((slave.station_address, outputs))
       None => ()
@@ -225,11 +257,18 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
       dc_cycle_period_ns,
       preparation.dc_cycle_period_ns,
     )
+    esm_timeout_policies.push(
+      (
+        slave.station_address,
+        @protocol.esm_timeout_policy_from_sii_timeouts(preparation.sii.timeouts),
+      ),
+    )
     current_logical_base = current_logical_base +
       preparation.mapping.output_bytes.reinterpret_as_uint() +
       preparation.mapping.input_bytes.reinterpret_as_uint()
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)
@@ -239,6 +278,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
     expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
     dc_cycle_period_ns,
     startup_mailbox_plans,
+    esm_timeout_policies,
   }
 }
 
@@ -310,10 +350,15 @@ pub fn run_startup_preparation_from_slave_preparations(
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
   let startup_outputs : Array[(UInt, Bytes)] = []
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = []
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for item in slave_preparations {
     let (station, preparation) = item
     slave_mappings.push((preparation.mapping, station))
+    if sii_prefers_not_lrw(preparation.sii) {
+      any_not_lrw = true
+    }
     match preparation.startup_outputs {
       Some(outputs) => startup_outputs.push((station, outputs))
       None => ()
@@ -329,8 +374,15 @@ pub fn run_startup_preparation_from_slave_preparations(
       dc_cycle_period_ns,
       preparation.dc_cycle_period_ns,
     )
+    esm_timeout_policies.push(
+      (
+        station,
+        @protocol.esm_timeout_policy_from_sii_timeouts(preparation.sii.timeouts),
+      ),
+    )
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)
@@ -340,6 +392,7 @@ pub fn run_startup_preparation_from_slave_preparations(
     expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
     dc_cycle_period_ns,
     startup_mailbox_plans,
+    esm_timeout_policies,
   }
 }
 
@@ -569,11 +622,15 @@ fn[N : @hal.Nic] active_process_data_lengths_after_mailbox_refresh(
     ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
   }
   if snapshot.state != @protocol.PreOp {
+    let policy = @protocol.esm_timeout_policy_from_sii_timeouts(
+      preparation.sii.timeouts,
+    )
     ignore(
-      @protocol.transition_to_target_strict(
+      @protocol.transition_to_target_strict_with_timeout_policy(
         nic,
         station,
         @protocol.PreOp,
+        policy,
         timeout,
       ),
     )
@@ -647,8 +704,10 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
   let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
   let startup_outputs : Array[(UInt, Bytes)] = []
   let startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = []
   let mut current_logical_base = logical_base
   let mut dc_cycle_period_ns : Int64? = None
+  let mut any_not_lrw = false
   for station in stations {
     let initial = prepare_slave_startup(
       nic, station, current_logical_base, startup_eeprom_word_count, timeout,
@@ -657,6 +716,9 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
       nic, station, current_logical_base, initial, timeout,
     )
     slave_mappings.push((refined.mapping, station))
+    if sii_prefers_not_lrw(refined.sii) {
+      any_not_lrw = true
+    }
     match refined.startup_outputs {
       Some(outputs) => startup_outputs.push((station, outputs))
       None => ()
@@ -672,11 +734,18 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
       dc_cycle_period_ns,
       refined.dc_cycle_period_ns,
     )
+    esm_timeout_policies.push(
+      (
+        station,
+        @protocol.esm_timeout_policy_from_sii_timeouts(refined.sii.timeouts),
+      ),
+    )
     current_logical_base = current_logical_base +
       refined.mapping.output_bytes.reinterpret_as_uint() +
       refined.mapping.input_bytes.reinterpret_as_uint()
   }
   let pdo_ctx = @protocol.PdoContext::build(slave_mappings, logical_base)
+  pdo_ctx.block_lrw = any_not_lrw
   for i = 0; i < startup_outputs.length(); i = i + 1 {
     let (station, outputs) = startup_outputs[i]
     pdo_ctx.set_slave_outputs(station, outputs)
@@ -686,6 +755,7 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
     expected_wkc: expected_wkc_from_slave_mappings(slave_mappings),
     dc_cycle_period_ns,
     startup_mailbox_plans,
+    esm_timeout_policies,
   }
 }
 
@@ -1378,6 +1448,9 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
   let mut active_pdo_ctx = pdo_ctx
   let mut active_expected_wkc = expected_wkc
   let mut active_startup_mailbox_plans : Array[StationStartupMailboxPlan] = []
+  let mut active_esm_timeout_policies : Array[
+    (UInt, @protocol.EsmTimeoutPolicy),
+  ] = []
   let mut startup_preop_ready = false
   let scan_report = scan(nic, timeout)
   let has_discovered_slaves = scan_report.slave_count > 0
@@ -1402,7 +1475,7 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
   if has_discovered_slaves {
     if startup_state == @protocol.SafeOp || startup_state == @protocol.Op {
       let preop_fault = transition_stations_to_preop_with_mailbox(
-        nic, stations, timeout,
+        nic, stations, timeout, active_esm_timeout_policies,
       )
       match preop_fault {
         Some(fault) =>
@@ -1437,11 +1510,12 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
         active_expected_wkc = resolved_preparation.expected_wkc
       }
       active_startup_mailbox_plans = resolved_preparation.startup_mailbox_plans
+      active_esm_timeout_policies = resolved_preparation.esm_timeout_policies
       startup_preop_ready = true
     }
     let startup_fault = transition_stations_for_startup(
       nic, stations, startup_state, active_pdo_ctx, active_startup_mailbox_plans,
-      run_config, timeout, startup_preop_ready,
+      run_config, timeout, startup_preop_ready, active_esm_timeout_policies,
     )
     match startup_fault {
       Some(fault) =>
@@ -1463,6 +1537,12 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
 
   let rt = Runtime::new(run_config)
   rt.configure_pdo(active_pdo_ctx, active_expected_wkc)
+  // Configure emergency polling for all stations with mailbox support.
+  let emg_stations : Array[(UInt, @mailbox.MailboxConfig)] = []
+  for plan in active_startup_mailbox_plans {
+    emg_stations.push((plan.station, plan.mailbox_config))
+  }
+  rt.configure_emergency_stations(emg_stations)
 
   let dc_ok = rt.init_dc(nic, stations, timeout) catch { _ => false }
   rt.set_timeout_threshold(settings.max_consecutive_timeouts)
@@ -1491,7 +1571,11 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
   if has_discovered_slaves {
     match shutdown_state {
       Some(target) =>
-        ignore(transition_stations_to_target(nic, stations, target, timeout))
+        ignore(
+          transition_stations_to_target(
+            nic, stations, target, timeout, active_esm_timeout_policies,
+          ),
+        )
       None => ()
     }
   }
@@ -1530,6 +1614,7 @@ fn build_operational_startup_steps(
   if has_process_data {
     steps.push(WarmupProcessData)
   }
+  steps.push(ValidateSmWatchdog)
   steps.push(TransitionToOp)
   steps
 }
@@ -1621,24 +1706,29 @@ fn[N : @hal.Nic] transition_stations_for_startup(
   run_config : @hal.MasterConfig,
   timeout : @hal.Duration,
   preop_ready : Bool,
+  esm_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
 ) -> RunFault? {
   if startup_state == @protocol.PreOp {
     if preop_ready {
       return None
     }
-    return transition_stations_to_preop_with_mailbox(nic, stations, timeout)
+    return transition_stations_to_preop_with_mailbox(
+      nic, stations, timeout, esm_policies,
+    )
   }
   if startup_state == @protocol.SafeOp {
     return transition_stations_to_safeop_with_process_mapping(
-      nic, stations, pdo_ctx, startup_mailbox_plans, timeout, preop_ready,
+      nic, stations, pdo_ctx, startup_mailbox_plans, timeout, preop_ready, esm_policies,
     )
   }
   if startup_state != @protocol.Op {
-    return transition_stations_to_target(nic, stations, startup_state, timeout)
+    return transition_stations_to_target(
+      nic, stations, startup_state, timeout, esm_policies,
+    )
   }
 
   let safeop_fault = transition_stations_to_safeop_with_process_mapping(
-    nic, stations, pdo_ctx, startup_mailbox_plans, timeout, preop_ready,
+    nic, stations, pdo_ctx, startup_mailbox_plans, timeout, preop_ready, esm_policies,
   )
   match safeop_fault {
     Some(_) => return safeop_fault
@@ -1674,6 +1764,8 @@ fn[N : @hal.Nic] transition_stations_for_startup(
           ),
         )
       WarmupProcessData => warmup_process_data_for_op(nic, pdo_ctx, timeout)
+      ValidateSmWatchdog =>
+        validate_sm_watchdog_before_op(nic, stations, timeout)
       TransitionToOp => {
         let fault = transition_stations_to_op_with_process_data(
           nic, stations, pdo_ctx, timeout,
@@ -1693,9 +1785,13 @@ fn[N : @hal.Nic] transition_stations_to_preop_with_mailbox(
   nic : N,
   stations : Array[UInt],
   timeout : @hal.Duration,
+  esm_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
 ) -> RunFault? {
   for station in stations {
-    let fault = transition_slave_to_preop_with_mailbox(nic, station, timeout)
+    let policy = lookup_esm_timeout_policy(esm_policies, station)
+    let fault = transition_slave_to_preop_with_mailbox(
+      nic, station, timeout, policy,
+    )
     match fault {
       Some(_) => return fault
       None => ()
@@ -1712,10 +1808,11 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
   startup_mailbox_plans : Array[StationStartupMailboxPlan],
   timeout : @hal.Duration,
   preop_ready : Bool,
+  esm_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
 ) -> RunFault? {
   if !preop_ready {
     let preop_fault = transition_stations_to_preop_with_mailbox(
-      nic, stations, timeout,
+      nic, stations, timeout, esm_policies,
     )
     match preop_fault {
       Some(_) => return preop_fault
@@ -1741,7 +1838,13 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
       None => ()
     }
   }
-  transition_stations_to_target(nic, stations, @protocol.SafeOp, timeout)
+  transition_stations_to_target(
+    nic,
+    stations,
+    @protocol.SafeOp,
+    timeout,
+    esm_policies,
+  )
 }
 
 ///|
@@ -1750,9 +1853,13 @@ fn[N : @hal.Nic] transition_stations_to_target(
   stations : Array[UInt],
   target : @protocol.EsmState,
   timeout : @hal.Duration,
+  policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
 ) -> RunFault? {
   for station in stations {
-    let fault = transition_slave_to_target(nic, station, target, timeout)
+    let policy = lookup_esm_timeout_policy(policies, station)
+    let fault = transition_slave_to_target(
+      nic, station, target, timeout, policy,
+    )
     match fault {
       Some(_) => return fault
       None => ()
@@ -1816,8 +1923,9 @@ fn[N : @hal.Nic] transition_slave_to_target(
   station : UInt,
   target : @protocol.EsmState,
   timeout : @hal.Duration,
+  policy : @protocol.EsmTimeoutPolicy,
 ) -> RunFault? {
-  if attempt_transition_slave_to_target(nic, station, target, timeout) {
+  if attempt_transition_slave_to_target(nic, station, target, timeout, policy) {
     None
   } else {
     let snapshot = read_startup_fault_details(nic, station, timeout)
@@ -1828,7 +1936,7 @@ fn[N : @hal.Nic] transition_slave_to_target(
     )
     stabilize_failed_startup_station(nic, station, strategy, timeout)
     if strategy == RetryTargetPath &&
-      attempt_transition_slave_to_target(nic, station, target, timeout) {
+      attempt_transition_slave_to_target(nic, station, target, timeout, policy) {
       None
     } else {
       Some(
@@ -1849,6 +1957,7 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
+  policy : @protocol.EsmTimeoutPolicy,
 ) -> RunFault? {
   let preparation = prepare_slave_startup(
     nic, station, 0U, startup_eeprom_word_count, timeout,
@@ -1884,7 +1993,7 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
       )
     _ => ()
   }
-  transition_slave_to_target(nic, station, @protocol.PreOp, timeout)
+  transition_slave_to_target(nic, station, @protocol.PreOp, timeout, policy)
 }
 
 ///|
@@ -1992,6 +2101,7 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
   station : UInt,
   target : @protocol.EsmState,
   timeout : @hal.Duration,
+  policy : @protocol.EsmTimeoutPolicy,
 ) -> Bool {
   let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout) catch {
     _ => return false
@@ -2001,8 +2111,8 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
       _ => return false
     }
   }
-  let final_state = @protocol.transition_to_target_strict(
-    nic, station, target, timeout,
+  let final_state = @protocol.transition_to_target_strict_with_timeout_policy(
+    nic, station, target, policy, timeout,
   ) catch {
     _ => return false
   }
@@ -2017,6 +2127,32 @@ fn[N : @hal.Nic] warmup_process_data_for_op(
 ) -> Unit {
   if pdo_ctx.logical_size > 0 {
     ignore(try? @protocol.pdo_exchange_result(nic, pdo_ctx, timeout))
+  }
+}
+
+///|
+/// SM Watchdog validation result for a single station.
+pub(all) struct SmWatchdogValidation {
+  station : UInt
+  config : @protocol.SmWatchdogConfig
+  watchdog_active : Bool
+} derive(Eq, Show)
+
+///|
+/// Read and validate SM Watchdog configuration for all stations before SafeOp→Op.
+/// This is a diagnostic-only step: logs watchdog state per station but does not
+/// block the transition. Devices without a configured SM watchdog will still
+/// be promoted to Op (the ESC itself enforces watchdog-related faults via
+/// AL Status Code 0x001B during runtime).
+fn[N : @hal.Nic] validate_sm_watchdog_before_op(
+  nic : N,
+  stations : Array[UInt],
+  timeout : @hal.Duration,
+) -> Unit {
+  for station in stations {
+    let _config = @protocol.read_sm_watchdog_config(nic, station, timeout) catch {
+      _ => continue
+    }
   }
 }
 

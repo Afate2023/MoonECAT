@@ -222,7 +222,8 @@ pub fn[N : @hal.Nic] clear_al_error(
       _ => None
     }
     let status_code_text = match status_code {
-      Some(code) => code.to_string()
+      Some(code) =>
+        code.to_string() + " (" + al_status_code_description(code) + ")"
       None => "unknown"
     }
     raise @hal.EcError::EsmStateError(
@@ -290,7 +291,8 @@ pub fn[N : @hal.Nic] clear_al_error_ap(
       _ => None
     }
     let status_code_text = match status_code {
-      Some(code) => code.to_string()
+      Some(code) =>
+        code.to_string() + " (" + al_status_code_description(code) + ")"
       None => "unknown"
     }
     raise @hal.EcError::EsmStateError(
@@ -725,6 +727,63 @@ pub fn[N : @hal.Nic] transition_to_target_strict_ap(
 }
 
 ///|
+/// Build an EsmTimeoutPolicy from SII-parsed timeouts (ETG.2010 category 41).
+///
+/// Mapping:
+/// - preop_timeout_ms         → preop (transition TO PreOp)
+/// - safeop_op_timeout_ms     → op   (SafeOp→Op transition)
+/// - back_to_init_timeout_ms  → init (transition TO Init)
+/// - back_to_safeop_timeout_ms → safeop (transition TO SafeOp)
+/// - boot                     → None (not specified by SII)
+///
+/// Returns a default (all-None) policy when timeouts are absent.
+pub fn esm_timeout_policy_from_sii_timeouts(
+  timeouts : @mailbox.SiiTimeouts?,
+) -> EsmTimeoutPolicy {
+  match timeouts {
+    None => default_esm_timeout_policy()
+    Some(t) => {
+      let ms_to_duration = fn(ms : UInt) -> @hal.Duration? {
+        if ms == 0U {
+          None
+        } else {
+          Some(@hal.Duration(ms.reinterpret_as_int().to_int64() * 1_000_000L))
+        }
+      }
+      {
+        init: ms_to_duration(t.back_to_init_timeout_ms),
+        preop: ms_to_duration(t.preop_timeout_ms),
+        safeop: ms_to_duration(t.back_to_safeop_timeout_ms),
+        op: ms_to_duration(t.safeop_op_timeout_ms),
+        boot: None,
+      }
+    }
+  }
+}
+
+///|
+/// Strict transitions via multi-step route with per-target timeout policy.
+///
+/// Same as `transition_to_target_strict` but resolves per-step timeouts from
+/// the supplied policy, allowing SII/ESI-derived timeout overrides.
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  policy : EsmTimeoutPolicy,
+  fallback_timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, fallback_timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through_with_timeout_policy(nic, station, path, policy)
+}
+
+///|
 /// Read the current ESM state from a slave.
 pub fn[N : @hal.Nic] read_al_status(
   nic : N,
@@ -788,10 +847,125 @@ pub fn[N : @hal.Nic] broadcast_state(
   nic : N,
   target : EsmState,
   timeout : @hal.Duration,
+  ack_error? : Bool = false,
 ) -> UInt raise @hal.EcError {
   let target_byte = target.to_byte()
-  let buf = Bytes::from_array([target_byte, b'\x00'])
+  let control = if ack_error { target_byte | b'\x10' } else { target_byte }
+  let buf = Bytes::from_array([control, b'\x00'])
   let addr = broadcast_address(reg_al_control)
   let pdu = transact_pdu(nic, EcCommand::BWR, addr, buf, timeout)
   pdu.wkc
+}
+
+///|
+/// Reset all slaves to a known default state before scanning.
+///
+/// Broadcasts zero-writes to FMMU, SM, DC, CRC, IRQ, and EEPROM registers,
+/// matching the sequence used by SOEM `ecx_set_slaves_to_default`.
+/// This ensures a clean slate regardless of any previous master session state.
+pub fn[N : @hal.Nic] set_slaves_to_default(
+  nic : N,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let zbuf48 = Bytes::new(48)
+  let zbuf32 = Bytes::new(32)
+  let zbuf8 = Bytes::new(8)
+  let zbuf4 = Bytes::new(4)
+  // Deactivate loop-manual forwarding
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dl_port),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Set IRQ mask (0x0004 = AL Status Change Event)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_irq_mask),
+    Bytes::from_array([b'\x04', b'\x00']),
+    timeout,
+  )
+  // Reset CRC / RX error counters (8 bytes at 0x0300)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_rx_error_counter),
+    zbuf8,
+    timeout,
+  )
+  // Reset FMMU0..2 (3 * 16 = 48 bytes at 0x0600)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_fmmu_base),
+    zbuf48,
+    timeout,
+  )
+  // Reset SM0..3 (4 * 8 = 32 bytes at 0x0800)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sm_base),
+    zbuf32,
+    timeout,
+  )
+  // Deactivate DC sync
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_sync_act),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Clear DC system time (4 bytes)
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_system_time),
+    zbuf4,
+    timeout,
+  )
+  // DC speed counter start = 0x1000
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_speed_count),
+    Bytes::from_array([b'\x00', b'\x10']),
+    timeout,
+  )
+  // DC time loop filter = 0x0C00
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_time_filter),
+    Bytes::from_array([b'\x00', b'\x0C']),
+    timeout,
+  )
+  // Clear station alias
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_station_alias),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  // Reset all slaves to Init + Ack
+  let _ = broadcast_state(nic, Init, timeout, ack_error=true)
+  // Force EEPROM from PDI, then set to master
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sii_config),
+    Bytes::from_array([b'\x02']),
+    timeout,
+  )
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_sii_config),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
 }

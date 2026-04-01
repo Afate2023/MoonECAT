@@ -11,6 +11,8 @@ pub fn address_offset(UInt) -> UInt
 
 pub fn address_station(UInt) -> UInt
 
+pub fn al_status_code_description(UInt) -> String
+
 pub fn[N : @hal.Nic] apply_op_only_policy(N, UInt, EsmState, Bool, Array[Int], @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] assign_station_address(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
@@ -21,7 +23,7 @@ pub fn broadcast_address(UInt) -> UInt
 
 pub let broadcast_mac : FixedArray[Byte]
 
-pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration) -> UInt raise @hal.EcError
+pub fn[N : @hal.Nic] broadcast_state(N, EsmState, @hal.Duration, ack_error? : Bool) -> UInt raise @hal.EcError
 
 pub fn build_shutdown_path(EsmState) -> Array[EsmState]
 
@@ -39,17 +41,33 @@ pub fn configured_address(UInt, UInt) -> UInt
 
 pub fn[N : @hal.Nic] count_slaves(N, @hal.Duration) -> Int raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_broadcast_sync_window(N, @hal.Duration) -> (UInt, UInt) raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_check_support(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_check_sync_window(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_compensate_cycle(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_configure_linear(N, Array[UInt], UInt, @hal.Duration, static_sync_iterations? : Int) -> DcInitResult? raise @hal.EcError
 
-pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic] dc_configure_sync0(N, UInt, UInt, @hal.Duration, shift_ns? : Int, sync1_cycle_ns? : UInt) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_deactivate_sync(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_deactivate_sync_all(N, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_latch_times(N, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_read_port_times(N, UInt, @hal.Duration) -> DcPortTimes raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_read_receive_time(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
+pub fn[N : @hal.Nic] dc_read_sof(N, UInt, @hal.Duration) -> UInt64 raise @hal.EcError
+
 pub fn[N : @hal.Nic] dc_read_sync_window(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
+
+pub fn[N : @hal.Nic] dc_read_system_time_64(N, UInt, @hal.Duration) -> UInt64 raise @hal.EcError
 
 pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(N, UInt, Array[UInt], @hal.Duration, smoothing_num? : UInt, smoothing_den? : UInt) -> Unit raise @hal.EcError
 
@@ -77,6 +95,10 @@ pub fn[N : @hal.Nic] eeprom_read_ap(N, UInt, UInt, Int, @hal.Duration) -> Bytes 
 
 pub fn[N : @hal.Nic] eeprom_read_word(N, UInt, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] eeprom_write_word(N, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] eeprom_write_word_ap(N, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] enable_alias_addressing(N, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn encode_lrw_frame_into(FixedArray[Byte], FixedArray[Byte], FixedArray[Byte], Byte, UInt, FixedArray[Byte], Int, Int) -> Int
@@ -89,11 +111,21 @@ pub fn esm_default_timeout(EsmState) -> @hal.Duration
 
 pub fn esm_timeout_for(EsmState, EsmTimeoutPolicy) -> @hal.Duration
 
+pub fn esm_timeout_policy_from_sii_timeouts(@mailbox.SiiTimeouts?) -> EsmTimeoutPolicy
+
 pub let ethernet_header_len : Int
 
 pub fn find_pdu_by_index(EcFrame, Byte) -> Pdu?
 
 pub let fmmu_entry_size : Int
+
+pub fn[N : @hal.Nic] foe_download(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_download_ap(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, Bytes, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_upload(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] foe_upload_ap(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, String, UInt, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn logical_address(UInt) -> UInt
 
@@ -153,6 +185,10 @@ pub fn read_command(AddressType) -> EcCommand
 
 pub fn[N : @hal.Nic] read_device_emulation(N, UInt, @hal.Duration) -> Bool raise @hal.EcError
 
+pub fn[N : @hal.Nic] read_dl_error_counters(N, UInt, @hal.Duration) -> DlErrorCounters raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_dl_error_counters_ap(N, UInt, @hal.Duration) -> DlErrorCounters raise @hal.EcError
+
 pub fn[N : @hal.Nic] read_register_ap(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu raise @hal.EcError
@@ -160,6 +196,8 @@ pub fn[N : @hal.Nic] read_register_fp(N, UInt, UInt, Int, @hal.Duration) -> Pdu 
 pub fn[N : @hal.Nic] read_sii_bytes(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_sii_bytes_ap(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+
+pub fn[N : @hal.Nic] read_sm_watchdog_config(N, UInt, @hal.Duration) -> SmWatchdogConfig raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_station_address_ap(N, UInt, @hal.Duration) -> UInt raise @hal.EcError
 
@@ -185,6 +223,8 @@ pub let reg_dc_cycle1 : UInt
 
 pub let reg_dc_sof : UInt
 
+pub let reg_dc_speed_count : UInt
+
 pub let reg_dc_start0 : UInt
 
 pub let reg_dc_sync_act : UInt
@@ -205,13 +245,31 @@ pub let reg_dc_time2 : UInt
 
 pub let reg_dc_time3 : UInt
 
+pub let reg_dc_time_filter : UInt
+
 pub let reg_dl_control : UInt
+
+pub let reg_dl_information : UInt
+
+pub let reg_dl_port : UInt
 
 pub let reg_dl_status : UInt
 
+pub let reg_ecat_pu_error_counter : UInt
+
 pub let reg_fmmu_base : UInt
 
+pub let reg_fwd_rx_error_counter : UInt
+
+pub let reg_irq_mask : UInt
+
+pub let reg_lost_link_counter : UInt
+
+pub let reg_pdi_error_counter : UInt
+
 pub let reg_revision : UInt
+
+pub let reg_rx_error_counter : UInt
 
 pub let reg_sii_address : UInt
 
@@ -228,6 +286,16 @@ pub let reg_station_address : UInt
 pub let reg_station_alias : UInt
 
 pub let reg_type : UInt
+
+pub let reg_watchdog_counter_pdata : UInt
+
+pub let reg_watchdog_divider : UInt
+
+pub let reg_watchdog_status_pdata : UInt
+
+pub let reg_watchdog_time_pdata : UInt
+
+pub let reg_watchdog_time_pdi : UInt
 
 pub fn[N : @hal.Nic] request_state(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
@@ -261,6 +329,8 @@ pub fn[N : @hal.Nic] sdo_upload_retry(N, UInt, @mailbox.MailboxConfig, @mailbox.
 
 pub fn[N : @hal.Nic] sdo_upload_retry_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, UInt, Byte, @hal.Duration) -> Bytes raise @hal.EcError
 
+pub fn[N : @hal.Nic] set_slaves_to_default(N, @hal.Duration) -> Unit raise @hal.EcError
+
 pub fn[N : @hal.Nic] set_sm_enable(N, UInt, Int, Bool, @hal.Duration) -> Unit raise @hal.EcError
 
 pub let sm_entry_size : Int
@@ -281,6 +351,8 @@ pub fn[N : @hal.Nic] transition_to_target_strict(N, UInt, EsmState, @hal.Duratio
 
 pub fn[N : @hal.Nic] transition_to_target_strict_ap(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(N, UInt, EsmState, EsmTimeoutPolicy, @hal.Duration) -> EsmState raise @hal.EcError
+
 pub let wkc_len : Int
 
 pub fn write_command(AddressType) -> EcCommand
@@ -288,6 +360,10 @@ pub fn write_command(AddressType) -> EcCommand
 pub fn[N : @hal.Nic] write_register_ap(N, UInt, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
 
 pub fn[N : @hal.Nic] write_register_fp(N, UInt, UInt, Bytes, @hal.Duration) -> Pdu raise @hal.EcError
+
+pub fn[N : @hal.Nic] write_sm_watchdog_config(N, UInt, UInt, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
+
+pub fn[N : @hal.Nic] write_station_alias(N, UInt, UInt, @hal.Duration) -> Unit raise @hal.EcError
 
 // Errors
 

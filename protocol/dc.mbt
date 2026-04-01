@@ -83,6 +83,35 @@ fn abs_diff_u32(a : UInt, b : UInt) -> UInt {
 }
 
 ///|
+fn le_u64(data : Bytes) -> UInt64 {
+  if data.length() < 8 {
+    return 0UL
+  }
+  data[0].to_uint().to_uint64() |
+  (data[1].to_uint().to_uint64() << 8) |
+  (data[2].to_uint().to_uint64() << 16) |
+  (data[3].to_uint().to_uint64() << 24) |
+  (data[4].to_uint().to_uint64() << 32) |
+  (data[5].to_uint().to_uint64() << 40) |
+  (data[6].to_uint().to_uint64() << 48) |
+  (data[7].to_uint().to_uint64() << 56)
+}
+
+///|
+fn write_u64(value : UInt64) -> Bytes {
+  Bytes::from_array([
+    (value & 0xFFUL).to_byte(),
+    ((value >> 8) & 0xFFUL).to_byte(),
+    ((value >> 16) & 0xFFUL).to_byte(),
+    ((value >> 24) & 0xFFUL).to_byte(),
+    ((value >> 32) & 0xFFUL).to_byte(),
+    ((value >> 40) & 0xFFUL).to_byte(),
+    ((value >> 48) & 0xFFUL).to_byte(),
+    ((value >> 56) & 0xFFUL).to_byte(),
+  ])
+}
+
+///|
 /// Latch DC receive times on all slaves by broadcast-writing to 0x0900.
 pub fn[N : @hal.Nic] dc_latch_times(
   nic : N,
@@ -109,6 +138,78 @@ pub fn[N : @hal.Nic] dc_read_receive_time(
 }
 
 ///|
+/// Per-port DC receive times (all 4 ports).
+pub(all) struct DcPortTimes {
+  port0 : UInt
+  port1 : UInt
+  port2 : UInt
+  port3 : UInt
+} derive(Eq, Show)
+
+///|
+/// Read all 4 port receive times in a single FPRD (16 bytes from 0x0900).
+pub fn[N : @hal.Nic] dc_read_port_times(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> DcPortTimes raise @hal.EcError {
+  let pdu = read_register_fp(nic, station, reg_dc_time0, 16, timeout)
+  let d = pdu.data
+  let read_u32_at = fn(offset : Int) -> UInt {
+    if d.length() < offset + 4 {
+      return 0U
+    }
+    d[offset].to_uint() |
+    (d[offset + 1].to_uint() << 8) |
+    (d[offset + 2].to_uint() << 16) |
+    (d[offset + 3].to_uint() << 24)
+  }
+  {
+    port0: read_u32_at(0),
+    port1: read_u32_at(4),
+    port2: read_u32_at(8),
+    port3: read_u32_at(12),
+  }
+}
+
+///|
+/// Check whether a slave supports Distributed Clocks.
+/// Reads DL Information register (0x0008) bit 2.
+pub fn[N : @hal.Nic] dc_check_support(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Bool raise @hal.EcError {
+  let pdu = read_register_fp(nic, station, reg_dl_information, 2, timeout)
+  if pdu.data.length() < 1 {
+    return false
+  }
+  (pdu.data[0] & b'\x04') != b'\x00'
+}
+
+///|
+/// Read the full 64-bit DC system time from a slave (0x0910, 8 bytes).
+pub fn[N : @hal.Nic] dc_read_system_time_64(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> UInt64 raise @hal.EcError {
+  let pdu = read_register_fp(nic, station, reg_dc_system_time, 8, timeout)
+  le_u64(pdu.data)
+}
+
+///|
+/// Read the 64-bit DC Start of Frame register (0x0918, 8 bytes).
+pub fn[N : @hal.Nic] dc_read_sof(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> UInt64 raise @hal.EcError {
+  let pdu = read_register_fp(nic, station, reg_dc_sof, 8, timeout)
+  le_u64(pdu.data)
+}
+
+///|
 /// Read DC sync window / system difference register (0x092C).
 pub fn[N : @hal.Nic] dc_read_sync_window(
   nic : N,
@@ -121,13 +222,16 @@ pub fn[N : @hal.Nic] dc_read_sync_window(
 
 ///|
 /// Configure SYNC0 output for one slave.
-/// Uses local DC system time low-word to choose a future aligned start tick.
+/// Uses full 64-bit DC system time to choose a future aligned start tick.
+/// When `sync1_cycle_ns` > 0, also configures SYNC1 and activates both
+/// (activation byte 0x07 instead of 0x03).
 pub fn[N : @hal.Nic] dc_configure_sync0(
   nic : N,
   station : UInt,
   cycle_ns : UInt,
   timeout : @hal.Duration,
   shift_ns? : Int = 0,
+  sync1_cycle_ns? : UInt = 0U,
 ) -> Unit raise @hal.EcError {
   // Stop cyclic operation
   let _ = write_register_fp(
@@ -145,30 +249,21 @@ pub fn[N : @hal.Nic] dc_configure_sync0(
     Bytes::from_array([b'\x00']),
     timeout,
   )
-  // Read DC system time low word
-  let t_pdu = read_register_fp(nic, station, reg_dc_system_time, 4, timeout)
-  let t_now = le_u32(t_pdu.data)
-  let start = if cycle_ns > 0U {
-    ((t_now + dc_sync_start_delay_ns) / cycle_ns + 1U) * cycle_ns +
-    shift_ns.reinterpret_as_uint()
+  // Read DC system time full 64-bit
+  let t_now = dc_read_system_time_64(nic, station, timeout)
+  let delay64 = dc_sync_start_delay_ns.to_uint64()
+  let cycle64 = cycle_ns.to_uint64()
+  let shift64 = shift_ns.to_int64().reinterpret_as_uint64()
+  let start : UInt64 = if cycle64 > 0UL {
+    ((t_now + delay64) / cycle64 + 1UL) * cycle64 + shift64
   } else {
-    t_now + dc_sync_start_delay_ns + shift_ns.reinterpret_as_uint()
+    t_now + delay64 + shift64
   }
   let _ = write_register_fp(
     nic,
     station,
     reg_dc_start0,
-    // 64-bit register: low 32-bit start, high 32-bit zero.
-    Bytes::from_array([
-      (start & 0xFFU).to_byte(),
-      ((start >> 8) & 0xFFU).to_byte(),
-      ((start >> 16) & 0xFFU).to_byte(),
-      ((start >> 24) & 0xFFU).to_byte(),
-      b'\x00',
-      b'\x00',
-      b'\x00',
-      b'\x00',
-    ]),
+    write_u64(start),
     timeout,
   )
   let _ = write_register_fp(
@@ -178,12 +273,23 @@ pub fn[N : @hal.Nic] dc_configure_sync0(
     write_u32(cycle_ns),
     timeout,
   )
-  // Activate cyclic + SYNC0
+  // Write SYNC1 cycle time if requested
+  if sync1_cycle_ns > 0U {
+    let _ = write_register_fp(
+      nic,
+      station,
+      reg_dc_cycle1,
+      write_u32(sync1_cycle_ns),
+      timeout,
+    )
+  }
+  // Activate cyclic + SYNC0 (+ SYNC1 if configured)
+  let act : Byte = if sync1_cycle_ns > 0U { b'\x07' } else { b'\x03' }
   let _ = write_register_fp(
     nic,
     station,
     reg_dc_sync_act,
-    Bytes::from_array([b'\x03']),
+    Bytes::from_array([act]),
     timeout,
   )
 }
@@ -303,4 +409,83 @@ pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(
       timeout,
     )
   }
+}
+
+///|
+/// Deactivate DC sync for a single slave.
+/// Writes 0 to the sync activation register and clears cycle times.
+pub fn[N : @hal.Nic] dc_deactivate_sync(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let _ = write_register_fp(
+    nic,
+    station,
+    reg_dc_sync_act,
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+  let _ = write_register_fp(nic, station, reg_dc_cycle0, write_u32(0U), timeout)
+  let _ = write_register_fp(nic, station, reg_dc_cycle1, write_u32(0U), timeout)
+}
+
+///|
+/// Broadcast-deactivate DC sync on all slaves.
+pub fn[N : @hal.Nic] dc_deactivate_sync_all(
+  nic : N,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let _ = transact_pdu(
+    nic,
+    EcCommand::BWR,
+    broadcast_address(reg_dc_sync_act),
+    Bytes::from_array([b'\x00']),
+    timeout,
+  )
+}
+
+///|
+/// Broadcast read DC System Time Difference (0x092C) across all slaves.
+///
+/// Per ETG.1500 §5.13.3 (#1103), a BRD to register 0x092C returns the
+/// bitwise-OR of all slaves' System Time Difference values. The master
+/// compares this against a limit to monitor DC synchronisation quality.
+///
+/// Returns the ORed 32-bit system time difference value and the working
+/// counter (number of DC slaves that responded).
+pub fn[N : @hal.Nic] dc_broadcast_sync_window(
+  nic : N,
+  timeout : @hal.Duration,
+) -> (UInt, UInt) raise @hal.EcError {
+  let pdu = transact_pdu(
+    nic,
+    EcCommand::BRD,
+    broadcast_address(reg_dc_system_diff),
+    Bytes::new(4),
+    timeout,
+  )
+  (le_u32(pdu.data), pdu.wkc)
+}
+
+///|
+/// Check whether the broadcast sync window is within an acceptable limit.
+///
+/// The `limit_ns` parameter is the maximum tolerable clock deviation in
+/// nanoseconds. Returns true when the ORed system time difference from
+/// all DC slaves is below the limit.
+pub fn[N : @hal.Nic] dc_check_sync_window(
+  nic : N,
+  limit_ns : UInt,
+  timeout : @hal.Duration,
+) -> Bool raise @hal.EcError {
+  let (diff, _wkc) = dc_broadcast_sync_window(nic, timeout)
+  // System Time Difference is a signed 32-bit value; compare magnitude.
+  let magnitude = if (diff & 0x8000_0000U) != 0U {
+    // Negative: two's complement
+    (diff ^ 0xFFFF_FFFFU) + 1U
+  } else {
+    diff
+  }
+  magnitude <= limit_ns
 }

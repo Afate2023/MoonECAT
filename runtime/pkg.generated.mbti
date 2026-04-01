@@ -14,6 +14,10 @@ pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.Mai
 
 pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
 
+pub fn[N : @hal.Nic] bridge_eoe_cycle(EoeSwitch, QueueEndpoint, N, @hal.Duration) -> (Int, Int)
+
+pub fn build_master_od(MasterIdentity, ScanReport?, Telemetry?, DiagnosticSurface?) -> MasterObjectDictionary
+
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
 pub fn build_task_schedule(Int64, Array[TaskDescriptor]) -> TaskSchedule?
@@ -33,6 +37,8 @@ pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> St
 pub fn cycle_timing_report(Int64, Int64, Int64, ClockDomain) -> CycleTimingReport
 
 pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
+
+pub fn default_master_identity() -> MasterIdentity
 
 pub fn diagnosis_restore_path(@protocol.EsmState) -> Array[@protocol.EsmState]
 
@@ -598,6 +604,7 @@ pub(all) struct RunStartupPreparation {
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
   startup_mailbox_plans : Array[StationStartupMailboxPlan]
+  esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)]
 }
 
 pub(all) struct Runtime {
@@ -707,6 +714,12 @@ pub(all) struct SlaveStartupPreparation {
   sii : @mailbox.SiiFullInfo
   sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
+
+pub(all) struct SmWatchdogValidation {
+  station : UInt
+  config : @protocol.SmWatchdogConfig
+  watchdog_active : Bool
+} derive(Eq, Show)
 
 pub(all) enum StartupCommandTransition {
   PreOpToSafeOp
