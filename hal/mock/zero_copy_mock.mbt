@@ -71,6 +71,9 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
     self.rx_queue[self.rx_tail] = rx_ref.slot
     self.rx_tail = (self.rx_tail + 1) % self.rx_capacity
     self.rx_count = self.rx_count + 1
+  } else {
+    // RX queue is full; drop this loopback frame and release the slot
+    self.pool.release(rx_ref)
   }
   // Release TX slot
   self.pool.mark_sent(fref)
