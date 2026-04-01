@@ -9,7 +9,6 @@
 ///       ↓ on_pre_cycle
 ///   HilCycleHook
 ///       → CoSimAdapter.read_inputs (plant → EtherCAT inputs from prev cycle)
-///       → tasks_due_at_cycle → for each task: controller logic
 ///       → CoSimAdapter.write_outputs (EtherCAT outputs → plant)
 ///       ↓ PDO exchange
 ///       ↓ on_post_cycle
@@ -78,7 +77,11 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
   }
   // Determine which tasks are due this cycle
   let due = tasks_due_at_cycle(self.session.schedule, snap.cycle)
-  // For each due task, write outputs from adapter into PI
+  // Read plant outputs into PI inputs (plant → EtherCAT inputs from prev cycle)
+  for task in due {
+    A::read_inputs(self.adapter, ctx.image, task.slice)
+  }
+  // Write PI outputs to plant (EtherCAT outputs → plant)
   for task in due {
     A::write_outputs(self.adapter, ctx.image, task.slice)
   }
@@ -94,10 +97,7 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
   if self.session.terminated {
     return StopGraceful
   }
-  // Read inputs from PI into adapter
-  for task in self.session.schedule.tasks {
-    A::read_inputs(self.adapter, ctx.image, task.slice)
-  }
+  ignore(ctx)
   // Advance the plant model by one cycle period
   let result = A::step(
     self.adapter,

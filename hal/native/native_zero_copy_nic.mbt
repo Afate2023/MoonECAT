@@ -82,10 +82,15 @@ impl @hal.ZeroCopyNic for NativeZeroCopyNic with recv(
   let rx_ref = self.pool.acquire_rx()
   let buf = self.pool.buffer(rx_ref)
   let max_len = self.pool.frame_size
-  let length = match self.resolved_backend {
+  let length = (match self.resolved_backend {
     WindowsNpcap => npcap_recv_zero_copy(self.handle_id, buf, max_len)
     LinuxRawSocket => linux_recv_zero_copy(self.handle_id, buf, max_len)
     Auto => raise native_not_supported("zero-copy recv")
+  }) catch {
+    e => {
+      self.pool.release(rx_ref)
+      raise e
+    }
   }
   self.pool.mark_received(rx_ref, length)
 }

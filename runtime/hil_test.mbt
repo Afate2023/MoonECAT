@@ -203,6 +203,35 @@ test "build_task_schedule rejects overlapping output slices" {
 }
 
 ///|
+test "build_task_schedule rejects overlapping input slices" {
+  let tasks : Array[@runtime.TaskDescriptor] = [
+    {
+      name: "a",
+      priority: 0,
+      cycle_divisor: 1,
+      slice: {
+        output_offset: 0,
+        output_length: 4,
+        input_offset: 0,
+        input_length: 4,
+      },
+    },
+    {
+      name: "b",
+      priority: 1,
+      cycle_divisor: 1,
+      slice: {
+        output_offset: 4,
+        output_length: 4,
+        input_offset: 2,
+        input_length: 4,
+      },
+    },
+  ]
+  assert_true(@runtime.build_task_schedule(1_000_000L, tasks) is None)
+}
+
+///|
 test "build_task_schedule sorts by priority" {
   let tasks : Array[@runtime.TaskDescriptor] = [
     {

@@ -1,11 +1,17 @@
 ///|
-/// ProcessImageSlice — a zero-copy view into a contiguous region of a ProcessImage.
+/// ProcessImageSlice — a lightweight descriptor identifying a contiguous region
+/// of a ProcessImage for a single task/controller.
 ///
 /// Design rationale:
 ///   - HIL and multi-axis systems need isolated access to subsets of the PI
-///   - Each task/controller owns one or more slices without copying
-///   - Slices are bounded and checked at creation, not at every access
+///   - Each task/controller owns one or more slices; the descriptor itself is
+///     copy-free (just offsets + lengths)
+///   - Slices are bounds-checked at creation via `slice_from_mapping`
 ///   - Maps directly to DMA descriptor regions on MCU targets
+///
+/// Note: read_slice_inputs copies bytes out to a new Bytes value; write_slice_outputs
+/// rebuilds the relevant section of ProcessImage.outputs. For fully in-place I/O use
+/// @hal.MutableProcessImage with FixedArray[Byte] buffers.
 ///
 /// Safety: offsets are validated at slice creation; subsequent access is
 /// bounds-checked by the underlying Bytes API.
@@ -119,6 +125,14 @@ pub fn build_task_schedule(
       }
     }
   }
+  // Validate no overlapping input regions
+  for i = 0; i < tasks.length(); i = i + 1 {
+    for j = i + 1; j < tasks.length(); j = j + 1 {
+      if slices_overlap_input(tasks[i].slice, tasks[j].slice) {
+        return None
+      }
+    }
+  }
   // Sort by priority
   let sorted = tasks.copy()
   sorted.sort_by(fn(a, b) { a.priority.compare(b.priority) })
@@ -133,6 +147,16 @@ fn slices_overlap_output(a : ProcessImageSlice, b : ProcessImageSlice) -> Bool {
   let a_end = a.output_offset + a.output_length
   let b_end = b.output_offset + b.output_length
   a.output_offset < b_end && b.output_offset < a_end
+}
+
+///|
+fn slices_overlap_input(a : ProcessImageSlice, b : ProcessImageSlice) -> Bool {
+  if a.input_length == 0 || b.input_length == 0 {
+    return false
+  }
+  let a_end = a.input_offset + a.input_length
+  let b_end = b.input_offset + b.input_length
+  a.input_offset < b_end && b.input_offset < a_end
 }
 
 ///|
@@ -160,6 +184,8 @@ pub fn read_slice_inputs(
 
 ///|
 /// Write output bytes for a slice into a ProcessImage.
+/// Builds a new Bytes value for image.outputs with the slice region replaced
+/// by `data`. Bytes outside the slice are preserved unchanged.
 pub fn write_slice_outputs(
   image : @protocol.ProcessImage,
   slice : ProcessImageSlice,
@@ -170,13 +196,11 @@ pub fn write_slice_outputs(
   } else {
     slice.output_length
   }
-  let buf = @buffer.new(size_hint=image.output_size)
-  for i = 0; i < image.output_size; i = i + 1 {
+  image.outputs = Bytes::makei(image.output_size, fn(i) {
     if i >= slice.output_offset && i < slice.output_offset + len {
-      buf.write_byte(data[i - slice.output_offset])
+      data[i - slice.output_offset]
     } else {
-      buf.write_byte(image.outputs[i])
+      image.outputs[i]
     }
-  }
-  image.outputs = buf.to_bytes()
+  })
 }
