@@ -53,7 +53,14 @@ fn is_power_of_two(n : Int) -> Bool {
 ///|
 pub fn EventRing::new(capacity : Int, slot_size : Int) -> EventRing {
   let cap = if is_power_of_two(capacity) { capacity } else { 64 }
-  { capacity: cap, slot_size, write_idx: 0U, read_idx: 0U, slots: [] }
+  let empty_entry : RingEntry = { seq: 0U, length: 0, data: Bytes::new(0) }
+  {
+    capacity: cap,
+    slot_size,
+    write_idx: 0U,
+    read_idx: 0U,
+    slots: Array::make(cap, empty_entry),
+  }
 }
 
 ///|
@@ -89,7 +96,8 @@ pub fn EventRing::push(self : EventRing, data : Bytes) -> Bool {
     data.length()
   }
   let trimmed = Bytes::makei(length, fn(i) { data[i] })
-  self.slots.push({ seq, length, data: trimmed })
+  let idx = self.write_idx.reinterpret_as_int() % self.capacity
+  self.slots[idx] = { seq, length, data: trimmed }
   self.write_idx = self.write_idx + 1U
   true
 }
@@ -102,9 +110,6 @@ pub fn EventRing::pop(self : EventRing) -> RingEntry? {
     return None
   }
   let idx = self.read_idx.reinterpret_as_int() % self.capacity
-  if idx >= self.slots.length() {
-    return None
-  }
   let entry = self.slots[idx]
   self.read_idx = self.read_idx + 1U
   Some(entry)

@@ -101,9 +101,11 @@ pub fn fuzz_run(
   oracle : FuzzOracle,
 ) -> FuzzResult {
   let rng = FuzzRng::new(seed)
-  let _log = rng.generate_event_log(event_count)
+  let log = rng.generate_event_log(event_count)
+  let replay = ReplayNic::from_log(log)
   // Replay through a ReplayNic and check oracle after each step
   for i in 0..<event_count {
+    apply_replay_event(replay, replay.log.events[i])
     if !(oracle.check)() {
       return {
         seed,
@@ -115,6 +117,22 @@ pub fn fuzz_run(
     }
   }
   { seed, event_count, crashed: false, crash_at: -1, error_msg: "" }
+}
+
+///|
+fn apply_replay_event(replay : ReplayNic, event : NicEvent) -> Unit {
+  match event {
+    Sent(data, _) => ignore(Ok(replay.send(data)) catch { _ => Err(()) })
+    SendFailed(_) => ignore(Ok(replay.send(b"")) catch { _ => Err(()) })
+    Received(_) =>
+      ignore(Ok(replay.recv(timeout=@hal.Duration(0L))) catch { _ => Err(()) })
+    RecvTimeout =>
+      ignore(Ok(replay.recv(timeout=@hal.Duration(0L))) catch { _ => Err(()) })
+    RecvFailed(_) =>
+      ignore(Ok(replay.recv(timeout=@hal.Duration(0L))) catch { _ => Err(()) })
+    LinkDown =>
+      ignore(Ok(replay.recv(timeout=@hal.Duration(0L))) catch { _ => Err(()) })
+  }
 }
 
 ///|

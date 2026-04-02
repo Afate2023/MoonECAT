@@ -45,6 +45,20 @@ test "EventRing full detection" {
 }
 
 ///|
+test "EventRing overwrites slots on wraparound" {
+  let ring = @mcu.EventRing::new(2, 16)
+  assert_true(ring.push(Bytes::make(1, b'\x01')))
+  assert_true(ring.push(Bytes::make(1, b'\x02')))
+  guard ring.pop() is Some(first) else { fail("missing first entry") }
+  assert_eq(first.data[0], b'\x01')
+  assert_true(ring.push(Bytes::make(1, b'\x03')))
+  guard ring.pop() is Some(second) else { fail("missing second entry") }
+  assert_eq(second.data[0], b'\x02')
+  guard ring.pop() is Some(third) else { fail("missing wrapped entry") }
+  assert_eq(third.data[0], b'\x03')
+}
+
+///|
 test "SharedMemoryRegion creation" {
   let region = @mcu.SharedMemoryRegion::new("ecat_ring", 0x2000_0000U, 65536)
   inspect(region.name, content="ecat_ring")
