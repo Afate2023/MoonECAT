@@ -41,4 +41,6 @@ jobs:
 
       - name: Run tests
         run: |
+          moon check
+          moon info
           moon test
