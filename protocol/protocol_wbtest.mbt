@@ -5,13 +5,13 @@ test "decode_dl_error_counters parses crafted register data" {
   // Port 1: frame=20, physical=15
   // Port 2: frame=0, physical=0
   // Port 3: frame=255, physical=128
-  let rx_data = Bytes::of([10, 5, 20, 15, 0, 0, 255, 128])
+  let rx_data = Bytes::from_array([10, 5, 20, 15, 0, 0, 255, 128])
   // Forwarded RX Error + EPU + PDI: 0x0308–0x030D (6 bytes)
   // Fwd Port 0=3, Port 1=7, Port 2=0, Port 3=1, EPU=42, PDI=99
-  let fwd_data = Bytes::of([3, 7, 0, 1, 42, 99])
+  let fwd_data = Bytes::from_array([3, 7, 0, 1, 42, 99])
   // Lost Link Counters: 0x0310–0x0313 (4 bytes)
   // Port 0=11, Port 1=22, Port 2=0, Port 3=33
-  let lost_data = Bytes::of([11, 22, 0, 33])
+  let lost_data = Bytes::from_array([11, 22, 0, 33])
   let counters = decode_dl_error_counters(rx_data, fwd_data, lost_data)
   // Port 0
   assert_eq(counters.ports[0].frame_errors, 10U)
@@ -59,9 +59,9 @@ test "decode_dl_error_counters handles short data gracefully" {
 ///|
 test "decode_dl_error_counters saturated counters at 0xFF" {
   // All counters at maximum (0xFF = 255, saturation point per ETG.1000.4)
-  let rx_data = Bytes::of([255, 255, 255, 255, 255, 255, 255, 255])
-  let fwd_data = Bytes::of([255, 255, 255, 255, 255, 255])
-  let lost_data = Bytes::of([255, 255, 255, 255])
+  let rx_data = Bytes::from_array([255, 255, 255, 255, 255, 255, 255, 255])
+  let fwd_data = Bytes::from_array([255, 255, 255, 255, 255, 255])
+  let lost_data = Bytes::from_array([255, 255, 255, 255])
   let counters = decode_dl_error_counters(rx_data, fwd_data, lost_data)
   for i = 0; i < 4; i = i + 1 {
     assert_eq(counters.ports[i].frame_errors, 255U)

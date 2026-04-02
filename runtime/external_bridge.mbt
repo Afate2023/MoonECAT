@@ -183,17 +183,3 @@ pub fn decode_step_response(data : Bytes, input_size : Int) -> (Byte, Bytes) {
   })
   (status, inputs)
 }
-
-///|
-fn write_i64_le_bytes(value : Int64) -> Bytes {
-  Bytes::makei(8, fn(i) { (value >> (i * 8)).to_byte() })
-}
-
-///|
-fn read_i64_le(buf : Bytes, offset : Int) -> Int64 {
-  let mut result = 0L
-  for i = 0; i < 8; i = i + 1 {
-    result = result.lor(buf[offset + i].to_int64() << (i * 8))
-  }
-  result
-}

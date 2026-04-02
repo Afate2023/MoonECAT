@@ -35,15 +35,6 @@ fn read_u16_le_fixed(buf : FixedArray[Byte], offset : Int) -> UInt {
 }
 
 ///|
-/// Read a 32-bit little-endian value from a FixedArray[Byte].
-fn read_u32_le_fixed(buf : FixedArray[Byte], offset : Int) -> UInt {
-  buf[offset].to_int().reinterpret_as_uint() |
-  (buf[offset + 1].to_int().reinterpret_as_uint() << 8) |
-  (buf[offset + 2].to_int().reinterpret_as_uint() << 16) |
-  (buf[offset + 3].to_int().reinterpret_as_uint() << 24)
-}
-
-///|
 /// Encode a single LRW PDU frame directly into a FixedArray[Byte] buffer.
 /// Returns the total frame length written.
 /// This is the zero-allocation hot-path encoder for PDO exchange.

@@ -118,6 +118,7 @@ pub(all) struct NativeZeroCopyNic {
   mut resolved_backend : NativeBackendKind
 }
 pub fn NativeZeroCopyNic::new(NativeNicConfig, @hal.FramePool) -> Self
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic
 
 // Type aliases
 

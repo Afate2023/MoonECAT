@@ -1340,7 +1340,7 @@ fn run_cycle_perf_command(
   ndjson_text : String,
   period_ns : Int64,
   as_json : Bool,
-) -> Unit raise @hal.EcError {
+) -> Unit {
   let log = @mock.NicEventLog::from_ndjson(ndjson_text)
   let analyzer = @runtime.CyclePerfAnalyzer::new(period_ns)
   // Feed timestamps from event log

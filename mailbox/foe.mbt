@@ -329,7 +329,7 @@ pub fn decode_foe_response(
 }
 
 ///|
-fn write_u32_le(buf : @buffer.T, value : UInt) -> Unit {
+fn write_u32_le(buf : @buffer.Buffer, value : UInt) -> Unit {
   buf.write_byte((value & 0xFFU).to_byte())
   buf.write_byte(((value >> 8) & 0xFFU).to_byte())
   buf.write_byte(((value >> 16) & 0xFFU).to_byte())

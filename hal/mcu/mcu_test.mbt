@@ -10,7 +10,7 @@ test "McuNic open raises NotSupported" {
   let result : Result[@mcu.McuNic, _] = Ok(@hal.Nic::open_("eth0")) catch {
     e => Err(e)
   }
-  inspect(result.is_err(), content="true")
+  inspect(result is Err(_), content="true")
 }
 
 ///|

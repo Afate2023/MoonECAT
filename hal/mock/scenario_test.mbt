@@ -83,7 +83,7 @@ test "VirtualMailbox SDO upload" {
   let mbx = @mock.VirtualMailbox::new()
   mbx.add_od(0x1018U, b'\x01', Bytes::make(4, b'\x42'))
   let response = mbx.handle_sdo_upload(0x1018U, b'\x01')
-  inspect(response.is_empty(), content="false")
+  inspect(response is None, content="false")
 }
 
 ///|
@@ -98,7 +98,7 @@ test "VirtualMailbox SDO download" {
   inspect(response.length() > 0, content="true")
   // Verify data was updated
   let entry = mbx.find_od(0x6000U, b'\x00')
-  inspect(entry.is_empty(), content="false")
+  inspect(entry is None, content="false")
 }
 
 ///|
@@ -106,7 +106,7 @@ test "VirtualMailbox SDO abort on missing entry" {
   let mbx = @mock.VirtualMailbox::new()
   let response = mbx.handle_sdo_upload(0xFFFFU, b'\x00')
   // Should return an abort frame
-  inspect(response.is_empty(), content="false")
+  inspect(response is None, content="false")
 }
 
 ///|

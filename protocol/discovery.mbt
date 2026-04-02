@@ -344,12 +344,12 @@ pub fn[N : @hal.Nic] read_station_alias(
 pub fn[N : @hal.Nic] write_station_alias(
   nic : N,
   station : UInt,
-  alias : UInt,
+  station_alias : UInt,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let buf = Bytes::from_array([
-    (alias & 0xFFU).to_byte(),
-    ((alias >> 8) & 0xFFU).to_byte(),
+    (station_alias & 0xFFU).to_byte(),
+    ((station_alias >> 8) & 0xFFU).to_byte(),
   ])
   let _ = write_register_fp(nic, station, reg_station_alias, buf, timeout)
 }
