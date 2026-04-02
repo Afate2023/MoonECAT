@@ -36,6 +36,9 @@ jobs:
 
       - name: Update MoonBit dependencies
         run: |
-            moon version --all
-            moon update
-            
+          moon version --all
+          moon update
+
+      - name: Run tests
+        run: |
+          moon test
