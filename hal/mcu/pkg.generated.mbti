@@ -1,0 +1,101 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "afate/MoonECAT/hal/mcu"
+
+import {
+  "afate/MoonECAT/hal",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub(all) struct BridgeConfig {
+  event_ring : EventRing
+  region : SharedMemoryRegion
+  max_batch : Int
+} derive(Show)
+pub fn BridgeConfig::new(SharedMemoryRegion, capacity? : Int, slot_size? : Int, max_batch? : Int) -> Self
+
+pub(all) struct BridgeStats {
+  mut total_pushed : Int64
+  mut total_popped : Int64
+  mut total_dropped : Int64
+  mut max_fill_level : Int
+} derive(Show)
+pub fn BridgeStats::new() -> Self
+pub fn BridgeStats::record_pop(Self) -> Unit
+pub fn BridgeStats::record_push(Self, Bool) -> Unit
+pub fn BridgeStats::update_fill(Self, Int) -> Unit
+
+pub(all) struct EventRing {
+  capacity : Int
+  slot_size : Int
+  mut write_idx : UInt
+  mut read_idx : UInt
+  slots : Array[RingEntry]
+} derive(Show)
+pub fn EventRing::is_empty(Self) -> Bool
+pub fn EventRing::is_full(Self) -> Bool
+pub fn EventRing::len(Self) -> Int
+pub fn EventRing::new(Int, Int) -> Self
+pub fn EventRing::pop(Self) -> RingEntry?
+pub fn EventRing::push(Self, Bytes) -> Bool
+
+pub(all) struct McuClock {
+  platform : McuPlatform
+  timer_freq_hz : Int64
+} derive(Show)
+pub fn McuClock::new(McuPlatform, Int64) -> Self
+pub impl @hal.Clock for McuClock
+
+pub(all) struct McuNic {
+  config : McuNicConfig
+  mut opened : Bool
+  mut tx_count : Int64
+  mut rx_count : Int64
+} derive(Show)
+pub fn McuNic::new(McuNicConfig) -> Self
+pub impl @hal.Nic for McuNic
+
+pub(all) struct McuNicConfig {
+  platform : McuPlatform
+  base_addr : UInt
+  rx_irq : Int
+  tx_irq : Int
+  ring_size : Int
+} derive(Show)
+pub fn McuNicConfig::default(McuPlatform) -> Self
+
+pub(all) enum McuPlatform {
+  RzN2L
+  Hpm6E00
+  Stm32H7Lan9252
+  Generic
+} derive(Eq, Show)
+
+pub(all) struct McuZeroCopyNic {
+  config : McuNicConfig
+  mut opened : Bool
+} derive(Show)
+pub fn McuZeroCopyNic::new(McuNicConfig) -> Self
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic
+
+pub(all) struct RingEntry {
+  seq : UInt
+  length : Int
+  data : Bytes
+} derive(Show)
+
+pub(all) struct SharedMemoryRegion {
+  name : String
+  mcu_base_addr : UInt
+  size : Int
+  cache_coherent : Bool
+} derive(Show)
+pub fn SharedMemoryRegion::new(String, UInt, Int, cache_coherent? : Bool) -> Self
+
+// Type aliases
+
+// Traits
+

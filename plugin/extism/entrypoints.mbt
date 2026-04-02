@@ -509,6 +509,30 @@ fn diagnostic_surface_json(surface : @runtime.DiagnosticSurface) -> Json {
     "issues": Json::array(
       surface.issues.map(fn(issue) { diagnostic_issue_json(issue) }),
     ),
+    "monitor_verdicts": match surface.monitor_verdicts {
+      Some(results) =>
+        Json::array(
+          results.map(fn(r) {
+            Json::object({
+              "name": Json::string(r.name),
+              "verdict": Json::string(r.verdict.to_string()),
+            })
+          }),
+        )
+      None => Json::null()
+    },
+    "overall_verdict": match surface.overall_verdict {
+      Some(v) => Json::string(v.to_string())
+      None => Json::null()
+    },
+    "topology_fingerprint": match surface.topology_fingerprint {
+      Some(fp) =>
+        Json::object({
+          "slave_count": Json::number(fp.slave_count.to_double()),
+          "identity_hash": Json::number(fp.identity_hash.to_double()),
+        })
+      None => Json::null()
+    },
   })
 }
 

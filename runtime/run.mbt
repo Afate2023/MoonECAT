@@ -601,7 +601,7 @@ fn should_retry_process_data_lengths_after_mailbox_refresh(
 ) -> Bool {
   match result {
     Ok((output_bytes, input_bytes)) =>
-      not(has_process_data_length_override(output_bytes, input_bytes))
+      !has_process_data_length_override(output_bytes, input_bytes)
     Err(@hal.EcError::MailboxTimeout) => true
     Err(@hal.EcError::MailboxProtocol(message)) =>
       message.contains("deactivated/reset")
@@ -671,7 +671,7 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
       let has_override = has_process_data_length_override(
         output_bytes, input_bytes,
       )
-      if not(has_override) {
+      if !has_override {
         preparation
       } else {
         let mapping = map_with_process_data_lengths(
@@ -798,7 +798,7 @@ fn derive_startup_outputs(
       }
     _ => ()
   }
-  if not(wrote) {
+  if !wrote {
     return None
   }
   Some(Bytes::from_array(seed))
@@ -927,7 +927,7 @@ pub fn[N : @hal.Nic] apply_startup_mailbox_commands(
   transition : StartupCommandTransition,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  if not(mailbox_config.is_valid()) || commands.length() <= 0 {
+  if !mailbox_config.is_valid() || commands.length() <= 0 {
     return
   }
   let rmsm = @mailbox.Rmsm::new(max_retries=0)
@@ -1095,7 +1095,7 @@ fn[N : @hal.Nic] verify_mailbox_sm_readback(
   let actual = @protocol.read_register_fp(
       nic, station, sm_addr, @protocol.sm_entry_size, timeout,
     ).data
-  if not(mailbox_sm_field_matches(expected, actual)) {
+  if !mailbox_sm_field_matches(expected, actual) {
     raise @hal.EcError::MailboxProtocol(
       "mailbox SyncManager readback mismatch at SM" +
       sm_index.to_string() +
@@ -1457,7 +1457,7 @@ fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
   let stations = scan_report.slaves.map(fn(slave) { slave.station_address })
 
   let validate_report = validate(scan_report, expected)
-  if not(validate_report.all_ok) {
+  if !validate_report.all_ok {
     return {
       scan: scan_report,
       validation: validate_report,
@@ -1810,7 +1810,7 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
   preop_ready : Bool,
   esm_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)],
 ) -> RunFault? {
-  if not(preop_ready) {
+  if !preop_ready {
     let preop_fault = transition_stations_to_preop_with_mailbox(
       nic, stations, timeout, esm_policies,
     )

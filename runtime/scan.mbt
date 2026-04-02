@@ -172,7 +172,7 @@ fn plan_scan_station_addresses_preserve_existing_unique_non_zero(
   for item in observed {
     let current_station_address = item.current_station_address
     if should_preserve_scan_station_address(current_station_address, observed) &&
-      not(array_contains_uint(used, current_station_address)) {
+      !array_contains_uint(used, current_station_address) {
       planned.push(current_station_address)
       used.push(current_station_address)
     } else {
@@ -259,17 +259,17 @@ fn[N : @hal.Nic] read_best_identity(
 ) -> @hal.SlaveIdentity {
   let ap_sii = try? read_identity_from_sii_ap(nic, position, timeout)
   match ap_sii {
-    Ok(identity) if not(identity_is_zero(identity)) => identity
+    Ok(identity) if !identity_is_zero(identity) => identity
     _ => {
       let fp_sii = try? read_identity_from_sii(nic, station, timeout)
       match fp_sii {
-        Ok(identity) if not(identity_is_zero(identity)) => identity
+        Ok(identity) if !identity_is_zero(identity) => identity
         _ => {
           let ap_regs = try? read_identity_from_registers_ap(
             nic, position, timeout,
           )
           match ap_regs {
-            Ok(identity) if not(identity_is_zero(identity)) => identity
+            Ok(identity) if !identity_is_zero(identity) => identity
             _ =>
               read_identity_from_registers(nic, station, timeout) catch {
                 _ =>

@@ -2,9 +2,18 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 2 节中 M5 到 M8。
 
+> **进度摘要**：M5-M7 全部完成 ✅；M8 为当前活跃里程碑，涵盖 L2→L4 跨度与主线 A 收口。
+
+| 里程碑 | 领域 | L 级 | 主线 | 状态 |
+|:---:|---|:---:|:---:|:---:|
+| M5 | CoE/SDO / 邮箱引擎 | L2 | — | ✅ |
+| M6 | 网络配置增强 | L2 | — | ✅ |
+| M7 | DC 同步 | L2 | — | ✅ |
+| M8 | CLI·集成·多后端 | L2-L4 | A | ⚠️ |
+
 ## 2. 里程碑任务（续）
 
-### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，含分段/CA/Info
+### M5 CoE/SDO、邮箱引擎 — ✅ 核心事务已闭环，含分段/CA/Info 【L2】
 
 - [x] 实现 MailboxHeader 编解码。
   - 📦 MailboxHeader::to_bytes/from_bytes + MailboxType 枚举
@@ -61,7 +70,7 @@
 - `SYNC1 独立配置` → `1acf07d` `feat(protocol): add SYNC1 configuration to dc_configure_sync0 per EtherCAT Compendium §5.5`
 - `EEPROM 数据写入` → `c0f4f6a` `feat(protocol): add EEPROM word-level write (ETG1500 #305)`
 
-### M6 网络配置增强 — ✅ 已完成
+### M6 网络配置增强 — ✅ 已完成 【L2】
 
 - [x] **EEPROM/SII 寄存器级读取流程**：通过 ESC 寄存器 0x0502-0x0508 读取 EEPROM 内容 [ETG.1500 #305]
   - ✅ [protocol/eeprom.mbt](../protocol/eeprom.mbt): eeprom_read_word/eeprom_read
@@ -86,7 +95,7 @@
 - `AP 邮箱诊断路径` → `b70b5e2` `feat(protocol): add AP mailbox diagnosis path`
 - `Diagnosis AL State / Error Flag / Status Code 增强` → `2fdf472` `feat(diagnosis): enhance diagnosis reporting with AL state, error flag, and status code`
 
-### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成
+### M7 DC 同步 — ✅ 基础能力与运行态补偿已完成 【L2】
 
 - [x] DC 初始化流程：传播延迟测量 + Offset 补偿 + Start Time 写入 [ETG.1500 #1101]
   - ✅ [protocol/dc.mbt](../protocol/dc.mbt): `dc_configure_linear`、`dc_configure_sync0`
@@ -106,7 +115,7 @@
 - `传播延迟估计模型改进` → `4287d29` `feat: improve dc propagation delay estimation`
 - `运行态连续传播延迟补偿（周期重估）` → `0971f77` `feat: complete sdo info and runtime dc compensation`
 
-### M8 CLI、文档、最终集成与多后端交付 — ⚠️ Native / Extism 后端待落地
+### M8 CLI、文档、最终集成与多后端交付 — ⚠️ Native / Extism 后端待落地 【L2-L4 · 主线 A】
 
 - [x] 实现 `moonecat scan` 命令（库层接口）。
   - 📦 [runtime/scan.mbt](../runtime/scan.mbt): scan() → ScanReport

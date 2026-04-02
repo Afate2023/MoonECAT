@@ -1,7 +1,11 @@
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/protocol",
+  "afate/MoonECAT/runtime",
 }
 
 import {
+  "afate/MoonECAT/fixtures",
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/protocol",
 } for "test"

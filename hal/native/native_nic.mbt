@@ -85,8 +85,8 @@ pub fn native_list_interfaces(
 pub fn native_interface_is_probe_candidate(
   interface : NativeInterfaceInfo,
 ) -> Bool {
-  not(interface.loopback) &&
-  not(interface.wireless) &&
+  !interface.loopback &&
+  !interface.wireless &&
   interface.up &&
   interface.connected
 }
@@ -255,7 +255,7 @@ pub impl @hal.Nic for NativeNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for NativeNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.last_sent = data
@@ -269,7 +269,7 @@ pub impl @hal.Nic for NativeNic with send(self, data) {
 ///|
 pub impl @hal.Nic for NativeNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   for _attempt = 0; _attempt < 4; _attempt = _attempt + 1 {

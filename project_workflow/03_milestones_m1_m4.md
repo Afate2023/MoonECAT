@@ -2,6 +2,16 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 1 节与第 2 节中 M1 到 M4。
 
+> **归档状态**：M1-M4 全部已完成 ✅，覆盖 **L1 Foundation** 与 **L2 Protocol Core** 早期阶段。  
+> 当前主线推进请参阅 [04_milestones_m5_m8.md](04_milestones_m5_m8.md) 与 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md)。
+
+| 里程碑 | 领域 | L 级 | 状态 |
+|:---:|---|:---:|:---:|
+| M1 | 基础骨架与包结构 | L1 | ✅ |
+| M2 | 协议编解码与帧收发 | L1 | ✅ |
+| M3 | ESM + PDO + DC 初始化 | L2 | ✅ |
+| M4 | Mailbox / CoE / SDO | L2 | ✅ |
+
 ## 1. 使用规则
 
 - 任务完成后再打勾，不能按预期完成时补充阻塞说明。
@@ -12,7 +22,7 @@
 
 ## 2. 里程碑任务
 
-### M1 基础骨架与包结构 — ✅ 已完成
+### M1 基础骨架与包结构 — ✅ 已完成 【L1】
 
 - [x] 建立稳定的 MoonBit 包结构，明确 HAL、Protocol Core、Mailbox、Runtime、CLI 的目录边界。
   - 📦 hal/, protocol/, mailbox/, runtime/, fixtures/, cmd/main/
@@ -30,7 +40,7 @@
 - `HAL 最小接口 + 错误/诊断/配置模型` → `fb12340` `feat: define platform hal contracts`
 - `最小测试骨架与夹具` → `4921fdf` `test: add minimal project test harness`
 
-### M2 HAL 与帧/PDU 最小闭环 — ✅ 已完成
+### M2 HAL 与帧/PDU 最小闭环 — ✅ 已完成 【L1】
 
 - [x] 实现 Ethernet II 与 EtherCAT 基本帧结构的编码、解码和校验。
   - 📦 EcFrame::encode/decode, EtherType 0x88A4 [ETG.1500 #107]
@@ -51,7 +61,7 @@
 - `Mock Loopback 后端` → `641fc49` `feat: add mock loopback hal`
 - `帧/PDU 收发闭环测试` → `5ab7859` `test: cover frame and pdu roundtrip`
 
-### M3 拓扑发现、SII/ESI、配置计算 — ✅ 已完成
+### M3 拓扑发现、SII/ESI、配置计算 — ✅ 已完成 【L2】
 
 - [x] 实现基础从站发现流程和拓扑结果对象。
   - 📦 count_slaves(BRD), SlaveInfo, ScanReport [ETG.1500 #301]
@@ -79,7 +89,7 @@
 - `SII ETG2010 v1.0.2 对齐` → `2074429` `fix(sii): align SII parsing with ETG2010 v1.0.2 conformance gaps`
 - `AL Status Code / SDO Abort Code 描述表` → `d19db2d` `feat(protocol): add AL Status Code and SDO Abort Code description tables per ETG.1000.6`
 
-### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成
+### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成 【L2】
 
 - [x] 实现 ESM 状态流转和错误回退路径。
   - 📦 EsmState 5 状态 + can_transition + request_state + transition_through [ETG.1500 #104]
@@ -95,6 +105,7 @@
   - 📦 [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) (~13 tests)
 - [x] **【缺口】pdo_exchange 实体循环**：完成 LRW/LRD/LWR 实际收发，使 run_cycle 能驱动真实 PDO 交换 [ETG.1500 #201]
   - ✅ 代码审查确认 pdo_exchange 已完整实现 (LRW + logical addressing)
+  - ✅ 2026-04-01 按 SOES 的 FMMU / process-data 模型继续补齐 [hal/mock/virtual_slave.mbt](../hal/mock/virtual_slave.mbt)、[hal/mock/virtual_bus.mbt](../hal/mock/virtual_bus.mbt) 与 [hal/mock/virtual_bus_test.mbt](../hal/mock/virtual_bus_test.mbt)，使 VirtualBus 在 mock 多从站场景下实际执行 LRD/LWR/LRW 逻辑寻址、单从站/多从站 PDO 交换和 Init→Op 生命周期回归（commit: `e1fee13`，验证：`moon test --target wasm-gc hal/mock` = `48/48`、`moon test --target wasm-gc hal hal/mock protocol mailbox fixtures` = `310/310`、`moon test --target wasm-gc .` = `2/2`）
 - [x] **【缺口】Device Emulation 感知**：ESM 引擎根据 SII DeviceEmulation 标志跳过 Error Indication Acknowledge [ETG.1500 #103]
   - ✅ [protocol/esm_extensions.mbt](../protocol/esm_extensions.mbt) : read_device_emulation + request_state_aware
 - [x] **【缺口】ESM 超时值**：从 SII/ESI 或 ETG.1020 默认值获取 ESM 转换超时 [ETG.1500 §5.3.4]
@@ -107,6 +118,7 @@
 提交映射（选项 → commit）：
 - `ESM 状态流转与回退` → `b4019b1` `feat: add esm transition engine`
 - `PDO 周期交换主循环` → `cfd6f14` `feat: add pdo runtime loop`
+- `Mock FMMU 逻辑 PDO 路由与多从站回归` → `e1fee13` `feat(mock): add FMMU logical PDO routing`
 - `运行时调度与 telemetry` → `ddc6158` `feat: add runtime scheduler and telemetry`
 - `Free Run 与恢复路径测试` → `3ccd459` `test: cover free-run and recovery paths`
 - `Device Emulation + OpOnly 扩展` → `89f0cc4` `feat: implement P0 gaps — mailbox transport, RMSM, SDO transaction, EEPROM read, ESM extensions`

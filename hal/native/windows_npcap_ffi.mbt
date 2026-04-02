@@ -40,7 +40,7 @@ pub fn windows_npcap_runtime_available() -> Bool {
 
 ///|
 pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError {
-  if not(windows_npcap_runtime_available()) {
+  if !windows_npcap_runtime_available() {
     raise @hal.EcError::NotSupported("Npcap runtime is not available")
   }
   @utf8.decode_lossy(ffi_windows_npcap_list_interfaces_text())
@@ -48,7 +48,7 @@ pub fn windows_npcap_list_interfaces_text() -> String raise @hal.EcError {
 
 ///|
 pub fn windows_npcap_list_interfaces_json() -> String raise @hal.EcError {
-  if not(windows_npcap_runtime_available()) {
+  if !windows_npcap_runtime_available() {
     raise @hal.EcError::NotSupported("Npcap runtime is not available")
   }
   @utf8.decode_lossy(ffi_windows_npcap_list_interfaces_json())
@@ -56,7 +56,7 @@ pub fn windows_npcap_list_interfaces_json() -> String raise @hal.EcError {
 
 ///|
 pub fn windows_npcap_open(config : NativeNicConfig) -> Int raise @hal.EcError {
-  if not(windows_npcap_runtime_available()) {
+  if !windows_npcap_runtime_available() {
     raise @hal.EcError::NotSupported("Npcap runtime is not available")
   }
   let handle_id = ffi_windows_npcap_open(

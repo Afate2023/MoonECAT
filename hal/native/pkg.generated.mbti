@@ -28,6 +28,10 @@ pub fn linux_raw_socket_runtime_available() -> Bool
 
 pub fn linux_raw_socket_send(Int, Bytes) -> Int raise @hal.EcError
 
+pub fn linux_recv_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
+pub fn linux_send_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
 pub fn native_backend_available(NativeBackendKind) -> Bool
 
 pub fn native_interface_is_probe_candidate(NativeInterfaceInfo) -> Bool
@@ -41,6 +45,10 @@ pub fn native_list_interfaces_json(NativeBackendKind) -> String raise @hal.EcErr
 pub fn native_list_interfaces_text(NativeBackendKind) -> String raise @hal.EcError
 
 pub fn native_stub_version() -> Int
+
+pub fn npcap_recv_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
+
+pub fn npcap_send_zero_copy(Int, FixedArray[Byte], Int) -> Int raise @hal.EcError
 
 pub fn parse_native_interface_listing(Json) -> NativeInterfaceListing raise @hal.EcError
 
@@ -101,6 +109,15 @@ pub(all) struct NativeNicConfig {
   promisc : Bool
   timeout_ms : Int
 } derive(Eq, Show)
+
+pub(all) struct NativeZeroCopyNic {
+  config : NativeNicConfig
+  pool : @hal.FramePool
+  mut handle_id : Int
+  mut is_open : Bool
+  mut resolved_backend : NativeBackendKind
+}
+pub fn NativeZeroCopyNic::new(NativeNicConfig, @hal.FramePool) -> Self
 
 // Type aliases
 

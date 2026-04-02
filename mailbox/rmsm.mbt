@@ -128,7 +128,7 @@ pub fn Rmsm::begin_read_repeat(
       "RMSM: cannot request mailbox repeat in state " + self.state.to_string(),
     )
   }
-  self.repeat_request = not(self.repeat_request)
+  self.repeat_request = !self.repeat_request
   self.awaiting_repeat_ack = true
   { request: self.repeat_request, acknowledge: false }.apply_to_activate_byte(
     activate,

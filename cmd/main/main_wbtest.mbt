@@ -457,7 +457,7 @@ test "cli master config helper enables dc when cycle is present" {
   assert_eq(dc_config.cycle_period_ns, 250_000L)
 
   let default_config = @runtime.master_config_with_optional_dc(None)
-  assert_true(not(default_config.dc_enabled))
+  assert_true(!default_config.dc_enabled)
   assert_eq(default_config.cycle_period_ns, 1_000_000L)
 }
 
@@ -1278,7 +1278,7 @@ pub impl @hal.Nic for StrictTransitionNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for StrictTransitionNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1328,7 +1328,7 @@ pub impl @hal.Nic for StrictTransitionNic with send(self, data) {
 ///|
 pub impl @hal.Nic for StrictTransitionNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1400,7 +1400,7 @@ test "cli state transition report text includes broadcast mode and wkc" {
   assert_true(text.contains("Mode: broadcast"))
   assert_true(text.contains("Target: Init"))
   assert_true(text.contains("WKC: 0"))
-  assert_true(not(text.contains("Station:")))
+  assert_true(!text.contains("Station:"))
 }
 
 ///|

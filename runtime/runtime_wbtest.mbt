@@ -125,7 +125,7 @@ fn ActivePdoLengthsNic::new(
     is_open: true,
     mailbox_ready: false,
     send_timeout_poll_budget: send_timeout_transactions * 32,
-    mailbox_mapping_ready: not(require_mailbox_mapping_refresh),
+    mailbox_mapping_ready: !require_mailbox_mapping_refresh,
     sm_windows: Array::makei(8, fn(_i) { Array::make(8, b'\x00') }),
   }
 }
@@ -302,7 +302,7 @@ pub impl @hal.Nic for ActivePdoLengthsNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -392,7 +392,7 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
 ///|
 pub impl @hal.Nic for ActivePdoLengthsNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -536,17 +536,13 @@ test "process data length refresh fallback only handles mailbox bootstrap failur
     ),
   )
   assert_true(
-    not(
-      should_retry_process_data_lengths_after_mailbox_refresh(
-        Ok((Some(6), None)),
-      ),
+    !should_retry_process_data_lengths_after_mailbox_refresh(
+      Ok((Some(6), None)),
     ),
   )
   assert_true(
-    not(
-      should_retry_process_data_lengths_after_mailbox_refresh(
-        Err(@hal.EcError::SdoAbort(0x06090011U)),
-      ),
+    !should_retry_process_data_lengths_after_mailbox_refresh(
+      Err(@hal.EcError::SdoAbort(0x06090011U)),
     ),
   )
 }
@@ -786,7 +782,7 @@ pub impl @hal.Nic for StrictRunTransitionNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for StrictRunTransitionNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -836,7 +832,7 @@ pub impl @hal.Nic for StrictRunTransitionNic with send(self, data) {
 ///|
 pub impl @hal.Nic for StrictRunTransitionNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -886,7 +882,7 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -970,7 +966,7 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with recv(
   timeout~,
 ) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1300,7 +1296,7 @@ pub impl @hal.Nic for StartupMappingNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for StartupMappingNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1354,7 +1350,7 @@ pub impl @hal.Nic for StartupMappingNic with send(self, data) {
 ///|
 pub impl @hal.Nic for StartupMappingNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response

@@ -2,6 +2,10 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原总述、Class B 功能对照、Class A 增量路线图与当前交付验收基线。
 
+> **整合说明**：ROADMAP 三条主线（A/B/C）与 BACKLOG（P0-P2）已整合进 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md)，并引入 L1-L4 成熟度分级。本文件继续作为 Class B 基线验收与 Class A 增量路线的主要载体，与 08 文件互补使用。
+
+> **成熟度定位**：Class B 功能对照表对应 **L1 Foundation + L2 Protocol Core** 全量完成；Class A 路线图延伸到 **L3 Product Surface** 与 **L4 Verification & Hardening**。
+
 ## 原始说明
 
 本清单基于 [MoonECAT项目申报书.md](../MoonECAT项目申报书.md) 与 [ETG.1500 Master Classes](../ETG1500_V1i0i2_D_R_MasterClasses/ETG1500_V1i0i2_D_R_MasterClasses.md) 整理，用于把项目目标转成可执行任务和可追踪提交。其中 [MoonECAT项目申报书.md](../MoonECAT项目申报书.md) 现主要作为交付基线文档使用，不再按立项申报材料维护。产品面仍保持 `Library API + CLI(scan/validate/run)` 双入口，但总体路线已调整为“**Class B 强制项已完成，继续向 ETG.1500 Class A 工程能力演进**”。`EoE/FoE/SoE/AoE/VoE` 不再作为永久排除项，而是保留为后续 feature pack 级扩展，不阻塞当前主线。
@@ -68,19 +72,23 @@
 
 > 来源：ETG.1500 对 Class A 的能力分层、EtherCAT_Compendium 对 Configuration Tool / ENI / 拓扑比较 / Hot Connect / 诊断分层的说明，以及 [src/SOEM-callflow-analysis.md](../src/SOEM-callflow-analysis.md)、[src/gatorcat-callflow-analysis.md](../src/gatorcat-callflow-analysis.md)、[src/ethercrab-callflow-analysis.md](../src/ethercrab-callflow-analysis.md)、[src/CherryECAT-callflow-analysis.md](../src/CherryECAT-callflow-analysis.md) 中的工程实现对照。
 
-| Class A 方向 | 标准/参考依据 | 当前状态 | 下一步落点 |
-|---|---|---|---|
-| 配置工具 + ENI 双源配置 | ETG.1500 5.5，EtherCAT_Compendium 对 ESI/ENI/Configuration Tool 的工程流说明；Gatorcat/SOEM 均有 ENI 或配置文件入口 | ⚠️ 已改成 `cmd/eni_json` 的 XML→JSON 中转：ENI XML 走统一配置 JSON，ESI XML 走共享 ESI JSON 中间模型；`validate --eni-json <path>` 与 `esi-sii -- --esi-json <path>` 分别消费各自 JSON 桥，并补上通过/警告/阻塞三级结论、完整差异项 JSON，以及最小 `SM/FMMU/PDO + mailbox/DC` 摘要；配置工具消费模型仍待补齐 | 继续补配置工具统一视图、启动时网络差异细分与更完整 offline 配置模型 |
-| CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT、EtherCrab、SOEM 均有完整 mailbox/SDO 流程 | ✅ 库层事务已完成 | 补 CLI / 配置工具入口与真实从站回归，避免能力停留在事务层 |
-| Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat 均在映射与批量访问中依赖 CA | ✅ 库层事务已完成 | 补用户面入口、批量对象浏览输出与 ENI 配置联动验证 |
-| SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium 强调对象字典与诊断工具链协同 | ⚠️ 已新增 Native CLI `od` 只读浏览入口，配置工具复用与错误分类仍待收口 | 补稳定错误分类、配置工具复用模型与实机 smoke 证据 |
-| Master Object Dictionary | ETG.1500 5.15.1，Class A 更强调统一主站信息表面 | ❌ 未实现 | 设计主站对象字典、配置摘要与诊断状态汇聚模型 |
-| 拓扑变化、显式标识与 Hot Connect | EtherCAT_Compendium 对拓扑比较、Explicit Device Identification、Hot Connect group 的说明；GatorCAT / ethercrab / SOEM 对从站顺序、别名、链路位置和可选从站处理的共同做法 | ⚠️ 已有显式标识读取、别名读取与 4-tuple 校验，但尚未冻结“拓扑指纹 / 可选组 / 启动告警”统一模型 | 继续补拓扑指纹、Hot Connect group/optional segment、启动期缺失从站分级和实机/回放证据 |
-| Multiple Tasks / Process Image 分区 | ETG.1500 5.4.2；EtherCrab/Gatorcat 展示了更细粒度 process image 与任务切分 | ➖ 目前以单任务 Free Run 优先 | 在 Free Run/DC 基线稳定后，再设计多任务调度与 process image 切片 |
-| EoE/FoE/SoE 等 feature pack | ETG.1500 5.8~5.10；CherryECAT/SOEM 提供协议面参考 | ➖ 当前不阻塞主线 | 在 Class A 主站基线完成后，按 feature pack 独立评估与落地 |
+| Class A 方向 | 标准/参考依据 | 当前状态 | L 级 | 主线 | 下一步落点 |
+|---|---|---|:---:|:---:|---|
+| 配置工具 + ENI 双源配置 | ETG.1500 5.5；Gatorcat/SOEM ENI 入口 | ⚠️ XML→JSON 中转已通，Pass/Warn/Block 已输出；配置工具消费待补 | L3 | A | 补配置工具统一视图与更完整 offline 配置模型 |
+| CoE 分段传输完整闭环 | ETG.1500 5.7；CherryECAT/EtherCrab/SOEM | ✅ 库层事务已完成 | L2 | — | 补 CLI / 配置工具入口与真实从站回归 |
+| Complete Access 完整支持 | ETG.1500 5.7；SOEM/EtherCrab/Gatorcat | ✅ 库层事务已完成 | L2 | — | 补用户面入口与 ENI 配置联动验证 |
+| SDO Info / 对象字典浏览 | ETG.1500 5.7；Compendium OD/诊断 | ⚠️ Native CLI `od` 已落地，配置工具复用待收口 | L3 | A | 补稳定错误分类与配置工具复用模型 |
+| Master Object Dictionary | ETG.1500 5.15.1 | ❌ 未实现 | L3 | B | 设计主站 OD、配置摘要与诊断汇聚模型 |
+| 拓扑变化 / Hot Connect | Compendium topology/Hot Connect；GatorCAT/ethercrab/SOEM | ⚠️ 显式标识+别名+4-tuple 已有，拓扑指纹待冻结 | L3-L4 | B | 补拓扑指纹与实机双分支证据 |
+| Multiple Tasks / Process Image | ETG.1500 5.4.2；EtherCrab/Gatorcat | ➖ 单任务 Free Run 优先 | L4 | C | DC 基线稳定后再设计 |
+| EoE/FoE/SoE 等 feature pack | ETG.1500 5.8~5.10 | ➖ 不阻塞主线 | — | — | Class A 基线完成后按 feature pack 评估 |
 
-## 0.2 当前交付验收基线（2026-03-12）
+## 0.2 当前交付验收基线
 
-- `moon test` 已通过，可作为仓库级最小回归闸门。
+> 成熟度快照：**L1** 9/9 ✅ · **L2** 22/22 ✅ · **L3** 15/15 ✅ · **L4** 7/13 ≈54%  
+> 测试：413+ tests passing · Class B 17/17 = 100%
+
+- `moon test` 413+ 用例通过，覆盖 Wasm-GC / Native 双后端，可作为仓库级最小回归闸门。
 - Windows Npcap 路径下 `moon run cmd/main state -- --backend native-windows-npcap --if <interface>` 已成功执行，可作为 Native `state` 入口 smoke 证据。
-- Native CLI 当前至少已具备 `list-if`、`read-sii`、`state`、`diagnosis`、`od` 等交付表面；其中 `state` 的最近一次实机执行已成功，`od` 已具备稳定文本/JSON 浏览输出。
+- Native CLI 当前具备 `list-if`、`read-sii`、`state`、`diagnosis`、`od` 等交付表面；其中 `state` 最近实机执行成功，`od` 已具备稳定文本/JSON 浏览输出。
+- SII Deep Read 全量解析已落地（Native CLI `read-sii --deep`），含 Category overlay 解码。

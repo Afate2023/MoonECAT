@@ -120,6 +120,9 @@ test "extism validate entry returns pass on mock replay" {
         "diagnosis_counter": null,
         "runtime_metrics": null,
         "issues": [],
+        "monitor_verdicts": null,
+        "overall_verdict": null,
+        "topology_fingerprint": null,
       },
     },
     "diagnostics": {
@@ -216,6 +219,9 @@ test "extism run entry returns replay run summary" {
           "dc_delay_updates": 0,
         },
         "issues": [],
+        "monitor_verdicts": null,
+        "overall_verdict": null,
+        "topology_fingerprint": null,
       },
     },
     "diagnostics": {

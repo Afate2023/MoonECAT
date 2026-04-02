@@ -97,7 +97,7 @@ pub fn[N : @hal.Nic] Runtime::init_dc(
   stations : Array[UInt],
   timeout : @hal.Duration,
 ) -> Bool raise @hal.EcError {
-  if not(self.config.dc_enabled) {
+  if !self.config.dc_enabled {
     self.dc_state = Disabled
     self.dc_reference_station = None
     self.dc_stations = []

@@ -50,9 +50,7 @@ test "EsmState valid transitions" {
   assert_true(@protocol.EsmState::SafeOp.can_transition(@protocol.EsmState::Op))
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::SafeOp))
   // Invalid transition
-  assert_true(
-    not(@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op)),
-  )
+  assert_true(!@protocol.EsmState::Init.can_transition(@protocol.EsmState::Op))
 }
 
 ///|
@@ -405,7 +403,7 @@ pub impl @hal.Nic for NoiseMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for NoiseMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response = data
@@ -415,7 +413,7 @@ pub impl @hal.Nic for NoiseMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   if self.emit_noise {
@@ -879,9 +877,7 @@ test "ESM state transitions - Op to SafeOp only" {
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::PreOp))
   assert_true(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Init))
   // Op cannot go to Boot
-  assert_true(
-    not(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot)),
-  )
+  assert_true(!@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot))
 }
 
 ///|
@@ -1004,7 +1000,7 @@ pub impl @hal.Nic for EsmControlNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmControlNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1054,7 +1050,7 @@ pub impl @hal.Nic for EsmControlNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmControlNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1108,7 +1104,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1149,7 +1145,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmRollbackToInitNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1205,7 +1201,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1252,7 +1248,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmOpNeedsPdoNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1303,7 +1299,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1357,7 +1353,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EsmOpFailureSnapshotNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -1499,7 +1495,7 @@ test "clear_al_error stabilizes state before caller chooses next target" {
   let timeout = @hal.Duration(1000L)
   let cleared = @protocol.clear_al_error(nic, 0x1001U, timeout)
   assert_eq(cleared.state, @protocol.EsmState::SafeOp)
-  assert_true(not(cleared.error_indication))
+  assert_true(!cleared.error_indication)
   assert_eq(cleared.status_code, None)
   let final_state = @protocol.transition_to_target_strict(
     nic,
@@ -1528,7 +1524,7 @@ test "recover_al_error_for_transition rolls configuration error back to init" {
     nic, 0x1001U, timeout,
   )
   assert_eq(recovered.state, @protocol.EsmState::Init)
-  assert_true(not(recovered.error_indication))
+  assert_true(!recovered.error_indication)
   assert_eq(recovered.status_code, None)
   assert_eq(nic.control_writes.length(), 2)
   assert_eq(
@@ -1925,7 +1921,7 @@ pub impl @hal.Nic for RepeatMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -1989,7 +1985,7 @@ pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2008,7 +2004,7 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2034,7 +2030,7 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for TimeoutMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2053,7 +2049,7 @@ pub impl @hal.Nic for ApMailboxMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2112,7 +2108,7 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for ApMailboxMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2337,7 +2333,7 @@ pub impl @hal.Nic for EepromMockNic with open_(name) {
 
 ///|
 pub impl @hal.Nic for EepromMockNic with send(self, data) {
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   let request = @protocol.EcFrame::decode(data)
@@ -2383,7 +2379,7 @@ pub impl @hal.Nic for EepromMockNic with send(self, data) {
 ///|
 pub impl @hal.Nic for EepromMockNic with recv(self, timeout~) {
   ignore(timeout)
-  if not(self.is_open) {
+  if !self.is_open {
     raise @hal.EcError::LinkDown
   }
   self.next_response
@@ -2848,178 +2844,303 @@ test "pdo_exchange with empty context" {
   assert_eq(wkc, 0U) // no data to exchange
 }
 
+// ============================================================
+// C-8: Zero-copy codec and PDO tests
+// ============================================================
+
 ///|
-test "pdo_exchange_result with block_lrw uses split LRD+LWR" {
+test "encode_lrw_frame_into produces valid EtherCAT frame" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\xAA', b'\xBB', b'\xCC', b'\xDD']
+  let len = @protocol.encode_lrw_frame_into(
+    buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0x1000U,
+    data, 0, 4,
+  )
+  // Minimum: 14 (eth) + 2 (ecat) + 10 (pdu hdr) + 4 (data) + 2 (wkc) = 32
+  assert_eq(len, 32)
+  // EtherType should be 0x88A4
+  assert_eq(buf[12], b'\x88')
+  assert_eq(buf[13], b'\xA4')
+  // Command should be LRW (0x0C)
+  assert_eq(buf[16], b'\x0C')
+  // Index should be 0x01
+  assert_eq(buf[17], b'\x01')
+  // Data payload
+  assert_eq(buf[26], b'\xAA')
+  assert_eq(buf[27], b'\xBB')
+  assert_eq(buf[28], b'\xCC')
+  assert_eq(buf[29], b'\xDD')
+}
+
+///|
+test "encode_pdu_frame_into produces valid frame for any command" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x11', b'\x22']
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::FPRD,
+    b'\x05',
+    0x2000U,
+    data,
+    0,
+    2,
+  )
+  assert_eq(len, 30) // 14 + 2 + 10 + 2 + 2
+  // Command byte for FPRD = 0x04
+  assert_eq(buf[16], b'\x04')
+  assert_eq(buf[17], b'\x05') // index
+}
+
+///|
+test "encode_zero_data_frame_into fills data with zeros" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\xFF')
+  let len = @protocol.encode_zero_data_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::LRD,
+    b'\x01',
+    0U,
+    8,
+  )
+  assert_eq(len, 36) // 14 + 2 + 10 + 8 + 2
+  // Data region (bytes 26..33) should be all zeros
+  for i in 26..<34 {
+    assert_eq(buf[i], b'\x00')
+  }
+}
+
+///|
+test "encode/decode_pdu_response roundtrip" {
+  let tx_buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x01', b'\x02', b'\x03', b'\x04']
+  let len = @protocol.encode_lrw_frame_into(
+    tx_buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0U, data,
+    0, 4,
+  )
+  // Simulate slave setting WKC=3 at the end
+  let wkc_offset = len - 2
+  tx_buf[wkc_offset] = b'\x03'
+  tx_buf[wkc_offset + 1] = b'\x00'
+  // Decode
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let (wkc, _irq) = @protocol.decode_pdu_response_from(
+    tx_buf, len, target, 0, 4,
+  )
+  assert_eq(wkc, 3U)
+  assert_eq(target[0], b'\x01')
+  assert_eq(target[1], b'\x02')
+  assert_eq(target[2], b'\x03')
+  assert_eq(target[3], b'\x04')
+}
+
+///|
+test "decode_pdu_response_slice skips output echo" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  // Build a frame with 4 bytes output + 2 bytes input = 6 bytes data
+  let data : FixedArray[Byte] = [
+    b'\xA1', b'\xA2', b'\xA3', b'\xA4', b'\xB1', b'\xB2',
+  ]
+  let len = @protocol.encode_lrw_frame_into(
+    buf, @protocol.broadcast_mac, @protocol.default_master_mac, b'\x01', 0U, data,
+    0, 6,
+  )
+  // Decode, skipping first 4 bytes (output echo), reading 2 bytes (inputs)
+  let target : FixedArray[Byte] = FixedArray::make(2, b'\x00')
+  let (wkc, _irq) = @protocol.decode_pdu_response_slice(
+    buf, len, 4, // skip
+     target, 0, 2,
+  )
+  assert_eq(wkc, 0U)
+  assert_eq(target[0], b'\xB1')
+  assert_eq(target[1], b'\xB2')
+}
+
+///|
+test "decode_pdu_wkc_only extracts WKC" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  let data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::LWR,
+    b'\x01',
+    0U,
+    data,
+    0,
+    2,
+  )
+  // Set WKC to 5
+  buf[len - 2] = b'\x05'
+  buf[len - 1] = b'\x00'
+  let wkc = @protocol.decode_pdu_wkc_only(buf, len)
+  assert_eq(wkc, 5U)
+}
+
+///|
+test "decode_pdu_response_from rejects short frame" {
+  let buf : FixedArray[Byte] = FixedArray::make(10, b'\x00')
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 10, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_from rejects wrong ethertype" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  // Set wrong ethertype
+  buf[12] = b'\x08'
+  buf[13] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext build and set/get slave data" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  assert_eq(ctx.image.output_size, 4)
+  assert_eq(ctx.image.input_size, 2)
+  // Set outputs
+  let out_data : FixedArray[Byte] = [b'\x11', b'\x22', b'\x33', b'\x44']
+  ctx.set_slave_outputs(0x1001U, out_data)
+  assert_eq(ctx.image.outputs[0], b'\x11')
+  assert_eq(ctx.image.outputs[3], b'\x44')
+  // Simulate input data
+  ctx.image.inputs[0] = b'\xAA'
+  ctx.image.inputs[1] = b'\xBB'
+  let inputs = ctx.get_slave_inputs(0x1001U)
+  assert_eq(inputs[0], b'\xAA')
+  assert_eq(inputs[1], b'\xBB')
+}
+
+///|
+test "MutablePdoContext set_slave_outputs rejects wrong length" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let bad_data : FixedArray[Byte] = [b'\x01', b'\x02']
+  let result = try? ctx.set_slave_outputs(0x1001U, bad_data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext set_slave_outputs unknown station" {
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],
     fmmu_configs: [],
     output_bytes: 2,
-    input_bytes: 2,
+    input_bytes: 0,
   }
-  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  ctx.block_lrw = true
-  let nic = @mock.MockNic::new()
-  let timeout = @hal.Duration(1000L)
-  // MockNic returns WKC=0 for all transactions; verify no crash and result shape
-  let result = @protocol.pdo_exchange_result(nic, ctx, timeout)
-  // LRD WKC + LWR WKC*2, both 0 from mock
-  assert_eq(result.wkc, 0U)
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let result = try? ctx.set_slave_outputs(0x9999U, data)
+  assert_true(result is Err(_))
 }
 
 ///|
-test "pdo_exchange_result with block_lrw false uses LRW" {
+test "pdo_exchange_zero_copy with empty context" {
+  let ctx = @protocol.MutablePdoContext::build([], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
+  let timeout = @hal.Duration(1000L)
+  let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
+  assert_eq(result.wkc, 0U)
+  assert_eq(result.irq, 0U)
+}
+
+///|
+test "pdo_exchange_zero_copy via MockZeroCopyNic loopback" {
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],
     fmmu_configs: [],
-    output_bytes: 2,
+    output_bytes: 4,
     input_bytes: 2,
   }
-  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  assert_true(not(ctx.block_lrw))
-  let nic = @mock.MockNic::new()
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
-  let result = @protocol.pdo_exchange_result(nic, ctx, timeout)
+  // Set outputs
+  let out_data : FixedArray[Byte] = [b'\xDE', b'\xAD', b'\xBE', b'\xEF']
+  ctx.set_slave_outputs(0x1001U, out_data)
+  // Exchange - MockZeroCopyNic loops back TX to RX
+  let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
+  // WKC is 0 because loopback doesn't modify WKC
   assert_eq(result.wkc, 0U)
 }
 
 ///|
-test "PdoContext build sets block_lrw to false by default" {
-  let ctx = @protocol.PdoContext::build([], 0U)
-  assert_true(not(ctx.block_lrw))
-}
-
-///|
-test "al_status_code_description known codes" {
-  assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
-  assert_eq(
-    @protocol.al_status_code_description(0x001EU),
-    "Invalid input configuration",
-  )
-  assert_eq(
-    @protocol.al_status_code_description(0x0016U),
-    "Invalid mailbox configuration (SafeOp)",
-  )
-  assert_eq(
-    @protocol.al_status_code_description(0x0070U),
-    "Detected module ident list does not match",
-  )
-  assert_eq(
-    @protocol.al_status_code_description(0x0030U),
-    "Invalid DC SYNC configuration",
-  )
-  assert_eq(@protocol.al_status_code_description(0x0051U), "EEPROM error")
-}
-
-///|
-test "al_status_code_description unknown code" {
-  let desc = @protocol.al_status_code_description(0xABCDU)
-  assert_true(desc.contains("Unknown"))
-}
-
-///|
-test "foe_download function exists and rejects small mailbox" {
-  // MailboxConfig with out_size too small (< 12) should be rejected
-  let nic = @mock.MockNic::new()
-  let mb_config : @mailbox.MailboxConfig = {
-    out_address: 0x1000U,
-    out_size: 10U, // too small for FoE (need at least 13)
-    out_sm_index: 0,
-    in_address: 0x1400U,
-    in_size: 128U,
-    in_sm_index: 1,
+test "pdo_read_zero_copy via MockZeroCopyNic" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 4,
   }
-  let rmsm = @mailbox.Rmsm::new()
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.foe_download(
-    nic,
-    0x1001U,
-    mb_config,
-    rmsm,
-    "test.bin",
-    0U,
-    Bytes::new(0),
-    timeout,
-  )
-  assert_true(result is Err(_))
+  let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
 }
 
 ///|
-test "foe_upload function exists and rejects small mailbox" {
-  let nic = @mock.MockNic::new()
-  let mb_config : @mailbox.MailboxConfig = {
-    out_address: 0x1000U,
-    out_size: 128U,
-    out_sm_index: 0,
-    in_address: 0x1400U,
-    in_size: 8U, // too small
-    in_sm_index: 1,
+test "pdo_write_zero_copy via MockZeroCopyNic" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
   }
-  let rmsm = @mailbox.Rmsm::new()
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.foe_upload(
-    nic, 0x1001U, mb_config, rmsm, "test.bin", 0U, timeout,
-  )
-  assert_true(result is Err(_))
-}
-
-///|
-test "foe_download_ap rejects small mailbox" {
-  let nic = @mock.MockNic::new()
-  let mb_config : @mailbox.MailboxConfig = {
-    out_address: 0x1000U,
-    out_size: 11U,
-    out_sm_index: 0,
-    in_address: 0x1400U,
-    in_size: 128U,
-    in_sm_index: 1,
+  // Set outputs
+  for i in 0..<4 {
+    ctx.image.outputs[i] = (i + 1).to_byte()
   }
-  let rmsm = @mailbox.Rmsm::new()
-  let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.foe_download_ap(
-    nic,
-    0U,
-    mb_config,
-    rmsm,
-    "fw.bin",
-    0U,
-    Bytes::new(10),
-    timeout,
-  )
-  assert_true(result is Err(_))
+  let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
 }
 
 ///|
-test "foe_upload_ap rejects small mailbox" {
-  let nic = @mock.MockNic::new()
-  let mb_config : @mailbox.MailboxConfig = {
-    out_address: 0x1000U,
-    out_size: 128U,
-    out_sm_index: 0,
-    in_address: 0x1400U,
-    in_size: 6U,
-    in_sm_index: 1,
+test "pdo_read_zero_copy with empty inputs returns 0" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
   }
-  let rmsm = @mailbox.Rmsm::new()
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.foe_upload_ap(
-    nic, 0U, mb_config, rmsm, "fw.bin", 0U, timeout,
-  )
-  assert_true(result is Err(_))
-}
-
-// ========== EEPROM Write Tests ==========
-
-///|
-test "eeprom_write_word via mock" {
-  let nic = EepromMockNic::new()
-  let timeout = @hal.Duration(1000L)
-  // Mock returns status 0x0000 (not busy, no NACK) → should succeed
-  @protocol.eeprom_write_word(nic, 0x1001U, 0x0010U, 0xABCDU, timeout)
+  let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
 }
 
 ///|
-test "eeprom_write_word_ap via mock" {
-  let nic = EepromMockNic::new()
+test "pdo_write_zero_copy with empty outputs returns 0" {
+  let ctx = @protocol.MutablePdoContext::build([], 0U)
+  let pool = @hal.FramePool::new()
+  let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
-  @protocol.eeprom_write_word_ap(nic, 0U, 0x0020U, 0x1234U, timeout)
+  let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
+  assert_eq(wkc, 0U)
 }

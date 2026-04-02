@@ -2,7 +2,17 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原 0.3 到 0.7 节。
 
-## 0.3 对象字典浏览产品化拆解
+> **成熟度定位**：产品化拆解覆盖 **L3 Product Surface** 与部分 **L4 Verification & Hardening**，横跨主线 A（Native Runtime）与主线 B（验证运行时）。
+
+| 章节 | 领域 | L 级 | 主线 | 完成度 |
+|---|---|:---:|:---:|:---:|
+| §0.3 | OD 浏览产品化 | L3 | A | 6/6 ✅ |
+| §0.4 | 配置工具 / ENI | L3 | A | 6/6 ✅ |
+| §0.5 | 主站 OD / 统一诊断 | L3 | A | 6/6 ✅ |
+| §0.6 | 拓扑 / Hot Connect | L3-L4 | B | 4/5 ⚠️ |
+| §0.7 | Native / Extism 收口 | L4 | A+C | 3/7 ⚠️ |
+
+## 0.3 对象字典浏览产品化拆解 【L3 · 主线 A】
 
 > 目标不是重复实现 CoE 事务，而是把已经落仓的 `SDO Info / Complete Access / Segmented Transfer` 能力组织成稳定的 CLI / 配置工具表面。
 
@@ -22,7 +32,7 @@
 - [x] 错误输出能区分“协议失败”“传输失败”“从站不支持”三类情形。
 - [x] 不修改既有库层 CoE 事务 public API 的语义，仅在产品面增加封装与结果组织。
 
-## 0.4 配置工具 / ENI 主线拆解
+## 0.4 配置工具 / ENI 主线拆解 【L3 · 主线 A】
 
 > 目标是把 online scan、离线 ENI、启动比对和差异报告纳入同一配置对象模型，而不是维护两套配置来源、两套校验语义。
 
@@ -42,7 +52,7 @@
 - [x] CLI 输出同时支持人工阅读和配置工具复用；Extism 返回结构与 CLI 对齐。
 - [x] 不新增第二套拓扑/配置语义，`scan/validate` 与 ENI 路径共享同一核心校验规则。
 
-## 0.5 主站对象字典与统一诊断表面拆解
+## 0.5 主站对象字典与统一诊断表面拆解 【L3 · 主线 A】
 
 > 目标是把 AL / WKC / DC / 拓扑 / 配置摘要汇聚到一个稳定结果对象，避免 CLI、库和配置工具各自维护状态解释逻辑。
 
@@ -62,7 +72,7 @@
 - [x] 现有 `diagnosis`、`state`、`validate` 中重复的状态解释逻辑可以收敛到统一模型。
 - [x] 不把平台专属实现细节泄漏进诊断 public surface。
 
-## 0.6 拓扑变化 / Hot Connect 主线拆解
+## 0.6 拓扑变化 / Hot Connect 主线拆解 【L3-L4 · 主线 B】
 
 > 目标是把“显式标识校验”扩展成稳定的启动期拓扑比较与 Hot Connect 能力，而不是继续停留在 4-tuple 单点校验。设计依据以 EtherCAT_Compendium 对 topology comparison / Hot Connect group 的描述为主，并参考 GatorCAT、ethercrab、SOEM 在从站顺序、站地址、别名地址、链路位置恢复上的共同做法。
 
@@ -86,7 +96,7 @@
 - [x] 统一差异输出既能服务 CLI 文本，也能直接供配置工具/Extism JSON 复用。
 - [ ] 至少有一条回放测试与一条 Native smoke 证明 Hot Connect 分级不是纸面模型。
 
-## 0.7 Native / Extism 后续收口补充
+## 0.7 Native / Extism 后续收口补充 【L4 · 主线 A+C】
 
 > 目标不是继续扩展命令数量，而是把已有 Native/Extism 表面收敛成可发布、可验证、可维护的后端产品面。参考依据以 Npcap SDK、IGH Raw Socket 路径、GatorCAT NIC 封装，以及 Extism Host boundary 设计文档为主。
 

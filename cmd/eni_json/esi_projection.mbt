@@ -80,7 +80,7 @@ fn parse_esi_document_projection(
           continue
         }
 
-        if in_device && not(in_module) {
+        if in_device && !in_module {
           match elem.name {
             "Type" => {
               current_device = {
@@ -235,7 +235,7 @@ fn parse_esi_document_projection(
                 }
               }
             "Entry" =>
-              if not(in_init_cmd) {
+              if !in_init_cmd {
                 current_entry = Some(empty_esi_pdo_entry_projection())
               }
             "SubIndex" =>
@@ -380,7 +380,7 @@ fn parse_esi_document_projection(
         }
       }
       @xml.Empty(elem) =>
-        if in_device && not(in_module) {
+        if in_device && !in_module {
           match elem.name {
             "CoE" =>
               current_device = {

@@ -2,6 +2,9 @@
 
 本文件由原 AI 任务清单拆分整理而来，对应原第 4、5、6 节。
 
+> **成熟度覆盖**：工作流主要关联 **L2 Protocol Core → L4 Verification & Hardening**；风险清单已延伸至事件溯源与多后端交付。  
+> 当前三条主线（A/B/C）与 L1-L4 完整路线图请参阅 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md)。
+
 ## 4. 并行工作流
 
 ### HAL
@@ -118,3 +121,15 @@
 - [x] 检查 mailbox 推进和 PDO 热路径是否仍然解耦。
   - ✅ [runtime/runtime_test.mbt](../runtime/runtime_test.mbt) `Decoupling: mailbox diagnosis failure does not block PDO run loop`
   - ✅ commit: `5f7629a` `test(runtime): verify mailbox and PDO path decoupling`
+
+### 事件溯源与确定性重放 【主线 B】
+
+- [ ] 确认 EventStream 时间戳精度（`timestamp_ns`）在 Native / Wasm-GC 两条路径上的来源一致性，避免重放结果漂移。
+- [ ] 评估嵌入式场景下事件溯源日志的存储与带宽开销：MCU Flash / SoC 内存受限时，需要定义事件裁剪策略而非无限追加。
+- [ ] 明确 `State = f(InitialState, EventStream)` 的幂等性验证方法：同一事件流在不同平台二进制上重放，结果必须 bit-exact。
+- [ ] 为 Monitor / Verdict 验证引擎建立最小合同：输入为 EventStream + 规则集，输出为 Pass/Fail + 触发证据链。
+
+### MCU / SoC 平台多样性 【主线 C】
+
+- [ ] 评估 MoonBit Native 在 ARM Cortex-M / RISC-V 上的编译可达性与 HAL 适配成本。
+- [ ] 定义 HIL（硬件在环）测试的最小总线拓扑：至少 1 个 EtherCAT 从站 + 1 个实时 NIC，确保验证不停留在仿真层。

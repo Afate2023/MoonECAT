@@ -40,7 +40,7 @@ pub fn linux_raw_socket_runtime_available() -> Bool {
 
 ///|
 pub fn linux_raw_socket_list_interfaces_text() -> String raise @hal.EcError {
-  if not(linux_raw_socket_runtime_available()) {
+  if !linux_raw_socket_runtime_available() {
     raise @hal.EcError::NotSupported(
       "Linux Raw Socket backend is not available",
     )
@@ -50,7 +50,7 @@ pub fn linux_raw_socket_list_interfaces_text() -> String raise @hal.EcError {
 
 ///|
 pub fn linux_raw_socket_list_interfaces_json() -> String raise @hal.EcError {
-  if not(linux_raw_socket_runtime_available()) {
+  if !linux_raw_socket_runtime_available() {
     raise @hal.EcError::NotSupported(
       "Linux Raw Socket backend is not available",
     )
@@ -62,7 +62,7 @@ pub fn linux_raw_socket_list_interfaces_json() -> String raise @hal.EcError {
 pub fn linux_raw_socket_open(
   config : NativeNicConfig,
 ) -> Int raise @hal.EcError {
-  if not(linux_raw_socket_runtime_available()) {
+  if !linux_raw_socket_runtime_available() {
     raise @hal.EcError::NotSupported(
       "Linux Raw Socket backend is not available",
     )
