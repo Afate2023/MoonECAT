@@ -214,6 +214,7 @@ test "factory functions set new fields to None by default" {
     al_status_code: None,
     error_register: b'\x00',
     diagnosis_counter: None,
+    dl_error_counters: None,
   })
   assert_true(surface.monitor_verdicts is None)
   assert_true(surface.overall_verdict is None)
