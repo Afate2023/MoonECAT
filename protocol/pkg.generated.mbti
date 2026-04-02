@@ -386,6 +386,19 @@ pub(all) struct DcInitResult {
   configured_count : Int
 } derive(Eq, Show)
 
+pub(all) struct DcPortTimes {
+  port0 : UInt
+  port1 : UInt
+  port2 : UInt
+  port3 : UInt
+} derive(Eq, Show)
+
+pub(all) struct DlErrorCounters {
+  ports : FixedArray[PortErrorCounters]
+  ecat_pu_errors : UInt
+  pdi_errors : UInt
+} derive(Eq, Show)
+
 pub(all) enum EcCommand {
   NOP
   APRD
@@ -466,6 +479,7 @@ pub(all) struct PdoContext {
   mappings : Array[PdoMapping]
   logical_base : UInt
   logical_size : Int
+  mut block_lrw : Bool
 } derive(Show)
 pub fn PdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
 pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError
@@ -500,6 +514,13 @@ pub(all) struct PduHeader {
   irq : UInt
 } derive(Eq, Show)
 
+pub(all) struct PortErrorCounters {
+  frame_errors : UInt
+  physical_errors : UInt
+  forwarded_rx_errors : UInt
+  lost_link_count : UInt
+} derive(Eq, Show)
+
 pub(all) struct ProcessImage {
   mut outputs : Bytes
   mut inputs : Bytes
@@ -521,6 +542,14 @@ pub(all) struct SlaveInfo {
   dl_status : UInt
   mut sii : @mailbox.SiiData?
 } derive(Show)
+
+pub(all) struct SmWatchdogConfig {
+  divider : UInt
+  pdi_time : UInt
+  pdata_time : UInt
+  pdata_status : Bool
+  pdata_counter : UInt
+} derive(Eq, Show)
 
 // Type aliases
 
