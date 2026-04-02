@@ -180,6 +180,8 @@ pub fn score_dimension(QualityDimension) -> Int
 
 pub fn slice_from_mapping(@protocol.PdoMapping, @protocol.ProcessImage) -> ProcessImageSlice?
 
+pub fn slice_inputs_view(@hal.MutableProcessImage, ProcessImageSlice) -> (FixedArray[Byte], Int, Int)
+
 pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
 
 pub fn startup_preparation_from_esi_offline_report(EsiOfflineSiiReport, UInt) -> SlaveStartupPreparation
@@ -211,6 +213,8 @@ pub fn[N : @hal.Nic] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.
 pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> Unit
+
+pub fn write_slice_outputs_inplace(@hal.MutableProcessImage, ProcessImageSlice, FixedArray[Byte], Int) -> Unit
 
 // Errors
 

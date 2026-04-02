@@ -1,14 +1,20 @@
 ///|
-/// ProcessImageSlice — a zero-copy view into a contiguous region of a ProcessImage.
+/// ProcessImageSlice — an offset/length descriptor defining a task's region
+/// within the ProcessImage.
 ///
 /// Design rationale:
 ///   - HIL and multi-axis systems need isolated access to subsets of the PI
-///   - Each task/controller owns one or more slices without copying
+///   - Each task/controller owns one or more slices
 ///   - Slices are bounded and checked at creation, not at every access
 ///   - Maps directly to DMA descriptor regions on MCU targets
 ///
+/// Note: The copy-based helpers `read_slice_inputs`/`write_slice_outputs`
+/// operate on the immutable `ProcessImage` type and allocate on each call.
+/// For zero-allocation hot-path access use `slice_inputs_view` and
+/// `write_slice_outputs_inplace`, which operate on `@hal.MutableProcessImage`.
+///
 /// Safety: offsets are validated at slice creation; subsequent access is
-/// bounds-checked by the underlying Bytes API.
+/// bounds-checked by the underlying buffer API.
 pub(all) struct ProcessImageSlice {
   /// Byte offset into the parent ProcessImage outputs.
   output_offset : Int
@@ -91,7 +97,8 @@ pub fn partition_by_slave(
 
 ///|
 /// Build a TaskSchedule from task descriptors.
-/// Validates: no overlapping PI regions, positive divisors, unique names.
+/// Validates: no overlapping output PI regions, no overlapping input PI regions,
+/// positive divisors, unique names.
 /// Returns None if validation fails.
 pub fn build_task_schedule(
   base_period_ns : Int64,
@@ -119,6 +126,14 @@ pub fn build_task_schedule(
       }
     }
   }
+  // Validate no overlapping input regions
+  for i = 0; i < tasks.length(); i = i + 1 {
+    for j = i + 1; j < tasks.length(); j = j + 1 {
+      if slices_overlap_input(tasks[i].slice, tasks[j].slice) {
+        return None
+      }
+    }
+  }
   // Sort by priority
   let sorted = tasks.copy()
   sorted.sort_by(fn(a, b) { a.priority.compare(b.priority) })
@@ -136,7 +151,48 @@ fn slices_overlap_output(a : ProcessImageSlice, b : ProcessImageSlice) -> Bool {
 }
 
 ///|
-/// Determine which tasks should execute at a given cycle number.
+fn slices_overlap_input(a : ProcessImageSlice, b : ProcessImageSlice) -> Bool {
+  if a.input_length == 0 || b.input_length == 0 {
+    return false
+  }
+  let a_end = a.input_offset + a.input_length
+  let b_end = b.input_offset + b.input_length
+  a.input_offset < b_end && b.input_offset < a_end
+}
+
+///|
+/// Zero-copy read: returns the inputs buffer reference, offset, and length.
+/// The caller can index directly into `buf` at `[offset..<offset+len]`
+/// without any heap allocation.
+pub fn slice_inputs_view(
+  image : @hal.MutableProcessImage,
+  slice : ProcessImageSlice,
+) -> (FixedArray[Byte], Int, Int) {
+  (image.inputs, slice.input_offset, slice.input_length)
+}
+
+///|
+/// Zero-copy write: writes bytes from `src[src_offset..]` directly into
+/// the outputs buffer at the slice's output_offset. No new buffer is
+/// allocated; the update is performed in-place.
+pub fn write_slice_outputs_inplace(
+  image : @hal.MutableProcessImage,
+  slice : ProcessImageSlice,
+  src : FixedArray[Byte],
+  src_offset : Int,
+) -> Unit {
+  let available = src.length() - src_offset
+  let len = if available < slice.output_length {
+    available
+  } else {
+    slice.output_length
+  }
+  for i = 0; i < len; i = i + 1 {
+    image.outputs[slice.output_offset + i] = src[src_offset + i]
+  }
+}
+
+///|
 pub fn tasks_due_at_cycle(
   schedule : TaskSchedule,
   cycle : Int64,

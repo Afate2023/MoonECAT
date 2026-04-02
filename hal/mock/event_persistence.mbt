@@ -5,6 +5,8 @@
 ///   {"type":"sent","data":"88a4...","len":42}
 ///   {"type":"received","data":"88a4..."}
 ///   {"type":"recv_timeout"}
+///   {"type":"recv_failed","msg":"..."}
+///   {"type":"link_down"}
 ///   {"type":"send_failed","msg":"..."}
 ///
 /// Header line (optional) carries recording metadata:
@@ -27,6 +29,11 @@ pub fn nic_event_to_json(event : NicEvent) -> String {
       "{\"type\":\"received\",\"data\":\"" + hex + "\"}"
     }
     RecvTimeout => "{\"type\":\"recv_timeout\"}"
+    RecvFailed(msg) => {
+      let escaped = escape_json_string(msg)
+      "{\"type\":\"recv_failed\",\"msg\":\"" + escaped + "\"}"
+    }
+    LinkDown => "{\"type\":\"link_down\"}"
     SendFailed(msg) => {
       let escaped = escape_json_string(msg)
       "{\"type\":\"send_failed\",\"msg\":\"" + escaped + "\"}"
@@ -83,6 +90,11 @@ pub fn nic_event_from_json(line : String) -> NicEvent? {
     Some(Received(data))
   } else if line.contains("\"type\":\"recv_timeout\"") {
     Some(RecvTimeout)
+  } else if line.contains("\"type\":\"recv_failed\"") {
+    let msg = extract_json_string(line, "msg")
+    Some(RecvFailed(msg))
+  } else if line.contains("\"type\":\"link_down\"") {
+    Some(LinkDown)
   } else if line.contains("\"type\":\"send_failed\"") {
     let msg = extract_json_string(line, "msg")
     Some(SendFailed(msg))

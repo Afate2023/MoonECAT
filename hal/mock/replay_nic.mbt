@@ -64,6 +64,14 @@ pub impl @hal.Nic for ReplayNic with recv(self, timeout~) {
       self.cursor += 1
       raise @hal.EcError::RecvTimeout
     }
+    LinkDown => {
+      self.cursor += 1
+      raise @hal.EcError::LinkDown
+    }
+    RecvFailed(msg) => {
+      self.cursor += 1
+      raise @hal.EcError::RecvFailed(msg)
+    }
     _ =>
       raise @hal.EcError::RecvFailed(
         "replay: expected Received event at cursor " + self.cursor.to_string(),

@@ -6,6 +6,8 @@ pub(all) enum NicEvent {
   Sent(Bytes, Int)
   Received(Bytes)
   RecvTimeout
+  RecvFailed(String)
+  LinkDown
   SendFailed(String)
 } derive(Eq, Show)
 

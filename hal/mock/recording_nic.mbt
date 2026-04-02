@@ -50,9 +50,21 @@ pub impl @hal.Nic for RecordingNic with recv(self, timeout~) {
       self.log.append(NicEvent::Received(data))
       data
     }
-    Err(_) => {
+    Err(@hal.EcError::RecvTimeout) => {
       self.log.append(NicEvent::RecvTimeout)
       raise @hal.EcError::RecvTimeout
+    }
+    Err(@hal.EcError::LinkDown) => {
+      self.log.append(NicEvent::LinkDown)
+      raise @hal.EcError::LinkDown
+    }
+    Err(@hal.EcError::RecvFailed(msg)) => {
+      self.log.append(NicEvent::RecvFailed(msg))
+      raise @hal.EcError::RecvFailed(msg)
+    }
+    Err(e) => {
+      self.log.append(NicEvent::RecvFailed(e.to_string()))
+      raise e
     }
   }
 }
