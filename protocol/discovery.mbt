@@ -13,8 +13,16 @@ pub let reg_build : UInt = 0x0002U
 pub let reg_dl_status : UInt = 0x0110U
 
 ///|
+/// DL Information register: supported features (DC, FMMU count, SM count, etc.).
+pub let reg_dl_information : UInt = 0x0008U
+
+///|
 /// DL Control register.
 pub let reg_dl_control : UInt = 0x0100U
+
+///|
+/// DL Port control register (forwarding / loop-back per port).
+pub let reg_dl_port : UInt = 0x0101U
 
 ///|
 /// DL Control bit used to enable station alias addressing.
@@ -31,6 +39,10 @@ pub let reg_al_status_code : UInt = 0x0134U
 ///|
 /// AL Control register: request ESM state transition.
 pub let reg_al_control : UInt = 0x0120U
+
+///|
+/// IRQ Mask register (0x0200).
+pub let reg_irq_mask : UInt = 0x0200U
 
 ///|
 /// Configured Station Address register.
@@ -63,6 +75,46 @@ pub let reg_fmmu_base : UInt = 0x0600U
 ///|
 /// FMMU entry size in bytes.
 pub let fmmu_entry_size : Int = 16
+
+///|
+/// Watchdog Divider register (ESC clock divider for both PDI and SM watchdogs).
+pub let reg_watchdog_divider : UInt = 0x0400U
+
+///|
+/// PDI Watchdog Time register (master-to-PDI communication timeout).
+pub let reg_watchdog_time_pdi : UInt = 0x0410U
+
+///|
+/// SM (Process Data) Watchdog Time register (process data arrival timeout).
+pub let reg_watchdog_time_pdata : UInt = 0x0420U
+
+///|
+/// SM Watchdog Status register (bit 0: 0=expired, 1=active/reloaded).
+pub let reg_watchdog_status_pdata : UInt = 0x0440U
+
+///|
+/// SM Watchdog Counter register (increments on each watchdog event).
+pub let reg_watchdog_counter_pdata : UInt = 0x0442U
+
+///|
+/// RX Error Counter base register (0x0300–0x0307, 8 bytes: frame+physical per port).
+pub let reg_rx_error_counter : UInt = 0x0300U
+
+///|
+/// Forwarded RX Error Counter base register (0x0308–0x030B, 4 bytes: one per port).
+pub let reg_fwd_rx_error_counter : UInt = 0x0308U
+
+///|
+/// EtherCAT Processing Unit Error Counter register (0x030C).
+pub let reg_ecat_pu_error_counter : UInt = 0x030CU
+
+///|
+/// PDI Error Counter register (0x030D).
+pub let reg_pdi_error_counter : UInt = 0x030DU
+
+///|
+/// Lost Link Counter base register (0x0310–0x0313, 4 bytes: one per port).
+pub let reg_lost_link_counter : UInt = 0x0310U
 
 ///|
 /// Sync Manager base register (SM0 starts at 0x0800, each SM is 8 bytes).
@@ -107,6 +159,14 @@ pub let reg_dc_system_delay : UInt = 0x0928U
 ///|
 /// DC sync window/system difference register.
 pub let reg_dc_system_diff : UInt = 0x092CU
+
+///|
+/// DC speed counter start register (0x0930).
+pub let reg_dc_speed_count : UInt = 0x0930U
+
+///|
+/// DC time loop filter register (0x0934).
+pub let reg_dc_time_filter : UInt = 0x0934U
 
 ///|
 /// DC control unit register.
@@ -277,6 +337,21 @@ pub fn[N : @hal.Nic] read_station_alias(
     raise @hal.EcError::InvalidPdu("station alias response too short")
   }
   pdu.data[0].to_uint() | (pdu.data[1].to_uint() << 8)
+}
+
+///|
+/// Write station alias register (0x0012) using configured station addressing.
+pub fn[N : @hal.Nic] write_station_alias(
+  nic : N,
+  station : UInt,
+  alias : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let buf = Bytes::from_array([
+    (alias & 0xFFU).to_byte(),
+    ((alias >> 8) & 0xFFU).to_byte(),
+  ])
+  let _ = write_register_fp(nic, station, reg_station_alias, buf, timeout)
 }
 
 ///|

@@ -55,6 +55,9 @@ pub(all) struct PdoContext {
   logical_base : UInt
   /// Total logical range in bytes (output + input).
   logical_size : Int
+  /// When true, use separate LRD + LWR instead of LRW.
+  /// Set when any slave in the group sets the SII PreferNotLRW flag.
+  mut block_lrw : Bool
 } derive(Show)
 
 ///|
@@ -101,6 +104,7 @@ pub fn PdoContext::build(
     mappings,
     logical_base,
     logical_size: total_logical,
+    block_lrw: false,
   }
 }
 
@@ -125,6 +129,9 @@ pub fn[N : @hal.Nic] pdo_exchange_result(
   if ctx.logical_size <= 0 {
     return { wkc: 0U, irq: 0U }
   }
+  if ctx.block_lrw {
+    return pdo_exchange_split_result(nic, ctx, timeout)
+  }
   // Build the outgoing data: combine outputs + zero-filled input area
   let total = ctx.image.output_size + ctx.image.input_size
   let out_data = Bytes::makei(total, fn(i) {
@@ -148,6 +155,55 @@ pub fn[N : @hal.Nic] pdo_exchange_result(
     })
   }
   { wkc: pdu.wkc, irq: pdu.header.irq }
+}
+
+///|
+/// Execute one PDO cycle using separate LRD + LWR instead of LRW.
+/// Used when any slave in the group sets the PreferNotLRW SII flag.
+/// WKC from LWR is doubled to normalise against LRW semantics (per SOEM convention).
+fn[N : @hal.Nic] pdo_exchange_split_result(
+  nic : N,
+  ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> PdoExchangeResult raise @hal.EcError {
+  let mut total_wkc = 0U
+  let mut irq = 0U
+  // LRD: read inputs
+  if ctx.image.input_size > 0 {
+    let pdu = transact_pdu(
+      nic,
+      EcCommand::LRD,
+      logical_address(
+        ctx.logical_base + ctx.image.output_size.reinterpret_as_uint(),
+      ),
+      Bytes::new(ctx.image.input_size),
+      timeout,
+    )
+    if pdu.data.length() >= ctx.image.input_size {
+      ctx.image.inputs = Bytes::makei(ctx.image.input_size, fn(i) {
+        pdu.data[i]
+      })
+    }
+    total_wkc = total_wkc + pdu.wkc
+    irq = pdu.header.irq
+  }
+  // LWR: write outputs
+  if ctx.image.output_size > 0 {
+    let pdu = transact_pdu(
+      nic,
+      EcCommand::LWR,
+      logical_address(ctx.logical_base),
+      ctx.image.outputs,
+      timeout,
+    )
+    // Double LWR WKC to normalise against LRW: LRW increments WKC for
+    // both read and write, while LWR increments only for write.
+    total_wkc = total_wkc + pdu.wkc * 2U
+    if irq == 0U {
+      irq = pdu.header.irq
+    }
+  }
+  { wkc: total_wkc, irq }
 }
 
 ///|

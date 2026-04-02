@@ -650,6 +650,7 @@ test "cli diagnosis output json includes nullable counter" {
     al_status_code: Some(0x0016U),
     error_register: b'\x0A',
     diagnosis_counter: None,
+    dl_error_counters: None,
   }).stringify(indent=2)
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"al_state\": \"SafeOp\""))
@@ -683,6 +684,7 @@ test "cli diagnosis output json includes shared surface" {
     al_status_code: Some(0x0011U),
     error_register: b'\x04',
     diagnosis_counter: Some(2U),
+    dl_error_counters: None,
   }).stringify(indent=2)
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Block\""))
@@ -698,6 +700,7 @@ test "cli diagnosis report text includes AL snapshot fields" {
     al_status_code: Some(0x0000U),
     error_register: b'\x04',
     diagnosis_counter: Some(3U),
+    dl_error_counters: None,
   })
   assert_true(text.contains("AL State: Op"))
   assert_true(text.contains("AL Error Flag: clear"))
@@ -1840,6 +1843,7 @@ test "cli run report json includes shared surface telemetry" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Done,
     fault: Some(
@@ -1885,6 +1889,7 @@ test "cli run report ndjson wraps summary payload" {
       wkc_errors: 1L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Done,
     fault: None,
@@ -1914,6 +1919,7 @@ test "cli run progress json includes telemetry snapshot" {
       wkc_errors: 3L,
       irq_events: 4L,
       dc_delay_updates: 5L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 2,
   }).stringify()
@@ -1942,6 +1948,7 @@ test "cli run progress json emits null requested cycles for until-fault mode" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 0,
   }).stringify()
@@ -1967,6 +1974,7 @@ test "cli run progress text formats key counters" {
       wkc_errors: 2L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     consecutive_timeouts: 1,
   })
@@ -2045,6 +2053,7 @@ test "cli read-sii json includes categories" {
     sysman_class: b'\x00',
     flags: b'\x0A',
     current_on_ebus: 14,
+    group_idx_dup: b'\x01',
     physical_port_0: b'\x01',
     physical_port_1: b'\x01',
     physical_port_2: b'\x00',

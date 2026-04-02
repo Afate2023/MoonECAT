@@ -578,6 +578,7 @@ pub(all) struct SiiGeneral {
   sysman_class : Byte
   flags : Byte
   current_on_ebus : Int
+  group_idx_dup : Byte
   physical_port_0 : Byte
   physical_port_1 : Byte
   physical_port_2 : Byte
@@ -619,6 +620,11 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
     },
     flags: data[11],
     current_on_ebus: read_sii_i16_at_byte(data, 12),
+    group_idx_dup: if data.length() > 14 {
+      data[14]
+    } else {
+      b'\x00'
+    },
     physical_port_0: if data.length() > 16 {
       data[16] & b'\x0F'
     } else {
@@ -675,6 +681,8 @@ pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
       b'\x01' => result.push(Outputs)
       b'\x02' => result.push(Inputs)
       b'\x03' => result.push(MailboxState)
+      b'\x05' => result.push(DynamicOutputs)
+      b'\x06' => result.push(DynamicInputs)
       _ => ()
     }
   }

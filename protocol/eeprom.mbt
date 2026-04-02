@@ -513,3 +513,123 @@ fn[N : @hal.Nic] eeprom_clear_errors_ap(
   ])
   let _ = write_register_ap(nic, position, reg_sii_control, clear_buf, timeout)
 }
+
+///|
+/// SII write command: bit 9 (write) + bit 0 (write enable).
+let sii_ctrl_write_cmd : UInt = 0x0201U
+
+///|
+/// Write a single 16-bit word to a slave's EEPROM at the given word address.
+/// Implements ETG.1500 #305 (EEPROM Write may).
+///
+/// Protocol (per SOEM pattern):
+///   1. Acquire Master ownership
+///   2. Write 16-bit data to SII data register (0x0508)
+///   3. Write command (0x0201) + address to SII control register (0x0502)
+///   4. Wait for busy flag to clear
+///   5. Restore PDI ownership
+pub fn[N : @hal.Nic] eeprom_write_word(
+  nic : N,
+  station : UInt,
+  word_address : UInt,
+  data : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  eeprom_prepare_master(nic, station, timeout)
+  eeprom_write_word_owned(nic, station, word_address, data, timeout)
+  ignore(eeprom_restore_pdi(nic, station, timeout) catch { _ => () })
+}
+
+///|
+fn[N : @hal.Nic] eeprom_write_word_owned(
+  nic : N,
+  station : UInt,
+  word_address : UInt,
+  data : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let ready = eeprom_wait_ready(nic, station, timeout)
+  if (ready & sii_ctrl_error_mask) != 0U {
+    eeprom_clear_errors(nic, station, timeout)
+  }
+  for _retry = 0; _retry < sii_retry_limit; _retry = _retry + 1 {
+    // Write 16-bit data to SII data register BEFORE issuing the write command
+    let data_buf = Bytes::from_array([
+      (data & 0xFFU).to_byte(),
+      ((data >> 8) & 0xFFU).to_byte(),
+    ])
+    let _ = write_register_fp(nic, station, reg_sii_data, data_buf, timeout)
+    // Issue write command + address
+    let ctrl_buf = Bytes::from_array([
+      (sii_ctrl_write_cmd & 0xFFU).to_byte(),
+      ((sii_ctrl_write_cmd >> 8) & 0xFFU).to_byte(),
+      (word_address & 0xFFU).to_byte(),
+      ((word_address >> 8) & 0xFFU).to_byte(),
+      b'\x00',
+      b'\x00',
+    ])
+    let _ = write_register_fp(nic, station, reg_sii_control, ctrl_buf, timeout)
+    let status = eeprom_wait_ready_after_command(nic, station, timeout)
+    if (status & sii_ctrl_nack) != 0U {
+      continue
+    }
+    return
+  }
+  raise @hal.EcError::SiiReadFailed(
+    "SII write received NACK for word address " +
+    word_address.reinterpret_as_int().to_string(),
+  )
+}
+
+///|
+/// Write a single 16-bit word to a slave's EEPROM using auto-increment addressing.
+pub fn[N : @hal.Nic] eeprom_write_word_ap(
+  nic : N,
+  position : UInt,
+  word_address : UInt,
+  data : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  eeprom_prepare_master_ap(nic, position, timeout)
+  eeprom_write_word_owned_ap(nic, position, word_address, data, timeout)
+  ignore(eeprom_restore_pdi_ap(nic, position, timeout) catch { _ => () })
+}
+
+///|
+fn[N : @hal.Nic] eeprom_write_word_owned_ap(
+  nic : N,
+  position : UInt,
+  word_address : UInt,
+  data : UInt,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let ready = eeprom_wait_ready_ap(nic, position, timeout)
+  if (ready & sii_ctrl_error_mask) != 0U {
+    eeprom_clear_errors_ap(nic, position, timeout)
+  }
+  for _retry = 0; _retry < sii_retry_limit; _retry = _retry + 1 {
+    let data_buf = Bytes::from_array([
+      (data & 0xFFU).to_byte(),
+      ((data >> 8) & 0xFFU).to_byte(),
+    ])
+    let _ = write_register_ap(nic, position, reg_sii_data, data_buf, timeout)
+    let ctrl_buf = Bytes::from_array([
+      (sii_ctrl_write_cmd & 0xFFU).to_byte(),
+      ((sii_ctrl_write_cmd >> 8) & 0xFFU).to_byte(),
+      (word_address & 0xFFU).to_byte(),
+      ((word_address >> 8) & 0xFFU).to_byte(),
+      b'\x00',
+      b'\x00',
+    ])
+    let _ = write_register_ap(nic, position, reg_sii_control, ctrl_buf, timeout)
+    let status = eeprom_wait_ready_after_command_ap(nic, position, timeout)
+    if (status & sii_ctrl_nack) != 0U {
+      continue
+    }
+    return
+  }
+  raise @hal.EcError::SiiReadFailed(
+    "SII AP write received NACK for position " +
+    position.reinterpret_as_int().to_string(),
+  )
+}

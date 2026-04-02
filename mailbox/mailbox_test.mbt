@@ -16,6 +16,8 @@ test "FmmuDirection display" {
   inspect(@mailbox.FmmuDirection::Outputs, content="Outputs")
   inspect(@mailbox.FmmuDirection::Inputs, content="Inputs")
   inspect(@mailbox.FmmuDirection::MailboxState, content="MailboxState")
+  inspect(@mailbox.FmmuDirection::DynamicOutputs, content="DynamicOutputs")
+  inspect(@mailbox.FmmuDirection::DynamicInputs, content="DynamicInputs")
 }
 
 ///|
@@ -1776,6 +1778,7 @@ test "SiiGeneral::is_op_only detects flag bit 0" {
     sysman_class: b'\x00',
     flags: b'\x01', // bit 0 set = OpOnly
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1803,6 +1806,7 @@ test "SiiGeneral::prefers_not_lrw detects flag bit 1" {
     sysman_class: b'\x00',
     flags: b'\x02', // bit 1 set = NotLRW
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1829,6 +1833,7 @@ test "SiiGeneral::supports_identification_ado detects flag bit 3" {
     sysman_class: b'\x00',
     flags: b'\x08', // bit 3 set = IdentificationAdo
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1854,6 +1859,7 @@ test "SiiGeneral all flags clear" {
     sysman_class: b'\x00',
     flags: b'\x00',
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1883,6 +1889,7 @@ test "SiiGeneral mailbox and identification helpers detect bits" {
     sysman_class: b'\x00',
     flags: b'\x14',
     current_on_ebus: 0,
+    group_idx_dup: b'\x00',
     physical_port_0: b'\x00',
     physical_port_1: b'\x00',
     physical_port_2: b'\x00',
@@ -1934,4 +1941,300 @@ test "SiiData mailbox protocol helpers detect masks" {
   assert_true(sii.supports_foe())
   assert_true(sii.supports_soe())
   assert_true(sii.supports_voe())
+}
+
+///|
+test "parse_sii_fmmu handles dynamic outputs and inputs" {
+  let fmmu_dirs = @mailbox.parse_sii_fmmu(
+    Bytes::from_array([b'\x05', b'\x06', b'\x01', b'\x02']),
+  )
+  assert_eq(fmmu_dirs.length(), 4)
+  assert_eq(fmmu_dirs[0], @mailbox.FmmuDirection::DynamicOutputs)
+  assert_eq(fmmu_dirs[1], @mailbox.FmmuDirection::DynamicInputs)
+  assert_eq(fmmu_dirs[2], @mailbox.FmmuDirection::Outputs)
+  assert_eq(fmmu_dirs[3], @mailbox.FmmuDirection::Inputs)
+}
+
+///|
+test "parse_sii_general populates group_idx_dup" {
+  let data = Bytes::makei(20, fn(i) {
+    match i {
+      0 => b'\x01' // group_idx
+      14 => b'\x07' // group_idx_dup
+      _ => b'\x00'
+    }
+  })
+  let general = @mailbox.parse_sii_general(data)
+  assert_eq(general.group_idx, b'\x01')
+  assert_eq(general.group_idx_dup, b'\x07')
+}
+
+///|
+test "SiiGeneral identification_method extracts bits 3-4" {
+  // bits 3-4 = 0b00 => method 0
+  let gen0 : @mailbox.SiiGeneral = {
+    group_idx: b'\x00',
+    image_idx: b'\x00',
+    order_idx: b'\x00',
+    name_idx: b'\x00',
+    coe_details: b'\x00',
+    foe_supported: false,
+    eoe_supported: false,
+    soe_supported: false,
+    soe_channels: b'\x00',
+    ds402_channels: b'\x00',
+    sysman_class: b'\x00',
+    flags: b'\x00',
+    current_on_ebus: 0,
+    group_idx_dup: b'\x00',
+    physical_port_0: b'\x00',
+    physical_port_1: b'\x00',
+    physical_port_2: b'\x00',
+    physical_port_3: b'\x00',
+    physical_memory_address: 0U,
+  }
+  assert_eq(gen0.identification_method(), 0)
+  // bit 3 set = 0x08 => method 1 (IdentALSts)
+  let gen1 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x08' }
+  assert_eq(gen1.identification_method(), 1)
+  // bit 4 set = 0x10 => method 2 (IdentPhyM)
+  let gen2 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x10' }
+  assert_eq(gen2.identification_method(), 2)
+  // bits 3+4 set = 0x18 => method 3 (both)
+  let gen3 : @mailbox.SiiGeneral = { ..gen0, flags: b'\x18' }
+  assert_eq(gen3.identification_method(), 3)
+}
+
+///|
+test "SiiPdo flag helpers" {
+  let pdo : @mailbox.SiiPdo = {
+    pdo_index: 0x1600U,
+    entry_count: b'\x01',
+    sync_manager: b'\x02',
+    synchronization: b'\x00',
+    name_idx: b'\x00',
+    flags: 0x0B33U, // bits 0,1,4,5,8,9,11 set
+    entries: [],
+  }
+  assert_true(pdo.is_mandatory()) // bit 0
+  assert_true(pdo.is_default()) // bit 1
+  assert_true(pdo.is_fixed_content()) // bit 4
+  assert_true(pdo.is_virtual_content()) // bit 5
+  assert_true(pdo.is_module_align()) // bit 8
+  assert_true(pdo.is_depend_on_slot()) // bit 9
+  assert_true(!pdo.is_depend_on_slot_group()) // bit 10 NOT set
+  assert_true(pdo.is_overwritten_by_module()) // bit 11
+}
+
+///|
+test "SiiPdo all flags clear" {
+  let pdo : @mailbox.SiiPdo = {
+    pdo_index: 0x1A00U,
+    entry_count: b'\x00',
+    sync_manager: b'\x00',
+    synchronization: b'\x00',
+    name_idx: b'\x00',
+    flags: 0x0000U,
+    entries: [],
+  }
+  assert_true(!pdo.is_mandatory())
+  assert_true(!pdo.is_default())
+  assert_true(!pdo.is_fixed_content())
+  assert_true(!pdo.is_virtual_content())
+  assert_true(!pdo.is_module_align())
+  assert_true(!pdo.is_depend_on_slot())
+  assert_true(!pdo.is_depend_on_slot_group())
+  assert_true(!pdo.is_overwritten_by_module())
+}
+
+///|
+test "sdo_abort_code_description known codes" {
+  assert_eq(@mailbox.sdo_abort_code_description(0x00000000U), "No error")
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x06020000U),
+    "The object does not exist in the object dictionary",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x06090011U),
+    "Subindex does not exist",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x05030000U),
+    "Toggle bit not changed",
+  )
+  assert_eq(
+    @mailbox.sdo_abort_code_description(0x08000022U),
+    "Data cannot be transferred or stored to the application because of the present device state",
+  )
+}
+
+///|
+test "sdo_abort_code_description unknown code" {
+  let desc = @mailbox.sdo_abort_code_description(0xDEADBEEFU)
+  assert_true(desc.contains("Unknown"))
+}
+
+///|
+test "FoeOpCode roundtrip byte conversion" {
+  let ops : Array[@mailbox.FoeOpCode] = [Read, Write, Data, Ack, Error, Busy]
+  for op in ops {
+    let b = op.to_byte()
+    let decoded = @mailbox.FoeOpCode::from_byte(b)
+    assert_eq(op, decoded)
+  }
+}
+
+///|
+test "FoeOpCode from_byte invalid raises error" {
+  let result = try? @mailbox.FoeOpCode::from_byte(b'\x00')
+  assert_true(result is Err(_))
+  let result2 = try? @mailbox.FoeOpCode::from_byte(b'\xFF')
+  assert_true(result2 is Err(_))
+}
+
+///|
+test "FoeErrorCode roundtrip" {
+  let codes : Array[@mailbox.FoeErrorCode] = [
+    NotDefined,
+    NotFound,
+    AccessDenied,
+    DiskFull,
+    Illegal,
+    PacketNumberWrong,
+    AlreadyExists,
+    NoUser,
+    BootstrapOnly,
+    NotInBootstrap,
+    NoRights,
+    ProgramError,
+    InvalidChecksum,
+    InvalidFirmware,
+    FlashError,
+  ]
+  for code in codes {
+    let u = code.to_uint()
+    let decoded = @mailbox.FoeErrorCode::from_uint(u)
+    assert_eq(code, decoded)
+  }
+}
+
+///|
+test "FoeErrorCode unknown code roundtrip" {
+  let code = @mailbox.FoeErrorCode::from_uint(0x1234U)
+  assert_true(code is Unknown(_))
+  assert_eq(code.to_uint(), 0x1234U)
+}
+
+///|
+test "encode_foe_read produces valid frame" {
+  let frame = @mailbox.encode_foe_read(b'\x01', 0x12345678U, "test.bin")
+  // 6 mailbox header + 6 FoE header + 8 filename = 20 bytes
+  assert_eq(frame.length(), 20)
+  // Mailbox header: length field (LE u16 at offset 0) = 14 (FoE header + filename)
+  assert_eq(frame[0], b'\x0E') // 14 low
+  assert_eq(frame[1], b'\x00') // 14 high
+  // Mailbox type byte at offset 5: bits [3:0] = 4 (FoE), bits [7:4] = counter
+  // counter=1 → (1 << 4) | 4 = 0x14
+  assert_eq(frame[5], b'\x14')
+  // FoE OpCode at offset 6: Read = 0x01
+  assert_eq(frame[6], b'\x01')
+  // Reserved at offset 7
+  assert_eq(frame[7], b'\x00')
+  // Password (LE u32) at offset 8-11: 0x12345678
+  assert_eq(frame[8], b'\x78')
+  assert_eq(frame[9], b'\x56')
+  assert_eq(frame[10], b'\x34')
+  assert_eq(frame[11], b'\x12')
+}
+
+///|
+test "encode_foe_write produces valid frame" {
+  let frame = @mailbox.encode_foe_write(b'\x02', 0U, "fw.bin")
+  // 6 + 6 + 6 = 18 bytes
+  assert_eq(frame.length(), 18)
+  // FoE OpCode at offset 6: Write = 0x02
+  assert_eq(frame[6], b'\x02')
+}
+
+///|
+test "encode_foe_data produces valid frame" {
+  let payload = Bytes::from_array([b'\xAA', b'\xBB', b'\xCC'])
+  let frame = @mailbox.encode_foe_data(b'\x03', 1U, payload)
+  // 6 + 6 + 3 = 15 bytes
+  assert_eq(frame.length(), 15)
+  // FoE OpCode at offset 6: Data = 0x03
+  assert_eq(frame[6], b'\x03')
+  // Packet number (LE u32) at offset 8-11: 1
+  assert_eq(frame[8], b'\x01')
+  assert_eq(frame[9], b'\x00')
+  // Payload starts at offset 12
+  assert_eq(frame[12], b'\xAA')
+  assert_eq(frame[13], b'\xBB')
+  assert_eq(frame[14], b'\xCC')
+}
+
+///|
+test "encode_foe_ack produces valid frame" {
+  let frame = @mailbox.encode_foe_ack(b'\x04', 5U)
+  // 6 + 6 = 12 bytes
+  assert_eq(frame.length(), 12)
+  // FoE OpCode at offset 6: Ack = 0x04
+  assert_eq(frame[6], b'\x04')
+  // Packet number at offset 8-11: 5
+  assert_eq(frame[8], b'\x05')
+  assert_eq(frame[9], b'\x00')
+}
+
+///|
+test "decode_foe_response Data frame" {
+  // Build a FoE Data response frame manually
+  let frame = @mailbox.encode_foe_data(
+    b'\x01',
+    42U,
+    Bytes::from_array([b'\xDE', b'\xAD']),
+  )
+  let (mbh, resp) = @mailbox.decode_foe_response(frame)
+  assert_eq(mbh.mb_type, @mailbox.MailboxType::FoE)
+  match resp {
+    @mailbox.FoeResponse::FoeData(packet_number=pn, data=d) => {
+      assert_eq(pn, 42U)
+      assert_eq(d.length(), 2)
+      assert_eq(d[0], b'\xDE')
+      assert_eq(d[1], b'\xAD')
+    }
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "decode_foe_response Ack frame" {
+  let frame = @mailbox.encode_foe_ack(b'\x02', 7U)
+  let (_mbh, resp) = @mailbox.decode_foe_response(frame)
+  match resp {
+    @mailbox.FoeResponse::FoeAck(packet_number=pn) => assert_eq(pn, 7U)
+    _ => assert_true(false)
+  }
+}
+
+///|
+test "decode_foe_response too short frame" {
+  let short = Bytes::from_array([b'\x00', b'\x01', b'\x02'])
+  let result = try? @mailbox.decode_foe_response(short)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_foe_response wrong mailbox type" {
+  // Build a frame with CoE type instead of FoE
+  let buf = Bytes::makei(14, fn(i) {
+    match i {
+      0 => b'\x08' // length low = 8
+      1 => b'\x00' // length high
+      5 => b'\x13' // type=CoE(3), counter=1 → (1<<4)|3 = 0x13
+      6 => b'\x03' // FoE Data opcode (but type is CoE)
+      _ => b'\x00'
+    }
+  })
+  let result = try? @mailbox.decode_foe_response(buf)
+  assert_true(result is Err(_))
 }

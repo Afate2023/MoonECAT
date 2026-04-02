@@ -86,6 +86,8 @@
 - `网络一致性 4-tuple 校验` → `3a08bff` `fix(validate): compare full identity 4-tuple`
 - `按站地址位置校验与边界测试` → `a6069bb` `fix: validate slaves by configured position and add boundary tests`
 - `SII/ESI 规范修正` → `2006272` `fix(mailbox): ESI/SII conformance fixes per ETG1000.6`
+- `SII ETG2010 v1.0.2 对齐` → `2074429` `fix(sii): align SII parsing with ETG2010 v1.0.2 conformance gaps`
+- `AL Status Code / SDO Abort Code 描述表` → `d19db2d` `feat(protocol): add AL Status Code and SDO Abort Code description tables per ETG.1000.6`
 
 ### M4 ESM、PDO 周期通信、运行时编排 — ✅ 已完成 【L2】
 

@@ -16,6 +16,8 @@ pub(all) enum FmmuDirection {
   Outputs
   Inputs
   MailboxState
+  DynamicOutputs
+  DynamicInputs
 } derive(Eq, Show)
 
 ///|

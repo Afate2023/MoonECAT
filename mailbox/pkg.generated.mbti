@@ -38,6 +38,10 @@ pub fn decode_emergency(Bytes) -> EmergencyMessage raise @hal.EcError
 
 pub fn decode_emergency_frame(Bytes) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError
 
+pub fn decode_eoe_response(Bytes) -> EoeResponse raise @hal.EcError
+
+pub fn decode_foe_response(Bytes) -> (MailboxHeader, FoeResponse) raise @hal.EcError
+
 pub fn decode_sdo_info_od_description_payload(Bytes) -> SdoInfoObjectDescription raise @hal.EcError
 
 pub fn decode_sdo_info_od_list_payload(Bytes) -> Array[UInt]
@@ -47,6 +51,26 @@ pub fn decode_sdo_info_oe_description_payload(Bytes) -> SdoInfoEntryDescription 
 pub fn decode_sdo_info_response(Bytes) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError
 
 pub fn decode_sdo_response(Bytes) -> (MailboxHeader, SdoResponse) raise @hal.EcError
+
+pub fn decode_soe_response(Bytes) -> SoeResponse raise @hal.EcError
+
+pub fn encode_eoe_fragment(Byte, UInt, Bool, UInt, UInt, UInt, Bytes) -> Bytes
+
+pub fn encode_eoe_get_ip_req(Byte, UInt) -> Bytes
+
+pub fn encode_eoe_set_ip_req(Byte, UInt, Bytes, Bytes, Bytes) -> Bytes
+
+pub fn encode_foe_ack(Byte, UInt) -> Bytes
+
+pub fn encode_foe_data(Byte, UInt, Bytes) -> Bytes
+
+pub fn encode_foe_read(Byte, UInt, String) -> Bytes
+
+pub fn encode_foe_write(Byte, UInt, String) -> Bytes
+
+pub fn encode_soe_read_req(Byte, UInt, Byte, UInt) -> Bytes
+
+pub fn encode_soe_write_req(Byte, UInt, Byte, UInt, Bytes) -> Bytes
 
 pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
 
@@ -76,7 +100,11 @@ pub fn parse_sii_sync_units(Bytes) -> Array[SiiSyncUnit]
 
 pub fn parse_sii_timeouts(Bytes) -> SiiTimeouts raise @hal.EcError
 
+pub fn sdo_abort_code_description(UInt) -> String
+
 pub let sii_category_start : Int
+
+pub fn soe_element_flags(Array[SoeElementFlag]) -> Byte
 
 // Errors
 
@@ -375,6 +403,7 @@ pub(all) struct SiiGeneral {
   sysman_class : Byte
   flags : Byte
   current_on_ebus : Int
+  group_idx_dup : Byte
   physical_port_0 : Byte
   physical_port_1 : Byte
   physical_port_2 : Byte

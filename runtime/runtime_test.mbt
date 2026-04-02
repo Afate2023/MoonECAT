@@ -8,6 +8,7 @@ test "Telemetry initializes to zero" {
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
   assert_eq(t.dc_delay_updates, 0L)
+  assert_eq(t.emergency_events, 0L)
 }
 
 ///|
@@ -990,6 +991,7 @@ test "Recovery: Telemetry reset clears all counters" {
   t.retries = 3L
   t.wkc_errors = 10L
   t.dc_delay_updates = 8L
+  t.emergency_events = 2L
   t.reset()
   assert_eq(t.cycles, 0L)
   assert_eq(t.tx_frames, 0L)
@@ -998,6 +1000,54 @@ test "Recovery: Telemetry reset clears all counters" {
   assert_eq(t.retries, 0L)
   assert_eq(t.wkc_errors, 0L)
   assert_eq(t.dc_delay_updates, 0L)
+  assert_eq(t.emergency_events, 0L)
+}
+
+///|
+test "Emergency: configure_emergency_stations sets station list" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  assert_eq(rt.emergency_stations.length(), 0)
+  let mb_config : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1800U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  rt.configure_emergency_stations([(0x1001U, mb_config)])
+  assert_eq(rt.emergency_stations.length(), 1)
+  let (station, _cfg) = rt.emergency_stations[0]
+  assert_eq(station, 0x1001U)
+}
+
+///|
+test "Emergency: telemetry starts at zero and accumulates" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let tel = rt.get_telemetry()
+  assert_eq(tel.emergency_events, 0L)
+}
+
+///|
+test "Emergency: no stations configured means no polling overhead" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
+  rt.configure_pdo(ctx, 0U)
+  rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
+  let nic = @mock.MockNic::new()
+  let success = rt.run_cycles(nic, 5, @hal.Duration(1000L))
+  assert_eq(success, 5)
+  let tel = rt.get_telemetry()
+  assert_eq(tel.emergency_events, 0L)
 }
 
 ///|
@@ -2210,6 +2260,7 @@ test "diagnostic surface from slave diagnosis classifies register and mailbox is
     al_status_code: Some(0x0011U),
     error_register: b'\x04',
     diagnosis_counter: Some(2U),
+    dl_error_counters: None,
   })
   assert_eq(surface.overall_level, @runtime.Block)
   assert_eq(surface.issues.length(), 4)
@@ -2516,6 +2567,7 @@ test "RunReport format with cycles and telemetry" {
     wkc_errors: 3L,
     irq_events: 4L,
     dc_delay_updates: 2L,
+    emergency_events: 0L,
   }
   let report : @runtime.RunReport = {
     scan: { slave_count: 2, slaves: [] },
@@ -2584,6 +2636,7 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2640,6 +2693,7 @@ test "run with empty bus skips ESM broadcasts" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2671,6 +2725,7 @@ test "run confirms op via per-station transition without broadcast" {
       mappings: [],
       logical_base: 0U,
       logical_size: 0,
+      block_lrw: false,
     },
     0U,
     1,
@@ -2736,6 +2791,7 @@ test "RunReport format includes timeout recovery fault" {
       wkc_errors: 0L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Operational,
     fault: Some(
@@ -2778,6 +2834,7 @@ test "diagnostic surface from run includes runtime fault issues" {
       wkc_errors: 5L,
       irq_events: 0L,
       dc_delay_updates: 0L,
+      emergency_events: 0L,
     },
     final_phase: @runtime.Operational,
     fault: Some(
@@ -2818,6 +2875,7 @@ test "run with mock loopback: validation fails when slaves expected but not foun
     mappings: [],
     logical_base: 0U,
     logical_size: 128,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2843,6 +2901,7 @@ test "replay integration minimal flow: scan->validate->run->stop" {
     mappings: [],
     logical_base: 0U,
     logical_size: 0,
+    block_lrw: false,
   }
   let report = @runtime.run(
     nic,
@@ -2927,4 +2986,611 @@ test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
   assert_eq(t.cycles, 5L)
   assert_eq(t.timeouts, 0L)
   assert_eq(t.wkc_errors, 0L)
+}
+
+///|
+test "Master OD build_master_od contains standard objects" {
+  let identity : @runtime.MasterIdentity = {
+    vendor_id: 0x1234U,
+    product_code: 0x5678U,
+    revision: 1U,
+    serial: 42U,
+  }
+  let od = @runtime.build_master_od(identity, None, None, None)
+  // 0x1000 Device Type
+  let dt = od.lookup(0x1000U, b'\x00')
+  assert_true(dt is Some(_))
+  assert_true(dt.unwrap().value is @runtime.MasterOdValue::U32(0U))
+  // 0x1008 Device Name
+  let dn = od.lookup(0x1008U, b'\x00')
+  assert_true(dn is Some(_))
+  assert_true(dn.unwrap().value is @runtime.MasterOdValue::Str("MoonECAT"))
+  // 0x1018 Identity sub1 = vendor_id
+  let vid = od.lookup(0x1018U, b'\x01')
+  assert_true(vid is Some(_))
+  assert_true(vid.unwrap().value is @runtime.MasterOdValue::U32(0x1234U))
+  // 0x1018 Identity sub3 = revision
+  let rev = od.lookup(0x1018U, b'\x03')
+  assert_true(rev is Some(_))
+  assert_true(rev.unwrap().value is @runtime.MasterOdValue::U32(1U))
+}
+
+///|
+test "Master OD indices returns unique sorted list" {
+  let od = @runtime.build_master_od(
+    @runtime.default_master_identity(),
+    None,
+    None,
+    None,
+  )
+  let idxs = od.indices()
+  // Standard objects: 0x1000, 0x1001, 0x1008, 0x1009, 0x100A, 0x1018, 0x10F3, 0x2000, 0x2002, 0x2003
+  assert_true(idxs.length() >= 10)
+  // No duplicates
+  for i = 0; i < idxs.length(); i = i + 1 {
+    for j = i + 1; j < idxs.length(); j = j + 1 {
+      assert_true(idxs[i] != idxs[j])
+    }
+  }
+}
+
+///|
+test "Master OD with scan report includes slave count" {
+  let scan : @runtime.ScanReport = { slave_count: 3, slaves: [] }
+  let od = @runtime.build_master_od(
+    @runtime.default_master_identity(),
+    Some(scan),
+    None,
+    None,
+  )
+  let sc = od.lookup(0x2000U, b'\x00')
+  assert_true(sc is Some(_))
+  assert_true(sc.unwrap().value is @runtime.MasterOdValue::U32(3U))
+}
+
+///|
+test "Master OD with telemetry includes cycle count" {
+  let t = @runtime.Telemetry::new()
+  t.cycles = 100L
+  t.tx_frames = 200L
+  let od = @runtime.build_master_od(
+    @runtime.default_master_identity(),
+    None,
+    Some(t),
+    None,
+  )
+  let cyc = od.lookup(0x2001U, b'\x01')
+  assert_true(cyc is Some(_))
+  assert_true(cyc.unwrap().value is @runtime.MasterOdValue::U32(100U))
+  let tx = od.lookup(0x2001U, b'\x02')
+  assert_true(tx is Some(_))
+  assert_true(tx.unwrap().value is @runtime.MasterOdValue::U32(200U))
+}
+
+///|
+test "Master OD format_text contains object table" {
+  let od = @runtime.build_master_od(
+    @runtime.default_master_identity(),
+    None,
+    None,
+    None,
+  )
+  let text = od.format_text()
+  assert_true(text.contains("Master Object Dictionary"))
+  assert_true(text.contains("0x1000"))
+  assert_true(text.contains("MoonECAT"))
+  assert_true(text.contains("Device Type"))
+}
+
+///|
+test "Master OD to_json produces valid structure" {
+  let od = @runtime.build_master_od(
+    @runtime.default_master_identity(),
+    None,
+    None,
+    None,
+  )
+  let json = od.to_json()
+  // Should have object_count, entry_count, entries fields
+  assert_true(json is Json::Object(_))
+}
+
+///|
+test "MasterOdValue format displays correctly" {
+  assert_eq(@runtime.MasterOdValue::U8(b'\xFF').format(), "0xff")
+  assert_eq(@runtime.MasterOdValue::U32(0x1234U).format(), "0x00001234")
+  assert_eq(@runtime.MasterOdValue::Str("hello").format(), "hello")
+  assert_eq(@runtime.MasterOdValue::I32(-1).format(), "-1")
+}
+
+///|
+test "EoeSwitch new creates empty switch" {
+  let sw = @runtime.EoeSwitch::new()
+  let j = sw.to_json()
+  assert_true(j is Json::Object(_))
+  let text = sw.format_text()
+  assert_true(text.contains("Stations: 0"))
+}
+
+///|
+test "EoeSwitch add_station registers station" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  sw.add_station(0x1002U, cfg)
+  // Duplicate should be ignored
+  sw.add_station(0x1001U, cfg)
+  let text = sw.format_text()
+  assert_true(text.contains("Stations: 2"))
+}
+
+///|
+test "eoe_max_fragment_size computes 32-byte aligned" {
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  // 128 - 10 = 118, aligned to 32 = 96
+  assert_eq(@runtime.eoe_max_fragment_size(cfg), 96)
+}
+
+///|
+test "eoe_max_fragment_size with small mailbox" {
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 10U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 10U,
+    in_sm_index: 1,
+  }
+  // 10 - 10 = 0
+  assert_eq(@runtime.eoe_max_fragment_size(cfg), 0)
+}
+
+///|
+test "EoeSwitch process_received reassembles single fragment" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  // Build a single-fragment EoE frame using the mailbox encoder
+  let payload = Bytes::makei(20, fn(i) { i.to_byte() })
+  let frame = @mailbox.encode_eoe_fragment(
+    b'\x01', 0U, true, 0U, 0U, 0U, payload,
+  )
+  let complete = sw.process_received(0x1001U, frame)
+  assert_true(complete)
+  let received = sw.drain_rx()
+  assert_eq(received.length(), 1)
+  assert_eq(received[0].station, 0x1001U)
+  assert_eq(received[0].data.length(), 20)
+  for i = 0; i < 20; i = i + 1 {
+    assert_eq(received[0].data[i], i.to_byte())
+  }
+}
+
+///|
+test "EoeSwitch process_received reassembles multi-fragment" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  // Fragment 0: not last, 32 bytes
+  let data0 = Bytes::makei(32, fn(i) { i.to_byte() })
+  let f0 = @mailbox.encode_eoe_fragment(b'\x01', 0U, false, 0U, 0U, 5U, data0)
+  let c0 = sw.process_received(0x1001U, f0)
+  assert_true(!c0)
+  // Fragment 1: last, 10 bytes
+  let data1 = Bytes::makei(10, fn(i) { (32 + i).to_byte() })
+  let f1 = @mailbox.encode_eoe_fragment(b'\x02', 0U, true, 1U, 1U, 5U, data1)
+  let c1 = sw.process_received(0x1001U, f1)
+  assert_true(c1)
+  let received = sw.drain_rx()
+  assert_eq(received.length(), 1)
+  assert_eq(received[0].data.length(), 42)
+  // Verify concatenation: first 32 bytes, then 10 bytes
+  assert_eq(received[0].data[0], b'\x00')
+  assert_eq(received[0].data[31], b'\x1F')
+  assert_eq(received[0].data[32], b'\x20')
+  assert_eq(received[0].data[41], b'\x29')
+}
+
+///|
+test "EoeSwitch process_received ignores unknown station" {
+  let sw = @runtime.EoeSwitch::new()
+  let payload = Bytes::makei(10, fn(i) { i.to_byte() })
+  let frame = @mailbox.encode_eoe_fragment(
+    b'\x01', 0U, true, 0U, 0U, 0U, payload,
+  )
+  let complete = sw.process_received(0x9999U, frame)
+  assert_true(!complete)
+  assert_eq(sw.drain_rx().length(), 0)
+}
+
+///|
+test "EoeSwitch to_json has expected fields" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let j = sw.to_json()
+  guard j is Json::Object(m) else {
+    assert_true(false)
+    return
+  }
+  assert_true(m.contains("station_count"))
+  assert_true(m.contains("tx_fragments"))
+  assert_true(m.contains("rx_fragments"))
+  assert_true(m.contains("rx_frames_complete"))
+  assert_true(m.contains("rx_errors"))
+  assert_true(m.contains("rx_queue_depth"))
+}
+
+///|
+test "EoeSwitch drain_rx empties queue" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  // Deliver two complete single-fragment frames
+  let p1 = Bytes::makei(5, fn(_i) { b'\xAA' })
+  let f1 = @mailbox.encode_eoe_fragment(b'\x01', 0U, true, 0U, 0U, 0U, p1)
+  let _ = sw.process_received(0x1001U, f1)
+  let p2 = Bytes::makei(5, fn(_i) { b'\xBB' })
+  let f2 = @mailbox.encode_eoe_fragment(b'\x02', 0U, true, 0U, 0U, 1U, p2)
+  let _ = sw.process_received(0x1001U, f2)
+  let batch = sw.drain_rx()
+  assert_eq(batch.length(), 2)
+  // Second drain should be empty
+  let empty = sw.drain_rx()
+  assert_eq(empty.length(), 0)
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 2 — QueueEndpoint / bridge_eoe_cycle
+// ---------------------------------------------------------------------------
+
+///|
+test "QueueEndpoint new defaults" {
+  let ep = @runtime.QueueEndpoint::new()
+  assert_eq(ep.tx_depth(), 0)
+  assert_eq(ep.rx_depth(), 0)
+  assert_true(ep.is_up())
+}
+
+///|
+test "QueueEndpoint submit_tx and consume_rx round-trip" {
+  let ep = @runtime.QueueEndpoint::new()
+  let data = Bytes::makei(10, fn(i) { i.to_byte() })
+  assert_true(ep.submit_tx(0x1001U, data))
+  assert_eq(ep.tx_depth(), 1)
+  // consume_rx should be empty — submit_tx fills tx_pending, not rx_pending
+  assert_true(ep.consume_rx() is None)
+  // read_frame drains tx_pending (used by bridge)
+  let frame = ep.read_frame()
+  assert_true(frame is Some(_))
+  assert_eq(ep.tx_depth(), 0)
+}
+
+///|
+test "QueueEndpoint write_frame and consume_rx" {
+  let ep = @runtime.QueueEndpoint::new()
+  let data = Bytes::makei(8, fn(i) { (0x40 + i).to_byte() })
+  assert_true(ep.write_frame(data))
+  assert_eq(ep.rx_depth(), 1)
+  let f = ep.consume_rx()
+  guard f is Some(f) else {
+    assert_true(false)
+    return
+  }
+  assert_eq(f.data.length(), 8)
+  assert_eq(f.data[0], b'\x40')
+  assert_eq(ep.rx_depth(), 0)
+}
+
+///|
+test "QueueEndpoint rejects when down" {
+  let ep = @runtime.QueueEndpoint::new()
+  ep.set_up(false)
+  assert_true(!ep.is_up())
+  let data = Bytes::makei(4, fn(_) { b'\x00' })
+  assert_true(!ep.submit_tx(1U, data))
+  assert_true(!ep.write_frame(data))
+}
+
+///|
+test "QueueEndpoint overflow at max_depth" {
+  let ep = @runtime.QueueEndpoint::new(max_depth=2)
+  let data = Bytes::makei(4, fn(_) { b'\xAA' })
+  assert_true(ep.submit_tx(1U, data))
+  assert_true(ep.submit_tx(2U, data))
+  // Third should fail
+  assert_true(!ep.submit_tx(3U, data))
+  assert_eq(ep.tx_depth(), 2)
+}
+
+///|
+test "QueueEndpoint to_json has fields" {
+  let ep = @runtime.QueueEndpoint::new()
+  let j = ep.to_json()
+  guard j is Json::Object(m) else {
+    assert_true(false)
+    return
+  }
+  assert_true(m.contains("up"))
+  assert_true(m.contains("tx_depth"))
+  assert_true(m.contains("rx_depth"))
+  assert_true(m.contains("max_depth"))
+}
+
+///|
+test "bridge_eoe_cycle delivers rx frames to endpoint" {
+  // Setup switch with one station and a complete received frame
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let payload = Bytes::makei(16, fn(i) { i.to_byte() })
+  let frame = @mailbox.encode_eoe_fragment(
+    b'\x01', 0U, true, 0U, 0U, 0U, payload,
+  )
+  let _ = sw.process_received(0x1001U, frame)
+  // Bridge cycle: tx_pending is empty, rx should deliver 1 frame
+  let ep = @runtime.QueueEndpoint::new()
+  let nic = @mock.MockNic::new()
+  let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
+  assert_eq(tx, 0)
+  assert_eq(rx, 1)
+  assert_eq(ep.rx_depth(), 1)
+  let received = ep.consume_rx()
+  guard received is Some(f) else {
+    assert_true(false)
+    return
+  }
+  assert_eq(f.station, 0x1001U)
+  assert_eq(f.data.length(), 16)
+}
+
+///|
+test "bridge_eoe_cycle drains tx_pending via switch" {
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let ep = @runtime.QueueEndpoint::new()
+  let data = Bytes::makei(20, fn(i) { i.to_byte() })
+  ignore(ep.submit_tx(0x1001U, data))
+  let nic = @mock.MockNic::new()
+  let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
+  // MockNic accepts send, so tx_sent = 1
+  assert_eq(tx, 1)
+  assert_eq(rx, 0)
+  // tx_pending should be fully drained
+  assert_eq(ep.tx_depth(), 0)
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 3 — EoeRelay (embedded synchronous relay)
+// ---------------------------------------------------------------------------
+
+///|
+test "EoeRelay new defaults" {
+  let relay = @runtime.EoeRelay::new()
+  let j = relay.to_json()
+  guard j is Json::Object(m) else {
+    assert_true(false)
+    return
+  }
+  assert_true(m.contains("active"))
+  assert_true(m.contains("stats"))
+}
+
+///|
+test "EoeRelay set_active toggles" {
+  let relay = @runtime.EoeRelay::new()
+  let text = relay.format_text()
+  assert_true(text.contains("Active: true"))
+  relay.set_active(false)
+  let text2 = relay.format_text()
+  assert_true(text2.contains("Active: false"))
+}
+
+///|
+test "EoeRelay inactive relay_cycle returns zero" {
+  let relay = @runtime.EoeRelay::new()
+  relay.set_active(false)
+  let sw = @runtime.EoeSwitch::new()
+  let nic = @mock.MockNic::new()
+  let (rx, tx) = relay.relay_cycle(
+    sw,
+    nic,
+    @hal.Duration(10_000L),
+    fn(_f) { true },
+    fn() { None },
+  )
+  assert_eq(rx, 0)
+  assert_eq(tx, 0)
+}
+
+///|
+test "EoeRelay relay_cycle delivers rx frames via handler" {
+  let relay = @runtime.EoeRelay::new()
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let payload = Bytes::makei(12, fn(i) { i.to_byte() })
+  let frame = @mailbox.encode_eoe_fragment(
+    b'\x01', 0U, true, 0U, 0U, 0U, payload,
+  )
+  let _ = sw.process_received(0x1001U, frame)
+  // Collect frames delivered to handler
+  let delivered : Array[@runtime.EoeRelayFrame] = []
+  let nic = @mock.MockNic::new()
+  let (rx, tx) = relay.relay_cycle(
+    sw,
+    nic,
+    @hal.Duration(10_000L),
+    fn(f) {
+      delivered.push(f)
+      true
+    },
+    fn() { None },
+  )
+  assert_eq(rx, 1)
+  assert_eq(tx, 0)
+  assert_eq(delivered.length(), 1)
+  assert_true(delivered[0].direction is @runtime.SlaveToHost)
+  assert_eq(delivered[0].station, 0x1001U)
+  assert_eq(delivered[0].data.length(), 12)
+}
+
+///|
+test "EoeRelay relay_cycle handler rejection increments dropped" {
+  let relay = @runtime.EoeRelay::new()
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let payload = Bytes::makei(8, fn(_) { b'\xFF' })
+  let frame = @mailbox.encode_eoe_fragment(
+    b'\x01', 0U, true, 0U, 0U, 0U, payload,
+  )
+  let _ = sw.process_received(0x1001U, frame)
+  let nic = @mock.MockNic::new()
+  // Handler rejects frames
+  let (rx, _tx) = relay.relay_cycle(
+    sw,
+    nic,
+    @hal.Duration(10_000L),
+    fn(_f) { false },
+    fn() { None },
+  )
+  assert_eq(rx, 0) // handler rejected, so rx_count = 0
+  let text = relay.format_text()
+  assert_true(text.contains("Dropped: 1"))
+}
+
+///|
+test "EoeRelay relay_cycle tx_provider sends frames" {
+  let relay = @runtime.EoeRelay::new()
+  let sw = @runtime.EoeSwitch::new()
+  let cfg : @mailbox.MailboxConfig = {
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
+  }
+  sw.add_station(0x1001U, cfg)
+  let nic = @mock.MockNic::new()
+  let mut provided = 0
+  // Provide one frame then stop
+  let (_rx, _tx) = relay.relay_cycle(
+    sw,
+    nic,
+    @hal.Duration(10_000L),
+    fn(_f) { true },
+    fn() {
+      if provided == 0 {
+        provided = provided + 1
+        let data = Bytes::makei(10, fn(i) { i.to_byte() })
+        Some(@runtime.EoeRelayFrame::{
+          direction: @runtime.HostToSlave,
+          station: 0x1001U,
+          data,
+        })
+      } else {
+        None
+      }
+    },
+  )
+  // MockNic will cause send_frame to fail → dropped
+  let text = relay.format_text()
+  assert_true(text.contains("Dropped: 1") || text.contains("TX relayed: 1"))
+}
+
+///|
+test "EoeRelayStats new is zeroed" {
+  let stats = @runtime.EoeRelayStats::new()
+  assert_eq(stats.tx_relayed, 0L)
+  assert_eq(stats.rx_relayed, 0L)
+  assert_eq(stats.dropped, 0L)
+  let j = stats.to_json()
+  guard j is Json::Object(m) else {
+    assert_true(false)
+    return
+  }
+  assert_true(m.contains("tx_relayed"))
+  assert_true(m.contains("rx_relayed"))
+  assert_true(m.contains("dropped"))
+}
+
+///|
+test "EoeRelayDirection display" {
+  let d1 : @runtime.EoeRelayDirection = @runtime.HostToSlave
+  let d2 : @runtime.EoeRelayDirection = @runtime.SlaveToHost
+  assert_true(d1.to_string().contains("HostToSlave"))
+  assert_true(d2.to_string().contains("SlaveToHost"))
 }

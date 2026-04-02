@@ -2556,6 +2556,116 @@ test "dc_read_receive_time via mock returns zero" {
 }
 
 ///|
+test "watchdog register constants match ETG1000.4 addresses" {
+  assert_eq(@protocol.reg_watchdog_divider, 0x0400U)
+  assert_eq(@protocol.reg_watchdog_time_pdi, 0x0410U)
+  assert_eq(@protocol.reg_watchdog_time_pdata, 0x0420U)
+  assert_eq(@protocol.reg_watchdog_status_pdata, 0x0440U)
+  assert_eq(@protocol.reg_watchdog_counter_pdata, 0x0442U)
+}
+
+///|
+test "SmWatchdogConfig struct equality and derive Show" {
+  let a : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 5U,
+  }
+  let b : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 5U,
+  }
+  assert_eq(a, b)
+  // Show derive produces non-empty string
+  assert_true(a.to_string().length() > 0)
+}
+
+///|
+test "SmWatchdogConfig inequality on different pdata_time" {
+  let a : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0x03E8U,
+    pdata_status: true,
+    pdata_counter: 0U,
+  }
+  let b : @protocol.SmWatchdogConfig = {
+    divider: 0x09C2U,
+    pdi_time: 0x03E8U,
+    pdata_time: 0U,
+    pdata_status: true,
+    pdata_counter: 0U,
+  }
+  assert_true(a != b)
+}
+
+///|
+test "read_sm_watchdog_config via mock returns zeroed defaults" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let config = @protocol.read_sm_watchdog_config(nic, 0x1001U, timeout)
+  // MockNic loopback echoes frame with zero-filled data area for FPRD
+  assert_eq(config.divider, 0U)
+  assert_eq(config.pdi_time, 0U)
+  assert_eq(config.pdata_time, 0U)
+  assert_eq(config.pdata_status, false)
+  assert_eq(config.pdata_counter, 0U)
+}
+
+///|
+test "esm_timeout_policy_from_sii_timeouts returns defaults when None" {
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(None)
+  assert_eq(policy, @protocol.default_esm_timeout_policy())
+  assert_eq(policy.init, None)
+  assert_eq(policy.preop, None)
+  assert_eq(policy.safeop, None)
+  assert_eq(policy.op, None)
+  assert_eq(policy.boot, None)
+}
+
+///|
+test "esm_timeout_policy_from_sii_timeouts maps SII fields correctly" {
+  let timeouts : @mailbox.SiiTimeouts = {
+    preop_timeout_ms: 2000U,
+    safeop_op_timeout_ms: 5000U,
+    back_to_init_timeout_ms: 1000U,
+    back_to_safeop_timeout_ms: 3000U,
+    mailbox_request_timeout_ms: 100U,
+    mailbox_response_timeout_ms: 200U,
+  }
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
+  // preop_timeout_ms → preop
+  assert_eq(policy.preop, Some(@hal.Duration(2_000_000_000L)))
+  // safeop_op_timeout_ms → op
+  assert_eq(policy.op, Some(@hal.Duration(5_000_000_000L)))
+  // back_to_init_timeout_ms → init
+  assert_eq(policy.init, Some(@hal.Duration(1_000_000_000L)))
+  // back_to_safeop_timeout_ms → safeop
+  assert_eq(policy.safeop, Some(@hal.Duration(3_000_000_000L)))
+  // boot is always None
+  assert_eq(policy.boot, None)
+}
+
+///|
+test "esm_timeout_policy_from_sii_timeouts zero fields remain None" {
+  let timeouts : @mailbox.SiiTimeouts = {
+    preop_timeout_ms: 0U,
+    safeop_op_timeout_ms: 0U,
+    back_to_init_timeout_ms: 0U,
+    back_to_safeop_timeout_ms: 0U,
+    mailbox_request_timeout_ms: 0U,
+    mailbox_response_timeout_ms: 0U,
+  }
+  let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
+  assert_eq(policy, @protocol.default_esm_timeout_policy())
+}
+
+///|
 test "dc_read_sync_window via mock returns zero" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
@@ -2571,10 +2681,67 @@ test "dc_configure_sync0 via mock" {
 }
 
 ///|
+test "dc_configure_sync0 with SYNC1 via mock" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  // SYNC1 cycle = 2x SYNC0 cycle
+  @protocol.dc_configure_sync0(
+    nic,
+    0x1001U,
+    1_000_000U,
+    timeout,
+    sync1_cycle_ns=2_000_000U,
+  )
+}
+
+///|
 test "dc_compensate_cycle via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   @protocol.dc_compensate_cycle(nic, 0x1001U, timeout)
+}
+
+///|
+test "read_dl_error_counters via mock returns all zeros" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let counters = @protocol.read_dl_error_counters(nic, 0x1001U, timeout)
+  assert_eq(counters.ecat_pu_errors, 0U)
+  assert_eq(counters.pdi_errors, 0U)
+  for i = 0; i < counters.ports.length(); i = i + 1 {
+    assert_eq(counters.ports[i].frame_errors, 0U)
+    assert_eq(counters.ports[i].physical_errors, 0U)
+    assert_eq(counters.ports[i].forwarded_rx_errors, 0U)
+    assert_eq(counters.ports[i].lost_link_count, 0U)
+  }
+}
+
+///|
+test "read_dl_error_counters_ap via mock returns all zeros" {
+  let nic = @mock.MockNic::new()
+  let timeout = @hal.Duration(1000L)
+  let counters = @protocol.read_dl_error_counters_ap(nic, 0U, timeout)
+  assert_eq(counters.ecat_pu_errors, 0U)
+  assert_eq(counters.pdi_errors, 0U)
+  assert_eq(counters.ports.length(), 4)
+}
+
+///|
+test "DlErrorCounters struct has expected port count" {
+  let ports : FixedArray[@protocol.PortErrorCounters] = FixedArray::make(4, {
+    frame_errors: 0U,
+    physical_errors: 0U,
+    forwarded_rx_errors: 0U,
+    lost_link_count: 0U,
+  })
+  let counters : @protocol.DlErrorCounters = {
+    ports,
+    ecat_pu_errors: 5U,
+    pdi_errors: 3U,
+  }
+  assert_eq(counters.ports.length(), 4)
+  assert_eq(counters.ecat_pu_errors, 5U)
+  assert_eq(counters.pdi_errors, 3U)
 }
 
 ///|

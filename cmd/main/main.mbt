@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
+/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -398,6 +398,7 @@ fn run_native_command_with_fresh_nic(
           expected_wkc: 0U,
           dc_cycle_period_ns: None,
           startup_mailbox_plans: [],
+          esm_timeout_policies: [],
         }
       }
   }
@@ -597,6 +598,19 @@ fn[N : @hal.Nic] run_command_with_nic(
         println(validate_report.format())
       }
     }
+    "master-od" => {
+      let scan_report : @runtime.ScanReport? = Some(@runtime.scan(nic, timeout)) catch {
+        _ => None
+      }
+      nic.close()
+      let identity = @runtime.default_master_identity()
+      let od = @runtime.build_master_od(identity, scan_report, None, None)
+      if as_json {
+        println(od.to_json().stringify(indent=2))
+      } else {
+        println(od.format_text())
+      }
+    }
     _ => print_usage()
   }
 }
@@ -605,7 +619,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -3527,6 +3541,10 @@ fn esc_register_report_json(report : EscRegisterReport) -> Json {
     "al_state": Json::string(report.al_state.to_string()),
     "al_error_flag": Json::boolean(report.al_error_flag),
     "al_status_code": option_uint_json(report.al_status_code),
+    "al_status_code_description": match report.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "sync_managers": Json::array(
       report.sync_managers.map(fn(sm) {
         Json::object({
@@ -3632,7 +3650,11 @@ fn esc_register_report_text(report : EscRegisterReport) -> String {
   let buf = @buffer.new(size_hint=768)
   let al_error_flag_text = if report.al_error_flag { "set" } else { "clear" }
   let al_status_code_text = match report.al_status_code {
-    Some(code) => format_hex(code, 4)
+    Some(code) =>
+      format_hex(code, 4) +
+      " (" +
+      @protocol.al_status_code_description(code) +
+      ")"
     None => "not set"
   }
   buf.write_string("EtherCAT ESC Register Snapshot\n")
@@ -3849,6 +3871,10 @@ fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
     "al_state": option_esm_state_json(phase.al_state),
     "al_error_flag": option_bool_json(phase.al_error_flag),
     "al_status_code": option_uint_json(phase.al_status_code),
+    "al_status_code_description": match phase.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "sync_managers": Json::array(
       phase.sync_managers.map(fn(sm) {
         Json::object({
@@ -3903,11 +3929,21 @@ fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
                 "value_u32": option_uint_json(entry.value_u32),
                 "error_detail": option_string_json(entry.error_detail),
                 "abort_code": option_uint_json(entry.abort_code),
+                "abort_code_description": match entry.abort_code {
+                  Some(code) =>
+                    Json::string(@mailbox.sdo_abort_code_description(code))
+                  None => Json::null()
+                },
               })
             }),
           ),
           "error_detail": option_string_json(obj.error_detail),
           "abort_code": option_uint_json(obj.abort_code),
+          "abort_code_description": match obj.abort_code {
+            Some(code) =>
+              Json::string(@mailbox.sdo_abort_code_description(code))
+            None => Json::null()
+          },
         })
       }),
     ),
@@ -4119,7 +4155,11 @@ fn startup_trace_report_text(report : StartupTraceReport) -> String {
       None => "unknown"
     }
     let phase_status = match phase.al_status_code {
-      Some(value) => format_hex(value, 4)
+      Some(value) =>
+        format_hex(value, 4) +
+        " (" +
+        @protocol.al_status_code_description(value) +
+        ")"
       None => "not set"
     }
     buf.write_string(phase.name + "\n")
@@ -4450,9 +4490,38 @@ fn diagnosis_output_json(
       Some(code) => Json::number(code.to_double())
       None => Json::null()
     },
+    "al_status_code_description": match report.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "error_register": Json::number(report.error_register.to_uint().to_double()),
     "diagnosis_counter": match report.diagnosis_counter {
       Some(value) => Json::number(value.to_double())
+      None => Json::null()
+    },
+    "dl_error_counters": match report.dl_error_counters {
+      Some(dl) => {
+        let port_arr : Array[Json] = []
+        for i = 0; i < dl.ports.length(); i = i + 1 {
+          let p = dl.ports[i]
+          port_arr.push(
+            Json::object({
+              "port": Json::number(i.to_double()),
+              "frame_errors": Json::number(p.frame_errors.to_double()),
+              "physical_errors": Json::number(p.physical_errors.to_double()),
+              "forwarded_rx_errors": Json::number(
+                p.forwarded_rx_errors.to_double(),
+              ),
+              "lost_link_count": Json::number(p.lost_link_count.to_double()),
+            }),
+          )
+        }
+        Json::object({
+          "ports": Json::array(port_arr),
+          "ecat_pu_errors": Json::number(dl.ecat_pu_errors.to_double()),
+          "pdi_errors": Json::number(dl.pdi_errors.to_double()),
+        })
+      }
       None => Json::null()
     },
     "surface": diagnostic_surface_json(
@@ -4474,7 +4543,11 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
     None => "unknown"
   }
   let al_status_code_text = match report.al_status_code {
-    Some(code) => format_hex(code, 4)
+    Some(code) =>
+      format_hex(code, 4) +
+      " (" +
+      @protocol.al_status_code_description(code) +
+      ")"
     None => "unknown"
   }
   let diagnosis_counter_text = match report.diagnosis_counter {
@@ -4491,6 +4564,30 @@ fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
     "Error Register: " + format_hex(report.error_register.to_uint(), 2) + "\n",
   )
   buf.write_string("Diagnosis Counter: " + diagnosis_counter_text + "\n")
+  match report.dl_error_counters {
+    Some(dl) => {
+      buf.write_string("DL Error Counters:\n")
+      for i = 0; i < dl.ports.length(); i = i + 1 {
+        let p = dl.ports[i]
+        buf.write_string(
+          "  Port " +
+          i.to_string() +
+          ": frame=" +
+          p.frame_errors.to_string() +
+          " physical=" +
+          p.physical_errors.to_string() +
+          " fwd_rx=" +
+          p.forwarded_rx_errors.to_string() +
+          " lost_link=" +
+          p.lost_link_count.to_string() +
+          "\n",
+        )
+      }
+      buf.write_string("  EPU errors: " + dl.ecat_pu_errors.to_string() + "\n")
+      buf.write_string("  PDI errors: " + dl.pdi_errors.to_string() + "\n")
+    }
+    None => buf.write_string("DL Error Counters: not available\n")
+  }
   buf.to_string()
 }
 
@@ -4569,6 +4666,11 @@ fn od_report_json(report : OdBrowseReport) -> Json {
             Some(code) => Json::number(code.to_double())
             None => Json::null()
           },
+          "abort_code_description": match report.abort_code {
+            Some(code) =>
+              Json::string(@mailbox.sdo_abort_code_description(code))
+            None => Json::null()
+          },
         })
       None => Json::null()
     },
@@ -4591,7 +4693,13 @@ fn od_report_text(report : OdBrowseReport) -> String {
       buf.write_string("Error Category: " + category + "\n")
       match report.abort_code {
         Some(code) =>
-          buf.write_string("Abort Code: " + format_hex(code, 8) + "\n")
+          buf.write_string(
+            "Abort Code: " +
+            format_hex(code, 8) +
+            " (" +
+            @mailbox.sdo_abort_code_description(code) +
+            ")\n",
+          )
         None => ()
       }
       match report.error_detail {
@@ -4981,8 +5089,8 @@ fn physical_port_name(port : Byte) -> String {
 ///|
 fn fmmu_usage_name(direction : @mailbox.FmmuDirection) -> String {
   match direction {
-    Outputs => "used for Outputs"
-    Inputs => "used for Inputs"
+    Outputs | DynamicOutputs => "used for Outputs"
+    Inputs | DynamicInputs => "used for Inputs"
     MailboxState => "used for SyncM mailbox status (MBoxStat)"
   }
 }
@@ -6554,6 +6662,7 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       "wkc_errors": Json::number(tel.wkc_errors.to_double()),
       "irq_events": Json::number(tel.irq_events.to_double()),
       "dc_delay_updates": Json::number(tel.dc_delay_updates.to_double()),
+      "emergency_events": Json::number(tel.emergency_events.to_double()),
     }),
     "surface": diagnostic_surface_json(
       @runtime.diagnostic_surface_from_run(report),
@@ -6592,6 +6701,9 @@ fn run_progress_json(progress : @runtime.RunProgress) -> Json {
       "irq_events": Json::number(progress.telemetry.irq_events.to_double()),
       "dc_delay_updates": Json::number(
         progress.telemetry.dc_delay_updates.to_double(),
+      ),
+      "emergency_events": Json::number(
+        progress.telemetry.emergency_events.to_double(),
       ),
     }),
     "consecutive_timeouts": Json::number(
@@ -6769,6 +6881,10 @@ fn state_surface_summary_json(summary : @runtime.StateSurfaceSummary) -> Json {
       Some(code) => Json::number(code.to_double())
       None => Json::null()
     },
+    "al_status_code_description": match summary.al_status_code {
+      Some(code) => Json::string(@protocol.al_status_code_description(code))
+      None => Json::null()
+    },
     "wkc": match summary.wkc {
       Some(wkc) => Json::number(wkc.to_double())
       None => Json::null()
@@ -6816,6 +6932,7 @@ fn runtime_metrics_summary_json(
     "wkc_errors": Json::number(summary.wkc_errors.to_double()),
     "irq_events": Json::number(summary.irq_events.to_double()),
     "dc_delay_updates": Json::number(summary.dc_delay_updates.to_double()),
+    "emergency_events": Json::number(summary.emergency_events.to_double()),
   })
 }
 

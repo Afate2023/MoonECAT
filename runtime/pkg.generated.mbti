@@ -943,6 +943,7 @@ pub(all) struct RunStartupPreparation {
   expected_wkc : UInt
   dc_cycle_period_ns : Int64?
   startup_mailbox_plans : Array[StationStartupMailboxPlan]
+  esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)]
 }
 
 pub(all) struct Runtime {
@@ -1076,6 +1077,12 @@ pub(all) struct SlaveStartupPreparation {
   sii : @mailbox.SiiFullInfo
   sii_categories : Array[@mailbox.SiiCategoryEntry]
 }
+
+pub(all) struct SmWatchdogValidation {
+  station : UInt
+  config : @protocol.SmWatchdogConfig
+  watchdog_active : Bool
+} derive(Eq, Show)
 
 pub(all) enum StartupCommandTransition {
   PreOpToSafeOp
