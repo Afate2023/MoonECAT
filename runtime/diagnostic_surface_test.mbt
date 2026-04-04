@@ -268,9 +268,9 @@ test "parse_error_register_payload valid" {
 
 ///|
 test "parse_error_register_payload too short" {
-  let result : Result[Byte, _] = try {
+  let result : Result[Byte, _] = try
     @runtime.parse_error_register_payload(b"") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   assert_true(result is Err(_))
@@ -286,9 +286,9 @@ test "parse_u32_payload valid" {
 
 ///|
 test "parse_u32_payload too short" {
-  let result : Result[UInt, _] = try {
+  let result : Result[UInt, _] = try
     @runtime.parse_u32_payload(b"\x01\x02\x03") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   assert_true(result is Err(_))
@@ -448,9 +448,7 @@ test "diagnostic_surface_from_run includes telemetry and fault issues" {
     output_period_ns: None,
     telemetry,
     final_phase: @runtime.Done,
-    fault: Some(
-      @runtime.DcDrift(delta_ns=500L),
-    ),
+    fault: Some(@runtime.DcDrift(delta_ns=500L)),
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   guard surface.runtime_metrics is Some(rm) else {

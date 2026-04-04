@@ -195,10 +195,7 @@ test "should_ignore_rx_decode_error with other InvalidFrame is false" {
 
 ///|
 test "should_ignore_rx_decode_error with non-frame error is false" {
-  assert_eq(
-    should_ignore_rx_decode_error(@hal.EcError::RecvTimeout),
-    false,
-  )
+  assert_eq(should_ignore_rx_decode_error(@hal.EcError::RecvTimeout), false)
 }
 
 // ===== Coverage: protocol/esm_engine.mbt — decode_al_status_snapshot =====
@@ -301,7 +298,9 @@ test "write_u32_le_fixed encodes LE 4 bytes" {
 
 ///|
 test "read_u16_le and read_u32_le" {
-  let data = Bytes::from_array([b'\x34', b'\x12', b'\xEF', b'\xBE', b'\xAD', b'\xDE'])
+  let data = Bytes::from_array([
+    b'\x34', b'\x12', b'\xEF', b'\xBE', b'\xAD', b'\xDE',
+  ])
   assert_eq(read_u16_le(data, 0), 0x1234U)
   assert_eq(read_u32_le(data, 2), 0xDEADBEEFU)
 }
@@ -398,10 +397,10 @@ test "validate_input_mailbox_sm_window deactivated SM raises" {
   // deactivate_mask = 0x0100 → window[7] bit 0
   let window = Bytes::from_array([
     b'\x00', b'\x10', // start = 0x1000
-    b'\x80', b'\x00', // length = 0x0080
-    b'\x00',          // control_lo (byte 4)
-    b'\x00',          // status (byte 5)
-    b'\x00', b'\x01', // activate/pdi: control_word = 0x0100 (deactivated)
+     b'\x80', b'\x00', // length = 0x0080
+     b'\x00', // control_lo (byte 4)
+     b'\x00', // status (byte 5)
+     b'\x00', b'\x01', // activate/pdi: control_word = 0x0100 (deactivated)
   ])
   let result = try? validate_input_mailbox_sm_window(window)
   assert_true(result is Err(_))
@@ -412,10 +411,10 @@ test "validate_input_mailbox_sm_window repeat_request with zero start+length rai
   // start=0, length=0, repeat_request bit set (bit 1 of control lo = 0x02)
   let window = Bytes::from_array([
     b'\x00', b'\x00', // start = 0
-    b'\x00', b'\x00', // length = 0
-    b'\x00',          // control_lo
-    b'\x00',          // status
-    b'\x02', b'\x00', // control_word = 0x0002 (repeat_request)
+     b'\x00', b'\x00', // length = 0
+     b'\x00', // control_lo
+     b'\x00', // status
+     b'\x02', b'\x00', // control_word = 0x0002 (repeat_request)
   ])
   let result = try? validate_input_mailbox_sm_window(window)
   assert_true(result is Err(_))
@@ -425,10 +424,10 @@ test "validate_input_mailbox_sm_window repeat_request with zero start+length rai
 test "validate_input_mailbox_sm_window normal SM passes" {
   let window = Bytes::from_array([
     b'\x00', b'\x10', // start = 0x1000
-    b'\x80', b'\x00', // length = 0x0080
-    b'\x00',          // control_lo
-    b'\x08',          // status (mailbox full)
-    b'\x01', b'\x00', // control_word = 0x0001 (activate, not deactivated)
+     b'\x80', b'\x00', // length = 0x0080
+     b'\x00', // control_lo
+     b'\x08', // status (mailbox full)
+     b'\x01', b'\x00', // control_word = 0x0001 (activate, not deactivated)
   ])
   validate_input_mailbox_sm_window(window) // should not raise
 }

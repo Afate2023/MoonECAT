@@ -1660,7 +1660,11 @@ test "validation_grade_from_differences Mixed Extra+Missing is Block" {
 ///|
 test "validation_grade_from_differences StationAddressMismatch is Block" {
   let diffs : Array[ConfigurationDifference] = [
-    StationAddressMismatch(position=0, expected=Some(0x1001U), actual=Some(0x1002U)),
+    StationAddressMismatch(
+      position=0,
+      expected=Some(0x1001U),
+      actual=Some(0x1002U),
+    ),
   ]
   assert_eq(validation_grade_from_differences(diffs), Block)
 }
@@ -1670,7 +1674,12 @@ test "validation_grade_from_differences IdentityMismatch is Block" {
   let diffs : Array[ConfigurationDifference] = [
     IdentityMismatch(
       position=0,
-      expected=Some({ vendor_id: 1U, product_code: 2U, revision: 3U, serial: 4U }),
+      expected=Some({
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 3U,
+        serial: 4U,
+      }),
       actual=Some({ vendor_id: 5U, product_code: 6U, revision: 7U, serial: 8U }),
     ),
   ]
@@ -1759,7 +1768,12 @@ test "option_identity_or_zero None" {
 
 ///|
 test "option_identity_or_zero Some" {
-  let expected : @hal.SlaveIdentity = { vendor_id: 1U, product_code: 2U, revision: 3U, serial: 4U }
+  let expected : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 2U,
+    revision: 3U,
+    serial: 4U,
+  }
   let id = option_identity_or_zero(Some(expected))
   assert_eq(id.vendor_id, 1U)
 }
@@ -1890,7 +1904,9 @@ test "master_od_value_json I32" {
 
 ///|
 test "master_od_value_json Raw" {
-  let json = master_od_value_json(MasterOdValue::Raw(Bytes::from_array([b'\xAB', b'\xCD'])))
+  let json = master_od_value_json(
+    MasterOdValue::Raw(Bytes::from_array([b'\xAB', b'\xCD'])),
+  )
   let s = json.to_string()
   assert_true(s.length() > 0)
 }
@@ -1900,7 +1916,7 @@ test "master_od_value_json Raw" {
 ///|
 test "next_scan_station_address skips used addresses" {
   let used : Array[UInt] = [scan_station_address_base]
-  let addr = try { next_scan_station_address(used) } catch { _ => 0U }
+  let addr = next_scan_station_address(used) catch { _ => 0U }
   assert_eq(addr, scan_station_address_base + 1U)
 }
 
@@ -2082,17 +2098,18 @@ test "validate_recommendations sync1 over limit from whitebox" {
   }
   let rec = compute_sync_offsets(config, avg)
   let tuner = PdoAutoTuner::new(config~)
-  let result = tuner.analyze(
-    [0x1001U],
-    [[{
+  let result = tuner.analyze([0x1001U], [
+    [
+      {
         station: 0x1001U,
         forward_delay_ns: 100_000L,
         reverse_delay_ns: 100_000L,
         round_trip_ns: 200_000L,
         recv_time_port0: 100_000L,
         recv_time_port1: 200_000L,
-      }]],
-  )
+      },
+    ],
+  ])
   let errors = validate_recommendations(result, 2_000_000L)
   // sync1 = sync0 + 9_000_000 which is >> 2_000_000
   assert_true(
@@ -2136,9 +2153,7 @@ test "validate_recommendations negative propagation from whitebox" {
     messages: [],
   }
   let errors = validate_recommendations(result, 10_000_000L)
-  assert_true(
-    errors.iter().any(fn(s) { s.contains("negative propagation") }),
-  )
+  assert_true(errors.iter().any(fn(s) { s.contains("negative propagation") }))
 }
 
 // ===== EoeReassemblyBuffer is_complete with gap =====
@@ -3020,9 +3035,7 @@ test "max_uint" {
 // ── Batch 4: esi_json helper constructors for testing ──
 
 ///|
-fn make_minimal_esi_mailbox(
-  data_link_layer~ : Bool = false,
-) -> EsiJsonMailbox {
+fn make_minimal_esi_mailbox(data_link_layer? : Bool = false) -> EsiJsonMailbox {
   {
     data_link_layer,
     aoe: false,
@@ -3040,8 +3053,8 @@ fn make_minimal_esi_mailbox(
 
 ///|
 fn make_minimal_esi_device(
-  type_name~ : String = "TestType",
-  device_name~ : String = "TestDev",
+  type_name? : String = "TestType",
+  device_name? : String = "TestDev",
 ) -> EsiJsonDevice {
   {
     vendor_id: 1U,
@@ -3070,7 +3083,7 @@ fn make_minimal_esi_device(
 
 ///|
 fn make_minimal_esi_device_with_dc(
-  assign_activate~ : UInt = 0U,
+  assign_activate? : UInt = 0U,
 ) -> EsiJsonDevice {
   {
     vendor_id: 1U,
@@ -3107,9 +3120,7 @@ fn make_minimal_esi_device_with_dc(
 }
 
 ///|
-fn make_minimal_esi_device_with_mailbox(
-  mb : EsiJsonMailbox,
-) -> EsiJsonDevice {
+fn make_minimal_esi_device_with_mailbox(mb : EsiJsonMailbox) -> EsiJsonDevice {
   {
     vendor_id: 1U,
     product_code: 2U,
@@ -3201,9 +3212,7 @@ test "decode_optional_eni_json_process_data_summary invalid" {
   let json = @json.parse("{}"[:]) catch { _ => panic() }
   let mut caught = false
   try {
-    let _ = decode_optional_eni_json_process_data_summary(
-      Some(json),
-    )
+    let _ = decode_optional_eni_json_process_data_summary(Some(json))
     ()
   } catch {
     @hal.EcError::EsiParseFailed(msg) => {
@@ -3346,12 +3355,7 @@ test "project_esi_startup_mailbox_commands unknown transition" {
   let device2 = {
     ..device,
     init_commands: [
-      {
-        transition: "UNKNOWN",
-        index: 0x1000U,
-        subindex: 0,
-        data: b"",
-      },
+      { transition: "UNKNOWN", index: 0x1000U, subindex: 0, data: b"" },
     ],
   }
   let cmds = project_esi_startup_mailbox_commands(device2)
@@ -3648,12 +3652,21 @@ test "decode_le_u32_payload more than 4 bytes takes first 4" {
 
 ///|
 test "lookup_esm_timeout_policy found" {
-  let p1 : @protocol.EsmTimeoutPolicy = { init: Some(@hal.Duration(111L)), preop: None, safeop: None, op: None, boot: None }
-  let p2 : @protocol.EsmTimeoutPolicy = { init: None, preop: Some(@hal.Duration(222L)), safeop: None, op: None, boot: None }
-  let policies = [
-    (0x1001U, p1),
-    (0x1002U, p2),
-  ]
+  let p1 : @protocol.EsmTimeoutPolicy = {
+    init: Some(@hal.Duration(111L)),
+    preop: None,
+    safeop: None,
+    op: None,
+    boot: None,
+  }
+  let p2 : @protocol.EsmTimeoutPolicy = {
+    init: None,
+    preop: Some(@hal.Duration(222L)),
+    safeop: None,
+    op: None,
+    boot: None,
+  }
+  let policies = [(0x1001U, p1), (0x1002U, p2)]
   let p = lookup_esm_timeout_policy(policies, 0x1002U)
   assert_eq(p.preop, Some(@hal.Duration(222L)))
 }
@@ -3684,9 +3697,7 @@ test "has_process_data_length_override input Some" {
 ///|
 test "should_retry_process_data_lengths Ok no override" {
   assert_eq(
-    should_retry_process_data_lengths_after_mailbox_refresh(
-      Ok((None, None)),
-    ),
+    should_retry_process_data_lengths_after_mailbox_refresh(Ok((None, None))),
     true,
   )
 }
@@ -3715,7 +3726,9 @@ test "should_retry_process_data_lengths MailboxTimeout" {
 test "should_retry_process_data_lengths MailboxProtocol deactivated" {
   assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(
-      Err(@hal.EcError::MailboxProtocol("SM deactivated/reset after transition")),
+      Err(
+        @hal.EcError::MailboxProtocol("SM deactivated/reset after transition"),
+      ),
     ),
     true,
   )
@@ -3784,18 +3797,42 @@ test "pdo_mapping_entry_u32 zero fields" {
 test "sii_prefers_not_lrw general None returns false" {
   let sii : @mailbox.SiiFullInfo = {
     eeprom: b"",
-    preamble: { pdi_control: 0U, pdi_config: 0U, sync_impulse_length_raw: 0U, pdi_config2: 0U, configured_station_alias: 0U, checksum: 0U, checksum_ok: true },
+    preamble: {
+      pdi_control: 0U,
+      pdi_config: 0U,
+      sync_impulse_length_raw: 0U,
+      pdi_config2: 0U,
+      configured_station_alias: 0U,
+      checksum: 0U,
+      checksum_ok: true,
+    },
     standard: { eeprom_size_raw: 0U, version: 0U },
     header: {
-      vendor_id: 0U, product_code: 0U, revision: 0U, serial: 0U,
-      bootstrap_rx_offset: 0U, bootstrap_rx_size: 0U, bootstrap_tx_offset: 0U, bootstrap_tx_size: 0U,
-      mailbox_rx_offset: 0U, mailbox_rx_size: 0U,
-      mailbox_tx_offset: 0U, mailbox_tx_size: 0U,
-      mailbox_protocols: 0U, firmware_version: 0U, hardware_version: 0U, production_date_raw: 0U,
-      pdi_control_1: b'\x00', esc_config_b0: b'\x00',
-      pdi_config_1: 0U, pdi_config_1_ext: 0U,
-      esc_config_b4: 0U, esc_config_b5: 0U, esc_config_b6: 0U,
-      checksum_b: 0U, esc_config_b_present: false,
+      vendor_id: 0U,
+      product_code: 0U,
+      revision: 0U,
+      serial: 0U,
+      bootstrap_rx_offset: 0U,
+      bootstrap_rx_size: 0U,
+      bootstrap_tx_offset: 0U,
+      bootstrap_tx_size: 0U,
+      mailbox_rx_offset: 0U,
+      mailbox_rx_size: 0U,
+      mailbox_tx_offset: 0U,
+      mailbox_tx_size: 0U,
+      mailbox_protocols: 0U,
+      firmware_version: 0U,
+      hardware_version: 0U,
+      production_date_raw: 0U,
+      pdi_control_1: b'\x00',
+      esc_config_b0: b'\x00',
+      pdi_config_1: 0U,
+      pdi_config_1_ext: 0U,
+      esc_config_b4: 0U,
+      esc_config_b5: 0U,
+      esc_config_b6: 0U,
+      checksum_b: 0U,
+      esc_config_b_present: false,
     },
     categories: [],
     strings: [],
@@ -3880,56 +3917,24 @@ test "map_with_process_data_lengths None passthrough" {
 
 ///|
 test "uint_to_hex nonzero values" {
-  inspect(uint_to_hex(0x1001U), content=(
-    #|〱㄰
-  ))
-  inspect(uint_to_hex(0xFFU), content=(
-    #|晦
-  ))
-  inspect(uint_to_hex(1U), content=(
-    #|1
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  ))
+  inspect(
+    uint_to_hex(0x1001U),
+    content=(
+      #|〱㄰
+    ),
+  )
+  inspect(
+    uint_to_hex(0xFFU),
+    content=(
+      #|晦
+    ),
+  )
+  inspect(
+    uint_to_hex(1U),
+    content=(
+      #|1
+    ),
+  )
   inspect(uint_to_hex(0U), content="0")
 }
 
@@ -4017,8 +4022,18 @@ test "highest_diagnostic_level empty list uses fallback" {
 ///|
 test "highest_diagnostic_level picks highest among issues" {
   let issues : Array[DiagnosticIssue] = [
-    { source: RuntimeTelemetry, category: RuntimeMetrics, level: Info, detail: "ok" },
-    { source: RuntimeTelemetry, category: RuntimeMetrics, level: Degrade, detail: "warn" },
+    {
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Info,
+      detail: "ok",
+    },
+    {
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Degrade,
+      detail: "warn",
+    },
   ]
   assert_eq(highest_diagnostic_level(issues, Info), Degrade)
 }
@@ -4026,7 +4041,12 @@ test "highest_diagnostic_level picks highest among issues" {
 ///|
 test "highest_diagnostic_level Block overrides all" {
   let issues : Array[DiagnosticIssue] = [
-    { source: RuntimeTelemetry, category: RuntimeMetrics, level: Block, detail: "fatal" },
+    {
+      source: RuntimeTelemetry,
+      category: RuntimeMetrics,
+      level: Block,
+      detail: "fatal",
+    },
   ]
   assert_eq(highest_diagnostic_level(issues, Info), Block)
 }
@@ -4046,9 +4066,15 @@ test "empty_state_surface_summary all None" {
 ///|
 test "runtime_metrics_summary maps telemetry fields" {
   let tel : Telemetry = {
-    cycles: 100L, tx_frames: 50L, rx_frames: 48L,
-    timeouts: 2L, retries: 1L, wkc_errors: 3L,
-    irq_events: 10L, dc_delay_updates: 5L, emergency_events: 0L,
+    cycles: 100L,
+    tx_frames: 50L,
+    rx_frames: 48L,
+    timeouts: 2L,
+    retries: 1L,
+    wkc_errors: 3L,
+    irq_events: 10L,
+    dc_delay_updates: 5L,
+    emergency_events: 0L,
   }
   let s = runtime_metrics_summary(tel)
   assert_eq(s.cycles, 100L)
@@ -4065,9 +4091,15 @@ test "runtime_metrics_summary maps telemetry fields" {
 ///|
 test "runtime_metrics_issues no issues when clean" {
   let tel : Telemetry = {
-    cycles: 10L, tx_frames: 10L, rx_frames: 10L,
-    timeouts: 0L, retries: 0L, wkc_errors: 0L,
-    irq_events: 0L, dc_delay_updates: 0L, emergency_events: 0L,
+    cycles: 10L,
+    tx_frames: 10L,
+    rx_frames: 10L,
+    timeouts: 0L,
+    retries: 0L,
+    wkc_errors: 0L,
+    irq_events: 0L,
+    dc_delay_updates: 0L,
+    emergency_events: 0L,
   }
   let issues = runtime_metrics_issues(tel, 10, 10)
   assert_eq(issues.length(), 0)
@@ -4076,9 +4108,15 @@ test "runtime_metrics_issues no issues when clean" {
 ///|
 test "runtime_metrics_issues timeout and wkc and retry and incomplete" {
   let tel : Telemetry = {
-    cycles: 10L, tx_frames: 10L, rx_frames: 10L,
-    timeouts: 5L, retries: 3L, wkc_errors: 2L,
-    irq_events: 0L, dc_delay_updates: 0L, emergency_events: 0L,
+    cycles: 10L,
+    tx_frames: 10L,
+    rx_frames: 10L,
+    timeouts: 5L,
+    retries: 3L,
+    wkc_errors: 2L,
+    irq_events: 0L,
+    dc_delay_updates: 0L,
+    emergency_events: 0L,
   }
   let issues = runtime_metrics_issues(tel, 10, 7)
   assert_eq(issues.length(), 4)
@@ -4108,15 +4146,27 @@ test "validation_difference_issue Identity category for IdentityMismatch" {
 ///|
 test "validation_difference_issue Configuration category for ProcessDataSummaryMismatch" {
   let expected : ConfigurationProcessDataSummary = {
-    sync_manager_count: 0, fmmu_count: 0, rx_pdo_count: 0, tx_pdo_count: 0,
-    mailbox_protocols: None, dc_op_mode_count: 0, dc_assign_activate_count: 0,
+    sync_manager_count: 0,
+    fmmu_count: 0,
+    rx_pdo_count: 0,
+    tx_pdo_count: 0,
+    mailbox_protocols: None,
+    dc_op_mode_count: 0,
+    dc_assign_activate_count: 0,
   }
   let actual : ConfigurationProcessDataSummary = {
-    sync_manager_count: 2, fmmu_count: 1, rx_pdo_count: 1, tx_pdo_count: 1,
-    mailbox_protocols: None, dc_op_mode_count: 0, dc_assign_activate_count: 0,
+    sync_manager_count: 2,
+    fmmu_count: 1,
+    rx_pdo_count: 1,
+    tx_pdo_count: 1,
+    mailbox_protocols: None,
+    dc_op_mode_count: 0,
+    dc_assign_activate_count: 0,
   }
   let diff = ConfigurationDifference::ProcessDataSummaryMismatch(
-    position=0, expected~, actual~,
+    position=0,
+    expected~,
+    actual~,
   )
   let issue = validation_difference_issue(diff)
   assert_true(issue.source is Configuration)
@@ -4135,11 +4185,35 @@ test "configuration_surface_summary maps scan report" {
   let scan : ScanReport = {
     slave_count: 2,
     slaves: [
-      { position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 2U, revision: 0U, serial: 0U, identification: 0U },
-      { position: 1, station_address: 0x1002U, alias_address: None, vendor_id: 1U, product_code: 3U, revision: 0U, serial: 0U, identification: 0U },
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 2U,
+        revision: 0U,
+        serial: 0U,
+        identification: 0U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 3U,
+        revision: 0U,
+        serial: 0U,
+        identification: 0U,
+      },
     ],
   }
-  let s = configuration_surface_summary(scan, Some(OnlineScan), Some(OfflineConfig), Some(Pass), 0)
+  let s = configuration_surface_summary(
+    scan,
+    Some(OnlineScan),
+    Some(OfflineConfig),
+    Some(Pass),
+    0,
+  )
   assert_eq(s.slave_count, 2)
   assert_eq(s.station_addresses.length(), 2)
   assert_eq(s.station_addresses[0], 0x1001U)
@@ -4151,8 +4225,12 @@ test "configuration_surface_summary maps scan report" {
 ///|
 test "EoeStationContext next_counter wraps 1 to 7" {
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   // Initial mb_counter = 1
@@ -4175,8 +4253,12 @@ test "EoeStationContext next_counter wraps 1 to 7" {
 ///|
 test "EoeStationContext next_frame_number wraps 0 to 15" {
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   // Should produce 0..15 then wrap
@@ -4190,8 +4272,12 @@ test "EoeStationContext next_frame_number wraps 0 to 15" {
 ///|
 test "EoeStationContext get_reassembly allocates new buffer" {
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   let buf = ctx.get_reassembly(5U)
@@ -4201,8 +4287,12 @@ test "EoeStationContext get_reassembly allocates new buffer" {
 ///|
 test "EoeStationContext get_reassembly returns existing" {
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   let buf1 = ctx.get_reassembly(3U)
@@ -4214,8 +4304,12 @@ test "EoeStationContext get_reassembly returns existing" {
 ///|
 test "EoeStationContext clear_reassembly removes buffer" {
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   let _ = ctx.get_reassembly(7U)
@@ -4315,8 +4409,12 @@ test "EoeSwitch find_station returns None for unknown" {
 test "EoeSwitch add_station and find_station" {
   let sw = EoeSwitch::new()
   let mb : @mailbox.MailboxConfig = {
-    out_address: 0x1000U, out_size: 128U, out_sm_index: 0,
-    in_address: 0x1080U, in_size: 128U, in_sm_index: 1,
+    out_address: 0x1000U,
+    out_size: 128U,
+    out_sm_index: 0,
+    in_address: 0x1080U,
+    in_size: 128U,
+    in_sm_index: 1,
   }
   sw.add_station(0x1001U, mb)
   let result = sw.find_station(0x1001U)
@@ -4327,13 +4425,23 @@ test "EoeSwitch add_station and find_station" {
 
 ///|
 test "identity_is_zero all zeros" {
-  let id : @hal.SlaveIdentity = { vendor_id: 0U, product_code: 0U, revision: 0U, serial: 0U }
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 0U,
+    product_code: 0U,
+    revision: 0U,
+    serial: 0U,
+  }
   assert_eq(identity_is_zero(id), true)
 }
 
 ///|
 test "identity_is_zero nonzero vendor" {
-  let id : @hal.SlaveIdentity = { vendor_id: 1U, product_code: 0U, revision: 0U, serial: 0U }
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 0U,
+    revision: 0U,
+    serial: 0U,
+  }
   assert_eq(identity_is_zero(id), false)
 }
 
@@ -4400,7 +4508,9 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero preserves un
     { position: 0U, current_station_address: 0x2000U },
     { position: 1U, current_station_address: 0x3000U },
   ]
-  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(observed)
+  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(
+    observed,
+  )
   assert_eq(planned[0], 0x2000U)
   assert_eq(planned[1], 0x3000U)
 }
@@ -4411,7 +4521,9 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero reassigns du
     { position: 0U, current_station_address: 0x1001U },
     { position: 1U, current_station_address: 0x1001U },
   ]
-  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(observed)
+  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(
+    observed,
+  )
   // Both duplicated → both get reassigned starting at scan_station_address_base
   assert_eq(planned[0], 0x1001U) // scan_station_address_base = 0x1001, but also same as current
   assert_eq(planned.length(), 2)
@@ -4424,7 +4536,9 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero reassigns ze
   let observed : Array[ObservedSlaveAddress] = [
     { position: 0U, current_station_address: 0U },
   ]
-  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(observed)
+  let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(
+    observed,
+  )
   // Zero address gets reassigned
   assert_eq(planned[0], 0x1001U) // scan_station_address_base
 }

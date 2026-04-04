@@ -171,7 +171,8 @@ test "fuzz_campaign runs without crash" {
 test "apply_protocol_deviation PadFrame inserts bytes at offset" {
   let data = b"\x01\x02\x03\x04"
   let result = @mock.apply_protocol_deviation(
-    @mock.PadFrame(offset=2, count=3), data,
+    @mock.PadFrame(offset=2, count=3),
+    data,
   )
   // Total length = 4 + 3 = 7
   assert_eq(result.length(), 7)
@@ -191,7 +192,8 @@ test "apply_protocol_deviation PadFrame inserts bytes at offset" {
 test "apply_protocol_deviation PadFrame offset at start" {
   let data = b"\xAA\xBB"
   let result = @mock.apply_protocol_deviation(
-    @mock.PadFrame(offset=0, count=2), data,
+    @mock.PadFrame(offset=0, count=2),
+    data,
   )
   assert_eq(result.length(), 4)
   assert_eq(result[0], b'\x00')
@@ -204,7 +206,8 @@ test "apply_protocol_deviation PadFrame offset at start" {
 test "apply_protocol_deviation PadFrame offset at end" {
   let data = b"\xAA\xBB"
   let result = @mock.apply_protocol_deviation(
-    @mock.PadFrame(offset=2, count=1), data,
+    @mock.PadFrame(offset=2, count=1),
+    data,
   )
   assert_eq(result.length(), 3)
   assert_eq(result[0], b'\xAA')
@@ -223,7 +226,8 @@ test "apply_protocol_deviation CorruptEcatLength modifies header" {
     }
   })
   let result = @mock.apply_protocol_deviation(
-    @mock.CorruptEcatLength(delta=5), frame,
+    @mock.CorruptEcatLength(delta=5),
+    frame,
   )
   assert_eq(result.length(), 20)
   // Low byte should change: (0x10 & 0x7FF) + 5 = 21 = 0x15
@@ -234,7 +238,8 @@ test "apply_protocol_deviation CorruptEcatLength modifies header" {
 test "apply_protocol_deviation CorruptEcatLength short data returns original" {
   let data = b"\x01\x02"
   let result = @mock.apply_protocol_deviation(
-    @mock.CorruptEcatLength(delta=1), data,
+    @mock.CorruptEcatLength(delta=1),
+    data,
   )
   assert_eq(result, data)
 }
@@ -244,7 +249,8 @@ test "apply_protocol_deviation CorruptPduData modifies byte" {
   // 30 bytes: PDU data starts at byte 26
   let frame = Bytes::make(30, 0)
   let result = @mock.apply_protocol_deviation(
-    @mock.CorruptPduData(pdu_index=0, offset=2, value=b'\xFF'), frame,
+    @mock.CorruptPduData(pdu_index=0, offset=2, value=b'\xFF'),
+    frame,
   )
   assert_eq(result[28], b'\xFF') // byte 26 + 2 = 28
 }
@@ -253,7 +259,8 @@ test "apply_protocol_deviation CorruptPduData modifies byte" {
 test "apply_protocol_deviation CorruptPduData out of range returns original" {
   let frame = Bytes::make(10, 0)
   let result = @mock.apply_protocol_deviation(
-    @mock.CorruptPduData(pdu_index=0, offset=100, value=b'\xFF'), frame,
+    @mock.CorruptPduData(pdu_index=0, offset=100, value=b'\xFF'),
+    frame,
   )
   assert_eq(result, frame)
 }
@@ -262,7 +269,8 @@ test "apply_protocol_deviation CorruptPduData out of range returns original" {
 test "apply_protocol_deviation CorruptPduData pdu_index nonzero returns original" {
   let frame = Bytes::make(30, 0)
   let result = @mock.apply_protocol_deviation(
-    @mock.CorruptPduData(pdu_index=1, offset=0, value=b'\xFF'), frame,
+    @mock.CorruptPduData(pdu_index=1, offset=0, value=b'\xFF'),
+    frame,
   )
   assert_eq(result, frame)
 }
@@ -271,7 +279,8 @@ test "apply_protocol_deviation CorruptPduData pdu_index nonzero returns original
 test "apply_protocol_deviation InvalidPduCommand replaces command byte" {
   let frame = Bytes::make(20, 0)
   let result = @mock.apply_protocol_deviation(
-    @mock.InvalidPduCommand(pdu_index=0, command=b'\xAB'), frame,
+    @mock.InvalidPduCommand(pdu_index=0, command=b'\xAB'),
+    frame,
   )
   assert_eq(result[16], b'\xAB')
 }
@@ -280,7 +289,8 @@ test "apply_protocol_deviation InvalidPduCommand replaces command byte" {
 test "apply_protocol_deviation InvalidPduCommand short frame returns original" {
   let data = b"\x01\x02"
   let result = @mock.apply_protocol_deviation(
-    @mock.InvalidPduCommand(pdu_index=0, command=b'\xFF'), data,
+    @mock.InvalidPduCommand(pdu_index=0, command=b'\xFF'),
+    data,
   )
   assert_eq(result, data)
 }
@@ -289,7 +299,8 @@ test "apply_protocol_deviation InvalidPduCommand short frame returns original" {
 test "apply_protocol_deviation InvalidPduCommand nonzero pdu_index returns original" {
   let frame = Bytes::make(20, 0)
   let result = @mock.apply_protocol_deviation(
-    @mock.InvalidPduCommand(pdu_index=1, command=b'\xFF'), frame,
+    @mock.InvalidPduCommand(pdu_index=1, command=b'\xFF'),
+    frame,
   )
   assert_eq(result, frame)
 }
@@ -525,14 +536,10 @@ test "fuzz_campaign stops early on crash" {
 test "apply_protocol_deviation TruncateFrame out of range returns original" {
   let data = b"\x01\x02\x03"
   // n >= data.length() → returns original
-  let result = @mock.apply_protocol_deviation(
-    @mock.TruncateFrame(10), data,
-  )
+  let result = @mock.apply_protocol_deviation(@mock.TruncateFrame(10), data)
   assert_eq(result, data)
   // negative n → returns original
-  let result2 = @mock.apply_protocol_deviation(
-    @mock.TruncateFrame(-1), data,
-  )
+  let result2 = @mock.apply_protocol_deviation(@mock.TruncateFrame(-1), data)
   assert_eq(result2, data)
 }
 
@@ -541,7 +548,8 @@ test "apply_protocol_deviation PadFrame invalid params returns original" {
   let data = b"\x01\x02"
   // count = 0 → returns original
   let result = @mock.apply_protocol_deviation(
-    @mock.PadFrame(offset=0, count=0), data,
+    @mock.PadFrame(offset=0, count=0),
+    data,
   )
   assert_eq(result, data)
 }
@@ -565,7 +573,7 @@ test "Scenario evaluate AllMatch fails when expected missing" {
   s.expect(5L, @runtime.Fail("f"))
   // No observed at cycle 5
   let observed2 : Array[@mock.ObservedVerdict] = [
-    { cycle: 1L, verdict: @runtime.Pass } ,
+    { cycle: 1L, verdict: @runtime.Pass },
   ]
   let result = s.evaluate(observed2, @runtime.Pass, 10L, "done")
   assert_eq(result.passed, false)
@@ -574,7 +582,8 @@ test "Scenario evaluate AllMatch fails when expected missing" {
 ///|
 test "Scenario evaluate GracefulStopWithin passes" {
   let s = @mock.Scenario::new(
-    "grace", pass_condition=@mock.GracefulStopWithin(5),
+    "grace",
+    pass_condition=@mock.GracefulStopWithin(5),
   )
   let observed3 : Array[@mock.ObservedVerdict] = [
     { cycle: 3L, verdict: @runtime.Fail("error") },
@@ -587,7 +596,8 @@ test "Scenario evaluate GracefulStopWithin passes" {
 ///|
 test "Scenario evaluate GracefulStopWithin fails" {
   let s = @mock.Scenario::new(
-    "no-grace", pass_condition=@mock.GracefulStopWithin(2),
+    "no-grace",
+    pass_condition=@mock.GracefulStopWithin(2),
   )
   let observed4 : Array[@mock.ObservedVerdict] = [
     { cycle: 3L, verdict: @runtime.Fail("error") },
@@ -617,7 +627,8 @@ test "nic_event_to_json RecvFailed with newline in msg" {
 ///|
 test "Scenario evaluate FinalVerdictAtMost passes when at most Warn" {
   let s = @mock.Scenario::new(
-    "fvam-pass", pass_condition=@mock.FinalVerdictAtMost(@runtime.Warn("")),
+    "fvam-pass",
+    pass_condition=@mock.FinalVerdictAtMost(@runtime.Warn("")),
   )
   let observed : Array[@mock.ObservedVerdict] = []
   // final verdict is Pass, severity 0 <= Warn severity 1
@@ -628,7 +639,8 @@ test "Scenario evaluate FinalVerdictAtMost passes when at most Warn" {
 ///|
 test "Scenario evaluate FinalVerdictAtMost fails when exceeds" {
   let s = @mock.Scenario::new(
-    "fvam-fail", pass_condition=@mock.FinalVerdictAtMost(@runtime.Warn("")),
+    "fvam-fail",
+    pass_condition=@mock.FinalVerdictAtMost(@runtime.Warn("")),
   )
   let observed : Array[@mock.ObservedVerdict] = []
   // final verdict is Fail, severity 2 > Warn severity 1
@@ -777,9 +789,7 @@ test "RecordingNic records recv timeout" {
   let inner = @mock.VirtualNic::new(bus)
   let rec = @mock.RecordingNic::wrap(inner)
   // No data to receive → timeout
-  let result : Result[Bytes, _] = try? rec.recv(
-    timeout=@hal.Duration(1_000L),
-  )
+  let result : Result[Bytes, _] = try? rec.recv(timeout=@hal.Duration(1_000L))
   assert_true(result is Err(_))
   let log = rec.get_log()
   assert_eq(log.len(), 1)
@@ -794,15 +804,17 @@ test "RecordingNic records successful send and recv" {
     revision: 1U,
     serial: 0U,
   }
-  let bus = @mock.VirtualBus::new(
-    [@mock.VirtualSlave::new(0, id, Bytes::new(256))],
-  )
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, id, Bytes::new(256)),
+  ])
   let inner = @mock.VirtualNic::new(bus)
   let rec = @mock.RecordingNic::wrap(inner)
   // Build a valid frame for NOP
   let builder = @protocol.FrameBuilder::new()
   let _idx = builder.add(
-    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::from_array([b'\x00']),
   )
   let frame = builder.build()
   let _ = rec.send(frame.encode())

@@ -739,11 +739,7 @@ test "VirtualBus: APRW reads and writes register" {
   let builder = @protocol.FrameBuilder::new()
   let rw_data = Bytes::from_array([b'\xAA', b'\xBB'])
   let addr = @protocol.auto_increment_address(0U) | (0x0010U << 16)
-  let _idx = builder.add(
-    @protocol.EcCommand::APRW,
-    addr,
-    rw_data,
-  )
+  let _idx = builder.add(@protocol.EcCommand::APRW, addr, rw_data)
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC should be 3 for APRW (read + write)
@@ -784,13 +780,25 @@ test "VirtualBus: BRW broadcasts read-write to all slaves" {
   let timeout = @hal.Duration(50_000_000L)
   // Write unique values to same register on each slave
   let _ = @protocol.write_register_ap(
-    nic, 0U, 0x0000, Bytes::from_array([b'\x01']), timeout,
+    nic,
+    0U,
+    0x0000,
+    Bytes::from_array([b'\x01']),
+    timeout,
   )
   let _ = @protocol.write_register_ap(
-    nic, 1U, 0x0000, Bytes::from_array([b'\x02']), timeout,
+    nic,
+    1U,
+    0x0000,
+    Bytes::from_array([b'\x02']),
+    timeout,
   )
   let _ = @protocol.write_register_ap(
-    nic, 2U, 0x0000, Bytes::from_array([b'\x04']), timeout,
+    nic,
+    2U,
+    0x0000,
+    Bytes::from_array([b'\x04']),
+    timeout,
   )
   // BRW: read from all slaves (OR'd) and write back
   let builder = @protocol.FrameBuilder::new()
@@ -818,11 +826,7 @@ test "VirtualBus: NOP command passes through" {
   let timeout = @hal.Duration(50_000_000L)
   let builder = @protocol.FrameBuilder::new()
   let nop_data = Bytes::from_array([b'\x00'])
-  let _idx = builder.add(
-    @protocol.EcCommand::NOP,
-    0U,
-    nop_data,
-  )
+  let _idx = builder.add(@protocol.EcCommand::NOP, 0U, nop_data)
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // NOP should not increment WKC
@@ -864,13 +868,19 @@ test "VirtualSlave: PreOp to Init transition" {
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → PreOp
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x02', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']),
+    timeout,
   )
   // PreOp → Init
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x01', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x01', b'\x00']),
+    timeout,
   )
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
@@ -886,17 +896,26 @@ test "VirtualSlave: SafeOp to PreOp transition" {
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → PreOp → SafeOp
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x02', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']),
+    timeout,
   )
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x04', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x04', b'\x00']),
+    timeout,
   )
   // SafeOp → PreOp
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x02', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']),
+    timeout,
   )
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
@@ -982,13 +1001,19 @@ test "VirtualSlave: Boot to Init transition" {
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → Boot (0x03)
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x03', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x03', b'\x00']),
+    timeout,
   )
   // Boot → Init (0x01)
   let _ = @protocol.write_register_fp(
-    nic, 0x1001U, @protocol.reg_al_control,
-    Bytes::from_array([b'\x01', b'\x00']), timeout,
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x01', b'\x00']),
+    timeout,
   )
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
@@ -1116,7 +1141,9 @@ test "FaultNic: send with non-send fault passes through" {
   // Build a minimal valid frame to send
   let builder = @protocol.FrameBuilder::new()
   let _idx = builder.add(
-    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::from_array([b'\x00']),
   )
   let frame = builder.build()
   let sent = nic.send(frame.encode())
@@ -1130,13 +1157,13 @@ test "FaultNic: recv with FrameCorrupt injects corruption" {
   let injector = @mock.FaultInjector::new()
   let nic = @mock.FaultNic::new(inner, injector)
   // Set up FrameCorrupt to fire on recv count 0
-  injector.add(
-    @mock.FrameCorrupt(offset=0, value=b'\xFF'), @mock.AtCycle(0),
-  )
+  injector.add(@mock.FrameCorrupt(offset=0, value=b'\xFF'), @mock.AtCycle(0))
   // First send a frame so there's something to receive
   let builder = @protocol.FrameBuilder::new()
   let _idx = builder.add(
-    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::from_array([b'\x00']),
   )
   let frame = builder.build()
   let _ = nic.send(frame.encode())
@@ -1154,7 +1181,9 @@ test "FaultNic: recv with WkcCorrupt modifies wkc" {
   injector.add(@mock.WkcCorrupt(delta=1), @mock.AtCycle(0))
   let builder = @protocol.FrameBuilder::new()
   let _idx = builder.add(
-    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::from_array([b'\x00']),
   )
   let frame = builder.build()
   let _ = nic.send(frame.encode())
@@ -1173,7 +1202,9 @@ test "FaultNic: recv with SendFailure during recv passes through" {
   // First send a frame normally
   let builder = @protocol.FrameBuilder::new()
   let _idx = builder.add(
-    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::from_array([b'\x00']),
   )
   let frame = builder.build()
   let _ = nic.send(frame.encode())

@@ -17,7 +17,15 @@ test "read_sii_word_at_byte short buffer returns zero" {
 ///|
 test "read_sii_i16_at_byte negative value" {
   // 0x8001 → should return -32767
-  let data = Bytes::makei(4, fn(i) { if i == 0 { b'\x01' } else if i == 1 { b'\x80' } else { b'\x00' } })
+  let data = Bytes::makei(4, fn(i) {
+    if i == 0 {
+      b'\x01'
+    } else if i == 1 {
+      b'\x80'
+    } else {
+      b'\x00'
+    }
+  })
   assert_eq(read_sii_i16_at_byte(data, 0), -32767)
 }
 
@@ -223,7 +231,9 @@ test "sdo_command_from_byte UploadResponse via byte 0x40" {
 
 ///|
 test "sdo_command_from_byte unknown raises" {
-  let result = try { sdo_command_from_byte(b'\xA0') |> Ok } catch { e => Err(e) }
+  let result = try sdo_command_from_byte(b'\xA0') |> Ok catch {
+    e => Err(e)
+  }
   assert_true(result is Err(_))
 }
 
@@ -239,7 +249,9 @@ test "SdoCommand to_coe_service response variants" {
 test "Rmsm validate_response in wrong state" {
   let rmsm = Rmsm::new(max_retries=3)
   // rmsm starts in Idle state, not WaitingForResponse
-  let result = try { rmsm.validate_response(b'\x01') |> Ok } catch { e => Err(e) }
+  let result = try rmsm.validate_response(b'\x01') |> Ok catch {
+    e => Err(e)
+  }
   assert_true(result is Err(_))
 }
 
@@ -405,9 +417,7 @@ test "collect_sii_timeouts Err branch with corrupt data" {
 test "collect_sii_dc Err branch with corrupt data" {
   // Data too short (< 24) → parse_sii_dc raises → Err → silently ignored
   let data = Bytes::make(4, 0)
-  let cats : Array[SiiCategoryEntry] = [
-    { category: Dc, type_code: 60U, data },
-  ]
+  let cats : Array[SiiCategoryEntry] = [{ category: Dc, type_code: 60U, data }]
   let result = collect_sii_dc(cats)
   assert_eq(result.length(), 0)
 }
@@ -464,9 +474,7 @@ test "collect_sii_pdo with TxPdo data" {
 test "collect_sii_dc with valid dc data" {
   // DC category needs 24 bytes
   let data = Bytes::make(24, 0)
-  let cats : Array[SiiCategoryEntry] = [
-    { category: Dc, type_code: 60U, data },
-  ]
+  let cats : Array[SiiCategoryEntry] = [{ category: Dc, type_code: 60U, data }]
   let result = collect_sii_dc(cats)
   assert_eq(result.length(), 1)
 }

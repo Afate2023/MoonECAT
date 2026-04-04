@@ -3613,7 +3613,10 @@ test "validation_difference_category Topology variants" {
   )
   assert_eq(
     @runtime.validation_difference_category(
-      @runtime.ConfigurationDifference::OptionalMissing(position=2, group_id=None),
+      @runtime.ConfigurationDifference::OptionalMissing(
+        position=2,
+        group_id=None,
+      ),
     ),
     @runtime.ValidateDifferenceCategory::Topology,
   )
@@ -3645,8 +3648,18 @@ test "validation_difference_category Identity" {
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::IdentityMismatch(
         position=0,
-        expected=Some({ vendor_id: 1U, product_code: 2U, revision: 3U, serial: 4U }),
-        actual=Some({ vendor_id: 5U, product_code: 6U, revision: 7U, serial: 8U }),
+        expected=Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        actual=Some({
+          vendor_id: 5U,
+          product_code: 6U,
+          revision: 7U,
+          serial: 8U,
+        }),
       ),
     ),
     @runtime.ValidateDifferenceCategory::Identity,
@@ -3666,13 +3679,20 @@ test "validation_difference_category Configuration variants" {
     @runtime.ValidateDifferenceCategory::Configuration,
   )
   let pds : @runtime.ConfigurationProcessDataSummary = {
-    sync_manager_count: 2, fmmu_count: 2, rx_pdo_count: 1, tx_pdo_count: 1,
-    mailbox_protocols: None, dc_op_mode_count: 0, dc_assign_activate_count: 0,
+    sync_manager_count: 2,
+    fmmu_count: 2,
+    rx_pdo_count: 1,
+    tx_pdo_count: 1,
+    mailbox_protocols: None,
+    dc_op_mode_count: 0,
+    dc_assign_activate_count: 0,
   }
   assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::ProcessDataSummaryMismatch(
-        position=0, expected=pds, actual=pds,
+        position=0,
+        expected=pds,
+        actual=pds,
       ),
     ),
     @runtime.ValidateDifferenceCategory::Configuration,
@@ -3691,7 +3711,10 @@ test "validation_difference_grade Warn for Extra and OptionalMissing" {
   )
   assert_eq(
     @runtime.validation_difference_grade(
-      @runtime.ConfigurationDifference::OptionalMissing(position=1, group_id=None),
+      @runtime.ConfigurationDifference::OptionalMissing(
+        position=1,
+        group_id=None,
+      ),
     ),
     @runtime.ValidateGrade::Warn,
   )
@@ -3712,7 +3735,9 @@ test "validation_difference_grade Block for StationAddressMismatch" {
   assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::StationAddressMismatch(
-        position=0, expected=Some(0x1001U), actual=Some(0x1002U),
+        position=0,
+        expected=Some(0x1001U),
+        actual=Some(0x1002U),
       ),
     ),
     @runtime.ValidateGrade::Block,
@@ -3725,8 +3750,18 @@ test "validation_difference_grade Block for IdentityMismatch" {
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::IdentityMismatch(
         position=0,
-        expected=Some({ vendor_id: 1U, product_code: 2U, revision: 3U, serial: 4U }),
-        actual=Some({ vendor_id: 5U, product_code: 6U, revision: 7U, serial: 8U }),
+        expected=Some({
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 3U,
+          serial: 4U,
+        }),
+        actual=Some({
+          vendor_id: 5U,
+          product_code: 6U,
+          revision: 7U,
+          serial: 8U,
+        }),
       ),
     ),
     @runtime.ValidateGrade::Block,
@@ -3864,7 +3899,12 @@ test "VerificationReport new initializes correctly" {
 ///|
 test "VerificationReport add_event appends timeline" {
   let report = @runtime.VerificationReport::new("Test")
-  report.add_event(100L, "StateTransition", "Init to PreOp", @runtime.Verdict::Pass)
+  report.add_event(
+    100L,
+    "StateTransition",
+    "Init to PreOp",
+    @runtime.Verdict::Pass,
+  )
   assert_eq(report.timeline.length(), 1)
   assert_eq(report.timeline[0].cycle, 100L)
   assert_eq(report.timeline[0].event_type, "StateTransition")
@@ -3947,7 +3987,12 @@ test "validate_configuration extra slave in actual" {
     position: 1,
     configured_address: Some(0x1002U),
     alias_address: None,
-    identity: Some({ vendor_id: 9U, product_code: 10U, revision: 11U, serial: 12U }),
+    identity: Some({
+      vendor_id: 9U,
+      product_code: 10U,
+      revision: 11U,
+      serial: 12U,
+    }),
     identification: None,
     process_data_summary: None,
     presence: @hal.Mandatory,
@@ -4012,34 +4057,36 @@ test "diagnosis_restore_path PreOp" {
 
 ///|
 test "diagnosis_restore_path SafeOp" {
-  assert_eq(
-    @runtime.diagnosis_restore_path(@protocol.SafeOp),
-    [@protocol.PreOp, @protocol.SafeOp],
-  )
+  assert_eq(@runtime.diagnosis_restore_path(@protocol.SafeOp), [
+    @protocol.PreOp,
+    @protocol.SafeOp,
+  ])
 }
 
 ///|
 test "diagnosis_restore_path Op" {
-  assert_eq(
-    @runtime.diagnosis_restore_path(@protocol.Op),
-    [@protocol.PreOp, @protocol.SafeOp, @protocol.Op],
-  )
+  assert_eq(@runtime.diagnosis_restore_path(@protocol.Op), [
+    @protocol.PreOp,
+    @protocol.SafeOp,
+    @protocol.Op,
+  ])
 }
 
 ///|
 test "diagnosis_restore_path Init" {
-  assert_eq(
-    @runtime.diagnosis_restore_path(@protocol.Init),
-    [@protocol.PreOp, @protocol.Init],
-  )
+  assert_eq(@runtime.diagnosis_restore_path(@protocol.Init), [
+    @protocol.PreOp,
+    @protocol.Init,
+  ])
 }
 
 ///|
 test "diagnosis_restore_path Boot" {
-  assert_eq(
-    @runtime.diagnosis_restore_path(@protocol.Boot),
-    [@protocol.PreOp, @protocol.Init, @protocol.Boot],
-  )
+  assert_eq(@runtime.diagnosis_restore_path(@protocol.Boot), [
+    @protocol.PreOp,
+    @protocol.Init,
+    @protocol.Boot,
+  ])
 }
 
 ///|
@@ -4050,9 +4097,7 @@ test "parse_error_register_payload valid" {
 
 ///|
 test "parse_error_register_payload empty rejects" {
-  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(
-    b"",
-  )
+  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(b"")
   assert_true(result is Err(_))
 }
 
@@ -4071,8 +4116,13 @@ test "parse_u32_payload too short rejects" {
 ///|
 test "diagnostic_surface_from_state_transition no issues when match" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    Some(0x1001U), @protocol.PreOp, Some(@protocol.Init),
-    Some(@protocol.PreOp), Some(false), Some(0U), Some(1U),
+    Some(0x1001U),
+    @protocol.PreOp,
+    Some(@protocol.Init),
+    Some(@protocol.PreOp),
+    Some(false),
+    Some(0U),
+    Some(1U),
   )
   assert_eq(surface.station_address, Some(0x1001U))
   assert_eq(surface.issues.length(), 0)
@@ -4082,8 +4132,13 @@ test "diagnostic_surface_from_state_transition no issues when match" {
 ///|
 test "diagnostic_surface_from_state_transition final state mismatch" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    Some(0x1001U), @protocol.PreOp, Some(@protocol.Init),
-    Some(@protocol.Init), None, None, None,
+    Some(0x1001U),
+    @protocol.PreOp,
+    Some(@protocol.Init),
+    Some(@protocol.Init),
+    None,
+    None,
+    None,
   )
   assert_true(surface.issues.length() > 0)
   assert_true(surface.overall_level is @runtime.DiagnosticLevel::Block)
@@ -4092,33 +4147,52 @@ test "diagnostic_surface_from_state_transition final state mismatch" {
 ///|
 test "diagnostic_surface_from_state_transition al_error_flag set" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    None, @protocol.PreOp, None, Some(@protocol.PreOp),
-    Some(true), None, None,
+    None,
+    @protocol.PreOp,
+    None,
+    Some(@protocol.PreOp),
+    Some(true),
+    None,
+    None,
   )
   assert_true(surface.issues.length() > 0)
   assert_true(
-    surface.issues.iter().any(fn(i) {
-      i.detail.contains("AL error indication")
-    }),
+    surface.issues
+    .iter()
+    .any(fn(i) { i.detail.contains("AL error indication") }),
   )
 }
 
 ///|
 test "diagnostic_surface_from_state_transition status_code nonzero" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    None, @protocol.PreOp, None, Some(@protocol.PreOp),
-    None, Some(0x001DU), None,
+    None,
+    @protocol.PreOp,
+    None,
+    Some(@protocol.PreOp),
+    None,
+    Some(0x001DU),
+    None,
   )
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("AL status code") }))
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("AL status code") }),
+  )
 }
 
 ///|
 test "diagnostic_surface_from_state_transition wkc zero" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    None, @protocol.PreOp, None, Some(@protocol.PreOp),
-    None, None, Some(0U),
+    None,
+    @protocol.PreOp,
+    None,
+    Some(@protocol.PreOp),
+    None,
+    None,
+    Some(0U),
   )
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("WKC is zero") }))
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("WKC is zero") }),
+  )
   assert_true(surface.overall_level is @runtime.DiagnosticLevel::Degrade)
 }
 
@@ -4188,13 +4262,19 @@ test "diagnostic_surface_from_slave_diagnosis with errors" {
 
 ///|
 test "monitor_result_to_issue Pass returns None" {
-  let r : @runtime.MonitorResult = { name: "test", verdict: @runtime.Verdict::Pass }
+  let r : @runtime.MonitorResult = {
+    name: "test",
+    verdict: @runtime.Verdict::Pass,
+  }
   assert_true(@runtime.monitor_result_to_issue(r) is None)
 }
 
 ///|
 test "monitor_result_to_issue Warn returns Info issue" {
-  let r : @runtime.MonitorResult = { name: "wkc", verdict: @runtime.Verdict::Warn("drift") }
+  let r : @runtime.MonitorResult = {
+    name: "wkc",
+    verdict: @runtime.Verdict::Warn("drift"),
+  }
   let issue = @runtime.monitor_result_to_issue(r)
   assert_true(issue is Some(_))
   match issue {
@@ -4209,7 +4289,10 @@ test "monitor_result_to_issue Warn returns Info issue" {
 
 ///|
 test "monitor_result_to_issue Fail returns Degrade issue" {
-  let r : @runtime.MonitorResult = { name: "timeout", verdict: @runtime.Verdict::Fail("too many") }
+  let r : @runtime.MonitorResult = {
+    name: "timeout",
+    verdict: @runtime.Verdict::Fail("too many"),
+  }
   match @runtime.monitor_result_to_issue(r) {
     Some(i) => assert_true(i.level is @runtime.DiagnosticLevel::Degrade)
     None => abort("expected Some")
@@ -4218,7 +4301,10 @@ test "monitor_result_to_issue Fail returns Degrade issue" {
 
 ///|
 test "monitor_result_to_issue Block returns Block issue" {
-  let r : @runtime.MonitorResult = { name: "fatal", verdict: @runtime.Verdict::Block("dead") }
+  let r : @runtime.MonitorResult = {
+    name: "fatal",
+    verdict: @runtime.Verdict::Block("dead"),
+  }
   match @runtime.monitor_result_to_issue(r) {
     Some(i) => assert_true(i.level is @runtime.DiagnosticLevel::Block)
     None => abort("expected Some")
@@ -4227,18 +4313,39 @@ test "monitor_result_to_issue Block returns Block issue" {
 
 ///|
 test "verdict_to_diagnostic_level mapping" {
-  assert_true(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Pass) is @runtime.DiagnosticLevel::Info)
-  assert_true(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Warn("w")) is @runtime.DiagnosticLevel::Info)
-  assert_true(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Fail("f")) is @runtime.DiagnosticLevel::Degrade)
-  assert_true(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Block("b")) is @runtime.DiagnosticLevel::Block)
+  assert_true(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Pass)
+    is @runtime.DiagnosticLevel::Info,
+  )
+  assert_true(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Warn("w"))
+    is @runtime.DiagnosticLevel::Info,
+  )
+  assert_true(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Fail("f"))
+    is @runtime.DiagnosticLevel::Degrade,
+  )
+  assert_true(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Block("b"))
+    is @runtime.DiagnosticLevel::Block,
+  )
 }
 
 ///|
 test "enrich_surface_with_fingerprint adds fingerprint" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    None, @protocol.PreOp, None, Some(@protocol.PreOp), None, None, None,
+    None,
+    @protocol.PreOp,
+    None,
+    Some(@protocol.PreOp),
+    None,
+    None,
+    None,
   )
-  let fp : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 12345L }
+  let fp : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 12345L,
+  }
   let enriched = @runtime.enrich_surface_with_fingerprint(surface, fp)
   assert_eq(enriched.topology_fingerprint, Some(fp))
 }
@@ -4246,13 +4353,23 @@ test "enrich_surface_with_fingerprint adds fingerprint" {
 ///|
 test "enrich_surface_with_monitors adds verdicts and issues" {
   let surface = @runtime.diagnostic_surface_from_state_transition(
-    None, @protocol.PreOp, None, Some(@protocol.PreOp), None, None, None,
+    None,
+    @protocol.PreOp,
+    None,
+    Some(@protocol.PreOp),
+    None,
+    None,
+    None,
   )
   let results : Array[@runtime.MonitorResult] = [
     { name: "wkc", verdict: @runtime.Verdict::Warn("high") },
     { name: "ok", verdict: @runtime.Verdict::Pass },
   ]
-  let enriched = @runtime.enrich_surface_with_monitors(surface, results, @runtime.Verdict::Warn("w"))
+  let enriched = @runtime.enrich_surface_with_monitors(
+    surface,
+    results,
+    @runtime.Verdict::Warn("w"),
+  )
   assert_true(enriched.monitor_verdicts is Some(_))
   assert_true(enriched.overall_verdict is Some(_))
   assert_true(enriched.issues.length() >= 1) // one Warn issue from "wkc"
@@ -4261,21 +4378,42 @@ test "enrich_surface_with_monitors adds verdicts and issues" {
 ///|
 test "fingerprint_match identical" {
   let fp : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 42L }
-  assert_true(@runtime.fingerprint_match(fp, fp) is @runtime.TopologyFingerprintMatch::Identical)
+  assert_true(
+    @runtime.fingerprint_match(fp, fp)
+    is @runtime.TopologyFingerprintMatch::Identical,
+  )
 }
 
 ///|
 test "fingerprint_match slave count changed" {
-  let fp1 : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 42L }
-  let fp2 : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 42L }
-  assert_true(@runtime.fingerprint_match(fp1, fp2) is @runtime.TopologyFingerprintMatch::SlaveCountChanged(..))
+  let fp1 : @runtime.TopologyFingerprint = {
+    slave_count: 3,
+    identity_hash: 42L,
+  }
+  let fp2 : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 42L,
+  }
+  assert_true(
+    @runtime.fingerprint_match(fp1, fp2)
+    is @runtime.TopologyFingerprintMatch::SlaveCountChanged(..),
+  )
 }
 
 ///|
 test "fingerprint_match identity changed" {
-  let fp1 : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 42L }
-  let fp2 : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 99L }
-  assert_true(@runtime.fingerprint_match(fp1, fp2) is @runtime.TopologyFingerprintMatch::IdentityChanged)
+  let fp1 : @runtime.TopologyFingerprint = {
+    slave_count: 3,
+    identity_hash: 42L,
+  }
+  let fp2 : @runtime.TopologyFingerprint = {
+    slave_count: 3,
+    identity_hash: 99L,
+  }
+  assert_true(
+    @runtime.fingerprint_match(fp1, fp2)
+    is @runtime.TopologyFingerprintMatch::IdentityChanged,
+  )
 }
 
 ///|
@@ -4301,9 +4439,7 @@ test "diagnostic_surface_from_validate with differences" {
     total_expected: 1,
     total_found: 2,
     results: [@runtime.ValidationResult::Ok],
-    differences: [
-      @runtime.ConfigurationDifference::Extra(position=1),
-    ],
+    differences: [@runtime.ConfigurationDifference::Extra(position=1)],
     all_ok: false,
     grade: @runtime.ValidateGrade::Warn,
   }
@@ -4316,14 +4452,30 @@ test "diagnostic_surface_from_validate with differences" {
 
 ///|
 test "quality_grade_from_score boundaries" {
-  assert_true(@runtime.quality_grade_from_score(1000) is @runtime.QualityGrade::Excellent)
-  assert_true(@runtime.quality_grade_from_score(900) is @runtime.QualityGrade::Excellent)
-  assert_true(@runtime.quality_grade_from_score(899) is @runtime.QualityGrade::Good)
-  assert_true(@runtime.quality_grade_from_score(750) is @runtime.QualityGrade::Good)
-  assert_true(@runtime.quality_grade_from_score(500) is @runtime.QualityGrade::Acceptable)
-  assert_true(@runtime.quality_grade_from_score(250) is @runtime.QualityGrade::Poor)
-  assert_true(@runtime.quality_grade_from_score(249) is @runtime.QualityGrade::Critical)
-  assert_true(@runtime.quality_grade_from_score(0) is @runtime.QualityGrade::Critical)
+  assert_true(
+    @runtime.quality_grade_from_score(1000) is @runtime.QualityGrade::Excellent,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(900) is @runtime.QualityGrade::Excellent,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(899) is @runtime.QualityGrade::Good,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(750) is @runtime.QualityGrade::Good,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(500) is @runtime.QualityGrade::Acceptable,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(250) is @runtime.QualityGrade::Poor,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(249) is @runtime.QualityGrade::Critical,
+  )
+  assert_true(
+    @runtime.quality_grade_from_score(0) is @runtime.QualityGrade::Critical,
+  )
 }
 
 ///|
@@ -4452,8 +4604,18 @@ test "QualityScore to_json contains fields" {
 
 ///|
 test "ValidateReport format shows all mismatch types" {
-  let expected_id : @hal.SlaveIdentity = { vendor_id: 1U, product_code: 2U, revision: 3U, serial: 4U }
-  let actual_id : @hal.SlaveIdentity = { vendor_id: 5U, product_code: 6U, revision: 7U, serial: 8U }
+  let expected_id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 2U,
+    revision: 3U,
+    serial: 4U,
+  }
+  let actual_id : @hal.SlaveIdentity = {
+    vendor_id: 5U,
+    product_code: 6U,
+    revision: 7U,
+    serial: 8U,
+  }
   let report : @runtime.ValidateReport = {
     expected_source: @runtime.ConfigurationSource::OnlineScan,
     actual_source: @runtime.ConfigurationSource::OnlineScan,
@@ -4465,17 +4627,23 @@ test "ValidateReport format shows all mismatch types" {
     results: [
       @runtime.ValidationResult::Ok,
       @runtime.ValidationResult::StationAddressMismatch(
-        position=1, expected=0x1001U, actual=0x1002U,
+        position=1,
+        expected=0x1001U,
+        actual=0x1002U,
       ),
       @runtime.ValidationResult::AliasAddressMismatch(
-        position=2, expected=0x00U, actual=0x01U,
+        position=2,
+        expected=0x00U,
+        actual=0x01U,
       ),
       @runtime.ValidationResult::IdentityMismatch(
         expected=expected_id,
         actual=actual_id,
       ),
       @runtime.ValidationResult::IdentificationMismatch(
-        position=4, expected=0x10U, actual=0x20U,
+        position=4,
+        expected=0x10U,
+        actual=0x20U,
       ),
       @runtime.ValidationResult::ProcessDataMismatch(position=5),
     ],
@@ -4540,9 +4708,18 @@ test "ValidateReport format OptionalMissing without group_id" {
 test "VerificationReport to_markdown with monitor_results" {
   let report = @runtime.VerificationReport::new("test verification")
   report.add_event(0L, "cycle", "start", @runtime.Verdict::Pass)
-  report.timeline.push({ cycle: 1L, timestamp_ns: 1000L, event_type: "monitor", detail: "check", verdict: @runtime.Verdict::Pass })
+  report.timeline.push({
+    cycle: 1L,
+    timestamp_ns: 1000L,
+    event_type: "monitor",
+    detail: "check",
+    verdict: @runtime.Verdict::Pass,
+  })
   report.monitor_results.push({ name: "wkc", verdict: @runtime.Verdict::Pass })
-  report.monitor_results.push({ name: "state", verdict: @runtime.Verdict::Warn("degraded") })
+  report.monitor_results.push({
+    name: "state",
+    verdict: @runtime.Verdict::Warn("degraded"),
+  })
   let md = report.to_markdown()
   assert_true(md.contains("wkc"))
   assert_true(md.contains("state"))
@@ -4554,7 +4731,10 @@ test "VerificationReport to_json with multiple monitors and timeline" {
   report.add_event(0L, "cycle", "start", @runtime.Verdict::Pass)
   report.add_event(1000L, "cycle", "end", @runtime.Verdict::Pass)
   report.monitor_results.push({ name: "m1", verdict: @runtime.Verdict::Pass })
-  report.monitor_results.push({ name: "m2", verdict: @runtime.Verdict::Warn("minor") })
+  report.monitor_results.push({
+    name: "m2",
+    verdict: @runtime.Verdict::Warn("minor"),
+  })
   report.fault_injections.push("inject1")
   report.fault_injections.push("inject2")
   let json = report.to_json()
@@ -4587,10 +4767,7 @@ test "TopologyHealthReport to_json multi-slave and warnings" {
 
 ///|
 test "CyclePerfAnalyzer record with window update" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(
-    1_000_000L,
-    window_size=5,
-  )
+  let analyzer = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
   // Record enough timestamps to fill the window
   for i = 0; i < 7; i = i + 1 {
     analyzer.record(i.to_int64() * 1_000_000L)
@@ -4618,10 +4795,7 @@ test "CyclePerfAnalyzer record_duration with deadline miss" {
 
 ///|
 test "CyclePerfAnalyzer trend degrading" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(
-    1_000_000L,
-    window_size=5,
-  )
+  let analyzer = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
   // Window 1: 5 normal cycles → prev_window_mean set
   for i = 0; i < 5; i = i + 1 {
     analyzer.record_duration(1_000_000L)
@@ -4671,13 +4845,23 @@ test "analyze_multi_rate non-harmonic with peak tie" {
         name: "t1",
         priority: 0,
         cycle_divisor: 3,
-        slice: { output_offset: 0, output_length: 10, input_offset: 0, input_length: 10 },
+        slice: {
+          output_offset: 0,
+          output_length: 10,
+          input_offset: 0,
+          input_length: 10,
+        },
       },
       {
         name: "t2",
         priority: 1,
         cycle_divisor: 5,
-        slice: { output_offset: 10, output_length: 20, input_offset: 10, input_length: 20 },
+        slice: {
+          output_offset: 10,
+          output_length: 20,
+          input_offset: 10,
+          input_length: 20,
+        },
       },
     ],
   }
@@ -4697,13 +4881,23 @@ test "validate_multi_rate detects hyperperiod exceeds" {
         name: "t1",
         priority: 0,
         cycle_divisor: 7,
-        slice: { output_offset: 0, output_length: 10, input_offset: 0, input_length: 10 },
+        slice: {
+          output_offset: 0,
+          output_length: 10,
+          input_offset: 0,
+          input_length: 10,
+        },
       },
       {
         name: "t2",
         priority: 1,
         cycle_divisor: 11,
-        slice: { output_offset: 10, output_length: 10, input_offset: 10, input_length: 10 },
+        slice: {
+          output_offset: 10,
+          output_length: 10,
+          input_offset: 10,
+          input_length: 10,
+        },
       },
     ],
   }
@@ -4722,12 +4916,18 @@ test "validate_multi_rate detects IO exceeds" {
         name: "t1",
         priority: 0,
         cycle_divisor: 1,
-        slice: { output_offset: 0, output_length: 1000, input_offset: 0, input_length: 1000 },
+        slice: {
+          output_offset: 0,
+          output_length: 1000,
+          input_offset: 0,
+          input_length: 1000,
+        },
       },
     ],
   }
   let errors = @runtime.validate_multi_rate(
-    schedule, max_io_bytes_per_cycle=100,
+    schedule,
+    max_io_bytes_per_cycle=100,
   )
   assert_true(errors.iter().any(fn(s) { s.contains("I/O") }))
 }
@@ -4737,16 +4937,21 @@ test "validate_multi_rate detects tasks exceeds" {
   // 3 tasks all with divisor 1 → all fire every cycle
   let tasks : Array[@runtime.TaskDescriptor] = []
   for i = 0; i < 3; i = i + 1 {
-    let slice : @runtime.ProcessImageSlice = { output_offset: i * 10, output_length: 5, input_offset: i * 10, input_length: 5 }
-    tasks.push({ name: "t" + i.to_string(), priority: i, cycle_divisor: 1, slice })
+    let slice : @runtime.ProcessImageSlice = {
+      output_offset: i * 10,
+      output_length: 5,
+      input_offset: i * 10,
+      input_length: 5,
+    }
+    tasks.push({
+      name: "t" + i.to_string(),
+      priority: i,
+      cycle_divisor: 1,
+      slice,
+    })
   }
-  let schedule : @runtime.TaskSchedule = {
-    base_period_ns: 1_000_000L,
-    tasks,
-  }
-  let errors = @runtime.validate_multi_rate(
-    schedule, max_tasks_per_cycle=2,
-  )
+  let schedule : @runtime.TaskSchedule = { base_period_ns: 1_000_000L, tasks }
+  let errors = @runtime.validate_multi_rate(schedule, max_tasks_per_cycle=2)
   assert_true(errors.iter().any(fn(s) { s.contains("tasks per cycle") }))
 }
 
@@ -4759,7 +4964,12 @@ test "validate_multi_rate non-harmonic warning" {
         name: "t1",
         priority: 0,
         cycle_divisor: 3,
-        slice: { output_offset: 0, output_length: 5, input_offset: 0, input_length: 5 },
+        slice: {
+          output_offset: 0,
+          output_length: 5,
+          input_offset: 0,
+          input_length: 5,
+        },
       },
     ],
   }
@@ -4785,20 +4995,32 @@ test "hil_session_to_json with multiple tasks and steps" {
     name: "task_a",
     priority: 0,
     cycle_divisor: 1,
-    slice: { output_offset: 0, output_length: 4, input_offset: 0, input_length: 4 },
+    slice: {
+      output_offset: 0,
+      output_length: 4,
+      input_offset: 0,
+      input_length: 4,
+    },
   }
   let t2 : @runtime.TaskDescriptor = {
     name: "task_b",
     priority: 1,
     cycle_divisor: 2,
-    slice: { output_offset: 4, output_length: 4, input_offset: 4, input_length: 4 },
+    slice: {
+      output_offset: 4,
+      output_length: 4,
+      input_offset: 4,
+      input_length: 4,
+    },
   }
   let schedule : @runtime.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [t1, t2],
   }
   let session = @runtime.HilSession::new(1_000_000L, schedule)
-  session.step_log.push(@runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)))
+  session.step_log.push(
+    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+  )
   session.step_log.push(@runtime.SimStepResult::Terminated("done"))
   session.step_log.push(@runtime.SimStepResult::Error("oops"))
   let json = @runtime.hil_session_to_json(session)
@@ -4815,7 +5037,9 @@ test "hil_session_summary with terminated step" {
     tasks: [],
   }
   let session = @runtime.HilSession::new(1_000_000L, schedule)
-  session.step_log.push(@runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)))
+  session.step_log.push(
+    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+  )
   session.step_log.push(@runtime.SimStepResult::Terminated("timeout"))
   session.step_log.push(@runtime.SimStepResult::Error("fail"))
   session.terminated = true
@@ -4866,30 +5090,90 @@ test "ScanReport format with alias and multiple slaves" {
 
 ///|
 test "build_task_schedule returns None for overlapping inputs" {
-  let s1 : @runtime.ProcessImageSlice = { output_offset: 0, output_length: 10, input_offset: 0, input_length: 20 }
-  let s2 : @runtime.ProcessImageSlice = { output_offset: 20, output_length: 10, input_offset: 10, input_length: 20 }
-  let t1 : @runtime.TaskDescriptor = { name: "t1", priority: 0, cycle_divisor: 1, slice: s1 }
-  let t2 : @runtime.TaskDescriptor = { name: "t2", priority: 1, cycle_divisor: 1, slice: s2 }
+  let s1 : @runtime.ProcessImageSlice = {
+    output_offset: 0,
+    output_length: 10,
+    input_offset: 0,
+    input_length: 20,
+  }
+  let s2 : @runtime.ProcessImageSlice = {
+    output_offset: 20,
+    output_length: 10,
+    input_offset: 10,
+    input_length: 20,
+  }
+  let t1 : @runtime.TaskDescriptor = {
+    name: "t1",
+    priority: 0,
+    cycle_divisor: 1,
+    slice: s1,
+  }
+  let t2 : @runtime.TaskDescriptor = {
+    name: "t2",
+    priority: 1,
+    cycle_divisor: 1,
+    slice: s2,
+  }
   let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is None)
 }
 
 ///|
 test "build_task_schedule returns None for overlapping outputs" {
-  let s1 : @runtime.ProcessImageSlice = { output_offset: 0, output_length: 20, input_offset: 100, input_length: 10 }
-  let s2 : @runtime.ProcessImageSlice = { output_offset: 10, output_length: 20, input_offset: 200, input_length: 10 }
-  let t1 : @runtime.TaskDescriptor = { name: "t1", priority: 0, cycle_divisor: 1, slice: s1 }
-  let t2 : @runtime.TaskDescriptor = { name: "t2", priority: 1, cycle_divisor: 1, slice: s2 }
+  let s1 : @runtime.ProcessImageSlice = {
+    output_offset: 0,
+    output_length: 20,
+    input_offset: 100,
+    input_length: 10,
+  }
+  let s2 : @runtime.ProcessImageSlice = {
+    output_offset: 10,
+    output_length: 20,
+    input_offset: 200,
+    input_length: 10,
+  }
+  let t1 : @runtime.TaskDescriptor = {
+    name: "t1",
+    priority: 0,
+    cycle_divisor: 1,
+    slice: s1,
+  }
+  let t2 : @runtime.TaskDescriptor = {
+    name: "t2",
+    priority: 1,
+    cycle_divisor: 1,
+    slice: s2,
+  }
   let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is None)
 }
 
 ///|
 test "build_task_schedule success with non-overlapping slices" {
-  let s1 : @runtime.ProcessImageSlice = { output_offset: 0, output_length: 10, input_offset: 0, input_length: 10 }
-  let s2 : @runtime.ProcessImageSlice = { output_offset: 10, output_length: 10, input_offset: 10, input_length: 10 }
-  let t1 : @runtime.TaskDescriptor = { name: "t1", priority: 0, cycle_divisor: 1, slice: s1 }
-  let t2 : @runtime.TaskDescriptor = { name: "t2", priority: 1, cycle_divisor: 2, slice: s2 }
+  let s1 : @runtime.ProcessImageSlice = {
+    output_offset: 0,
+    output_length: 10,
+    input_offset: 0,
+    input_length: 10,
+  }
+  let s2 : @runtime.ProcessImageSlice = {
+    output_offset: 10,
+    output_length: 10,
+    input_offset: 10,
+    input_length: 10,
+  }
+  let t1 : @runtime.TaskDescriptor = {
+    name: "t1",
+    priority: 0,
+    cycle_divisor: 1,
+    slice: s1,
+  }
+  let t2 : @runtime.TaskDescriptor = {
+    name: "t2",
+    priority: 1,
+    cycle_divisor: 2,
+    slice: s2,
+  }
   let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is Some(_))
 }
@@ -4994,9 +5278,9 @@ test "diagnostic_surface_from_run with StartupTransitionFailed" {
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(surface.issues.length() > 0)
   assert_true(
-    surface.issues.iter().any(
-      fn(i) { i.detail.contains("Startup transition failed") },
-    ),
+    surface.issues
+    .iter()
+    .any(fn(i) { i.detail.contains("Startup transition failed") }),
   )
 }
 
@@ -5030,9 +5314,7 @@ test "diagnostic_surface_from_run with TimeoutRecoveryRequired" {
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(
-    surface.issues.iter().any(
-      fn(i) { i.detail.contains("Timeout recovery") },
-    ),
+    surface.issues.iter().any(fn(i) { i.detail.contains("Timeout recovery") }),
   )
 }
 
@@ -5061,9 +5343,7 @@ test "diagnostic_surface_from_run with DcDrift" {
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(
-    surface.issues.iter().any(
-      fn(i) { i.detail.contains("DC drift") },
-    ),
+    surface.issues.iter().any(fn(i) { i.detail.contains("DC drift") }),
   )
 }
 
@@ -5097,9 +5377,7 @@ test "diagnostic_surface_from_run with RuntimeRecoveryRequired" {
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(
-    surface.issues.iter().any(
-      fn(i) { i.detail.contains("Runtime recovery") },
-    ),
+    surface.issues.iter().any(fn(i) { i.detail.contains("Runtime recovery") }),
   )
 }
 
@@ -5168,7 +5446,21 @@ test "build_master_od with diagnostic surface" {
 
 ///|
 test "diagnostic_surface_from_slave_diagnosis with al_error_flag" {
-  let scan : @runtime.ScanReport = { slave_count: 1, slaves: [{ position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 1U, revision: 1U, serial: 1U, identification: 0U }] }
+  let scan : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 1U,
+        revision: 1U,
+        serial: 1U,
+        identification: 0U,
+      },
+    ],
+  }
   let diag : @runtime.SlaveDiagnosis = {
     station_address: 0x1001U,
     al_state: Some(@protocol.EsmState::SafeOp),
@@ -5181,9 +5473,15 @@ test "diagnostic_surface_from_slave_diagnosis with al_error_flag" {
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
   assert_eq(surface.station_address, Some(0x1001U))
   assert_true(surface.issues.length() >= 3) // al_error, al_status_code, error_register
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("AL error flag") }))
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("Error register") }))
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("Diagnosis history") }))
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("AL error flag") }),
+  )
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("Error register") }),
+  )
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("Diagnosis history") }),
+  )
 }
 
 ///|
@@ -5207,8 +5505,18 @@ test "diagnostic_surface_from_slave_diagnosis clean" {
 ///|
 test "diagnostic_surface_from_validate with identity mismatch" {
   let scan : @runtime.ScanReport = { slave_count: 1, slaves: [] }
-  let expected_id : @hal.SlaveIdentity = { vendor_id: 1U, product_code: 100U, revision: 1U, serial: 1U }
-  let actual_id : @hal.SlaveIdentity = { vendor_id: 2U, product_code: 200U, revision: 1U, serial: 1U }
+  let expected_id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 100U,
+    revision: 1U,
+    serial: 1U,
+  }
+  let actual_id : @hal.SlaveIdentity = {
+    vendor_id: 2U,
+    product_code: 200U,
+    revision: 1U,
+    serial: 1U,
+  }
   let report : @runtime.ValidateReport = {
     expected_source: @runtime.OnlineScan,
     actual_source: @runtime.OnlineScan,
@@ -5216,13 +5524,23 @@ test "diagnostic_surface_from_validate with identity mismatch" {
     total_found: 1,
     all_ok: false,
     grade: @runtime.ValidateGrade::Block,
-    differences: [@runtime.ConfigurationDifference::IdentityMismatch(position=0, expected=Some(expected_id), actual=Some(actual_id))],
+    differences: [
+      @runtime.ConfigurationDifference::IdentityMismatch(
+        position=0,
+        expected=Some(expected_id),
+        actual=Some(actual_id),
+      ),
+    ],
     results: [],
   }
   let surface = @runtime.diagnostic_surface_from_validate(scan, report)
   assert_true(surface.issues.length() >= 1)
   // Identity differences produce Configuration source
-  assert_true(surface.issues.iter().any(fn(i) { i.source == @runtime.DiagnosticSourceLayer::Configuration }))
+  assert_true(
+    surface.issues
+    .iter()
+    .any(fn(i) { i.source == @runtime.DiagnosticSourceLayer::Configuration }),
+  )
 }
 
 ///|
@@ -5235,12 +5553,22 @@ test "diagnostic_surface_from_validate with identification mismatch" {
     total_found: 1,
     all_ok: false,
     grade: @runtime.ValidateGrade::Block,
-    differences: [@runtime.ConfigurationDifference::IdentificationMismatch(position=0, expected=Some(100U), actual=Some(200U))],
+    differences: [
+      @runtime.ConfigurationDifference::IdentificationMismatch(
+        position=0,
+        expected=Some(100U),
+        actual=Some(200U),
+      ),
+    ],
     results: [],
   }
   let surface = @runtime.diagnostic_surface_from_validate(scan, report)
   assert_true(surface.issues.length() >= 1)
-  assert_true(surface.issues.iter().any(fn(i) { i.category == @runtime.DiagnosticCategory::Configuration }))
+  assert_true(
+    surface.issues
+    .iter()
+    .any(fn(i) { i.category == @runtime.DiagnosticCategory::Configuration }),
+  )
 }
 
 // ===== diagnostic_surface_from_state_transition =====
@@ -5257,7 +5585,9 @@ test "diagnostic_surface_from_state_transition final state mismatch v2" {
     None,
   )
   assert_true(surface.issues.length() >= 1)
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("Final state") }))
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("Final state") }),
+  )
 }
 
 ///|
@@ -5272,9 +5602,17 @@ test "diagnostic_surface_from_state_transition with al_error and status_code" {
     Some(0U), // wkc = 0
   )
   assert_true(surface.issues.length() >= 4)
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("AL error indication") }))
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("AL status code") }))
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("WKC is zero") }))
+  assert_true(
+    surface.issues
+    .iter()
+    .any(fn(i) { i.detail.contains("AL error indication") }),
+  )
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("AL status code") }),
+  )
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("WKC is zero") }),
+  )
 }
 
 ///|
@@ -5295,13 +5633,19 @@ test "diagnostic_surface_from_state_transition clean transition" {
 
 ///|
 test "monitor_result_to_issue Pass returns None v2" {
-  let r : @runtime.MonitorResult = { name: "test_monitor", verdict: @runtime.Verdict::Pass }
+  let r : @runtime.MonitorResult = {
+    name: "test_monitor",
+    verdict: @runtime.Verdict::Pass,
+  }
   assert_true(@runtime.monitor_result_to_issue(r) is None)
 }
 
 ///|
 test "monitor_result_to_issue Warn returns issue" {
-  let r : @runtime.MonitorResult = { name: "test_monitor", verdict: @runtime.Verdict::Warn("low") }
+  let r : @runtime.MonitorResult = {
+    name: "test_monitor",
+    verdict: @runtime.Verdict::Warn("low"),
+  }
   let issue = @runtime.monitor_result_to_issue(r)
   assert_true(issue is Some(_))
   match issue {
@@ -5316,7 +5660,10 @@ test "monitor_result_to_issue Warn returns issue" {
 
 ///|
 test "monitor_result_to_issue Fail returns degrade" {
-  let r : @runtime.MonitorResult = { name: "wkc", verdict: @runtime.Verdict::Fail("errors") }
+  let r : @runtime.MonitorResult = {
+    name: "wkc",
+    verdict: @runtime.Verdict::Fail("errors"),
+  }
   let issue = @runtime.monitor_result_to_issue(r)
   match issue {
     Some(i) => assert_eq(i.level, @runtime.DiagnosticLevel::Degrade)
@@ -5326,7 +5673,10 @@ test "monitor_result_to_issue Fail returns degrade" {
 
 ///|
 test "monitor_result_to_issue Block returns block" {
-  let r : @runtime.MonitorResult = { name: "critical", verdict: @runtime.Verdict::Block("fatal") }
+  let r : @runtime.MonitorResult = {
+    name: "critical",
+    verdict: @runtime.Verdict::Block("fatal"),
+  }
   let issue = @runtime.monitor_result_to_issue(r)
   match issue {
     Some(i) => assert_eq(i.level, @runtime.DiagnosticLevel::Block)
@@ -5353,7 +5703,11 @@ test "enrich_surface_with_monitors adds issues" {
     { name: "m2", verdict: @runtime.Verdict::Fail("failure") },
     { name: "m3", verdict: @runtime.Verdict::Pass },
   ]
-  let enriched = @runtime.enrich_surface_with_monitors(base, results, @runtime.Verdict::Fail("overall"))
+  let enriched = @runtime.enrich_surface_with_monitors(
+    base,
+    results,
+    @runtime.Verdict::Fail("overall"),
+  )
   assert_true(enriched.issues.length() >= 2) // m1 and m2, not m3
   assert_true(enriched.monitor_verdicts is Some(_))
   assert_true(enriched.overall_verdict is Some(_))
@@ -5373,7 +5727,10 @@ test "enrich_surface_with_fingerprint attaches fingerprint" {
     None,
   )
   assert_true(base.topology_fingerprint is None)
-  let fp : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 12345L }
+  let fp : @runtime.TopologyFingerprint = {
+    slave_count: 3,
+    identity_hash: 12345L,
+  }
   let enriched = @runtime.enrich_surface_with_fingerprint(base, fp)
   assert_true(enriched.topology_fingerprint is Some(_))
 }
@@ -5395,7 +5752,11 @@ test "diagnosis_restore_path to SafeOp" {
 ///|
 test "diagnosis_restore_path to Op" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::Op)
-  assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::SafeOp, @protocol.EsmState::Op])
+  assert_eq(path, [
+    @protocol.EsmState::PreOp,
+    @protocol.EsmState::SafeOp,
+    @protocol.EsmState::Op,
+  ])
 }
 
 ///|
@@ -5407,7 +5768,11 @@ test "diagnosis_restore_path to Init" {
 ///|
 test "diagnosis_restore_path to Boot" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::Boot)
-  assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::Init, @protocol.EsmState::Boot])
+  assert_eq(path, [
+    @protocol.EsmState::PreOp,
+    @protocol.EsmState::Init,
+    @protocol.EsmState::Boot,
+  ])
 }
 
 // ===== diagnostic_surface_from_run with telemetry retries =====
@@ -5438,7 +5803,9 @@ test "diagnostic_surface_from_run with retries telemetry" {
     fault: None,
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
-  assert_true(surface.issues.iter().any(fn(i) { i.detail.contains("Retry count") }))
+  assert_true(
+    surface.issues.iter().any(fn(i) { i.detail.contains("Retry count") }),
+  )
 }
 
 // ===== DriftCompensator =====
@@ -5464,7 +5831,10 @@ test "DriftCompensationGains conservative" {
 ///|
 test "DriftCompensator compensate applies correction" {
   let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   // First update: reference=1000, local=1100 => error = 100 - 0 = 100
   let correction = comp.compensate(sync, 1000L, 1100L)
   assert_true(correction != 0L)
@@ -5474,7 +5844,10 @@ test "DriftCompensator compensate applies correction" {
 ///|
 test "DriftCompensator report generates report" {
   let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   // Do a few compensations
   for i = 0; i < 5; i = i + 1 {
     let ref_ns = (i * 1_000_000).to_int64()
@@ -5497,7 +5870,11 @@ test "CommQualityScorer trend with history" {
   scorer.record_score(70)
   let trend = scorer.trend()
   // Should detect degrading since scores are declining  
-  assert_true(trend is @runtime.QualityTrend::Degrading || trend is @runtime.QualityTrend::Stable || trend is @runtime.QualityTrend::Improving)
+  assert_true(
+    trend is @runtime.QualityTrend::Degrading ||
+    trend is @runtime.QualityTrend::Stable ||
+    trend is @runtime.QualityTrend::Improving,
+  )
 }
 
 ///|
@@ -5516,8 +5893,20 @@ test "score_dimension with value at bad threshold" {
 ///|
 test "compute_quality_score with multiple dimensions" {
   let dims : Array[@runtime.QualityDimension] = [
-    { name: "timeouts", value: 0L, good_threshold: 0L, bad_threshold: 100L, weight: 2 },
-    { name: "wkc_errors", value: 50L, good_threshold: 0L, bad_threshold: 100L, weight: 1 },
+    {
+      name: "timeouts",
+      value: 0L,
+      good_threshold: 0L,
+      bad_threshold: 100L,
+      weight: 2,
+    },
+    {
+      name: "wkc_errors",
+      value: 50L,
+      good_threshold: 0L,
+      bad_threshold: 100L,
+      weight: 1,
+    },
   ]
   let (overall, per_dim) = @runtime.compute_quality_score(dims)
   assert_true(overall >= 0 && overall <= 1000)
@@ -5528,7 +5917,10 @@ test "compute_quality_score with multiple dimensions" {
 test "CommQualityScorer score_from_telemetry with jitter" {
   let scorer = @runtime.CommQualityScorer::new()
   let score = scorer.score_from_telemetry(
-    1000L, 5L, 2L, 1L,
+    1000L,
+    5L,
+    2L,
+    1L,
     jitter_p99_abs_ns=5_000L,
     nominal_period_ns=1_000_000L,
   )
@@ -5546,7 +5938,9 @@ test "parse_error_register_payload valid v2" {
 
 ///|
 test "parse_error_register_payload too short v2" {
-  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(Bytes::new(0))
+  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(
+    Bytes::new(0),
+  )
   assert_true(result is Err(_))
 }
 
@@ -5569,18 +5963,30 @@ test "parse_u32_payload too short v2" {
 
 ///|
 test "verdict_to_diagnostic_level Pass and Warn are Info" {
-  assert_eq(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Pass), @runtime.DiagnosticLevel::Info)
-  assert_eq(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Warn("w")), @runtime.DiagnosticLevel::Info)
+  assert_eq(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Pass),
+    @runtime.DiagnosticLevel::Info,
+  )
+  assert_eq(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Warn("w")),
+    @runtime.DiagnosticLevel::Info,
+  )
 }
 
 ///|
 test "verdict_to_diagnostic_level Fail is Degrade" {
-  assert_eq(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Fail("f")), @runtime.DiagnosticLevel::Degrade)
+  assert_eq(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Fail("f")),
+    @runtime.DiagnosticLevel::Degrade,
+  )
 }
 
 ///|
 test "verdict_to_diagnostic_level Block is Block" {
-  assert_eq(@runtime.verdict_to_diagnostic_level(@runtime.Verdict::Block("b")), @runtime.DiagnosticLevel::Block)
+  assert_eq(
+    @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Block("b")),
+    @runtime.DiagnosticLevel::Block,
+  )
 }
 
 // ===== required_sii_read_word_count =====
@@ -5600,16 +6006,51 @@ test "topology_fingerprint with same slaves gives same hash" {
   let scan1 : @runtime.ScanReport = {
     slave_count: 2,
     slaves: [
-      { position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 100U, revision: 1U, serial: 1U, identification: 0U },
-      { position: 1, station_address: 0x1002U, alias_address: None, vendor_id: 2U, product_code: 200U, revision: 2U, serial: 2U, identification: 0U },
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 100U,
+        revision: 1U,
+        serial: 1U,
+        identification: 0U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        alias_address: None,
+        vendor_id: 2U,
+        product_code: 200U,
+        revision: 2U,
+        serial: 2U,
+        identification: 0U,
+      },
     ],
   }
   let scan2 : @runtime.ScanReport = {
     slave_count: 2,
-
     slaves: [
-      { position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 100U, revision: 1U, serial: 1U, identification: 0U },
-      { position: 1, station_address: 0x1002U, alias_address: None, vendor_id: 2U, product_code: 200U, revision: 2U, serial: 2U, identification: 0U },
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 100U,
+        revision: 1U,
+        serial: 1U,
+        identification: 0U,
+      },
+      {
+        position: 1,
+        station_address: 0x1002U,
+        alias_address: None,
+        vendor_id: 2U,
+        product_code: 200U,
+        revision: 2U,
+        serial: 2U,
+        identification: 0U,
+      },
     ],
   }
   let fp1 = @runtime.topology_fingerprint(scan1)
@@ -5622,13 +6063,31 @@ test "topology_fingerprint different slaves gives different hash" {
   let scan1 : @runtime.ScanReport = {
     slave_count: 1,
     slaves: [
-      { position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 100U, revision: 1U, serial: 1U, identification: 0U },
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 1U,
+        product_code: 100U,
+        revision: 1U,
+        serial: 1U,
+        identification: 0U,
+      },
     ],
   }
   let scan2 : @runtime.ScanReport = {
     slave_count: 1,
     slaves: [
-      { position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 99U, product_code: 999U, revision: 1U, serial: 1U, identification: 0U },
+      {
+        position: 0,
+        station_address: 0x1001U,
+        alias_address: None,
+        vendor_id: 99U,
+        product_code: 999U,
+        revision: 1U,
+        serial: 1U,
+        identification: 0U,
+      },
     ],
   }
   let fp1 = @runtime.topology_fingerprint(scan1)
@@ -5640,23 +6099,40 @@ test "topology_fingerprint different slaves gives different hash" {
 
 ///|
 test "topology_fingerprint_match identical" {
-  let fp : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 12345L }
+  let fp : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 12345L,
+  }
   let result = @runtime.fingerprint_match(fp, fp)
   assert_eq(result, @runtime.TopologyFingerprintMatch::Identical)
 }
 
 ///|
 test "topology_fingerprint_match slave count changed" {
-  let fp1 : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 12345L }
-  let fp2 : @runtime.TopologyFingerprint = { slave_count: 3, identity_hash: 12345L }
+  let fp1 : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 12345L,
+  }
+  let fp2 : @runtime.TopologyFingerprint = {
+    slave_count: 3,
+    identity_hash: 12345L,
+  }
   let result = @runtime.fingerprint_match(fp1, fp2)
-  assert_true(result is @runtime.TopologyFingerprintMatch::SlaveCountChanged(..))
+  assert_true(
+    result is @runtime.TopologyFingerprintMatch::SlaveCountChanged(..),
+  )
 }
 
 ///|
 test "topology_fingerprint_match identity changed" {
-  let fp1 : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 12345L }
-  let fp2 : @runtime.TopologyFingerprint = { slave_count: 2, identity_hash: 99999L }
+  let fp1 : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 12345L,
+  }
+  let fp2 : @runtime.TopologyFingerprint = {
+    slave_count: 2,
+    identity_hash: 99999L,
+  }
   let result = @runtime.fingerprint_match(fp1, fp2)
   assert_eq(result, @runtime.TopologyFingerprintMatch::IdentityChanged)
 }
@@ -5737,7 +6213,13 @@ test "monitor_pdo_configured expected_wkc zero warns" {
   let rt = @runtime.Runtime::new(@hal.MasterConfig::default())
   // Set a PDO context but leave expected_wkc at 0
   let img = @protocol.ProcessImage::new(16, 16)
-  let ctx : @protocol.PdoContext = { image: img, mappings: [], logical_base: 0U, logical_size: 32, block_lrw: false }
+  let ctx : @protocol.PdoContext = {
+    image: img,
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 32,
+    block_lrw: false,
+  }
   rt.pdo_ctx = Some(ctx)
   rt.expected_wkc = 0U
   let result = @runtime.monitor_pdo_configured(rt)
@@ -5750,7 +6232,10 @@ test "monitor_pdo_configured expected_wkc zero warns" {
 test "DriftCompensator compensate inactive returns zero" {
   let comp = @runtime.DriftCompensator::new()
   comp.active = false
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   let correction = comp.compensate(sync, 1000L, 2000L)
   assert_eq(correction, 0L)
 }
@@ -5760,7 +6245,10 @@ test "DriftCompensator compensate inactive returns zero" {
 ///|
 test "DriftCompensator integral windup positive clamp" {
   let comp = @runtime.DriftCompensator::new(max_integral_ns=100L)
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   // Large error to exceed max_integral: measured_offset = local - ref = huge
   for i = 0; i < 50; i = i + 1 {
     ignore(comp.compensate(sync, 0L, 1_000_000L))
@@ -5772,7 +6260,10 @@ test "DriftCompensator integral windup positive clamp" {
 ///|
 test "DriftCompensator integral windup negative clamp" {
   let comp = @runtime.DriftCompensator::new(max_integral_ns=100L)
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   // Negative error: local < ref
   for i = 0; i < 50; i = i + 1 {
     ignore(comp.compensate(sync, 1_000_000L, 0L))
@@ -5849,7 +6340,10 @@ test "decode_step_response empty data" {
 
 ///|
 test "HilSession getters" {
-  let schedule : @runtime.TaskSchedule = { tasks: [], base_period_ns: 1_000_000L }
+  let schedule : @runtime.TaskSchedule = {
+    tasks: [],
+    base_period_ns: 1_000_000L,
+  }
   let session = @runtime.HilSession::new(1_000_000L, schedule)
   let sim_time = session.get_sim_time()
   assert_eq(sim_time.to_ns(), 0L)
@@ -5876,7 +6370,9 @@ test "PdoAutoTuner analyze generates WARNING for slow round-trip" {
   let tuner = @runtime.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
   // round_trip_ns > cycle_time_ns (default=1_000_000)
-  let probe : @runtime.ProbeResult = @runtime.compute_probe_result(0x1001U, 1_500_000L, 3_000_000L, 500_000L)
+  let probe : @runtime.ProbeResult = @runtime.compute_probe_result(
+    0x1001U, 1_500_000L, 3_000_000L, 500_000L,
+  )
   let result = tuner.analyze(stations, [[probe]])
   assert_true(result.messages.iter().any(fn(m) { m.contains("WARNING") }))
 }
@@ -5900,7 +6396,9 @@ test "validate_recommendations sync0 over limit" {
   // forward_delay_ns = 10_000_000 => sync0 = 1_000_000 + 10_000_000 + margin > limit
   let tuner = @runtime.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
-  let probe = @runtime.compute_probe_result(0x1001U, 15_000_000L, 25_000_000L, 5_000_000L)
+  let probe = @runtime.compute_probe_result(
+    0x1001U, 15_000_000L, 25_000_000L, 5_000_000L,
+  )
   let result = tuner.analyze(stations, [[probe]])
   // validate with a small limit
   let errors = @runtime.validate_recommendations(result, 1_000_000L)
@@ -5945,7 +6443,15 @@ test "build_master_od surface with no error_register" {
   }
   let surface : @runtime.DiagnosticSurface = {
     station_address: Some(0x1001U),
-    state_summary: { target_state: None, current_state: None, final_state: None, al_state: None, al_error_flag: None, al_status_code: None, wkc: None },
+    state_summary: {
+      target_state: None,
+      current_state: None,
+      final_state: None,
+      al_state: None,
+      al_error_flag: None,
+      al_status_code: None,
+      wkc: None,
+    },
     configuration_summary: None,
     error_register: None,
     diagnosis_counter: None,
@@ -5985,14 +6491,15 @@ test "MasterOdValue format I32" {
   assert_true(formatted.contains("-42"))
 }
 
-
-
 // ===== DriftCompensator reset =====
 
 ///|
 test "DriftCompensator reset clears state" {
   let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(@runtime.ClockDomain::Mcu, @runtime.ClockDomain::Linux)
+  let sync = @runtime.TimebaseSync::new(
+    @runtime.ClockDomain::Mcu,
+    @runtime.ClockDomain::Linux,
+  )
   ignore(comp.compensate(sync, 1000L, 2000L))
   assert_true(comp.update_count > 0L)
   comp.reset()
@@ -6037,7 +6544,9 @@ test "parse_esi_json_document with valid json but missing devices key" {
 test "parse_esi_json_document with devices not array" {
   let mut msg = ""
   try {
-    let _ = @runtime.parse_esi_json_document("{\"devices\": 1, \"modules\": []}")
+    let _ = @runtime.parse_esi_json_document(
+      "{\"devices\": 1, \"modules\": []}",
+    )
   } catch {
     @hal.EcError::EsiParseFailed(m) => msg = m
     _ => ()
@@ -6049,7 +6558,9 @@ test "parse_esi_json_document with devices not array" {
 test "parse_esi_json_document with modules not array" {
   let mut msg = ""
   try {
-    let _ = @runtime.parse_esi_json_document("{\"devices\": [], \"modules\": \"bad\"}")
+    let _ = @runtime.parse_esi_json_document(
+      "{\"devices\": [], \"modules\": \"bad\"}",
+    )
   } catch {
     @hal.EcError::EsiParseFailed(m) => msg = m
     _ => ()
@@ -6059,7 +6570,9 @@ test "parse_esi_json_document with modules not array" {
 
 ///|
 test "parse_esi_json_document empty arrays succeeds" {
-  let doc = @runtime.parse_esi_json_document("{\"devices\": [], \"modules\": []}")
+  let doc = @runtime.parse_esi_json_document(
+    "{\"devices\": [], \"modules\": []}",
+  )
   assert_eq(doc.devices.length(), 0)
   assert_eq(doc.modules.length(), 0)
 }
@@ -6068,7 +6581,9 @@ test "parse_esi_json_document empty arrays succeeds" {
 test "parse_esi_json_document with invalid device entry raises" {
   let mut msg = ""
   try {
-    let _ = @runtime.parse_esi_json_document("{\"devices\": [{}], \"modules\": []}")
+    let _ = @runtime.parse_esi_json_document(
+      "{\"devices\": [{}], \"modules\": []}",
+    )
   } catch {
     @hal.EcError::EsiParseFailed(m) => msg = m
     _ => ()
@@ -6080,7 +6595,9 @@ test "parse_esi_json_document with invalid device entry raises" {
 test "parse_esi_json_document with invalid module entry raises" {
   let mut msg = ""
   try {
-    let _ = @runtime.parse_esi_json_document("{\"devices\": [], \"modules\": [{}]}")
+    let _ = @runtime.parse_esi_json_document(
+      "{\"devices\": [], \"modules\": [{}]}",
+    )
   } catch {
     @hal.EcError::EsiParseFailed(m) => msg = m
     _ => ()
@@ -6219,13 +6736,23 @@ test "analyze_multi_rate tied peak cycles" {
         name: "task_a",
         priority: 0,
         cycle_divisor: 2,
-        slice: { output_offset: 0, output_length: 10, input_offset: 0, input_length: 10 },
+        slice: {
+          output_offset: 0,
+          output_length: 10,
+          input_offset: 0,
+          input_length: 10,
+        },
       },
       {
         name: "task_b",
         priority: 1,
         cycle_divisor: 2,
-        slice: { output_offset: 10, output_length: 20, input_offset: 10, input_length: 20 },
+        slice: {
+          output_offset: 10,
+          output_length: 20,
+          input_offset: 10,
+          input_length: 20,
+        },
       },
     ],
   }
@@ -6246,13 +6773,23 @@ test "analyze_multi_rate with harmonic divisors" {
         name: "fast",
         priority: 0,
         cycle_divisor: 1,
-        slice: { output_offset: 0, output_length: 4, input_offset: 0, input_length: 4 },
+        slice: {
+          output_offset: 0,
+          output_length: 4,
+          input_offset: 0,
+          input_length: 4,
+        },
       },
       {
         name: "slow",
         priority: 1,
         cycle_divisor: 4,
-        slice: { output_offset: 4, output_length: 8, input_offset: 4, input_length: 8 },
+        slice: {
+          output_offset: 4,
+          output_length: 8,
+          input_offset: 4,
+          input_length: 8,
+        },
       },
     ],
   }
@@ -6297,19 +6834,34 @@ test "analyze_multi_rate tied peaks with equal count different IO" {
         name: "t1",
         priority: 0,
         cycle_divisor: 6,
-        slice: { output_offset: 0, output_length: 50, input_offset: 0, input_length: 60 },
+        slice: {
+          output_offset: 0,
+          output_length: 50,
+          input_offset: 0,
+          input_length: 60,
+        },
       },
       {
         name: "t2",
         priority: 1,
         cycle_divisor: 10,
-        slice: { output_offset: 50, output_length: 80, input_offset: 60, input_length: 90 },
+        slice: {
+          output_offset: 50,
+          output_length: 80,
+          input_offset: 60,
+          input_length: 90,
+        },
       },
       {
         name: "t3",
         priority: 2,
         cycle_divisor: 15,
-        slice: { output_offset: 130, output_length: 30, input_offset: 150, input_length: 40 },
+        slice: {
+          output_offset: 130,
+          output_length: 30,
+          input_offset: 150,
+          input_length: 40,
+        },
       },
     ],
   }
@@ -6331,13 +6883,23 @@ test "validate_multi_rate with too large hyperperiod" {
         name: "t1",
         priority: 0,
         cycle_divisor: 7,
-        slice: { output_offset: 0, output_length: 4, input_offset: 0, input_length: 4 },
+        slice: {
+          output_offset: 0,
+          output_length: 4,
+          input_offset: 0,
+          input_length: 4,
+        },
       },
       {
         name: "t2",
         priority: 1,
         cycle_divisor: 11,
-        slice: { output_offset: 4, output_length: 4, input_offset: 4, input_length: 4 },
+        slice: {
+          output_offset: 4,
+          output_length: 4,
+          input_offset: 4,
+          input_length: 4,
+        },
       },
     ],
   }
@@ -6350,19 +6912,19 @@ test "validate_multi_rate with too large hyperperiod" {
 test "validate_multi_rate with excessive tasks per cycle" {
   let tasks : Array[@runtime.TaskDescriptor] = []
   for i = 0; i < 20; i = i + 1 {
-    tasks.push(
-      {
-        name: "t" + i.to_string(),
-        priority: i,
-        cycle_divisor: 1,
-        slice: { output_offset: i * 4, output_length: 4, input_offset: i * 4, input_length: 4 },
+    tasks.push({
+      name: "t" + i.to_string(),
+      priority: i,
+      cycle_divisor: 1,
+      slice: {
+        output_offset: i * 4,
+        output_length: 4,
+        input_offset: i * 4,
+        input_length: 4,
       },
-    )
+    })
   }
-  let schedule : @runtime.TaskSchedule = {
-    base_period_ns: 1000000L,
-    tasks,
-  }
+  let schedule : @runtime.TaskSchedule = { base_period_ns: 1000000L, tasks }
   let msgs = @runtime.validate_multi_rate(schedule, max_tasks_per_cycle=5)
   assert_true(msgs.iter().any(fn(s) { s.contains("Peak tasks per cycle") }))
 }
@@ -6576,10 +7138,7 @@ test "compute_quality_score empty dimensions" {
 
 ///|
 test "CyclePerfAnalyzer trend improving" {
-  let a = @runtime.CyclePerfAnalyzer::new(
-    1_000_000L,
-    window_size=4,
-  )
+  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   // Fill first window with high values
   a.record(2_000_000L)
   a.record(2_000_000L)
@@ -6604,10 +7163,7 @@ test "CyclePerfAnalyzer trend improving" {
 
 ///|
 test "CyclePerfAnalyzer stats zero cycles" {
-  let a = @runtime.CyclePerfAnalyzer::new(
-    1_000_000L,
-    window_size=4,
-  )
+  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   let s = a.stats()
   assert_eq(s.total_cycles, 0L)
   assert_eq(s.min_ns, 0L)
@@ -6838,7 +7394,13 @@ test "required_sii_read_word_count with valid metadata" {
   // Build a minimal SII data buffer (128 bytes) with eeprom_size_raw set
   // SII metadata field eeprom_size is at word 62 (byte offset 124)
   // eeprom_size_raw = 4 → eeprom_size_bytes() = 4 * 128 = 512 → required = (512+3)/4 = 128
-  let data = Bytes::makei(128, fn(i) { if i == 124 { b'\x04' } else { b'\x00' } })
+  let data = Bytes::makei(128, fn(i) {
+    if i == 124 {
+      b'\x04'
+    } else {
+      b'\x00'
+    }
+  })
   let result = @runtime.required_sii_read_word_count(data, 64)
   assert_true(result >= 64) // should return max(computed, initial)
 }
@@ -6855,8 +7417,31 @@ test "diagnostic_surface_from_run with TimeoutRecoveryRequired fault" {
   let telemetry = @runtime.Telemetry::new()
   telemetry.timeouts = 5L
   let report : @runtime.RunReport = {
-    scan: { slave_count: 1, slaves: [{ position: 0, station_address: 0x1001U, alias_address: None, vendor_id: 1U, product_code: 2U, revision: 0U, serial: 0U, identification: 0U }] },
-    validation: { expected_source: @runtime.OnlineScan, actual_source: @runtime.OnlineScan, total_expected: 1, total_found: 1, results: [], differences: [], all_ok: true, grade: @runtime.Pass },
+    scan: {
+      slave_count: 1,
+      slaves: [
+        {
+          position: 0,
+          station_address: 0x1001U,
+          alias_address: None,
+          vendor_id: 1U,
+          product_code: 2U,
+          revision: 0U,
+          serial: 0U,
+          identification: 0U,
+        },
+      ],
+    },
+    validation: {
+      expected_source: @runtime.OnlineScan,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 1,
+      total_found: 1,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 100,
     cycles_ok: 95,
     until_fault: false,
@@ -6864,7 +7449,12 @@ test "diagnostic_surface_from_run with TimeoutRecoveryRequired fault" {
     output_period_ns: None,
     telemetry,
     final_phase: @runtime.Stopping,
-    fault: Some(@runtime.TimeoutRecoveryRequired(observed_timeouts=5L, consecutive_timeouts=3)),
+    fault: Some(
+      @runtime.TimeoutRecoveryRequired(
+        observed_timeouts=5L,
+        consecutive_timeouts=3,
+      ),
+    ),
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   // Should have issues from fault + telemetry
@@ -6877,7 +7467,16 @@ test "diagnostic_surface_from_run with RuntimeRecoveryRequired fault" {
   telemetry.wkc_errors = 3L
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },
-    validation: { expected_source: @runtime.OnlineScan, actual_source: @runtime.OnlineScan, total_expected: 0, total_found: 0, results: [], differences: [], all_ok: true, grade: @runtime.Pass },
+    validation: {
+      expected_source: @runtime.OnlineScan,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 100,
     cycles_ok: 100,
     until_fault: false,
@@ -6885,7 +7484,9 @@ test "diagnostic_surface_from_run with RuntimeRecoveryRequired fault" {
     output_period_ns: None,
     telemetry,
     final_phase: @runtime.Stopping,
-    fault: Some(@runtime.RuntimeRecoveryRequired(expected_wkc=3U, observed_wkc_errors=3L)),
+    fault: Some(
+      @runtime.RuntimeRecoveryRequired(expected_wkc=3U, observed_wkc_errors=3L),
+    ),
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(surface.issues.length() >= 1)
@@ -6896,7 +7497,16 @@ test "diagnostic_surface_from_run with DcDrift fault" {
   let telemetry = @runtime.Telemetry::new()
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },
-    validation: { expected_source: @runtime.OnlineScan, actual_source: @runtime.OnlineScan, total_expected: 0, total_found: 0, results: [], differences: [], all_ok: true, grade: @runtime.Pass },
+    validation: {
+      expected_source: @runtime.OnlineScan,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 100,
     cycles_ok: 100,
     until_fault: false,
@@ -6915,7 +7525,16 @@ test "diagnostic_surface_from_run StartupTransitionFailed with all Some fields" 
   let telemetry = @runtime.Telemetry::new()
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },
-    validation: { expected_source: @runtime.OnlineScan, actual_source: @runtime.OnlineScan, total_expected: 0, total_found: 0, results: [], differences: [], all_ok: true, grade: @runtime.Pass },
+    validation: {
+      expected_source: @runtime.OnlineScan,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 0,
     cycles_ok: 0,
     until_fault: false,
@@ -6923,13 +7542,15 @@ test "diagnostic_surface_from_run StartupTransitionFailed with all Some fields" 
     output_period_ns: None,
     telemetry,
     final_phase: @runtime.Stopping,
-    fault: Some(@runtime.StartupTransitionFailed(
-      station=0x1001U,
-      target=@protocol.Op,
-      current=Some(@protocol.SafeOp),
-      error_indication=Some(true),
-      status_code=Some(0x001EU),
-    )),
+    fault: Some(
+      @runtime.StartupTransitionFailed(
+        station=0x1001U,
+        target=@protocol.Op,
+        current=Some(@protocol.SafeOp),
+        error_indication=Some(true),
+        status_code=Some(0x001EU),
+      ),
+    ),
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
   assert_true(surface.issues.length() >= 1)
@@ -6940,7 +7561,16 @@ test "diagnostic_surface_from_run no fault" {
   let telemetry = @runtime.Telemetry::new()
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },
-    validation: { expected_source: @runtime.OnlineScan, actual_source: @runtime.OnlineScan, total_expected: 0, total_found: 0, results: [], differences: [], all_ok: true, grade: @runtime.Pass },
+    validation: {
+      expected_source: @runtime.OnlineScan,
+      actual_source: @runtime.OnlineScan,
+      total_expected: 0,
+      total_found: 0,
+      results: [],
+      differences: [],
+      all_ok: true,
+      grade: @runtime.Pass,
+    },
     cycles_requested: 100,
     cycles_ok: 100,
     until_fault: false,
@@ -7030,11 +7660,11 @@ test "EoeSwitch process_received non-FragData returns false" {
   // This should trigger the `_ => false` branch in process_received
   let frame = Bytes::from_array([
     b'\x04', b'\x00', // length = 4 (eoe_header_len only)
-    b'\x00', b'\x00', // address = 0
-    b'\x00',          // channel|priority
-    b'\x12',          // type=EoE(0x02) | counter=1 → 0x12
-    b'\x03', b'\x00', // fi1: frame_type=SetIpResp(3), port=0, last=0
-    b'\x00', b'\x00', // fi2: result=0
+     b'\x00', b'\x00', // address = 0
+     b'\x00', // channel|priority
+     b'\x12', // type=EoE(0x02) | counter=1 → 0x12
+     b'\x03', b'\x00', // fi1: frame_type=SetIpResp(3), port=0, last=0
+     b'\x00', b'\x00', // fi2: result=0
   ])
   let result = sw.process_received(0x1001U, frame)
   assert_eq(result, false)
@@ -7060,14 +7690,18 @@ test "EoeSwitch send_frame unknown station raises" {
     revision: 1U,
     serial: 0U,
   }
-  let bus = @mock.VirtualBus::new(
-    [@mock.VirtualSlave::new(0, id, Bytes::new(256))],
-  )
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, id, Bytes::new(256)),
+  ])
   let nic = @mock.VirtualNic::new(bus)
   let frame = b"\x01\x02\x03\x04"
   // station 0x9999U not registered → should raise MailboxProtocol
-  let result : Result[Int, _] = try?
-    sw.send_frame(nic, 0x9999U, frame, @hal.Duration(50_000_000L))
+  let result : Result[Int, _] = try? sw.send_frame(
+    nic,
+    0x9999U,
+    frame,
+    @hal.Duration(50_000_000L),
+  )
   assert_true(result is Err(_))
 }
 
@@ -7090,13 +7724,17 @@ test "EoeSwitch send_frame mailbox too small raises" {
     revision: 1U,
     serial: 0U,
   }
-  let bus = @mock.VirtualBus::new(
-    [@mock.VirtualSlave::new(0, id, Bytes::new(256))],
-  )
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, id, Bytes::new(256)),
+  ])
   let nic = @mock.VirtualNic::new(bus)
   let frame = b"\x01\x02\x03\x04"
-  let result : Result[Int, _] = try?
-    sw.send_frame(nic, 0x1001U, frame, @hal.Duration(50_000_000L))
+  let result : Result[Int, _] = try? sw.send_frame(
+    nic,
+    0x1001U,
+    frame,
+    @hal.Duration(50_000_000L),
+  )
   assert_true(result is Err(_))
 }
 
@@ -7282,7 +7920,7 @@ test "analyze_multi_rate multiple equal peaks detected" {
   // then `count == worst` (equal). Since cycle 0 always has all tasks,
   // no subsequent cycle can have count >= cycle 0's count.
   // So `count == worst` at cycle > 0 is impossible → DEAD CODE.
-  
+
   // Just verify basic behavior with non-harmonic setup
   let schedule : @runtime.TaskSchedule = {
     base_period_ns: 1_000_000L,

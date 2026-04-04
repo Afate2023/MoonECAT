@@ -118,7 +118,7 @@ test "runtime_metrics_issues all triggered" {
   assert_eq(issues.length(), 4)
   assert_eq(issues[0].level, Degrade) // timeouts
   assert_eq(issues[1].level, Degrade) // wkc_errors
-  assert_eq(issues[2].level, Info)    // retries
+  assert_eq(issues[2].level, Info) // retries
   assert_eq(issues[3].level, Degrade) // cycle completion
   assert_true(issues[3].detail.contains("90/100"))
 }
@@ -191,7 +191,10 @@ test "diagnostic_level_from_validate_grade Warn" {
 
 ///|
 test "diagnostic_level_from_validate_grade Block" {
-  assert_eq(diagnostic_level_from_validate_grade(ValidateGrade::Block), DiagnosticLevel::Block)
+  assert_eq(
+    diagnostic_level_from_validate_grade(ValidateGrade::Block),
+    DiagnosticLevel::Block,
+  )
 }
 
 ///|
@@ -205,12 +208,7 @@ test "highest_diagnostic_level empty issues uses fallback" {
 test "highest_diagnostic_level picks highest" {
   let issues : Array[DiagnosticIssue] = [
     { source: Registers, category: AlStatus, level: Info, detail: "info" },
-    {
-      source: Registers,
-      category: AlStatus,
-      level: Degrade,
-      detail: "degrade",
-    },
+    { source: Registers, category: AlStatus, level: Degrade, detail: "degrade" },
   ]
   assert_eq(highest_diagnostic_level(issues, Info), Degrade)
 }
@@ -219,12 +217,7 @@ test "highest_diagnostic_level picks highest" {
 test "highest_diagnostic_level Block wins" {
   let issues : Array[DiagnosticIssue] = [
     { source: Registers, category: AlStatus, level: Info, detail: "info" },
-    {
-      source: Registers,
-      category: AlStatus,
-      level: Block,
-      detail: "block",
-    },
+    { source: Registers, category: AlStatus, level: Block, detail: "block" },
   ]
   assert_eq(highest_diagnostic_level(issues, Info), Block)
 }
@@ -325,9 +318,9 @@ test "diagnosis_timeout_step Ok returns value" {
 ///|
 test "diagnosis_timeout_step RecvTimeout wraps" {
   let result : Result[Int, Error] = Err(@hal.EcError::RecvTimeout)
-  let outcome : Result[Int, _] = try {
+  let outcome : Result[Int, _] = try
     diagnosis_timeout_step(result, "test.step") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
@@ -338,9 +331,9 @@ test "diagnosis_timeout_step RecvTimeout wraps" {
 ///|
 test "diagnosis_timeout_step MailboxTimeout wraps" {
   let result : Result[Int, Error] = Err(@hal.EcError::MailboxTimeout)
-  let outcome : Result[Int, _] = try {
+  let outcome : Result[Int, _] = try
     diagnosis_timeout_step(result, "test.step") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
@@ -352,9 +345,9 @@ test "diagnosis_timeout_step Internal timeout chains" {
   let result : Result[Int, Error] = Err(
     @hal.EcError::Internal("timeout at inner.step"),
   )
-  let outcome : Result[Int, _] = try {
+  let outcome : Result[Int, _] = try
     diagnosis_timeout_step(result, "outer.step") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
@@ -365,9 +358,9 @@ test "diagnosis_timeout_step Internal timeout chains" {
 ///|
 test "diagnosis_timeout_step other error wraps" {
   let result : Result[Int, Error] = Err(@hal.EcError::LinkDown)
-  let outcome : Result[Int, _] = try {
+  let outcome : Result[Int, _] = try
     diagnosis_timeout_step(result, "test.step") |> Ok
-  } catch {
+  catch {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
