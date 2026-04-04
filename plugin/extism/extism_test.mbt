@@ -241,3 +241,35 @@ test "extism run entry returns replay run summary" {
     },
   })
 }
+
+///|
+test "encode_request with None timeout_ns" {
+  let req : @extism.PluginRequest = {
+    version: "1.0",
+    command: @extism.PluginCommand::Scan,
+    request_id: "r1",
+    timeout_ns: None,
+    payload: Json::null(),
+  }
+  let json = @extism.encode_request(req)
+  let s = json.stringify()
+  assert_true(s.contains("\"timeout_ns\":null"))
+  assert_true(s.contains("\"command\":\"scan\""))
+}
+
+///|
+test "encode_response with Some error_code and error_message" {
+  let resp : @extism.PluginResponse = {
+    version: "1.0",
+    request_id: "r2",
+    ok: false,
+    error_code: Some("E001"),
+    error_message: Some("something failed"),
+    payload: Json::null(),
+    diagnostics: Json::null(),
+  }
+  let json = @extism.encode_response(resp)
+  let s = json.stringify()
+  assert_true(s.contains("E001"))
+  assert_true(s.contains("something failed"))
+}

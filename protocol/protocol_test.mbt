@@ -2988,6 +2988,423 @@ test "decode_pdu_response_from rejects short frame" {
   assert_true(result is Err(_))
 }
 
+// ===== Coverage: zero_copy_codec error paths =====
+
+///|
+test "decode_pdu_response_from rejects wrong ethertype (0x0800)" {
+  // Build a frame with wrong ethertype
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  // Set EtherType to 0x0800 (IP) instead of 0x88A4
+  buf[12] = b'\x08'
+  buf[13] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_from rejects wrong ecat type" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  // EtherCAT header at byte 14: type in bits 15:12. Set type=2 (wrong).
+  // ecat_hdr = 0x2000 LE → buf[14]=0x00, buf[15]=0x20
+  buf[14] = b'\x00'
+  buf[15] = b'\x20'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_from rejects PDU header truncated" {
+  // Frame has valid Ethernet + EtherCAT header but not enough for PDU header
+  let buf : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  // ecat_hdr type=1, length=100 → 0x1064 LE
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  // buf_len=20 means only 4 bytes after EtherCAT header, not enough for 10-byte PDU header
+  let result = try? @protocol.decode_pdu_response_from(buf, 20, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_from rejects PDU data truncated" {
+  // Valid headers but claims more data than available
+  let buf : FixedArray[Byte] = FixedArray::make(30, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  // ecat_hdr type=1, length=100 → 0x1064 LE
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  // PDU at offset 16: len_flags at offset 22 (pdu+6), data_len = 200
+  buf[22] = b'\xC8' // 200 & 0xFF
+  buf[23] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_from(buf, 30, target, 0, 4)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_wkc_only rejects wrong ethertype" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  buf[12] = b'\x08'
+  buf[13] = b'\x00'
+  let result = try? @protocol.decode_pdu_wkc_only(buf, 64)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_wkc_only rejects wrong ecat type" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x00'
+  buf[15] = b'\x20' // type=2
+  let result = try? @protocol.decode_pdu_wkc_only(buf, 64)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_wkc_only rejects PDU header truncated" {
+  let buf : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  let result = try? @protocol.decode_pdu_wkc_only(buf, 20)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_wkc_only rejects PDU data truncated" {
+  let buf : FixedArray[Byte] = FixedArray::make(30, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  buf[22] = b'\xC8'
+  buf[23] = b'\x00'
+  let result = try? @protocol.decode_pdu_wkc_only(buf, 30)
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_slice rejects short frame" {
+  let buf : FixedArray[Byte] = FixedArray::make(10, b'\x00')
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_slice(
+    buf, 10, 0, target, 0, 4,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_slice rejects wrong ethertype" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  buf[12] = b'\x08'
+  buf[13] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_slice(
+    buf, 64, 0, target, 0, 4,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_slice rejects wrong ecat type" {
+  let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x00'
+  buf[15] = b'\x20'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_slice(
+    buf, 64, 0, target, 0, 4,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_slice rejects PDU header truncated" {
+  let buf : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_slice(
+    buf, 20, 0, target, 0, 4,
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "decode_pdu_response_slice rejects PDU data truncated" {
+  let buf : FixedArray[Byte] = FixedArray::make(30, b'\x00')
+  buf[12] = b'\x88'
+  buf[13] = b'\xA4'
+  buf[14] = b'\x64'
+  buf[15] = b'\x10'
+  buf[22] = b'\xC8'
+  buf[23] = b'\x00'
+  let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  let result = try? @protocol.decode_pdu_response_slice(
+    buf, 30, 0, target, 0, 4,
+  )
+  assert_true(result is Err(_))
+}
+
+// ===== Coverage: codec.mbt — EcFrame::decode error paths =====
+
+///|
+test "EcFrame::decode rejects short frame" {
+  let data = Bytes::new(10)
+  let result = try? @protocol.EcFrame::decode(data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "EcFrame::decode rejects wrong ethertype" {
+  let data = Bytes::from_array(
+    [
+      b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', // dst
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', // src
+      b'\x08', b'\x00', // IP ethertype
+      b'\x00', b'\x10', // ecat hdr
+    ],
+  )
+  let result = try? @protocol.EcFrame::decode(data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "EcFrame::decode rejects wrong ecat frame type" {
+  let data = Bytes::from_array(
+    [
+      b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', // dst
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', // src
+      b'\x88', b'\xA4', // correct ethertype
+      b'\x00', b'\x20', // ecat type = 2 (wrong)
+    ],
+  )
+  let result = try? @protocol.EcFrame::decode(data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "EcFrame::decode rejects PDU header truncated" {
+  let data = Bytes::from_array(
+    [
+      b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', // dst
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', // src
+      b'\x88', b'\xA4', // ethertype
+      b'\x64', b'\x10', // ecat type=1 len=100 → claims 100 bytes of PDU
+      b'\x00', b'\x00', // only 2 bytes of PDU data (not enough for 10-byte header)
+    ],
+  )
+  let result = try? @protocol.EcFrame::decode(data)
+  assert_true(result is Err(_))
+}
+
+///|
+test "EcFrame::decode rejects PDU data truncated" {
+  // Valid ethernet + ecat header, valid PDU header that claims large data
+  let data = Bytes::from_array(
+    [
+      b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', // dst
+      b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', // src
+      b'\x88', b'\xA4', // ethertype
+      b'\x64', b'\x10', // ecat type=1 len=100
+      b'\x01', // PDU command APRD
+      b'\x00', // index
+      b'\x00', b'\x00', b'\x00', b'\x00', // address
+      b'\xC8', b'\x00', // len_flags: data_len=200
+      b'\x00', b'\x00', // irq
+      // No data payload follows — will truncate
+    ],
+  )
+  let result = try? @protocol.EcFrame::decode(data)
+  assert_true(result is Err(_))
+}
+
+// ===== Coverage: al_status_code_description more branches =====
+
+///|
+test "al_status_code_description known codes" {
+  assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
+  assert_eq(
+    @protocol.al_status_code_description(0x0016U),
+    "Invalid mailbox configuration (SafeOp)",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x001DU),
+    "Invalid output configuration",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x001EU),
+    "Invalid input configuration",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0070U),
+    "Detected module ident list does not match",
+  )
+  assert_eq(@protocol.al_status_code_description(0x0030U), "Invalid DC SYNC configuration")
+  assert_eq(@protocol.al_status_code_description(0x0050U), "EEPROM no access")
+  assert_eq(
+    @protocol.al_status_code_description(0x0060U),
+    "Slave restarted locally",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0080U),
+    "Supply voltage too low",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0083U),
+    "Temperature too high",
+  )
+}
+
+///|
+test "al_status_code_description unknown code" {
+  let desc = @protocol.al_status_code_description(0xFFFFU)
+  assert_true(desc.contains("Unknown"))
+}
+
+// ===== Coverage: EsmState::from_byte invalid =====
+
+///|
+test "EsmState::from_byte invalid byte raises" {
+  let result = try? @protocol.EsmState::from_byte(b'\x0F')
+  assert_true(result is Err(_))
+}
+
+// ===== Coverage: EsmState::can_transition additional false cases =====
+
+///|
+test "EsmState::can_transition invalid paths" {
+  // These must all be false
+  assert_eq(@protocol.EsmState::Init.can_transition(@protocol.EsmState::SafeOp), false)
+  assert_eq(@protocol.EsmState::PreOp.can_transition(@protocol.EsmState::Op), false)
+  assert_eq(@protocol.EsmState::Boot.can_transition(@protocol.EsmState::PreOp), false)
+  assert_eq(@protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot), false)
+  assert_eq(@protocol.EsmState::PreOp.can_transition(@protocol.EsmState::Boot), false)
+}
+
+// ===== Coverage: address.mbt — Broadcast BRD and AutoIncrement APRW =====
+
+///|
+test "read_command Broadcast returns BRD" {
+  assert_eq(
+    @protocol.read_command(@protocol.AddressType::Broadcast),
+    @protocol.EcCommand::BRD,
+  )
+}
+
+///|
+test "readwrite_command AutoIncrement returns APRW" {
+  assert_eq(
+    @protocol.readwrite_command(@protocol.AddressType::AutoIncrement),
+    @protocol.EcCommand::APRW,
+  )
+}
+
+// ===== Coverage: encode_lrw_frame_into =====
+
+///|
+test "encode_lrw_frame_into produces valid frame layout" {
+  let buf : FixedArray[Byte] = FixedArray::make(128, b'\x00')
+  let dst_mac : FixedArray[Byte] = FixedArray::make(6, b'\xFF')
+  let src_mac : FixedArray[Byte] = FixedArray::make(6, b'\xAA')
+  let data : FixedArray[Byte] = FixedArray::make(4, b'\x00')
+  data[0] = b'\xDE'
+  data[1] = b'\xAD'
+  data[2] = b'\xBE'
+  data[3] = b'\xEF'
+  let len = @protocol.encode_lrw_frame_into(
+    buf, dst_mac, src_mac, b'\x07', 0x12345678U, data, 0, 4,
+  )
+  // Ethernet header: 14 bytes
+  // EtherCAT header: 2 bytes
+  // PDU header: 10 bytes
+  // Data: 4 bytes
+  // WKC: 2 bytes
+  assert_eq(len, 14 + 2 + 10 + 4 + 2)
+  // dst MAC
+  assert_eq(buf[0], b'\xFF')
+  // src MAC
+  assert_eq(buf[6], b'\xAA')
+  // EtherType 0x88A4
+  assert_eq(buf[12], b'\x88')
+  assert_eq(buf[13], b'\xA4')
+  // PDU command: LRW = 0x0C
+  assert_eq(buf[16], b'\x0C')
+  // PDU index
+  assert_eq(buf[17], b'\x07')
+  // Data at offset 26
+  assert_eq(buf[26], b'\xDE')
+  assert_eq(buf[27], b'\xAD')
+  assert_eq(buf[28], b'\xBE')
+  assert_eq(buf[29], b'\xEF')
+}
+
+// ===== Coverage: encode_pdu_frame_into =====
+
+///|
+test "encode_pdu_frame_into with FPWR command" {
+  let buf : FixedArray[Byte] = FixedArray::make(128, b'\x00')
+  let dst_mac : FixedArray[Byte] = FixedArray::make(6, b'\xFF')
+  let src_mac : FixedArray[Byte] = FixedArray::make(6, b'\x00')
+  let data : FixedArray[Byte] = FixedArray::make(2, b'\x42')
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    dst_mac,
+    src_mac,
+    @protocol.EcCommand::FPWR,
+    b'\x01',
+    0xABCD0000U,
+    data,
+    0,
+    2,
+  )
+  assert_eq(len, 14 + 2 + 10 + 2 + 2)
+  // Command: FPWR = 0x05
+  assert_eq(buf[16], b'\x05')
+  // Index
+  assert_eq(buf[17], b'\x01')
+  // Data at offset 26
+  assert_eq(buf[26], b'\x42')
+  assert_eq(buf[27], b'\x42')
+}
+
+// ===== Coverage: encode_zero_data_frame_into =====
+
+///|
+test "encode_zero_data_frame_into fills zeros" {
+  let buf : FixedArray[Byte] = FixedArray::make(128, b'\xFF')
+  let dst_mac : FixedArray[Byte] = FixedArray::make(6, b'\xFF')
+  let src_mac : FixedArray[Byte] = FixedArray::make(6, b'\x00')
+  let len = @protocol.encode_zero_data_frame_into(
+    buf,
+    dst_mac,
+    src_mac,
+    @protocol.EcCommand::LRD,
+    b'\x00',
+    0U,
+    8,
+  )
+  assert_eq(len, 14 + 2 + 10 + 8 + 2)
+  // Data region should be zeros
+  for i = 26; i < 34; i = i + 1 {
+    assert_eq(buf[i], b'\x00')
+  }
+  // Command: LRD = 0x0A
+  assert_eq(buf[16], b'\x0A')
+}
+
 ///|
 test "decode_pdu_response_from rejects wrong ethertype" {
   let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
@@ -3143,4 +3560,1129 @@ test "pdo_write_zero_copy with empty outputs returns 0" {
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
   assert_eq(wkc, 0U)
+}
+
+// ===== Coverage: protocol/esm.mbt — uncovered al_status_code_description arms =====
+
+///|
+test "al_status_code_description covers 0x0001 Unspecified error" {
+  assert_eq(@protocol.al_status_code_description(0x0001U), "Unspecified error")
+}
+
+///|
+test "al_status_code_description covers 0x0012 Unknown requested state" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0012U),
+    "Unknown requested state",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0017 Invalid sync manager configuration" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0017U),
+    "Invalid sync manager configuration",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x001F Invalid watchdog configuration" {
+  assert_eq(
+    @protocol.al_status_code_description(0x001FU),
+    "Invalid watchdog configuration",
+  )
+}
+
+// ===== Coverage: al_status_code_description — remaining uncovered arms =====
+
+///|
+test "al_status_code_description covers 0x0002 No memory" {
+  assert_eq(@protocol.al_status_code_description(0x0002U), "No memory")
+}
+
+///|
+test "al_status_code_description covers 0x0003 Invalid device setup" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0003U),
+    "Invalid device setup",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0004 Invalid revision" {
+  assert_eq(@protocol.al_status_code_description(0x0004U), "Invalid revision")
+}
+
+///|
+test "al_status_code_description covers 0x0006 SII EEPROM mismatch" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0006U),
+    "SII/EEPROM information does not match firmware",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0007 Firmware update failed" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0007U),
+    "Firmware update not successful, old firmware still running",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x000E License error" {
+  assert_eq(@protocol.al_status_code_description(0x000EU), "License error")
+}
+
+///|
+test "al_status_code_description covers 0x0011 Invalid requested state change" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0011U),
+    "Invalid requested state change",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0013 Bootstrap not supported" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0013U),
+    "Bootstrap not supported",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0014 No valid firmware" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0014U),
+    "No valid firmware",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0015 Invalid mailbox PreOp" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0015U),
+    "Invalid mailbox configuration (PreOp)",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0018 No valid inputs available" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0018U),
+    "No valid inputs available",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0019 No valid outputs" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0019U),
+    "No valid outputs",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x001A Synchronization error" {
+  assert_eq(
+    @protocol.al_status_code_description(0x001AU),
+    "Synchronization error",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x001B Sync manager watchdog" {
+  assert_eq(
+    @protocol.al_status_code_description(0x001BU),
+    "Sync manager watchdog",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x001C Invalid sync manager types" {
+  assert_eq(
+    @protocol.al_status_code_description(0x001CU),
+    "Invalid sync manager types",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0020 Slave needs cold start" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0020U),
+    "Slave needs cold start",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0021 Slave needs INIT" {
+  assert_eq(@protocol.al_status_code_description(0x0021U), "Slave needs INIT")
+}
+
+///|
+test "al_status_code_description covers 0x0022 Slave needs PREOP" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0022U),
+    "Slave needs PREOP",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0023 Slave needs SAFEOP" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0023U),
+    "Slave needs SAFEOP",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0024 Invalid input mapping" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0024U),
+    "Invalid input mapping",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0025 Invalid output mapping" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0025U),
+    "Invalid output mapping",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0026 Inconsistent settings" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0026U),
+    "Inconsistent settings",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0027 Freerun not supported" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0027U),
+    "Freerun not supported",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0028 Syncronisation not supported" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0028U),
+    "Synchronisation not supported",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0029 Freerun needs 3-buffer" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0029U),
+    "Freerun needs 3-buffer mode",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x002A Background watchdog" {
+  assert_eq(
+    @protocol.al_status_code_description(0x002AU),
+    "Background watchdog",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x002B No valid inputs and outputs" {
+  assert_eq(
+    @protocol.al_status_code_description(0x002BU),
+    "No valid inputs and outputs",
+  )
+}
+
+// ===== zero_copy_codec: target_len < pdu_data_len branch =====
+
+///|
+test "decode_pdu_response_from copies only target_len when target smaller than PDU data" {
+  let buf : FixedArray[Byte] = FixedArray::make(1518, b'\x00')
+  // PDU data with 8 bytes: 0x01..0x08
+  let data : FixedArray[Byte] = [
+    b'\x01', b'\x02', b'\x03', b'\x04', b'\x05', b'\x06', b'\x07', b'\x08',
+  ]
+  let len = @protocol.encode_pdu_frame_into(
+    buf,
+    @protocol.broadcast_mac,
+    @protocol.default_master_mac,
+    @protocol.EcCommand::BRD,
+    b'\x01',
+    0U,
+    data,
+    0,
+    8,
+  )
+  buf[len - 2] = b'\x01'
+  // target is only 3 bytes → should copy only 3 bytes from 8-byte PDU data
+  let target : FixedArray[Byte] = FixedArray::make(3, b'\x00')
+  let (wkc, _irq) = @protocol.decode_pdu_response_from(
+    buf, len, target, 0, 3,
+  )
+  assert_eq(wkc, 1U)
+  assert_eq(target[0], b'\x01')
+  assert_eq(target[1], b'\x02')
+  assert_eq(target[2], b'\x03')
+}
+
+// ===== PDO: set_slave_outputs preserves other slave data =====
+
+///|
+test "PdoContext set_slave_outputs preserves other slave data" {
+  // Two slave mappings: slave 0x1001 at offset 0 (2 bytes), slave 0x1002 at offset 2 (2 bytes)
+  let image = @protocol.ProcessImage::new(4, 0)
+  // Pre-fill outputs
+  let buf = @buffer.new(size_hint=4)
+  buf.write_byte(b'\xAA')
+  buf.write_byte(b'\xBB')
+  buf.write_byte(b'\xCC')
+  buf.write_byte(b'\xDD')
+  image.outputs = buf.to_bytes()
+  let ctx : @protocol.PdoContext = {
+    image,
+    mappings: [
+      {
+        station: 0x1001U,
+        output_logical: 0U,
+        output_offset: 0,
+        output_length: 2,
+        input_logical: 0U,
+        input_offset: 0,
+        input_length: 0,
+      },
+      {
+        station: 0x1002U,
+        output_logical: 2U,
+        output_offset: 2,
+        output_length: 2,
+        input_logical: 0U,
+        input_offset: 0,
+        input_length: 0,
+      },
+    ],
+    logical_base: 0U,
+    logical_size: 4,
+    block_lrw: false,
+  }
+  // Set outputs for slave 0x1001 only (first 2 bytes)
+  ctx.set_slave_outputs(0x1001U, Bytes::from_array([b'\x11', b'\x22']))
+  // Slave 0x1001 data should be updated
+  assert_eq(ctx.image.outputs[0], b'\x11')
+  assert_eq(ctx.image.outputs[1], b'\x22')
+  // Slave 0x1002 data should be preserved
+  assert_eq(ctx.image.outputs[2], b'\xCC')
+  assert_eq(ctx.image.outputs[3], b'\xDD')
+}
+
+///|
+test "al_status_code_description covers 0x002C Fatal sync error" {
+  assert_eq(
+    @protocol.al_status_code_description(0x002CU),
+    "Fatal sync error",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x002D No sync error" {
+  assert_eq(@protocol.al_status_code_description(0x002DU), "No sync error")
+}
+
+///|
+test "al_status_code_description covers 0x002E Invalid input FMMU" {
+  assert_eq(
+    @protocol.al_status_code_description(0x002EU),
+    "Invalid input FMMU configuration",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0031 Invalid DC latch" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0031U),
+    "Invalid DC latch configuration",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0032-0x0037 DC errors" {
+  assert_eq(@protocol.al_status_code_description(0x0032U), "PLL error")
+  assert_eq(
+    @protocol.al_status_code_description(0x0033U),
+    "DC sync IO error",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0034U),
+    "DC sync timeout error",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0035U),
+    "DC invalid sync cycle time",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0036U),
+    "DC invalid sync0 cycle time",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0037U),
+    "DC invalid sync1 cycle time",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0041-0x004F MBX codes" {
+  assert_eq(@protocol.al_status_code_description(0x0041U), "MBX_AOE")
+  assert_eq(@protocol.al_status_code_description(0x0042U), "MBX_EOE")
+  assert_eq(@protocol.al_status_code_description(0x0043U), "MBX_COE")
+  assert_eq(@protocol.al_status_code_description(0x0044U), "MBX_FOE")
+  assert_eq(@protocol.al_status_code_description(0x0045U), "MBX_SOE")
+  assert_eq(@protocol.al_status_code_description(0x004FU), "MBX_VOE")
+}
+
+///|
+test "al_status_code_description covers 0x0051-0x0061 misc codes" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0051U),
+    "EEPROM error",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0052U),
+    "External hardware not ready",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0061U),
+    "Device identification value updated",
+  )
+}
+
+///|
+test "al_status_code_description covers 0x0081-0x0082 voltage temperature" {
+  assert_eq(
+    @protocol.al_status_code_description(0x0081U),
+    "Supply voltage too high",
+  )
+  assert_eq(
+    @protocol.al_status_code_description(0x0082U),
+    "Temperature too low",
+  )
+}
+
+// ===== Coverage: protocol/address.mbt — uncovered match arms =====
+
+///|
+test "read_command Configured returns FPRD" {
+  assert_eq(
+    @protocol.read_command(@protocol.AddressType::Configured),
+    @protocol.EcCommand::FPRD,
+  )
+}
+
+///|
+test "write_command AutoIncrement returns APWR" {
+  assert_eq(
+    @protocol.write_command(@protocol.AddressType::AutoIncrement),
+    @protocol.EcCommand::APWR,
+  )
+}
+
+///|
+test "write_command Broadcast returns BWR" {
+  assert_eq(
+    @protocol.write_command(@protocol.AddressType::Broadcast),
+    @protocol.EcCommand::BWR,
+  )
+}
+
+///|
+test "readwrite_command Configured returns FPRW" {
+  assert_eq(
+    @protocol.readwrite_command(@protocol.AddressType::Configured),
+    @protocol.EcCommand::FPRW,
+  )
+}
+
+///|
+// ── Batch 6: ESM transition path / timeout coverage ──
+
+///|
+test "build_transition_path all states" {
+  assert_eq(@protocol.build_transition_path(@protocol.Init), [@protocol.Init])
+  assert_eq(
+    @protocol.build_transition_path(@protocol.PreOp),
+    [@protocol.Init, @protocol.PreOp],
+  )
+  assert_eq(
+    @protocol.build_transition_path(@protocol.SafeOp),
+    [@protocol.Init, @protocol.PreOp, @protocol.SafeOp],
+  )
+  assert_eq(
+    @protocol.build_transition_path(@protocol.Op),
+    [@protocol.Init, @protocol.PreOp, @protocol.SafeOp, @protocol.Op],
+  )
+  assert_eq(
+    @protocol.build_transition_path(@protocol.Boot),
+    [@protocol.Init, @protocol.Boot],
+  )
+}
+
+///|
+test "build_shutdown_path all states" {
+  assert_eq(@protocol.build_shutdown_path(@protocol.Init), [@protocol.Init])
+  assert_eq(
+    @protocol.build_shutdown_path(@protocol.PreOp),
+    [@protocol.PreOp, @protocol.Init],
+  )
+  assert_eq(
+    @protocol.build_shutdown_path(@protocol.SafeOp),
+    [@protocol.SafeOp, @protocol.PreOp, @protocol.Init],
+  )
+  assert_eq(
+    @protocol.build_shutdown_path(@protocol.Op),
+    [@protocol.Op, @protocol.SafeOp, @protocol.PreOp, @protocol.Init],
+  )
+  assert_eq(
+    @protocol.build_shutdown_path(@protocol.Boot),
+    [@protocol.Boot, @protocol.Init],
+  )
+}
+
+///|
+test "build_transition_route same state" {
+  assert_eq(
+    @protocol.build_transition_route(@protocol.Op, @protocol.Op),
+    [@protocol.Op],
+  )
+}
+
+///|
+test "build_transition_route to Init" {
+  assert_eq(
+    @protocol.build_transition_route(@protocol.SafeOp, @protocol.Init),
+    [@protocol.SafeOp, @protocol.PreOp, @protocol.Init],
+  )
+}
+
+///|
+test "build_transition_route from Init" {
+  assert_eq(
+    @protocol.build_transition_route(@protocol.Init, @protocol.Op),
+    [@protocol.Init, @protocol.PreOp, @protocol.SafeOp, @protocol.Op],
+  )
+}
+
+///|
+test "build_transition_route direct transition" {
+  // SafeOp → Op is a valid direct transition
+  assert_eq(
+    @protocol.build_transition_route(@protocol.SafeOp, @protocol.Op),
+    [@protocol.SafeOp, @protocol.Op],
+  )
+}
+
+///|
+test "build_transition_route indirect through Init" {
+  // Op → Boot: need shutdown from Op then startup to Boot
+  let route = @protocol.build_transition_route(@protocol.Op, @protocol.Boot)
+  // Should go Op→SafeOp→PreOp→Init→Boot
+  assert_eq(route[0], @protocol.Op)
+  assert_eq(route[route.length() - 1], @protocol.Boot)
+  assert_true(route.length() >= 3)
+}
+
+///|
+test "build_strict_transition_route delegates to build_transition_route" {
+  let strict = @protocol.build_strict_transition_route(
+    @protocol.PreOp, @protocol.SafeOp,
+  )
+  let normal = @protocol.build_transition_route(
+    @protocol.PreOp, @protocol.SafeOp,
+  )
+  assert_eq(strict, normal)
+}
+
+///|
+test "esm_default_timeout all states" {
+  let init_t = @protocol.esm_default_timeout(@protocol.Init)
+  let preop_t = @protocol.esm_default_timeout(@protocol.PreOp)
+  let safeop_t = @protocol.esm_default_timeout(@protocol.SafeOp)
+  let op_t = @protocol.esm_default_timeout(@protocol.Op)
+  let boot_t = @protocol.esm_default_timeout(@protocol.Boot)
+  assert_eq(init_t, @hal.Duration(5_000_000_000L))
+  assert_eq(preop_t, @hal.Duration(3_000_000_000L))
+  assert_eq(safeop_t, @hal.Duration(10_000_000_000L))
+  assert_eq(op_t, @hal.Duration(10_000_000_000L))
+  assert_eq(boot_t, @hal.Duration(5_000_000_000L))
+}
+
+///|
+test "default_esm_timeout_policy all None" {
+  let policy = @protocol.default_esm_timeout_policy()
+  assert_true(policy.init is None)
+  assert_true(policy.preop is None)
+  assert_true(policy.safeop is None)
+  assert_true(policy.op is None)
+  assert_true(policy.boot is None)
+}
+
+///|
+test "esm_timeout_for uses override when present" {
+  let policy : @protocol.EsmTimeoutPolicy = {
+    init: Some(@hal.Duration(999L)),
+    preop: None,
+    safeop: Some(@hal.Duration(42L)),
+    op: None,
+    boot: None,
+  }
+  assert_eq(@protocol.esm_timeout_for(@protocol.Init, policy), @hal.Duration(999L))
+  // PreOp has no override — uses default
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.PreOp, policy),
+    @hal.Duration(3_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.SafeOp, policy),
+    @hal.Duration(42L),
+  )
+  // Op / Boot fall back to defaults
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.Op, policy),
+    @hal.Duration(10_000_000_000L),
+  )
+  assert_eq(
+    @protocol.esm_timeout_for(@protocol.Boot, policy),
+    @hal.Duration(5_000_000_000L),
+  )
+}
+
+///|
+test "FrameBuilder add exceeds capacity" {
+  let fb = @protocol.FrameBuilder::new()
+  // Add 15 PDUs (max_pdus_per_frame) with minimal data
+  for _ in 0..<15 {
+    fb.add(@protocol.EcCommand::NOP, 0U, Bytes::new(1)) |> ignore
+  }
+  // 16th should fail
+  let result : Result[Byte, Error] = try? fb.add(
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(1),
+  )
+  assert_true(result is Err(_))
+}
+
+// ===== Batch 21: PdoContext::build with various mappings =====
+
+///|
+test "PdoContext build empty mappings" {
+  let ctx = @protocol.PdoContext::build([], 0x1000U)
+  assert_eq(ctx.mappings.length(), 0)
+  assert_eq(ctx.image.output_size, 0)
+  assert_eq(ctx.image.input_size, 0)
+  assert_eq(ctx.logical_size, 0)
+  assert_eq(ctx.block_lrw, false)
+}
+
+///|
+test "PdoContext build computes logical addresses correctly" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 6,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  assert_eq(ctx.mappings.length(), 1)
+  assert_eq(ctx.mappings[0].output_offset, 0)
+  assert_eq(ctx.mappings[0].output_length, 4)
+  assert_eq(ctx.mappings[0].input_offset, 0)
+  assert_eq(ctx.mappings[0].input_length, 6)
+  assert_eq(ctx.logical_size, 10)
+}
+
+///|
+test "PdoContext set_slave_outputs and get_slave_inputs" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 3,
+    input_bytes: 3,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  ctx.set_slave_outputs(0x1001U, Bytes::from_array([b'\xAA', b'\xBB', b'\xCC']))
+  assert_eq(ctx.image.outputs[0], b'\xAA')
+  // get_slave_inputs should return zeros initially
+  let inputs = ctx.get_slave_inputs(0x1001U)
+  assert_eq(inputs.length(), 3)
+  assert_eq(inputs[0], b'\x00')
+}
+
+///|
+test "PdoContext set_slave_outputs unknown station raises" {
+  let ctx = @protocol.PdoContext::build([], 0x0000U)
+  let result : Result[Unit, _] = try? ctx.set_slave_outputs(0xFFFFU, b"\x00")
+  assert_true(result is Err(_))
+}
+
+///|
+test "PdoContext get_slave_inputs unknown station raises" {
+  let ctx = @protocol.PdoContext::build([], 0x0000U)
+  let result : Result[Bytes, _] = try? ctx.get_slave_inputs(0xFFFFU)
+  assert_true(result is Err(_))
+}
+
+// ===== Batch 21: DC helper functions via VirtualNic =====
+
+///|
+test "dc_latch_times via VirtualNic succeeds" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let bus = @mock.VirtualBus::new(
+    [@mock.VirtualSlave::new(0, id, Bytes::new(256))],
+  )
+  let nic = @mock.VirtualNic::new(bus)
+  @protocol.dc_latch_times(nic, @hal.Duration(50_000_000L))
+}
+
+///|
+test "dc_read_receive_time via VirtualNic returns 0 initially" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let time = @protocol.dc_read_receive_time(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(time, 0U) // registers are initially zero
+}
+
+///|
+test "dc_read_port_times via VirtualNic returns zeros" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let times = @protocol.dc_read_port_times(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(times.port0, 0U)
+  assert_eq(times.port1, 0U)
+  assert_eq(times.port2, 0U)
+  assert_eq(times.port3, 0U)
+}
+
+// ===== Batch 21: ESM extensions via VirtualNic =====
+
+///|
+test "read_device_emulation default type register" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  // Default type register = 0x02 (bit 7 is 0) → Device Emulation = false
+  let de = @protocol.read_device_emulation(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(de, false)
+}
+
+///|
+test "set_sm_enable via VirtualNic writes activate register" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  @protocol.set_sm_enable(nic, 0U, 2, true, @hal.Duration(50_000_000L))
+  // SM2 activate register = 0x0800 + 2*8 + 6 = 0x0816
+  let reg = slave.read_reg(0x0816, 1)
+  assert_eq(reg[0], b'\x01')
+}
+
+///|
+test "set_sm_enable disable writes zero" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  @protocol.set_sm_enable(nic, 0U, 0, false, @hal.Duration(50_000_000L))
+  let reg = slave.read_reg(0x0806, 1)
+  assert_eq(reg[0], b'\x00')
+}
+
+///|
+test "apply_op_only_policy no-op when op_only is false" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  // Write 0xFF to SM2 activate so we can detect if it's changed
+  slave.registers[0x0816] = b'\xFF'
+  @protocol.apply_op_only_policy(
+    nic, 0U, @protocol.EsmState::SafeOp, false, [2],
+    @hal.Duration(50_000_000L),
+  )
+  // Not op_only → register should remain unchanged
+  assert_eq(slave.registers[0x0816], b'\xFF')
+}
+
+///|
+test "apply_op_only_policy disables SM for non-Op target" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  slave.registers[0x0816] = b'\xFF'
+  @protocol.apply_op_only_policy(
+    nic, 0U, @protocol.EsmState::SafeOp, true, [2],
+    @hal.Duration(50_000_000L),
+  )
+  // SafeOp + op_only → should disable SM2 (write 0x00)
+  assert_eq(slave.registers[0x0816], b'\x00')
+}
+
+///|
+test "apply_op_only_policy enables SM for Op target" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  @protocol.apply_op_only_policy(
+    nic, 0U, @protocol.EsmState::Op, true, [2],
+    @hal.Duration(50_000_000L),
+  )
+  // Op + op_only → should enable SM2 (write 0x01)
+  assert_eq(slave.registers[0x0816], b'\x01')
+}
+
+// ===== Batch 21: pdo_exchange with zero logical_size =====
+
+///|
+test "pdo_exchange with zero logical size returns 0 WKC" {
+  let bus = @mock.VirtualBus::new([])
+  let nic = @mock.VirtualNic::new(bus)
+  let ctx = @protocol.PdoContext::build([], 0x0000U)
+  let wkc = @protocol.pdo_exchange(nic, ctx, @hal.Duration(50_000_000L))
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_read with zero input size returns 0 WKC" {
+  let bus = @mock.VirtualBus::new([])
+  let nic = @mock.VirtualNic::new(bus)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  let wkc = @protocol.pdo_read(nic, ctx, @hal.Duration(50_000_000L))
+  assert_eq(wkc, 0U)
+}
+
+///|
+test "pdo_write with zero output size returns 0 WKC" {
+  let bus = @mock.VirtualBus::new([])
+  let nic = @mock.VirtualNic::new(bus)
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 0,
+    input_bytes: 4,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  let wkc = @protocol.pdo_write(nic, ctx, @hal.Duration(50_000_000L))
+  assert_eq(wkc, 0U)
+}
+
+// ===== Batch 22: PdoContext data operations =====
+
+///|
+test "PdoContext set_slave_outputs length mismatch raises" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  // Provide 2 bytes but mapping expects 4
+  let result : Result[Unit, _] = try? ctx.set_slave_outputs(
+    0x1001U, b"\x00\x00",
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "PdoContext build multi-slave computes offsets" {
+  let sm1 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 3,
+  }
+  let sm2 : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 1,
+  }
+  let ctx = @protocol.PdoContext::build(
+    [(sm1, 0x1001U), (sm2, 0x1002U)], 0x0000U,
+  )
+  assert_eq(ctx.mappings.length(), 2)
+  assert_eq(ctx.mappings[0].output_offset, 0)
+  assert_eq(ctx.mappings[0].output_length, 2)
+  assert_eq(ctx.mappings[0].input_offset, 0)
+  assert_eq(ctx.mappings[0].input_length, 3)
+  assert_eq(ctx.mappings[1].output_offset, 2)
+  assert_eq(ctx.mappings[1].output_length, 4)
+  assert_eq(ctx.mappings[1].input_offset, 3)
+  assert_eq(ctx.mappings[1].input_length, 1)
+  assert_eq(ctx.logical_size, 10)
+  assert_eq(ctx.image.output_size, 6)
+  assert_eq(ctx.image.input_size, 4)
+}
+
+// ===== Batch 22: MutablePdoContext =====
+
+///|
+test "MutablePdoContext build empty" {
+  let ctx = @protocol.MutablePdoContext::build([], 0x1000U)
+  assert_eq(ctx.mappings.length(), 0)
+  assert_eq(ctx.logical_size, 0)
+}
+
+///|
+test "MutablePdoContext set_slave_outputs and get_slave_inputs" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 3,
+    input_bytes: 2,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0x0000U)
+  ctx.set_slave_outputs(0x1001U, [b'\xAA', b'\xBB', b'\xCC'])
+  assert_eq(ctx.image.outputs[0], b'\xAA')
+  assert_eq(ctx.image.outputs[1], b'\xBB')
+  assert_eq(ctx.image.outputs[2], b'\xCC')
+  let inputs = ctx.get_slave_inputs(0x1001U)
+  assert_eq(inputs.length(), 2)
+}
+
+///|
+test "MutablePdoContext set_slave_outputs length mismatch raises" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 4,
+    input_bytes: 0,
+  }
+  let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0x0000U)
+  let result : Result[Unit, _] = try? ctx.set_slave_outputs(
+    0x1001U, [b'\x00', b'\x00'],
+  )
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext set_slave_outputs unknown station raises" {
+  let ctx = @protocol.MutablePdoContext::build([], 0x0000U)
+  let result : Result[Unit, _] = try? ctx.set_slave_outputs(0xFFFFU, [b'\x00'])
+  assert_true(result is Err(_))
+}
+
+///|
+test "MutablePdoContext get_slave_inputs unknown station raises" {
+  let ctx = @protocol.MutablePdoContext::build([], 0x0000U)
+  let result : Result[FixedArray[Byte], _] = try? ctx.get_slave_inputs(0xFFFFU)
+  assert_true(result is Err(_))
+}
+
+// ===== Batch 22: ESM extensions — SM watchdog config =====
+
+///|
+test "read_sm_watchdog_config via VirtualNic returns defaults" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(4096))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let config = @protocol.read_sm_watchdog_config(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  // All registers default to zero
+  assert_eq(config.divider, 0U)
+  assert_eq(config.pdi_time, 0U)
+  assert_eq(config.pdata_time, 0U)
+  assert_eq(config.pdata_status, false)
+  assert_eq(config.pdata_counter, 0U)
+}
+
+///|
+test "write_sm_watchdog_config via VirtualNic writes registers" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(4096))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  @protocol.write_sm_watchdog_config(
+    nic, 0U, 0x09C2U, 0x03E8U, 0x0100U, @hal.Duration(50_000_000L),
+  )
+  // Verify registers were written (little-endian)
+  // Divider at 0x0400
+  assert_eq(slave.registers[0x0400], b'\xC2')
+  assert_eq(slave.registers[0x0401], b'\x09')
+  // PDI time at 0x0410
+  assert_eq(slave.registers[0x0410], b'\xE8')
+  assert_eq(slave.registers[0x0411], b'\x03')
+  // PData time at 0x0420
+  assert_eq(slave.registers[0x0420], b'\x00')
+  assert_eq(slave.registers[0x0421], b'\x01')
+}
+
+///|
+test "read_device_emulation with bit 7 set returns true" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(4096))
+  // Set bit 7 of type register (ESC register 0x0000)
+  slave.registers[0x0000] = b'\x80'
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let de = @protocol.read_device_emulation(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(de, true)
+}
+
+// ===== Batch 22: pdo_exchange block_lrw mode =====
+
+///|
+test "pdo_exchange_result with block_lrw via VirtualNic" {
+  let sm : @mailbox.SlaveMapping = {
+    sm_configs: [],
+    fmmu_configs: [],
+    output_bytes: 2,
+    input_bytes: 2,
+  }
+  let bus = @mock.VirtualBus::new([])
+  let nic = @mock.VirtualNic::new(bus)
+  let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
+  ctx.block_lrw = true
+  // Will fail at transact level (no slaves), but exercises the split path
+  let result : Result[@protocol.PdoExchangeResult, _] = try? @protocol.pdo_exchange_result(
+    nic, ctx, @hal.Duration(50_000_000L),
+  )
+  // VirtualNic with no slaves returns WKC 0 for logical addressing
+  assert_true(result is Ok(_))
+}
+
+// ===== Batch 23: DC & ESM empty/short data paths =====
+
+///|
+test "dc_configure_linear empty stations returns None" {
+  let bus = @mock.VirtualBus::new([])
+  let nic = @mock.VirtualNic::new(bus)
+  let result = @protocol.dc_configure_linear(
+    nic, [], 1_000_000U, @hal.Duration(50_000_000L),
+  )
+  assert_true(result is None)
+}
+
+///|
+test "dc_check_support via VirtualNic" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  // Default registers are zero → bit 2 of DL Info is 0 → no DC support
+  let supports = @protocol.dc_check_support(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(supports, false)
+}
+
+///|
+test "dc_check_support with DC bit set" {
+  let id : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 1U,
+    revision: 1U,
+    serial: 0U,
+  }
+  let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
+  // Set bit 2 of DL Information register (0x0008) to indicate DC support
+  slave.write_reg(0x0008, b"\x04")
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let supports = @protocol.dc_check_support(
+    nic, 0U, @hal.Duration(50_000_000L),
+  )
+  assert_eq(supports, true)
 }

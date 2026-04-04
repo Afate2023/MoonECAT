@@ -420,6 +420,11 @@ fn parse_esi_document_projection(
                 ..current_device,
                 mailbox: { ..current_device.mailbox, voe: true },
               }
+            "AoE" =>
+              current_device = {
+                ..current_device,
+                mailbox: { ..current_device.mailbox, aoe: true },
+              }
             _ => ()
           }
         }

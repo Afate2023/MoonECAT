@@ -175,3 +175,107 @@ test "eni-json converter preserves device-level pdos for offline sii projection"
   assert_eq(report.startup_mailbox_commands.length(), 1)
   assert_eq(report.startup_mailbox_commands[0].index, 0x6060U)
 }
+
+// ===== Batch 13: coverage gaps in esi_projection =====
+
+///|
+test "esi-xml projects non-self-closing mailbox protocol tags" {
+  // Uses <EoE>x</EoE> etc. with text content to ensure they go through
+  // Start handler (the XML parser converts empty start+end to Empty).
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0001</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000001" RevisionNo="#x00000001">test</Type>
+    #|        <Name>test</Name>
+    #|        <Profile><ProfileNo>0</ProfileNo></Profile>
+    #|        <Mailbox>
+    #|          <EoE>x</EoE>
+    #|          <FoE>x</FoE>
+    #|          <SoE>x</SoE>
+    #|          <VoE>x</VoE>
+    #|          <AoE>x</AoE>
+    #|        </Mailbox>
+    #|      </Device>
+    #|    </Devices>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.devices.length(), 1)
+  let mb = document.devices[0].mailbox
+  assert_eq(mb.eoe, true)
+  assert_eq(mb.foe, true)
+  assert_eq(mb.soe, true)
+  assert_eq(mb.voe, true)
+  assert_eq(mb.aoe, true)
+}
+
+///|
+test "esi-xml projects module with TxPdo and module Name text" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0002</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000005" RevisionNo="#x00000001">dev</Type>
+    #|        <Name>dev</Name>
+    #|        <Profile><ProfileNo>0</ProfileNo></Profile>
+    #|      </Device>
+    #|    </Devices>
+    #|    <Modules>
+    #|      <Module>
+    #|        <Type ModuleIdent="#x00000020">mod-type</Type>
+    #|        <Name>MyModule</Name>
+    #|        <RxPdo Sm="2"><Index>#x1600</Index><Name>RxPdo1</Name><Entry><Index>#x7000</Index><SubIndex>1</SubIndex><BitLen>8</BitLen><Name>Out1</Name><DataType>USINT</DataType></Entry></RxPdo>
+    #|        <TxPdo Sm="3"><Index>#x1A00</Index><Name>TxPdo1</Name><Entry><Index DependOnSlot="1">#x6000</Index><SubIndex>1</SubIndex><BitLen>16</BitLen><Name>In1</Name><DataType>UINT</DataType></Entry></TxPdo>
+    #|      </Module>
+    #|    </Modules>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.modules.length(), 1)
+  let m = document.modules[0]
+  assert_eq(m.module_ident, 0x20U)
+  assert_eq(m.module_name, "mod-type")
+  assert_eq(m.rx_pdos.length(), 1)
+  assert_eq(m.tx_pdos.length(), 1)
+  assert_eq(m.tx_pdos[0].name, "TxPdo1")
+  assert_eq(m.tx_pdos[0].entries.length(), 1)
+  assert_eq(m.tx_pdos[0].entries[0].depend_on_slot_index, true)
+}
+
+///|
+test "esi-xml malformed XML triggers parse error" {
+  let xml = "<EtherCATInfo><Vendor><unclosed"
+  let result : Result[String, Error] = try? convert_esi_xml_to_json_string(xml)
+  assert_true(result is Err(_))
+}
+
+///|
+test "esi-xml CData in config data" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>1</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="2" RevisionNo="1">test</Type>
+    #|        <Name>test</Name>
+    #|        <Profile><ProfileNo>0</ProfileNo></Profile>
+    #|        <Eeprom><ByteSize>128</ByteSize><ConfigData><![CDATA[0102030405]]></ConfigData></Eeprom>
+    #|      </Device>
+    #|    </Devices>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.devices[0].config_data.length(), 5)
+}

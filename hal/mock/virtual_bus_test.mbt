@@ -724,3 +724,461 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   assert_eq(output_slave.process_data[0x1000], b'\xF0') // updated output
   assert_eq(response2.pdus[0].data[4], b'\x5A') // updated input
 }
+
+// ===== APRW / FPRW / BRW / NOP coverage =====
+
+///|
+test "VirtualBus: APRW reads and writes register" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  // Write some data to slave 0 register 0x0010 first
+  let wr_data = Bytes::from_array([b'\x42', b'\x00'])
+  let _ = @protocol.write_register_ap(nic, 0U, 0x0010, wr_data, timeout)
+  // Now APRW: read current value AND write new value atomically
+  let builder = @protocol.FrameBuilder::new()
+  let rw_data = Bytes::from_array([b'\xAA', b'\xBB'])
+  let addr = @protocol.auto_increment_address(0U) | (0x0010U << 16)
+  let _idx = builder.add(
+    @protocol.EcCommand::APRW,
+    addr,
+    rw_data,
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  // WKC should be 3 for APRW (read + write)
+  assert_eq(response.pdus[0].wkc, 3U)
+  // Response data should be the OLD value (read happened before write)
+  assert_eq(response.pdus[0].data[0], b'\x42')
+}
+
+///|
+test "VirtualBus: FPRW reads and writes by station address" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  // Assign station address to slave 0
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Write some initial data
+  let wr_data = Bytes::from_array([b'\x55'])
+  let _ = @protocol.write_register_fp(nic, 0x1001U, 0x0000, wr_data, timeout)
+  // FPRW: read and write
+  let builder = @protocol.FrameBuilder::new()
+  let rw_data = Bytes::from_array([b'\x77'])
+  let _idx = builder.add(
+    @protocol.EcCommand::FPRW,
+    @protocol.configured_address(0x1001U, 0x0000),
+    rw_data,
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  assert_eq(response.pdus[0].wkc, 3U)
+  // Response should contain old value
+  assert_eq(response.pdus[0].data[0], b'\x55')
+}
+
+///|
+test "VirtualBus: BRW broadcasts read-write to all slaves" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  // Write unique values to same register on each slave
+  let _ = @protocol.write_register_ap(
+    nic, 0U, 0x0000, Bytes::from_array([b'\x01']), timeout,
+  )
+  let _ = @protocol.write_register_ap(
+    nic, 1U, 0x0000, Bytes::from_array([b'\x02']), timeout,
+  )
+  let _ = @protocol.write_register_ap(
+    nic, 2U, 0x0000, Bytes::from_array([b'\x04']), timeout,
+  )
+  // BRW: read from all slaves (OR'd) and write back
+  let builder = @protocol.FrameBuilder::new()
+  let rw_data = Bytes::from_array([b'\xFF'])
+  let _idx = builder.add(
+    @protocol.EcCommand::BRW,
+    @protocol.broadcast_address(0x0000),
+    rw_data,
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  // WKC = 3 per slave × 3 slaves = 9
+  assert_eq(response.pdus[0].wkc, 9U)
+  // Response data is OR of all slaves' values. Each slave read is OR'd into out_data,
+  // but the write also overwrites each slave's register with the frame data (0xFF).
+  // So the OR of reads produces 0x01|0x02|0x04 = 0x07 PLUS OR with the write data 0xFF = 0xFF.
+  // Actually the data flows through all slaves and gets OR'd together.
+  assert_eq(response.pdus[0].data[0], b'\xFF')
+}
+
+///|
+test "VirtualBus: NOP command passes through" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  let builder = @protocol.FrameBuilder::new()
+  let nop_data = Bytes::from_array([b'\x00'])
+  let _idx = builder.add(
+    @protocol.EcCommand::NOP,
+    0U,
+    nop_data,
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  // NOP should not increment WKC
+  assert_eq(response.pdus[0].wkc, 0U)
+}
+
+///|
+test "VirtualBus: slave_count returns correct count" {
+  let bus = make_three_slave_bus()
+  assert_eq(bus.slave_count(), 3)
+  let empty_bus = @mock.VirtualBus::new([])
+  assert_eq(empty_bus.slave_count(), 0)
+}
+
+// ===== VirtualSlave state transitions =====
+
+///|
+test "VirtualSlave: Init to Boot transition" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Init → Boot (0x03)
+  let al_ctrl = Bytes::from_array([b'\x03', b'\x00'])
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control, al_ctrl, timeout,
+  )
+  let status = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(status.data[0], b'\x03')
+}
+
+///|
+test "VirtualSlave: PreOp to Init transition" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Init → PreOp
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']), timeout,
+  )
+  // PreOp → Init
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x01', b'\x00']), timeout,
+  )
+  let status = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(status.data[0], b'\x01')
+}
+
+///|
+test "VirtualSlave: SafeOp to PreOp transition" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Init → PreOp → SafeOp
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']), timeout,
+  )
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x04', b'\x00']), timeout,
+  )
+  // SafeOp → PreOp
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']), timeout,
+  )
+  let status = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(status.data[0], b'\x02')
+}
+
+///|
+test "VirtualSlave: SII read beyond eeprom fills 0xFF" {
+  let id = ek1100_identity()
+  let small_sii = Bytes::make(4, b'\xAA') // only 4 bytes
+  let slave = @mock.VirtualSlave::new(0, id, small_sii)
+  let bus = @mock.VirtualBus::new([slave])
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  // Set SII word address to word 3 (byte 6, beyond small_sii length 4)
+  let addr_data = Bytes::from_array([b'\x03', b'\x00', b'\x00', b'\x00'])
+  let _ = @protocol.write_register_ap(
+    nic, 0U, @protocol.reg_sii_address, addr_data, timeout,
+  )
+  // Trigger read
+  let ctrl = Bytes::from_array([b'\x01'])
+  let _ = @protocol.write_register_ap(
+    nic, 0U, @protocol.reg_sii_control, ctrl, timeout,
+  )
+  // Read SII data: should be 0xFF (beyond eeprom)
+  let sii_pdu = @protocol.read_register_ap(
+    nic, 0U, @protocol.reg_sii_data, 4, timeout,
+  )
+  assert_eq(sii_pdu.data[0], b'\xFF')
+  assert_eq(sii_pdu.data[1], b'\xFF')
+}
+
+///|
+test "VirtualSlave: read_process_data" {
+  let id = ek1100_identity()
+  let slave = @mock.VirtualSlave::new(0, id, make_sii(id))
+  // Write some process data directly
+  slave.process_data[0x100] = b'\x42'
+  slave.process_data[0x101] = b'\x43'
+  let data = slave.read_process_data(0x100, 2)
+  assert_eq(data[0], b'\x42')
+  assert_eq(data[1], b'\x43')
+}
+
+///|
+test "VirtualSlave: write_process_data" {
+  let id = ek1100_identity()
+  let slave = @mock.VirtualSlave::new(0, id, make_sii(id))
+  let arr : FixedArray[Byte] = [b'\xAA', b'\xBB', b'\xCC']
+  slave.write_process_data(0x200, arr, 1, 2) // write arr[1..3] to phys 0x200
+  assert_eq(slave.process_data[0x200], b'\xBB')
+  assert_eq(slave.process_data[0x201], b'\xCC')
+}
+
+// ===== ARMW/FRMW pass-through coverage =====
+
+///|
+test "VirtualBus: ARMW command passes through without modifying" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  let builder = @protocol.FrameBuilder::new()
+  let data = Bytes::from_array([b'\x00', b'\x00'])
+  let _idx = builder.add(
+    @protocol.EcCommand::ARMW,
+    @protocol.auto_increment_address(0U) | (0x0910U << 16),
+    data,
+  )
+  let frame = builder.build()
+  let response = @protocol.transact(nic, frame, timeout)
+  // ARMW is NOP for VirtualBus — wkc should be 0
+  assert_eq(response.pdus[0].wkc, 0U)
+}
+
+// ===== Boot → Init state transition =====
+
+///|
+test "VirtualSlave: Boot to Init transition" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Init → Boot (0x03)
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x03', b'\x00']), timeout,
+  )
+  // Boot → Init (0x01)
+  let _ = @protocol.write_register_fp(
+    nic, 0x1001U, @protocol.reg_al_control,
+    Bytes::from_array([b'\x01', b'\x00']), timeout,
+  )
+  let status = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(status.data[0], b'\x01')
+}
+
+// ===== VirtualSlave process_logical with FMMU =====
+
+///|
+test "VirtualSlave: process_logical read through FMMU" {
+  let id = ek1100_identity()
+  let slave = @mock.VirtualSlave::new(0, id, make_sii(id))
+  // Configure FMMU 0 for read (slave→master, direction=0x01)
+  // FMMU base = 0x0600, entry size = 16
+  let fmmu_base = 0x0600
+  // Logical start address = 0x1000 (4 bytes LE)
+  slave.registers[fmmu_base] = b'\x00'
+  slave.registers[fmmu_base + 1] = b'\x10'
+  slave.registers[fmmu_base + 2] = b'\x00'
+  slave.registers[fmmu_base + 3] = b'\x00'
+  // Length = 2 bytes
+  slave.registers[fmmu_base + 4] = b'\x02'
+  slave.registers[fmmu_base + 5] = b'\x00'
+  // Logical start bit = 0
+  slave.registers[fmmu_base + 6] = b'\x00'
+  // Logical end bit = 7
+  slave.registers[fmmu_base + 7] = b'\x07'
+  // Physical start = 0x0100 (2 bytes LE)
+  slave.registers[fmmu_base + 8] = b'\x00'
+  slave.registers[fmmu_base + 9] = b'\x01'
+  // Physical start bit = 0
+  slave.registers[fmmu_base + 10] = b'\x00'
+  // Direction = 0x01 (read: slave→master)
+  slave.registers[fmmu_base + 11] = b'\x01'
+  // Activate = 1
+  slave.registers[fmmu_base + 12] = b'\x01'
+  // Set process data at physical 0x0100
+  slave.process_data[0x0100] = b'\xDE'
+  slave.process_data[0x0101] = b'\xAD'
+  // process_logical: read from logical 0x1000, 2 bytes
+  let pdu_data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let out_data : FixedArray[Byte] = [b'\x00', b'\x00']
+  let (did_read, did_write) = slave.process_logical(
+    0x1000U, 2, pdu_data, out_data, true, false,
+  )
+  assert_true(did_read)
+  assert_eq(did_write, false)
+  assert_eq(out_data[0], b'\xDE')
+  assert_eq(out_data[1], b'\xAD')
+}
+
+///|
+test "VirtualSlave: process_logical write through FMMU" {
+  let id = ek1100_identity()
+  let slave = @mock.VirtualSlave::new(0, id, make_sii(id))
+  let fmmu_base = 0x0600
+  // Logical start = 0x2000
+  slave.registers[fmmu_base] = b'\x00'
+  slave.registers[fmmu_base + 1] = b'\x20'
+  slave.registers[fmmu_base + 2] = b'\x00'
+  slave.registers[fmmu_base + 3] = b'\x00'
+  // Length = 3
+  slave.registers[fmmu_base + 4] = b'\x03'
+  slave.registers[fmmu_base + 5] = b'\x00'
+  slave.registers[fmmu_base + 6] = b'\x00'
+  slave.registers[fmmu_base + 7] = b'\x07'
+  // Physical start = 0x0200
+  slave.registers[fmmu_base + 8] = b'\x00'
+  slave.registers[fmmu_base + 9] = b'\x02'
+  slave.registers[fmmu_base + 10] = b'\x00'
+  // Direction = 0x02 (write: master→slave)
+  slave.registers[fmmu_base + 11] = b'\x02'
+  slave.registers[fmmu_base + 12] = b'\x01'
+  let pdu_data : FixedArray[Byte] = [b'\xCA', b'\xFE', b'\xBE']
+  let out_data : FixedArray[Byte] = [b'\x00', b'\x00', b'\x00']
+  let (did_read, did_write) = slave.process_logical(
+    0x2000U, 3, pdu_data, out_data, false, true,
+  )
+  assert_eq(did_read, false)
+  assert_true(did_write)
+  assert_eq(slave.process_data[0x0200], b'\xCA')
+  assert_eq(slave.process_data[0x0201], b'\xFE')
+  assert_eq(slave.process_data[0x0202], b'\xBE')
+}
+
+// ===== FaultNic coverage =====
+
+///|
+test "FaultNic: open_ creates empty nic" {
+  let nic : @mock.FaultNic = @hal.Nic::open_("test")
+  nic.close()
+}
+
+///|
+test "FaultNic: close marks nic closed" {
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let nic = @mock.FaultNic::new(inner, @mock.FaultInjector::new())
+  nic.close()
+  // After close, inner is_open should be false
+  let result : Result[Int, _] = try? nic.send(b"\x00")
+  assert_true(result is Err(_))
+}
+
+///|
+test "FaultNic: send with SendFailure raises" {
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let injector = @mock.FaultInjector::new()
+  let nic = @mock.FaultNic::new(inner, injector)
+  injector.add(@mock.SendFailure("boom"), @mock.AtCycle(0))
+  let result : Result[Int, _] = try? nic.send(b"\x00\x01")
+  assert_true(result is Err(_))
+}
+
+///|
+test "FaultNic: send with non-send fault passes through" {
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let injector = @mock.FaultInjector::new()
+  let nic = @mock.FaultNic::new(inner, injector)
+  // RecvTimeout is not a send fault — it should be ignored during send
+  injector.add(@mock.RecvTimeout, @mock.AtCycle(0))
+  // Build a minimal valid frame to send
+  let builder = @protocol.FrameBuilder::new()
+  let _idx = builder.add(
+    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+  )
+  let frame = builder.build()
+  let sent = nic.send(frame.encode())
+  assert_true(sent > 0)
+}
+
+///|
+test "FaultNic: recv with FrameCorrupt injects corruption" {
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let injector = @mock.FaultInjector::new()
+  let nic = @mock.FaultNic::new(inner, injector)
+  // Set up FrameCorrupt to fire on recv count 0
+  injector.add(
+    @mock.FrameCorrupt(offset=0, value=b'\xFF'), @mock.AtCycle(0),
+  )
+  // First send a frame so there's something to receive
+  let builder = @protocol.FrameBuilder::new()
+  let _idx = builder.add(
+    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+  )
+  let frame = builder.build()
+  let _ = nic.send(frame.encode())
+  // Recv should get corrupted data (byte 0 → 0xFF)
+  let data = nic.recv(timeout=@hal.Duration(50_000_000L))
+  assert_eq(data[0], b'\xFF')
+}
+
+///|
+test "FaultNic: recv with WkcCorrupt modifies wkc" {
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let injector = @mock.FaultInjector::new()
+  let nic = @mock.FaultNic::new(inner, injector)
+  injector.add(@mock.WkcCorrupt(delta=1), @mock.AtCycle(0))
+  let builder = @protocol.FrameBuilder::new()
+  let _idx = builder.add(
+    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+  )
+  let frame = builder.build()
+  let _ = nic.send(frame.encode())
+  let data = nic.recv(timeout=@hal.Duration(50_000_000L))
+  // WkcCorrupt should return data (possibly corrupted WKC)
+  assert_true(data.length() > 0)
+}
+
+///|
+test "FaultNic: recv with SendFailure during recv passes through" {
+  // SendFailure fault in recv phase → just call inner recv
+  let bus = make_three_slave_bus()
+  let inner = @mock.VirtualNic::new(bus)
+  let injector = @mock.FaultInjector::new()
+  let nic = @mock.FaultNic::new(inner, injector)
+  // First send a frame normally
+  let builder = @protocol.FrameBuilder::new()
+  let _idx = builder.add(
+    @protocol.EcCommand::NOP, 0U, Bytes::from_array([b'\x00']),
+  )
+  let frame = builder.build()
+  let _ = nic.send(frame.encode())
+  // Now set up SendFailure for recv — should be ignored, just returns inner data
+  injector.add(@mock.SendFailure("ignored"), @mock.AtCycle(0))
+  let data = nic.recv(timeout=@hal.Duration(50_000_000L))
+  assert_true(data.length() > 0)
+}

@@ -204,3 +204,14 @@ test "run_monitors all pass in healthy running state" {
   assert_eq(results.length(), 6)
   assert_eq(worst, @runtime.Verdict::Pass)
 }
+
+// ===== Batch 16: monitor_startup_state Stopping =====
+
+///|
+test "monitor_startup_state Stopping yields Warn" {
+  let config = @hal.MasterConfig::default()
+  let rt = @runtime.Runtime::new(config)
+  rt.set_state(@runtime.RuntimeState::Stopping)
+  let r = @runtime.monitor_startup_state(rt)
+  assert_true(r.verdict is Warn(_))
+}

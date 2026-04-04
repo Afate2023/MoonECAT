@@ -646,3 +646,21 @@ test "CycleTimingReport negative jitter normalized to positive" {
   assert_eq(report.actual_period_ns, 999_500L)
   assert_eq(report.jitter_ns, 500L)
 }
+
+///|
+test "LoopbackCoSimAdapter read_inputs output shorter than input" {
+  let adapter = @runtime.LoopbackCoSimAdapter::new()
+  let image = @protocol.ProcessImage::new(2, 4)
+  image.outputs = b"\xAA\xBB"
+  image.inputs = b"\x11\x22\x33\x44"
+  let slice : @runtime.ProcessImageSlice = {
+    output_offset: 0,
+    output_length: 2,
+    input_offset: 0,
+    input_length: 4,
+  }
+  adapter.read_inputs(image, slice)
+  // First 2 bytes copied from outputs, remaining 2 bytes preserved from original inputs
+  assert_eq(image.inputs[0], b'\xAA')
+  assert_eq(image.inputs[1], b'\xBB')
+}

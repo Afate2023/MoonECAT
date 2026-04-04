@@ -379,3 +379,55 @@ test "FaultNic: multi-slave CountDown recv fault then PDO recovery" {
   assert_eq(slave.process_data[0x1002], b'\xCC')
   assert_eq(slave.process_data[0x1003], b'\xDD')
 }
+
+///|
+test "FaultInjector check_recv skips SendFailure rules" {
+  let injector = @mock.FaultInjector::new()
+  // Only add a SendFailure rule — check_recv should skip it
+  injector.add(@mock.SendFailure("nic failure"), @mock.Always)
+  let result = injector.check_recv()
+  assert_true(result is None)
+}
+
+///|
+test "apply_frame_fault RecvTimeout returns None" {
+  let data = Bytes::make(64, b'\xAA')
+  let result = @mock.apply_frame_fault(@mock.RecvTimeout, data)
+  assert_true(result is None)
+}
+
+///|
+test "apply_frame_fault FrameDrop returns None" {
+  let data = Bytes::make(64, b'\xAA')
+  let result = @mock.apply_frame_fault(@mock.FrameDrop, data)
+  assert_true(result is None)
+}
+
+///|
+test "apply_frame_fault FrameCorrupt offset out of bounds returns unchanged" {
+  let data = Bytes::from_array([b'\x01', b'\x02', b'\x03'])
+  // offset=10 is beyond data length 3
+  let result = @mock.apply_frame_fault(
+    @mock.FrameCorrupt(offset=10, value=b'\xFF'),
+    data,
+  )
+  guard result is Some(r) else { fail("expected Some") }
+  assert_eq(r, data)
+}
+
+///|
+test "apply_frame_fault WkcCorrupt data too short returns unchanged" {
+  let data = Bytes::from_array([b'\x01', b'\x02'])
+  // data.length()=2 < 18, so WKC offset computation is skipped
+  let result = @mock.apply_frame_fault(@mock.WkcCorrupt(delta=1), data)
+  guard result is Some(r) else { fail("expected Some") }
+  assert_eq(r, data)
+}
+
+///|
+test "apply_frame_fault SendFailure returns Some data unchanged" {
+  let data = Bytes::from_array([b'\x01', b'\x02', b'\x03'])
+  let result = @mock.apply_frame_fault(@mock.SendFailure("nic error"), data)
+  guard result is Some(r) else { fail("expected Some") }
+  assert_eq(r, data)
+}
