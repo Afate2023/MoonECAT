@@ -44,7 +44,7 @@ pub enum LinkGrade {
   Poor
   /// 故障：链路不可用
   Critical
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// 拓扑健康分析结果

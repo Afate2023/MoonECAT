@@ -3,6 +3,7 @@ package "afate/MoonECAT/plugin/extism"
 
 import {
   "afate/MoonECAT/hal",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -37,14 +38,18 @@ pub(all) struct HostCapabilityContract {
   file_read : Bool
   file_write : Bool
   shared_memory : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn HostCapabilityContract::to_string(Self) -> String
+pub impl Show for HostCapabilityContract
 
 pub(all) enum PluginCommand {
   Scan
   Validate
   Run
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn PluginCommand::to_string(Self) -> String
 pub fn PluginCommand::to_wire(Self) -> String
+pub impl Show for PluginCommand
 
 pub(all) struct PluginRequest {
   version : String
@@ -52,7 +57,9 @@ pub(all) struct PluginRequest {
   request_id : String
   timeout_ns : Int64?
   payload : Json
-} derive(Show)
+}
+pub fn PluginRequest::to_string(Self) -> String
+pub impl Show for PluginRequest
 
 pub(all) struct PluginResponse {
   version : String
@@ -62,7 +69,9 @@ pub(all) struct PluginResponse {
   error_message : String?
   payload : Json
   diagnostics : Json
-} derive(Show)
+}
+pub fn PluginResponse::to_string(Self) -> String
+pub impl Show for PluginResponse
 
 // Type aliases
 

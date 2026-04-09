@@ -20,7 +20,7 @@ pub(all) enum EoeRelayDirection {
   HostToSlave
   /// Frame received from an EoE slave, delivered to host application.
   SlaveToHost
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Metadata for a relayed EoE frame.
@@ -31,7 +31,7 @@ pub(all) struct EoeRelayFrame {
   station : UInt
   /// Raw Ethernet frame bytes.
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Statistics for the embedded relay.
@@ -42,7 +42,7 @@ pub(all) struct EoeRelayStats {
   mut rx_relayed : Int64
   /// Frames dropped due to handler rejection.
   mut dropped : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn EoeRelayStats::new() -> EoeRelayStats {
@@ -65,7 +65,7 @@ pub(all) struct EoeRelay {
   stats : EoeRelayStats
   /// Whether the relay is active.
   mut active : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn EoeRelay::new() -> EoeRelay {

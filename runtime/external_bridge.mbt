@@ -25,7 +25,7 @@ pub(all) enum BridgeTransport {
   NamedPipe(String)
   /// Shared memory region + semaphore pair.
   SharedMemory(name~ : String, size~ : Int)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Configuration for the external process bridge.
@@ -40,7 +40,7 @@ pub(all) struct ExternalBridgeConfig {
   launch_command : String
   /// Working directory for the external process.
   launch_cwd : String
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn ExternalBridgeConfig::unix_socket(path : String) -> ExternalBridgeConfig {
@@ -89,7 +89,7 @@ pub(all) enum BridgeState {
   Terminated(String)
   /// Communication error occurred.
   Error(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// ExternalProcessBridge — CoSimAdapter that delegates to an external process.
@@ -106,7 +106,7 @@ pub(all) struct ExternalProcessBridge {
   /// Accumulated round-trip latencies for diagnostics.
   mut step_count : Int64
   mut total_latency_ns : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn ExternalProcessBridge::new(

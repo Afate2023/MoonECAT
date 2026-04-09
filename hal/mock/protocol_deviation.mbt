@@ -21,7 +21,7 @@ pub(all) enum ProtocolDeviation {
   InvalidPduCommand(pdu_index~ : Int, command~ : Byte)
   /// Zero out the entire frame (complete corruption).
   ZeroFrame
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Apply a protocol deviation to raw frame data.

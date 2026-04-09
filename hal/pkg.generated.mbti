@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "afate/MoonECAT/hal"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub let default_pool_capacity : Int
 
@@ -27,7 +31,9 @@ pub(all) suberror EcError {
   ConfigMismatch(String)
   NotSupported(String)
   Internal(String)
-} derive(Show)
+} derive(@debug.Debug)
+pub fn EcError::to_string(Self) -> String
+pub impl Show for EcError
 
 // Types and methods
 pub(all) struct DiagnosticEvent {
@@ -35,12 +41,16 @@ pub(all) struct DiagnosticEvent {
   severity : Severity
   source : String
   message : String
-} derive(Show)
+} derive(@debug.Debug)
 pub fn DiagnosticEvent::new(Timestamp, Severity, String, String) -> Self
+pub fn DiagnosticEvent::to_string(Self) -> String
+pub impl Show for DiagnosticEvent
 
-pub(all) struct Duration(Int64) derive(Compare, Eq, Show)
+pub(all) struct Duration(Int64) derive(Compare, Eq, @debug.Debug)
 #deprecated
 pub fn Duration::inner(Self) -> Int64
+pub fn Duration::to_string(Self) -> String
+pub impl Show for Duration
 
 pub(all) struct FramePool {
   id : Int
@@ -78,7 +88,9 @@ pub(all) struct FrameRef {
   slot : Int
   offset : Int
   length : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn FrameRef::to_string(Self) -> String
+pub impl Show for FrameRef
 
 pub(all) enum FrameState {
   Free
@@ -88,7 +100,9 @@ pub(all) enum FrameState {
   Sent
   Receiving
   Received
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn FrameState::to_string(Self) -> String
+pub impl Show for FrameState
 
 pub(all) struct MasterConfig {
   interface_name : String
@@ -96,28 +110,36 @@ pub(all) struct MasterConfig {
   recv_timeout_ns : Int64
   max_retries : Int
   dc_enabled : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn MasterConfig::default() -> Self
+pub fn MasterConfig::to_string(Self) -> String
+pub impl Show for MasterConfig
 
 pub(all) struct MutableProcessImage {
   outputs : FixedArray[Byte]
   inputs : FixedArray[Byte]
   output_size : Int
   input_size : Int
-} derive(Show)
+} derive(@debug.Debug)
 pub fn MutableProcessImage::clear_inputs(Self) -> Unit
 pub fn MutableProcessImage::new(Int, Int) -> Self
+pub fn MutableProcessImage::to_string(Self) -> String
+pub impl Show for MutableProcessImage
 
 pub(all) struct NicHandle {
   id : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn NicHandle::to_string(Self) -> String
+pub impl Show for NicHandle
 
 pub(all) enum Severity {
   Debug
   Info
   Warn
   Error
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn Severity::to_string(Self) -> String
+pub impl Show for Severity
 
 pub(all) struct SlaveConfig {
   position : UInt
@@ -126,23 +148,31 @@ pub(all) struct SlaveConfig {
   expected_alias_address : UInt?
   configured_address : UInt
   presence : SlavePresence
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SlaveConfig::to_string(Self) -> String
+pub impl Show for SlaveConfig
 
 pub(all) struct SlaveIdentity {
   vendor_id : UInt
   product_code : UInt
   revision : UInt
   serial : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SlaveIdentity::to_string(Self) -> String
+pub impl Show for SlaveIdentity
 
 pub(all) enum SlavePresence {
   Mandatory
   Optional(group_id~ : UInt?)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SlavePresence::to_string(Self) -> String
+pub impl Show for SlavePresence
 
-pub(all) struct Timestamp(Int64) derive(Compare, Eq, Show)
+pub(all) struct Timestamp(Int64) derive(Compare, Eq, @debug.Debug)
 #deprecated
 pub fn Timestamp::inner(Self) -> Int64
+pub fn Timestamp::to_string(Self) -> String
+pub impl Show for Timestamp
 
 // Type aliases
 

@@ -14,7 +14,7 @@
 pub(all) struct ExpectedVerdict {
   cycle : Int64
   verdict : @runtime.Verdict
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// ScenarioPassCondition defines when a scenario is considered passed.
@@ -25,7 +25,7 @@ pub(all) enum ScenarioPassCondition {
   GracefulStopWithin(Int)
   /// Custom: the final verdict must equal the given severity or lower.
   FinalVerdictAtMost(@runtime.Verdict)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Scenario describes a complete verification case with fault injection
@@ -36,7 +36,7 @@ pub(all) struct Scenario {
   rules : Array[FaultRule]
   expected_verdicts : Array[ExpectedVerdict]
   pass_condition : ScenarioPassCondition
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn Scenario::new(
@@ -68,7 +68,7 @@ pub fn Scenario::expect(
 pub(all) struct ObservedVerdict {
   cycle : Int64
   verdict : @runtime.Verdict
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// ScenarioResult holds the outcome of running a scenario.
@@ -80,7 +80,7 @@ pub(all) struct ScenarioResult {
   final_verdict : @runtime.Verdict
   total_cycles : Int64
   stop_reason : String
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Build a FaultInjector from a Scenario's rules.

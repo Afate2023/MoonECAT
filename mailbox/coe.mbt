@@ -8,7 +8,7 @@ pub(all) enum CoeService {
   TxPdo
   RxPdo
   Emergency
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SDO command specifier for expedited/normal transfer.
@@ -18,7 +18,7 @@ pub(all) enum SdoCommand {
   UploadRequest
   UploadResponse
   AbortTransfer
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SDO request descriptor.
@@ -28,4 +28,4 @@ pub(all) struct SdoRequest {
   command : SdoCommand
   data : Bytes
   complete_access : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)

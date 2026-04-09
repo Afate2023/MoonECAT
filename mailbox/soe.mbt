@@ -18,7 +18,7 @@ pub(all) enum SoeOpCode {
   WriteRes
   Notification
   Emergency
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SoeOpCode::to_uint(self : SoeOpCode) -> UInt {
@@ -59,7 +59,7 @@ pub(all) enum SoeElementFlag {
   Max
   Value
   Default
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SoeElementFlag::to_byte(self : SoeElementFlag) -> Byte {
@@ -102,7 +102,7 @@ pub(all) enum SoeResponse {
   SoeError(drive_no~ : UInt, idn~ : UInt, error_code~ : UInt)
   /// Notification from drive.
   SoeNotification(drive_no~ : UInt, idn~ : UInt, data~ : Bytes)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build first SoE header byte: opCode[2:0] | incomplete[3] | error[4] | driveNo[7:5].

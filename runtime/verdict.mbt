@@ -10,14 +10,14 @@ pub(all) enum Verdict {
   Fail(String)
   /// Fatal condition preventing continued operation.
   Block(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// MonitorResult binds a named monitor to its verdict.
 pub(all) struct MonitorResult {
   name : String
   verdict : Verdict
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn Verdict::severity(self : Verdict) -> Int {

@@ -3,7 +3,7 @@ pub(all) enum NativeBackendKind {
   Auto
   LinuxRawSocket
   WindowsNpcap
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct NativeNicConfig {
@@ -12,7 +12,7 @@ pub(all) struct NativeNicConfig {
   snaplen : Int
   promisc : Bool
   timeout_ms : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct NativeInterfaceInfo {
@@ -23,13 +23,13 @@ pub(all) struct NativeInterfaceInfo {
   connected : Bool
   wireless : Bool
   index : Int?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct NativeInterfaceListing {
   backend : NativeBackendKind
   interfaces : Array[NativeInterfaceInfo]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct NativeNic {
@@ -37,4 +37,4 @@ pub(all) struct NativeNic {
   mut handle_id : Int
   mut is_open : Bool
   mut last_sent : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)

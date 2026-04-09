@@ -1,16 +1,16 @@
 ///|
 /// Timestamp represents a monotonic point in time, in nanoseconds.
-pub(all) struct Timestamp(Int64) derive(Eq, Show, Compare)
+pub(all) struct Timestamp(Int64) derive(Eq, Debug, Compare)
 
 ///|
 /// Duration represents a span of time, in nanoseconds.
-pub(all) struct Duration(Int64) derive(Eq, Show, Compare)
+pub(all) struct Duration(Int64) derive(Eq, Debug, Compare)
 
 ///|
 /// NicHandle is an opaque network interface handle provided by the HAL backend.
 pub(all) struct NicHandle {
   id : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// The maximum size of an EtherCAT frame payload (Ethernet MTU).

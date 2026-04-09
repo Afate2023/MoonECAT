@@ -8,7 +8,7 @@
 /// FuzzRng — simple linear congruential generator for deterministic fuzzing.
 pub(all) struct FuzzRng {
   mut state : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn FuzzRng::new(seed : Int64) -> FuzzRng {
@@ -89,7 +89,7 @@ pub(all) struct FuzzResult {
   crashed : Bool
   crash_at : Int
   error_msg : String
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Run a single fuzz iteration with the given seed and event count.

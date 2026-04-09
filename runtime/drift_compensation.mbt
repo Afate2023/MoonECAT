@@ -25,7 +25,7 @@ pub(all) struct DriftCompensationGains {
   /// Maps to fixed-point: ki_num / ki_den.
   ki_num : Int64
   ki_den : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn DriftCompensationGains::default() -> DriftCompensationGains {
@@ -63,7 +63,7 @@ pub(all) struct DriftCompensator {
   max_integral_ns : Int64
   /// Whether compensation is active.
   mut active : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn DriftCompensator::new(
@@ -139,7 +139,7 @@ pub(all) struct DriftCompensationReport {
   total_correction_ns : Int64
   estimated_drift_ppb : Int64
   converged : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Generate a diagnostic report of the current compensation state.

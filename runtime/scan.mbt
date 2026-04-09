@@ -10,7 +10,7 @@
 pub(all) struct ScanReport {
   slave_count : Int
   slaves : Array[SlaveReport]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SlaveReport holds info for one discovered slave.
@@ -23,7 +23,7 @@ pub(all) struct SlaveReport {
   revision : UInt
   serial : UInt
   identification : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Default IdentificationAdo register used for explicit device identification.
@@ -37,7 +37,7 @@ let scan_station_address_base : UInt = 0x1001U
 pub(all) enum ScanStationAddressStrategy {
   PreserveExistingUniqueNonZero
   TwinCATCompatible
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 let default_scan_station_address_strategy : ScanStationAddressStrategy = TwinCATCompatible
@@ -50,7 +50,7 @@ let sii_header_read_dwords : Int = 15
 pub(all) struct ObservedSlaveAddress {
   position : UInt
   current_station_address : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Run the scan procedure: count slaves, assign addresses, read identity

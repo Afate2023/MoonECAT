@@ -6,7 +6,7 @@ pub(all) enum ConfigurationSource {
   OnlineScan
   OfflineConfig
   EniImport
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationSlave {
@@ -17,7 +17,7 @@ pub(all) struct ConfigurationSlave {
   identification : UInt?
   process_data_summary : ConfigurationProcessDataSummary?
   presence : @hal.SlavePresence
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationMailboxProtocols {
@@ -27,7 +27,7 @@ pub(all) struct ConfigurationMailboxProtocols {
   foe : Bool
   soe : Bool
   voe : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationProcessDataSummary {
@@ -38,14 +38,14 @@ pub(all) struct ConfigurationProcessDataSummary {
   mailbox_protocols : ConfigurationMailboxProtocols?
   dc_op_mode_count : Int
   dc_assign_activate_count : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationModel {
   source : ConfigurationSource
   total_slaves : Int
   slaves : Array[ConfigurationSlave]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum ConfigurationDifference {
@@ -65,7 +65,7 @@ pub(all) enum ConfigurationDifference {
     expected~ : ConfigurationProcessDataSummary,
     actual~ : ConfigurationProcessDataSummary
   )
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationComparisonReport {
@@ -75,7 +75,7 @@ pub(all) struct ConfigurationComparisonReport {
   total_found : Int
   differences : Array[ConfigurationDifference]
   all_ok : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn configuration_from_scan(scan_report : ScanReport) -> ConfigurationModel {

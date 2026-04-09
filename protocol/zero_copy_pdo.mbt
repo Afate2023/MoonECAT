@@ -10,7 +10,7 @@ pub(all) struct MutablePdoContext {
   mappings : Array[PdoMapping]
   logical_base : UInt
   logical_size : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Build a MutablePdoContext from slave mappings, using pre-allocated buffers.

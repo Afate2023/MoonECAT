@@ -15,7 +15,7 @@ pub(all) enum FaultType {
   /// Corrupt the WKC field in the first PDU of the response by adding delta —
   /// directly triggers WKC mismatch detection in the runtime
   WkcCorrupt(delta~ : Int)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// FaultSchedule controls when a fault rule fires.
@@ -30,7 +30,7 @@ pub(all) enum FaultSchedule {
   AfterN(Int)
   /// Fire only at the exact operation count (0-based)
   AtCycle(Int)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// FaultRule binds a fault type to a schedule.
@@ -39,7 +39,7 @@ pub struct FaultRule {
   mut schedule : FaultSchedule
   mut active : Bool
   mut fired_count : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn FaultRule::new(fault : FaultType, schedule : FaultSchedule) -> FaultRule {
@@ -96,7 +96,7 @@ pub struct FaultInjector {
   rules : Array[FaultRule]
   mut send_count : Int
   mut recv_count : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn FaultInjector::new() -> FaultInjector {

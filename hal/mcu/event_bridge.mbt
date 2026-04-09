@@ -22,7 +22,7 @@ pub(all) struct RingEntry {
   length : Int
   /// Payload data.
   data : Bytes
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Lock-free SPSC ring buffer for cross-domain event transfer.
@@ -43,7 +43,7 @@ pub(all) struct EventRing {
   mut write_idx : UInt
   mut read_idx : UInt
   slots : Array[RingEntry]
-} derive(Show)
+} derive(Debug)
 
 ///|
 fn is_power_of_two(n : Int) -> Bool {
@@ -130,7 +130,7 @@ pub(all) struct SharedMemoryRegion {
   size : Int
   /// Whether this region is cache-coherent between domains.
   cache_coherent : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn SharedMemoryRegion::new(
@@ -151,7 +151,7 @@ pub(all) struct BridgeConfig {
   region : SharedMemoryRegion
   /// Maximum events per poll batch.
   max_batch : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn BridgeConfig::new(
@@ -170,7 +170,7 @@ pub(all) struct BridgeStats {
   mut total_popped : Int64
   mut total_dropped : Int64
   mut max_fill_level : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn BridgeStats::new() -> BridgeStats {

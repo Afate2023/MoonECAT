@@ -23,7 +23,7 @@ pub struct VirtualSlave {
   /// Process data memory backing SM2/SM3 (separate from register file).
   /// Indexed by physical address relative to SM physical_start.
   process_data : FixedArray[Byte]
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Maximum ESC register space to model (covers 0x0000..0x0FFF).
@@ -194,7 +194,7 @@ pub(all) struct FmmuEntry {
   /// 0x01 = read (slave→master), 0x02 = write (master→slave)
   direction : Int
   activate : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Read and parse FMMU entry n from the register file.

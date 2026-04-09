@@ -57,7 +57,7 @@ pub enum PerfTrend {
   Improving
   /// 性能恶化
   Degrading
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// 周期性能分析器

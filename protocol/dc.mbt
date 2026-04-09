@@ -32,7 +32,7 @@ let dc_delay_smoothing_den : UInt = 4U
 pub(all) struct DcInitResult {
   reference_station : UInt
   configured_count : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 fn le_u32(data : Bytes) -> UInt {
@@ -144,7 +144,7 @@ pub(all) struct DcPortTimes {
   port1 : UInt
   port2 : UInt
   port3 : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Read all 4 port receive times in a single FPRD (16 bytes from 0x0900).

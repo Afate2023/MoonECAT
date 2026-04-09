@@ -24,7 +24,7 @@ pub(all) struct ProcessImageSlice {
   input_offset : Int
   /// Number of input bytes in this slice.
   input_length : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// TaskDescriptor identifies a logical task that owns one PI partition.
@@ -43,7 +43,7 @@ pub(all) struct TaskDescriptor {
   cycle_divisor : Int
   /// The PI slice this task owns.
   slice : ProcessImageSlice
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// TaskSchedule holds an ordered sequence of tasks, sorted by priority,
@@ -53,7 +53,7 @@ pub(all) struct TaskSchedule {
   base_period_ns : Int64
   /// Tasks sorted by priority (0 = highest first).
   tasks : Array[TaskDescriptor]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Create a ProcessImageSlice from a PdoMapping.

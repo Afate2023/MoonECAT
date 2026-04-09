@@ -18,14 +18,14 @@ pub(all) struct SlaveDiagnosis {
   diagnosis_counter : UInt?
   /// DL/Physical layer error counters (ESC 0x0300–0x0313), when available.
   dl_error_counters : @protocol.DlErrorCounters?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum DiagnosticLevel {
   Block
   Degrade
   Info
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum DiagnosticSourceLayer {
@@ -36,7 +36,7 @@ pub(all) enum DiagnosticSourceLayer {
   RuntimeTelemetry
   StateTransition
   Monitor
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum DiagnosticCategory {
@@ -49,7 +49,7 @@ pub(all) enum DiagnosticCategory {
   RuntimeMetrics
   StateTransition
   MonitorVerdict
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct StateSurfaceSummary {
@@ -60,7 +60,7 @@ pub(all) struct StateSurfaceSummary {
   al_error_flag : Bool?
   al_status_code : UInt?
   wkc : UInt?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct ConfigurationSurfaceSummary {
@@ -70,7 +70,7 @@ pub(all) struct ConfigurationSurfaceSummary {
   actual_source : ConfigurationSource?
   validation_grade : ValidateGrade?
   difference_count : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct RuntimeMetricsSummary {
@@ -83,7 +83,7 @@ pub(all) struct RuntimeMetricsSummary {
   irq_events : Int64
   dc_delay_updates : Int64
   emergency_events : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct DiagnosticIssue {
@@ -91,7 +91,7 @@ pub(all) struct DiagnosticIssue {
   category : DiagnosticCategory
   level : DiagnosticLevel
   detail : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct DiagnosticSurface {
@@ -106,7 +106,7 @@ pub(all) struct DiagnosticSurface {
   monitor_verdicts : Array[MonitorResult]?
   overall_verdict : Verdict?
   topology_fingerprint : TopologyFingerprint?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// DiagnosisSession captures the state needed around a diagnosis run.

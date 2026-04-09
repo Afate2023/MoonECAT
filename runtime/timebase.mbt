@@ -28,14 +28,14 @@ pub(all) enum ClockDomain {
   Fpga
   /// Simulated/virtual domain (deterministic replay).
   Virtual
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// DomainTimestamp pairs a raw nanosecond value with its clock domain.
 pub(all) struct DomainTimestamp {
   domain : ClockDomain
   ns : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Timebase — the trait each clock domain implements.
@@ -75,7 +75,7 @@ pub(all) struct TimebaseSync {
   mut sync_count : Int64
   /// Nanosecond timestamp of last sync measurement (in reference domain).
   mut last_sync_ns : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn TimebaseSync::new(
@@ -190,7 +190,7 @@ pub(all) struct CycleTimingReport {
   jitter_ns : Int64
   /// Which clock domain produced the measurement.
   domain : ClockDomain
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Compute a CycleTimingReport from two consecutive timestamps.

@@ -10,7 +10,7 @@ pub(all) struct FrameBuilder {
   mut next_index : Int
   pending : Array[Pdu]
   mut pending_size : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Create a new FrameBuilder.

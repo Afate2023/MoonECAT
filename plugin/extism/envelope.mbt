@@ -3,7 +3,7 @@ pub(all) enum PluginCommand {
   Scan
   Validate
   Run
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct PluginRequest {
@@ -12,7 +12,7 @@ pub(all) struct PluginRequest {
   request_id : String
   timeout_ns : Int64?
   payload : Json
-} derive(Show)
+}
 
 ///|
 pub(all) struct PluginResponse {
@@ -23,7 +23,7 @@ pub(all) struct PluginResponse {
   error_message : String?
   payload : Json
   diagnostics : Json
-} derive(Show)
+}
 
 ///|
 pub fn PluginCommand::to_wire(self : PluginCommand) -> String {

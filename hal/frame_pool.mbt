@@ -10,7 +10,7 @@ pub(all) enum FrameState {
   Sent
   Receiving
   Received
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// FrameRef is a lightweight value-type reference to a frame slot.
@@ -20,7 +20,7 @@ pub(all) struct FrameRef {
   slot : Int
   offset : Int
   length : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// FramePool provides pre-allocated frame buffers that eliminate

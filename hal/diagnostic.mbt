@@ -5,7 +5,7 @@ pub(all) enum Severity {
   Info
   Warn
   Error
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// DiagnosticEvent represents a structured event emitted during operation.
@@ -14,7 +14,7 @@ pub(all) struct DiagnosticEvent {
   severity : Severity
   source : String
   message : String
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn DiagnosticEvent::new(

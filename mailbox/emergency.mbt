@@ -11,7 +11,7 @@ pub(all) struct EmergencyMessage {
   error_register : Byte
   /// Manufacturer-specific error data (5 bytes).
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// CoE Emergency message payload size (error_code + error_register + data).

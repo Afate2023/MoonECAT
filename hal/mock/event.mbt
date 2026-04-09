@@ -9,14 +9,14 @@ pub(all) enum NicEvent {
   RecvFailed(String)
   LinkDown
   SendFailed(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// NicEventLog is an ordered sequence of NicEvents captured during
 /// a Nic session. Pass to ReplayNic to reproduce the session.
 pub(all) struct NicEventLog {
   events : Array[NicEvent]
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn NicEventLog::new() -> NicEventLog {

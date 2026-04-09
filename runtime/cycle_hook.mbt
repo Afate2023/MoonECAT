@@ -27,7 +27,7 @@ pub(all) struct CycleSnapshot {
   dc_state : DcState
   /// Whether the runtime will trigger recovery after this cycle.
   recovery_pending : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// CycleDirective tells the runtime what action to take after a hook returns.
@@ -38,7 +38,7 @@ pub(all) enum CycleDirective {
   SkipCycle
   /// Request immediate graceful stop after this cycle.
   StopGraceful
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// CycleHook — the runtime calls these methods at each cycle boundary.

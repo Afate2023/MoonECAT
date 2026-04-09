@@ -16,7 +16,7 @@ pub(all) enum EcCommand {
   LRW // Logical Read Write
   ARMW // Auto Increment Physical Read Multiple Write
   FRMW // Configured Address Physical Read Multiple Write
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn EcCommand::to_byte(self : EcCommand) -> Byte {
@@ -75,7 +75,7 @@ pub(all) struct PduHeader {
   len_flags : UInt
   /// Datagram IRQ field (ETG.1000.4), parsed and propagated for runtime use.
   irq : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Full PDU including header, data payload, and working counter.
@@ -83,4 +83,4 @@ pub(all) struct Pdu {
   header : PduHeader
   data : Bytes
   wkc : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)

@@ -15,7 +15,7 @@ pub(all) enum MailboxType {
   SoE
   /// Vendor specific
   VoE
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn MailboxType::to_byte(self : MailboxType) -> Byte {
@@ -39,7 +39,7 @@ pub(all) struct MailboxHeader {
   priority : Byte
   mb_type : MailboxType
   counter : Byte
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Repeat request / acknowledge state for resilient mailbox read recovery.
@@ -51,7 +51,7 @@ pub(all) struct MailboxHeader {
 pub(all) struct MailboxRepeatState {
   request : Bool
   acknowledge : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 let mailbox_repeat_bit : Byte = b'\x02'

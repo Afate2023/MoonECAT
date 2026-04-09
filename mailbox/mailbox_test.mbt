@@ -3566,7 +3566,12 @@ test "decode_foe_response data empty segment" {
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
   let (_mbh, resp) = @mailbox.decode_foe_response(data)
-  inspect(resp, content="FoeData(packet_number=1, data=b\"\")")
+  inspect(
+    resp,
+    content=(
+      #|FoeData(packet_number=1, data=<Bytes: []>)
+    ),
+  )
 }
 
 ///|
@@ -3694,7 +3699,15 @@ test "decode_soe_response read no data" {
   let resp = @mailbox.decode_soe_response(data)
   inspect(
     resp,
-    content="SoeReadData(drive_no=0, element_flags=b'\\x00', idn=2, incomplete=false, data=b\"\")",
+    content=(
+      #|SoeReadData(
+      #|  drive_no=0,
+      #|  element_flags=0x00,
+      #|  idn=2,
+      #|  incomplete=false,
+      #|  data=<Bytes: []>,
+      #|)
+    ),
   )
 }
 
@@ -3715,7 +3728,12 @@ test "decode_soe_response notification no data" {
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
   let resp = @mailbox.decode_soe_response(data)
-  inspect(resp, content="SoeNotification(drive_no=0, idn=3, data=b\"\")")
+  inspect(
+    resp,
+    content=(
+      #|SoeNotification(drive_no=0, idn=3, data=<Bytes: []>)
+    ),
+  )
 }
 
 // ===== Batch 10: SII/SII parser uncovered paths =====
@@ -3808,7 +3826,14 @@ test "decode_eoe_response fragment empty data" {
   inspect(
     resp,
     content=(
-      #|EoeFragment(frame_type=FragData, last_fragment=false, frag_number=0, frame_offset=0, frame_number=0, data=b"")
+      #|EoeFragment(
+      #|  frame_type=FragData,
+      #|  last_fragment=false,
+      #|  frag_number=0,
+      #|  frame_offset=0,
+      #|  frame_number=0,
+      #|  data=<Bytes: []>,
+      #|)
     ),
   )
 }

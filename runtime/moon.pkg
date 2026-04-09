@@ -3,6 +3,7 @@ import {
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/mailbox",
   "moonbitlang/core/buffer",
+  "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/json",
 }

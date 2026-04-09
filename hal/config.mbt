@@ -11,7 +11,7 @@ pub(all) struct MasterConfig {
   max_retries : Int
   /// Enable DC synchronization.
   dc_enabled : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn MasterConfig::default() -> MasterConfig {
@@ -31,13 +31,13 @@ pub(all) struct SlaveIdentity {
   product_code : UInt
   revision : UInt
   serial : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum SlavePresence {
   Mandatory
   Optional(group_id~ : UInt?)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SlaveConfig holds per-slave configuration parameters.
@@ -54,4 +54,4 @@ pub(all) struct SlaveConfig {
   configured_address : UInt
   /// Whether this slave is mandatory or may be absent as part of a Hot Connect segment.
   presence : SlavePresence
-} derive(Eq, Show)
+} derive(Eq, Debug)

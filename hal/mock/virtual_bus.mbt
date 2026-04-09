@@ -4,7 +4,7 @@
 /// according to ETG.1000.4 addressing rules and returning the modified frame.
 pub struct VirtualBus {
   slaves : Array[VirtualSlave]
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn VirtualBus::new(slaves : Array[VirtualSlave]) -> VirtualBus {

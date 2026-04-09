@@ -19,7 +19,7 @@ pub(all) struct MailboxConfig {
   in_size : UInt
   /// SM Input SM index (typically 1).
   in_sm_index : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build a MailboxConfig from SII EEPROM header data.
