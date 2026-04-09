@@ -60,6 +60,20 @@ fn foe_raise_error(
 }
 
 ///|
+/// Patch the mailbox counter field (byte 5, bits 6:4) in a raw mailbox frame.
+fn patch_mailbox_counter(frame : Bytes, new_counter : Byte) -> Bytes {
+  Bytes::makei(frame.length(), fn(i) {
+    if i == 5 {
+      let type_bits = frame[5].to_int() & 0x0F
+      let counter_bits = (new_counter.to_int() & 0x07) << 4
+      (type_bits | counter_bits).to_byte()
+    } else {
+      frame[i]
+    }
+  })
+}
+
+///|
 /// Handle a FoE response that may be Busy, retrying the given resend closure.
 /// Returns the actual response (Data or Ack) when a non-Busy response arrives.
 fn[N : @hal.Nic] foe_handle_busy(
@@ -74,8 +88,10 @@ fn[N : @hal.Nic] foe_handle_busy(
   let mut resp = initial_resp
   for retry = 0; retry < foe_max_busy_retries; retry = retry + 1 {
     guard resp is @mailbox.FoeResponse::FoeBusy else { return resp }
-    // Re-send last frame
-    mailbox_send(nic, station, mb_config, last_frame, timeout)
+    // Begin a new retry transaction so RMSM expects the next counter
+    let new_cnt = rmsm.begin_retry_transaction()
+    let patched = patch_mailbox_counter(last_frame, new_cnt)
+    mailbox_send(nic, station, mb_config, patched, timeout)
     resp = recv_foe_validated_fp(nic, station, mb_config, rmsm, timeout)
   }
   raise @hal.EcError::MailboxProtocol("FoE: too many Busy retries")
@@ -95,7 +111,9 @@ fn[N : @hal.Nic] foe_handle_busy_ap(
   let mut resp = initial_resp
   for retry = 0; retry < foe_max_busy_retries; retry = retry + 1 {
     guard resp is @mailbox.FoeResponse::FoeBusy else { return resp }
-    mailbox_send_ap(nic, position, mb_config, last_frame, timeout)
+    let new_cnt = rmsm.begin_retry_transaction()
+    let patched = patch_mailbox_counter(last_frame, new_cnt)
+    mailbox_send_ap(nic, position, mb_config, patched, timeout)
     resp = recv_foe_validated_ap(nic, position, mb_config, rmsm, timeout)
   }
   raise @hal.EcError::MailboxProtocol("FoE: too many Busy retries")

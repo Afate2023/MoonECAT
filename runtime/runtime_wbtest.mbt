@@ -4794,3 +4794,133 @@ test "resolve_selected_module_pdos skips missing module_ident" {
   assert_eq(tx.length(), 0)
   assert_eq(rx.length(), 0)
 }
+
+// ===== Batch 26: HilCycleHook Terminated/Error paths =====
+
+///|
+struct TerminatingAdapter {
+  mut call_count : Int
+  terminate_at : Int
+}
+
+///|
+impl CoSimAdapter for TerminatingAdapter with init_(self, _config) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for TerminatingAdapter with write_outputs(
+  self,
+  _image,
+  _slice,
+) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for TerminatingAdapter with step(self, current, dt) {
+  self.call_count += 1
+  if self.call_count >= self.terminate_at {
+    Terminated("limit reached")
+  } else {
+    Ok(current.advance(dt))
+  }
+}
+
+///|
+impl CoSimAdapter for TerminatingAdapter with read_inputs(self, _image, _slice) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for TerminatingAdapter with shutdown(self) {
+  ignore(self)
+}
+
+///|
+test "HilCycleHook on_post_cycle Terminated path" {
+  let adapter : TerminatingAdapter = { call_count: 0, terminate_at: 1 }
+  let schedule : TaskSchedule = { base_period_ns: 1_000_000L, tasks: [] }
+  let session = HilSession::new(1_000_000L, schedule)
+  let hook = HilCycleHook::new(adapter, session)
+  let image = @protocol.ProcessImage::new(0, 0)
+  let ctx : @protocol.PdoContext = {
+    image,
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 0,
+    block_lrw: false,
+  }
+  let snap : CycleSnapshot = {
+    cycle: 0L,
+    result: None,
+    dc_state: Disabled,
+    recovery_pending: false,
+  }
+  let directive = hook.on_post_cycle(snap, ctx)
+  assert_eq(directive, StopGraceful)
+  assert_true(hook.session.terminated)
+  assert_eq(hook.session.termination_reason, "limit reached")
+}
+
+///|
+struct ErrorAdapter {
+  mut call_count : Int
+  error_at : Int
+}
+
+///|
+impl CoSimAdapter for ErrorAdapter with init_(self, _config) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for ErrorAdapter with write_outputs(self, _image, _slice) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for ErrorAdapter with step(self, current, dt) {
+  self.call_count += 1
+  if self.call_count >= self.error_at {
+    Error("solver diverged")
+  } else {
+    Ok(current.advance(dt))
+  }
+}
+
+///|
+impl CoSimAdapter for ErrorAdapter with read_inputs(self, _image, _slice) {
+  ignore(self)
+}
+
+///|
+impl CoSimAdapter for ErrorAdapter with shutdown(self) {
+  ignore(self)
+}
+
+///|
+test "HilCycleHook on_post_cycle Error path" {
+  let adapter : ErrorAdapter = { call_count: 0, error_at: 1 }
+  let schedule : TaskSchedule = { base_period_ns: 1_000_000L, tasks: [] }
+  let session = HilSession::new(1_000_000L, schedule)
+  let hook = HilCycleHook::new(adapter, session)
+  let image = @protocol.ProcessImage::new(0, 0)
+  let ctx : @protocol.PdoContext = {
+    image,
+    mappings: [],
+    logical_base: 0U,
+    logical_size: 0,
+    block_lrw: false,
+  }
+  let snap : CycleSnapshot = {
+    cycle: 0L,
+    result: None,
+    dc_state: Disabled,
+    recovery_pending: false,
+  }
+  let directive = hook.on_post_cycle(snap, ctx)
+  assert_eq(directive, StopGraceful)
+  assert_true(hook.session.terminated)
+  assert_eq(hook.session.termination_reason, "solver diverged")
+}

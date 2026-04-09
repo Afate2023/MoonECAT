@@ -1213,3 +1213,39 @@ test "FaultNic: recv with SendFailure during recv passes through" {
   let data = nic.recv(timeout=@hal.Duration(50_000_000L))
   assert_true(data.length() > 0)
 }
+
+///|
+test "VirtualSlave: SafeOp to Init transition" {
+  let bus = make_three_slave_bus()
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  // Init → PreOp
+  let _ = @protocol.write_register_fp(
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x02', b'\x00']),
+    timeout,
+  )
+  // PreOp → SafeOp
+  let _ = @protocol.write_register_fp(
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x04', b'\x00']),
+    timeout,
+  )
+  // SafeOp → Init (the uncovered transition)
+  let _ = @protocol.write_register_fp(
+    nic,
+    0x1001U,
+    @protocol.reg_al_control,
+    Bytes::from_array([b'\x01', b'\x00']),
+    timeout,
+  )
+  let status = @protocol.read_register_fp(
+    nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
+  )
+  assert_eq(status.data[0], b'\x01')
+}

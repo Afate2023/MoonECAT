@@ -686,6 +686,11 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
   let mut first = true
   let mut done = false
   while !done {
+    // For continuation fragments, begin a new transaction so RMSM
+    // transitions from Idle → WaitingForResponse for the next counter.
+    if !first {
+      let _ = rmsm.begin_transaction()
+    }
     let info = recv_sdo_info_validated_fp(
       nic, station, mb_config, rmsm, timeout,
     )

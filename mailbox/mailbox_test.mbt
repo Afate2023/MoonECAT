@@ -4155,3 +4155,14 @@ test "SiiOverlayCandidate dispatch_key covers hex_digit A-F" {
   let key = candidate.dispatch_key()
   assert_eq(key, "device-specific:ABCD")
 }
+
+///|
+test "SiiOverlayCandidate dispatch_key covers hex_digit E" {
+  let candidate : @mailbox.SiiOverlayCandidate = {
+    scope: DeviceSpecific,
+    type_code: 0xEF01U,
+    data: Bytes::new(0),
+  }
+  let key = candidate.dispatch_key()
+  assert_eq(key, "device-specific:EF01")
+}
