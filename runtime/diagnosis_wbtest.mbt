@@ -9,6 +9,8 @@ test "run_fault_issues StartupTransitionFailed all Some" {
       current=Some(@protocol.SafeOp),
       error_indication=Some(true),
       status_code=Some(0x001AU),
+      raw_status_code=Some(0x001AU),
+      control_wkc=Some(1U),
     ),
   )
   assert_eq(issues.length(), 1)
@@ -28,6 +30,8 @@ test "run_fault_issues StartupTransitionFailed all None" {
       current=None,
       error_indication=None,
       status_code=None,
+      raw_status_code=None,
+      control_wkc=None,
     ),
   )
   assert_eq(issues.length(), 1)
@@ -43,6 +47,8 @@ test "run_fault_issues StartupTransitionFailed error_indication false" {
       current=Some(@protocol.Init),
       error_indication=Some(false),
       status_code=Some(0U),
+      raw_status_code=Some(0U),
+      control_wkc=Some(0U),
     ),
   )
   assert_eq(issues.length(), 1)

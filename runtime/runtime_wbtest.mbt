@@ -985,14 +985,15 @@ test "runtime startup transition recovers SafeOp configuration error to init" {
     0x0016U,
   )
   let timeout = @hal.Duration(1000L)
-  let ok = attempt_transition_slave_to_target(
+  let result = attempt_transition_slave_to_target(
     nic,
     0x1001U,
     @protocol.EsmState::Init,
     timeout,
     @protocol.default_esm_timeout_policy(),
   )
-  assert_true(ok)
+  assert_true(result.reached_target)
+  assert_eq(result.observation.map(fn(value) { value.control_wkc }), Some(1U))
   assert_eq(nic.control_writes.length(), 2)
   assert_eq(
     nic.control_writes[0],
@@ -1009,14 +1010,18 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
     0x001EU,
   )
   let timeout = @hal.Duration(1000L)
-  let ok = attempt_transition_slave_to_target(
+  let result = attempt_transition_slave_to_target(
     nic,
     0x1001U,
     @protocol.PreOp,
     timeout,
     @protocol.default_esm_timeout_policy(),
   )
-  assert_true(ok)
+  assert_true(result.reached_target)
+  assert_eq(
+    result.observation.map(fn(value) { value.raw_status_code }),
+    Some(Some(0U)),
+  )
   assert_eq(nic.control_writes.length(), 3)
   assert_eq(
     nic.control_writes[0],
@@ -1696,6 +1701,8 @@ test "run_fault_issues StartupTransitionFailed all None" {
     current=None,
     error_indication=None,
     status_code=None,
+    raw_status_code=None,
+    control_wkc=None,
   )
   let issues = run_fault_issues(fault)
   assert_eq(issues.length(), 1)
@@ -1710,6 +1717,8 @@ test "run_fault_issues StartupTransitionFailed all Some" {
     current=Some(@protocol.EsmState::PreOp),
     error_indication=Some(false),
     status_code=Some(0x001AU),
+    raw_status_code=Some(0x001AU),
+    control_wkc=Some(1U),
   )
   let issues = run_fault_issues(fault)
   assert_eq(issues.length(), 1)

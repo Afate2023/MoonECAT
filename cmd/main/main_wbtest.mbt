@@ -1196,6 +1196,8 @@ test "cli state transition report uses broadcast when station is omitted" {
   assert_eq(report.current, None)
   assert_eq(report.final_state, None)
   assert_eq(report.status_code, None)
+  assert_eq(report.raw_status_code, None)
+  assert_eq(report.control_wkc, None)
   assert_eq(report.wkc, Some(0U))
 }
 
@@ -1356,6 +1358,8 @@ test "cli state path recovers configuration error to init" {
   assert_eq(report.final_state, Some(@protocol.EsmState::Init))
   assert_eq(report.al_error_flag, Some(false))
   assert_eq(report.status_code, None)
+  assert_eq(report.raw_status_code, None)
+  assert_eq(report.control_wkc, None)
   assert_eq(nic.control_writes.length(), 2)
   assert_eq(
     nic.control_writes[0],
@@ -1374,6 +1378,8 @@ test "cli state transition report json includes station mode fields" {
     final_state: Some(@protocol.SafeOp),
     al_error_flag: Some(false),
     status_code: Some(0U),
+    raw_status_code: Some(0U),
+    control_wkc: Some(1U),
     wkc: None,
   })
   let text = json.stringify(indent=2)
@@ -1381,6 +1387,8 @@ test "cli state transition report json includes station mode fields" {
   assert_true(text.contains("\"target_state\": \"SafeOp\""))
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"final_state\": \"SafeOp\""))
+  assert_true(text.contains("\"raw_status_code\": 0"))
+  assert_true(text.contains("\"control_wkc\": 1"))
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Info\""))
 }
@@ -1395,6 +1403,8 @@ test "cli state transition report text includes broadcast mode and wkc" {
     final_state: None,
     al_error_flag: None,
     status_code: None,
+    raw_status_code: None,
+    control_wkc: None,
     wkc: Some(0U),
   })
   assert_true(text.contains("Mode: broadcast"))

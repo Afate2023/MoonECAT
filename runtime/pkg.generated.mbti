@@ -1029,7 +1029,7 @@ pub(all) struct ReportEntry {
 } derive(Show)
 
 pub(all) enum RunFault {
-  StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?)
+  StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?, raw_status_code~ : UInt?, control_wkc~ : UInt?)
   TimeoutRecoveryRequired(observed_timeouts~ : Int64, consecutive_timeouts~ : Int)
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)

@@ -5272,6 +5272,8 @@ test "diagnostic_surface_from_run with StartupTransitionFailed" {
         current=Some(@protocol.EsmState::PreOp),
         error_indication=Some(true),
         status_code=Some(0x001AU),
+        raw_status_code=Some(0x001AU),
+        control_wkc=Some(1U),
       ),
     ),
   }
@@ -7549,6 +7551,8 @@ test "diagnostic_surface_from_run StartupTransitionFailed with all Some fields" 
         current=Some(@protocol.SafeOp),
         error_indication=Some(true),
         status_code=Some(0x001EU),
+        raw_status_code=Some(0x001EU),
+        control_wkc=Some(1U),
       ),
     ),
   }

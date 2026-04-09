@@ -468,7 +468,9 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
       target~,
       current~,
       error_indication~,
-      status_code~
+      status_code~,
+      raw_status_code~,
+      control_wkc~
     ) => {
       let current_text = match current {
         Some(state) => state.to_string()
@@ -481,6 +483,14 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
       }
       let status_text = match status_code {
         Some(code) => code.to_string()
+        None => "unknown"
+      }
+      let raw_status_text = match raw_status_code {
+        Some(code) => code.to_string()
+        None => "unknown"
+      }
+      let control_wkc_text = match control_wkc {
+        Some(wkc) => wkc.to_string()
         None => "unknown"
       }
       [
@@ -497,7 +507,11 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
           " error_flag=" +
           error_text +
           " status_code=" +
-          status_text,
+          status_text +
+          " raw_status_code=" +
+          raw_status_text +
+          " control_wkc=" +
+          control_wkc_text,
         },
       ]
     }

@@ -20,7 +20,9 @@ pub(all) enum RunFault {
     target~ : @protocol.EsmState,
     current~ : @protocol.EsmState?,
     error_indication~ : Bool?,
-    status_code~ : UInt?
+    status_code~ : UInt?,
+    raw_status_code~ : UInt?,
+    control_wkc~ : UInt?
   )
   TimeoutRecoveryRequired(
     observed_timeouts~ : Int64,
@@ -29,6 +31,12 @@ pub(all) enum RunFault {
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)
 } derive(Eq, Show)
+
+///|
+priv struct TransitionAttemptObservation {
+  reached_target : Bool
+  observation : @protocol.EsmStateRequestObservation?
+}
 
 ///|
 /// RunLoopSettings controls runtime loop behavior beyond startup/shutdown
@@ -1697,6 +1705,51 @@ fn[N : @hal.Nic] read_startup_fault_details(
 }
 
 ///|
+fn startup_snapshot_from_request_observation(
+  observation : @protocol.EsmStateRequestObservation,
+) -> @protocol.EsmStatusSnapshot {
+  {
+    state: observation.state,
+    error_indication: observation.error_indication,
+    status_code: observation.status_code,
+  }
+}
+
+///|
+fn startup_transition_failed_fault(
+  station : UInt,
+  target : @protocol.EsmState,
+  snapshot : @protocol.EsmStatusSnapshot?,
+  observation : @protocol.EsmStateRequestObservation?,
+) -> RunFault {
+  let current = match snapshot {
+    Some(value) => Some(value.state)
+    None => observation.map(fn(value) { value.state })
+  }
+  let error_indication = match snapshot {
+    Some(value) => Some(value.error_indication)
+    None => observation.map(fn(value) { value.error_indication })
+  }
+  let status_code = match snapshot {
+    Some(value) =>
+      match value.status_code {
+        Some(_) => value.status_code
+        None => observation.bind(fn(item) { item.status_code })
+      }
+    None => observation.bind(fn(value) { value.status_code })
+  }
+  RunFault::StartupTransitionFailed(
+    station~,
+    target~,
+    current~,
+    error_indication~,
+    status_code~,
+    raw_status_code=observation.bind(fn(value) { value.raw_status_code }),
+    control_wkc=observation.map(fn(value) { value.control_wkc }),
+  )
+}
+
+///|
 fn[N : @hal.Nic] transition_stations_for_startup(
   nic : N,
   stations : Array[UInt],
@@ -1911,6 +1964,8 @@ fn[N : @hal.Nic] apply_station_startup_mailbox_plans(
         current=Some(@protocol.SafeOp),
         error_indication=None,
         status_code=None,
+        raw_status_code=None,
+        control_wkc=None,
       ),
     )
   }
@@ -1925,27 +1980,49 @@ fn[N : @hal.Nic] transition_slave_to_target(
   timeout : @hal.Duration,
   policy : @protocol.EsmTimeoutPolicy,
 ) -> RunFault? {
-  if attempt_transition_slave_to_target(nic, station, target, timeout, policy) {
+  let attempt = attempt_transition_slave_to_target(
+    nic, station, target, timeout, policy,
+  )
+  if attempt.reached_target {
     None
   } else {
     let snapshot = read_startup_fault_details(nic, station, timeout)
     let strategy = classify_startup_recovery_strategy(
       snapshot.map(fn(value) { value.state }),
       target,
-      snapshot.bind(fn(value) { value.status_code }),
+      match snapshot {
+        Some(value) =>
+          match value.status_code {
+            Some(_) => value.status_code
+            None => attempt.observation.bind(fn(item) { item.status_code })
+          }
+        None => attempt.observation.bind(fn(item) { item.status_code })
+      },
     )
     stabilize_failed_startup_station(nic, station, strategy, timeout)
-    if strategy == RetryTargetPath &&
-      attempt_transition_slave_to_target(nic, station, target, timeout, policy) {
-      None
+    if strategy == RetryTargetPath {
+      let retry_attempt = attempt_transition_slave_to_target(
+        nic, station, target, timeout, policy,
+      )
+      if retry_attempt.reached_target {
+        None
+      } else {
+        Some(
+          startup_transition_failed_fault(
+            station,
+            target,
+            read_startup_fault_details(nic, station, timeout),
+            retry_attempt.observation,
+          ),
+        )
+      }
     } else {
       Some(
-        RunFault::StartupTransitionFailed(
-          station~,
-          target~,
-          current=snapshot.map(fn(value) { value.state }),
-          error_indication=snapshot.map(fn(value) { value.error_indication }),
-          status_code=snapshot.bind(fn(value) { value.status_code }),
+        startup_transition_failed_fault(
+          station,
+          target,
+          snapshot,
+          attempt.observation,
         ),
       )
     }
@@ -1970,6 +2047,8 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
           current=None,
           error_indication=None,
           status_code=None,
+          raw_status_code=None,
+          control_wkc=None,
         ),
       )
   }
@@ -1982,6 +2061,8 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
           current=None,
           error_indication=None,
           status_code=None,
+          raw_status_code=None,
+          control_wkc=None,
         ),
       )
   }
@@ -2031,6 +2112,8 @@ fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
           current=None,
           error_indication=None,
           status_code=None,
+          raw_status_code=None,
+          control_wkc=None,
         ),
       )
   }
@@ -2046,6 +2129,8 @@ fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
           current=None,
           error_indication=None,
           status_code=None,
+          raw_status_code=None,
+          control_wkc=None,
         ),
       )
   }
@@ -2059,8 +2144,8 @@ fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
   pdo_ctx : @protocol.PdoContext,
   timeout : @hal.Duration,
 ) -> RunFault? {
-  let snapshot = Some(
-    @protocol.request_state_with_process_data_snapshot(
+  let observation = Some(
+    @protocol.request_state_with_process_data_observe(
       nic,
       station,
       @protocol.Op,
@@ -2070,11 +2155,12 @@ fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
   ) catch {
     _ => None
   }
-  if snapshot is Some(observed) && observed.state == @protocol.Op {
+  if observation is Some(observed) && observed.state == @protocol.Op {
     None
   } else {
-    let fault_snapshot = match snapshot {
-      Some(observed) => Some(observed)
+    let fault_snapshot = match observation {
+      Some(observed) =>
+        Some(startup_snapshot_from_request_observation(observed))
       None => read_startup_fault_details(nic, station, timeout)
     }
     let strategy = classify_startup_recovery_strategy(
@@ -2084,12 +2170,11 @@ fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
     )
     stabilize_failed_startup_station(nic, station, strategy, timeout)
     Some(
-      RunFault::StartupTransitionFailed(
-        station~,
-        target=@protocol.Op,
-        current=fault_snapshot.map(fn(value) { value.state }),
-        error_indication=fault_snapshot.map(fn(value) { value.error_indication }),
-        status_code=fault_snapshot.bind(fn(value) { value.status_code }),
+      startup_transition_failed_fault(
+        station,
+        @protocol.Op,
+        fault_snapshot,
+        observation,
       ),
     )
   }
@@ -2102,21 +2187,25 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
   target : @protocol.EsmState,
   timeout : @hal.Duration,
   policy : @protocol.EsmTimeoutPolicy,
-) -> Bool {
+) -> TransitionAttemptObservation {
   let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout) catch {
-    _ => return false
+    _ => return { reached_target: false, observation: None }
   }
   if snapshot.error_indication {
     ignore(@protocol.recover_al_error_for_transition(nic, station, timeout)) catch {
-      _ => return false
+      _ => return { reached_target: false, observation: None }
     }
   }
-  let final_state = @protocol.transition_to_target_strict_with_timeout_policy(
+  let observation = @protocol.transition_to_target_strict_with_timeout_policy_observe(
     nic, station, target, policy, timeout,
   ) catch {
-    _ => return false
+    _ => return { reached_target: false, observation: None }
   }
-  final_state == target
+  match observation {
+    Some(value) =>
+      { reached_target: value.state == target, observation: Some(value) }
+    None => { reached_target: snapshot.state == target, observation: None }
+  }
 }
 
 ///|
@@ -2219,7 +2308,9 @@ fn run_fault_text(fault : RunFault) -> String {
       target~,
       current~,
       error_indication~,
-      status_code~
+      status_code~,
+      raw_status_code~,
+      control_wkc~
     ) => {
       let current_text = match current {
         Some(state) => state.to_string()
@@ -2234,6 +2325,14 @@ fn run_fault_text(fault : RunFault) -> String {
         Some(code) => code.to_string()
         None => "unknown"
       }
+      let raw_status_text = match raw_status_code {
+        Some(code) => code.to_string()
+        None => "unknown"
+      }
+      let control_wkc_text = match control_wkc {
+        Some(wkc) => wkc.to_string()
+        None => "unknown"
+      }
       "startup transition failed: station=" +
       station.to_string() +
       " target=" +
@@ -2243,7 +2342,11 @@ fn run_fault_text(fault : RunFault) -> String {
       " error_flag=" +
       error_text +
       " status_code=" +
-      status_text
+      status_text +
+      " raw_status_code=" +
+      raw_status_text +
+      " control_wkc=" +
+      control_wkc_text
     }
     TimeoutRecoveryRequired(observed_timeouts~, consecutive_timeouts~) =>
       "timeout recovery required: timeouts=" +
