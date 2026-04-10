@@ -123,7 +123,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | A-1 | 统一 Windows/Linux Native HAL 语义（open/send/recv/close/error/filter） | P0-1 | ⚠️ 部分 | hal/native/, cmd/main/ |
 | A-2 | Linux Raw Socket 实机闭环 `list-if → scan → validate → run` | P0-2 | ❌ | hal/native/, scripts/ |
 | A-3 | 冻结 NDJSON progress schema（版本/字段/兼容性） | P0-3 | ⚠️ 已实现待冻结 | runtime/, cmd/main/ |
-| A-4 | `run --until-fault` 正式化为回归入口（stop reason / fault summary） | P0-4 | ⚠️ 已实现待文档化 | runtime/, cmd/main/ |
+| A-4 | `run --until-fault` 正式化为回归入口（stop reason / fault summary） | P0-4 | ✅ Windows Npcap 已复核 | runtime/, cmd/main/ |
 | A-5 | Native FFI 生命周期与失败路径测试（ASan / double close / leak） | P0-5 | ❌ | hal/native/ |
 | A-6 | Native CLI 实机证据矩阵（平台 × 网卡 × 从站 × 命令 × 结果） | P0-6 | ⚠️ Windows 部分 | docs/, scripts/ |
 
@@ -131,7 +131,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 - Windows 与 Linux Native 后端共享同一稳定 HAL 语义
 - Linux 实机 `list-if → scan → validate → run` 闭环可复现
 - `run --progress-ndjson` 与最终 JSON summary 拥有冻结 schema
-- `run --until-fault` 有正式文档定义 stop reason
+- `run --until-fault` 已作为 Windows Npcap 单从站链路的回归入口复核，stop reason / fault summary 已在 workflow 中回填
 - Native CLI 各主命令拥有可复核的证据矩阵
 
 ### 主线 B：Verification Runtime（P1 优先级）
