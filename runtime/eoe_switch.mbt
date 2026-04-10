@@ -508,19 +508,19 @@ fn uint_to_hex(v : UInt) -> String {
   if v == 0U {
     return "0"
   }
-  let digits = "0123456789abcdef"
+  let digits = "0123456789abcdef".to_array()
   let buf = @buffer.new(size_hint=8)
   let mut val = v
-  let chars : Array[Byte] = []
+  let chars : Array[Char] = []
   while val > 0U {
     let nibble = (val & 0xFU).reinterpret_as_int()
-    chars.push(digits[nibble].to_byte())
+    chars.push(digits[nibble])
     val = val >> 4
   }
   // Reverse
   let len = chars.length()
   for i = len - 1; i >= 0; i = i - 1 {
-    buf.write_byte(chars[i])
+    buf.write_char(chars[i])
   }
   buf.to_string()
 }

@@ -156,6 +156,8 @@ pub fn run_startup_preparation_from_slave_preparations(Array[(UInt, SlaveStartup
 
 pub fn[N : @hal.Nic] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @hal.Duration) -> RunReport raise @hal.EcError
 
+pub fn[N : @hal.Nic, S : RunProgressSink] run_with_scan_and_states_and_settings_prepared_reporting_to(N, ScanReport, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
+
 pub fn[N : @hal.Nic] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration, S) -> RunReport raise @hal.EcError
@@ -1090,6 +1092,7 @@ pub(all) struct RunStartupPreparation {
   dc_cycle_period_ns : Int64?
   startup_mailbox_plans : Array[StationStartupMailboxPlan]
   esm_timeout_policies : Array[(UInt, @protocol.EsmTimeoutPolicy)]
+  slave_preparations : Array[(UInt, SlaveStartupPreparation)]?
 }
 
 pub(all) struct Runtime {
@@ -1227,6 +1230,7 @@ pub(all) struct SlaveStartupPreparation {
   mailbox_config : @mailbox.MailboxConfig
   sii : @mailbox.SiiFullInfo
   sii_categories : Array[@mailbox.SiiCategoryEntry]
+  prefer_live_pdo_state : Bool
 }
 
 pub(all) struct SmWatchdogValidation {
