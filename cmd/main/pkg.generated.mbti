@@ -34,6 +34,12 @@ type OdBrowseQuery
 
 type OdBrowseReport
 
+type PdoAuditReport
+
+type PdoDirectionReport
+
+type PdoMappingObjectReport
+
 type RunProgressOutput derive(Eq, Show)
 
 type StartupDiffReport
@@ -47,6 +53,8 @@ type StartupTracePhase
 type StartupTraceReport
 
 type StateTransitionReport
+
+type StationStartupDecision
 
 // Type aliases
 

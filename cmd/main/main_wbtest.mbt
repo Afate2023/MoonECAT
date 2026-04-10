@@ -1381,6 +1381,7 @@ test "cli state transition report json includes station mode fields" {
     raw_status_code: Some(0U),
     control_wkc: Some(1U),
     wkc: None,
+    pdo_audit: None,
   })
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"mode\": \"station-path\""))
@@ -1389,6 +1390,7 @@ test "cli state transition report json includes station mode fields" {
   assert_true(text.contains("\"final_state\": \"SafeOp\""))
   assert_true(text.contains("\"raw_status_code\": 0"))
   assert_true(text.contains("\"control_wkc\": 1"))
+  assert_true(text.contains("\"pdo_audit\": null"))
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Info\""))
 }
@@ -1406,11 +1408,47 @@ test "cli state transition report text includes broadcast mode and wkc" {
     raw_status_code: None,
     control_wkc: None,
     wkc: Some(0U),
+    pdo_audit: None,
   })
   assert_true(text.contains("Mode: broadcast"))
   assert_true(text.contains("Target: Init"))
   assert_true(text.contains("WKC: 0"))
   assert_true(!text.contains("Station:"))
+}
+
+///|
+fn sample_pdo_audit_report() -> PdoAuditReport {
+  {
+    plan_source: "esi-json",
+    policy: "prefer-live",
+    effective_source: "live",
+    live_detected: Some(true),
+    live_differs_from_plan: Some(true),
+    live_read_error: None,
+    configured_rx: {
+      assignment_index: 0x1C12U,
+      assigned_pdos: [0x1602U],
+      objects: [{ index: 0x1602U, entries: [0x10004060U, 0x2000FF60U] }],
+    },
+    configured_tx: {
+      assignment_index: 0x1C13U,
+      assigned_pdos: [0x1A02U],
+      objects: [{ index: 0x1A02U, entries: [0x10004160U, 0x20006460U] }],
+    },
+    live_rx: Some({
+      assignment_index: 0x1C12U,
+      assigned_pdos: [0x1600U],
+      objects: [{ index: 0x1600U, entries: [0x10004060U, 0x20007A60U] }],
+    }),
+    live_tx: Some({
+      assignment_index: 0x1C13U,
+      assigned_pdos: [0x1A00U],
+      objects: [{ index: 0x1A00U, entries: [0x10004160U, 0x20006460U] }],
+    }),
+    mismatches: [
+      "assignment 0x1C12 expected=[0x1602] actual=[0x1600]", "assignment 0x1C13 expected=[0x1A02] actual=[0x1A00]",
+    ],
+  }
 }
 
 ///|
@@ -1679,6 +1717,73 @@ test "cli mailbox readback report text highlights mismatch details" {
 }
 
 ///|
+test "cli mailbox readback source keeps esi-json when requested" {
+  assert_eq(mailbox_readback_source([]), "online-sii")
+  assert_eq(
+    mailbox_readback_source(["--esi-json", "References/sample.esi.json"]),
+    "esi-json",
+  )
+}
+
+///|
+test "cli startup trace source stays online for live path" {
+  assert_eq(startup_trace_source([]), "online-sii")
+  assert_eq(
+    startup_trace_source(["--esi-json", "References/sample.esi.json"]),
+    "esi-json",
+  )
+}
+
+///|
+test "cli startup mailbox commands detect PreOp refinement need for PDO remap" {
+  let commands : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.PreOpToSafeOp,
+      index: 0x1602U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x02']),
+    },
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x08']),
+    },
+  ]
+  assert_true(startup_mailbox_commands_need_preop_refinement(commands))
+}
+
+///|
+test "cli startup mailbox commands skip PreOp refinement without PDO remap" {
+  let commands : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x08']),
+    },
+  ]
+  assert_true(!startup_mailbox_commands_need_preop_refinement(commands))
+}
+
+///|
+test "cli startup trace od read retries stale and timeout errors" {
+  assert_true(startup_trace_should_retry_od_read(@hal.EcError::MailboxTimeout))
+  assert_true(
+    startup_trace_should_retry_od_read(
+      @hal.EcError::MailboxProtocol("RMSM: too many stale frames received"),
+    ),
+  )
+}
+
+///|
+test "cli startup trace od read does not retry sdo abort" {
+  assert_true(
+    !startup_trace_should_retry_od_read(@hal.EcError::SdoAbort(0x06020000U)),
+  )
+}
+
+///|
 test "cli startup trace report json includes phases and transition error" {
   let report : StartupTraceReport = {
     station: 0x1001U,
@@ -1725,6 +1830,7 @@ test "cli startup trace report json includes phases and transition error" {
       },
     ],
     transition_error: Some("safeop request failed: StartupTransitionFailed"),
+    pdo_audit: Some(sample_pdo_audit_report()),
   }
   let text = startup_trace_report_json(report).stringify(indent=2)
   assert_true(text.contains("\"phases\""))
@@ -1732,6 +1838,10 @@ test "cli startup trace report json includes phases and transition error" {
   assert_true(text.contains("\"od_objects\""))
   assert_true(text.contains("\"transition_error\""))
   assert_true(text.contains("\"final_state\": \"PreOp\""))
+  assert_true(text.contains("\"pdo_audit\""))
+  assert_true(text.contains("\"effective_source\": \"live\""))
+  assert_true(text.contains("\"assignment_index_hex\": \"0x1C12\""))
+  assert_true(text.contains("\"raw_hex\": \"0x10004060\""))
 }
 
 ///|
@@ -1812,9 +1922,16 @@ test "cli startup trace report text includes phase snapshots" {
       },
     ],
     transition_error: Some("safeop request failed: AL status code 30"),
+    pdo_audit: Some(sample_pdo_audit_report()),
   }
   let text = startup_trace_report_text(report)
   assert_true(text.contains("Startup Trace"))
+  assert_true(text.contains("PDO Audit"))
+  assert_true(text.contains("Effective Source: live"))
+  assert_true(text.contains("Configured Rx: 0x1C12 -> [0x1602]"))
+  assert_true(
+    text.contains("assignment 0x1C12 expected=[0x1602] actual=[0x1600]"),
+  )
   assert_true(text.contains("Source: online-sii"))
   assert_true(text.contains("before_safeop_request"))
   assert_true(text.contains("001E"))
