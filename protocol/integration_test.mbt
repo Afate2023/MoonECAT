@@ -640,6 +640,31 @@ test "integration/sdo_upload expedited via FP mock" {
   assert_eq(result, expected)
 }
 
+///|
+test "integration/sdo_upload discards stale counter mismatch frame" {
+  let expected = Bytes::from_array([b'\xDE', b'\xAD', b'\xBE', b'\xEF'])
+  let nic = MailboxMockNic::new([
+    build_sdo_upload_expedited_resp(
+      b'\x05', test_station, 0x1018U, b'\x01', expected,
+    ),
+    build_sdo_upload_expedited_resp(
+      b'\x01', test_station, 0x1018U, b'\x01', expected,
+    ),
+  ])
+  let rmsm = @mailbox.Rmsm::new()
+  let result = @protocol.sdo_upload(
+    nic,
+    test_station,
+    test_mb_config(),
+    rmsm,
+    0x1018U,
+    b'\x01',
+    test_timeout,
+  )
+  assert_eq(result, expected)
+  assert_eq(nic.response_index, 2)
+}
+
 // ========== SDO Segmented Upload ==========
 
 ///|

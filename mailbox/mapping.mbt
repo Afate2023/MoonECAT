@@ -69,16 +69,17 @@ pub fn apply_pdo_lengths_to_sm_configs(
   let updated : Array[SmConfig] = []
   for i = 0; i < sm_configs.length(); i = i + 1 {
     let sm = sm_configs[i]
-    let patched = if sm.length == 0U {
-      let total_bits = match sm.sm_type {
-        ProcessDataOut | DynamicProcessDataOut =>
-          pdo_bit_length_for_sync_manager(rx_pdos, i.to_byte())
-        ProcessDataIn | DynamicProcessDataIn =>
-          pdo_bit_length_for_sync_manager(tx_pdos, i.to_byte())
-        _ => 0
-      }
-      if total_bits > 0 {
-        { ..sm, length: ((total_bits + 7) / 8).reinterpret_as_uint() }
+    let total_bits = match sm.sm_type {
+      ProcessDataOut | DynamicProcessDataOut =>
+        pdo_bit_length_for_sync_manager(rx_pdos, i.to_byte())
+      ProcessDataIn | DynamicProcessDataIn =>
+        pdo_bit_length_for_sync_manager(tx_pdos, i.to_byte())
+      _ => 0
+    }
+    let patched = if total_bits > 0 {
+      let pdo_length = ((total_bits + 7) / 8).reinterpret_as_uint()
+      if sm.length != pdo_length {
+        { ..sm, length: pdo_length }
       } else {
         sm
       }
