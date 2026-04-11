@@ -13,6 +13,8 @@
 #include <tchar.h>
 #include <windows.h>
 
+#include "npcap_compat.h"
+
 static void moonecat_copy_windows_error_message(char *buffer, size_t capacity,
                                                 const char *message) {
   WCHAR wide_buffer[512];
@@ -141,25 +143,7 @@ static moonbit_bytes_t moonecat_bytes_from_buffer(const char *buffer,
 
 #ifdef _WIN32
 
-#include <pcap.h>
-
-typedef int(__cdecl *moonecat_pcap_init_fn)(unsigned int, char *);
-typedef int(__cdecl *moonecat_pcap_findalldevs_fn)(pcap_if_t **, char *);
-typedef void(__cdecl *moonecat_pcap_freealldevs_fn)(pcap_if_t *);
-typedef pcap_t *(__cdecl *moonecat_pcap_open_fn)(const char *, int, int, int,
-                                                 struct pcap_rmtauth *, char *);
-typedef pcap_t *(__cdecl *moonecat_pcap_open_live_fn)(const char *, int, int,
-                                                      int, char *);
-typedef int(__cdecl *moonecat_pcap_datalink_fn)(pcap_t *);
-typedef int(__cdecl *moonecat_pcap_setdirection_fn)(pcap_t *, pcap_direction_t);
-typedef void(__cdecl *moonecat_pcap_close_fn)(pcap_t *);
-typedef int(__cdecl *moonecat_pcap_sendpacket_fn)(pcap_t *, const u_char *,
-                                                  int);
-typedef int(__cdecl *moonecat_pcap_next_ex_fn)(pcap_t *, struct pcap_pkthdr **,
-                                               const u_char **);
-typedef char *(__cdecl *moonecat_pcap_geterr_fn)(pcap_t *);
-
-static pcap_t *g_npcap_handles[32] = {0};
+pcap_t *g_npcap_handles[32] = {0};
 static int g_npcap_initialized = 0;
 static HMODULE g_npcap_module = NULL;
 static moonecat_pcap_init_fn g_pcap_init = NULL;
@@ -168,10 +152,9 @@ static moonecat_pcap_freealldevs_fn g_pcap_freealldevs = NULL;
 static moonecat_pcap_open_fn g_pcap_open = NULL;
 static moonecat_pcap_open_live_fn g_pcap_open_live = NULL;
 static moonecat_pcap_datalink_fn g_pcap_datalink = NULL;
-static moonecat_pcap_setdirection_fn g_pcap_setdirection = NULL;
 static moonecat_pcap_close_fn g_pcap_close = NULL;
-static moonecat_pcap_sendpacket_fn g_pcap_sendpacket = NULL;
-static moonecat_pcap_next_ex_fn g_pcap_next_ex = NULL;
+moonecat_pcap_sendpacket_fn g_pcap_sendpacket = NULL;
+moonecat_pcap_next_ex_fn g_pcap_next_ex = NULL;
 static moonecat_pcap_geterr_fn g_pcap_geterr = NULL;
 
 static int moonecat_find_free_handle_slot(void) {
@@ -250,8 +233,6 @@ static int moonecat_load_npcap_symbols(void) {
       g_npcap_module, "pcap_open_live");
   g_pcap_datalink = (moonecat_pcap_datalink_fn)GetProcAddress(g_npcap_module,
                                                               "pcap_datalink");
-  g_pcap_setdirection = (moonecat_pcap_setdirection_fn)GetProcAddress(
-      g_npcap_module, "pcap_setdirection");
   g_pcap_close =
       (moonecat_pcap_close_fn)GetProcAddress(g_npcap_module, "pcap_close");
   g_pcap_sendpacket = (moonecat_pcap_sendpacket_fn)GetProcAddress(

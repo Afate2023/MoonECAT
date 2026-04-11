@@ -340,6 +340,7 @@ fn run_mock_command_with_fresh_nic(
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
   let run_report = run_with_progress_output(
     run_nic,
+    None,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
@@ -380,7 +381,9 @@ fn run_native_command_with_fresh_nic(
   let startup_preparation_override = if target_requires_process_data_configuration(
       startup_state,
     ) {
-    resolve_run_startup_preparation_override(scan_report, args)
+    resolve_run_startup_preparation_override(
+      run_nic, scan_report, args, timeout,
+    )
   } else {
     None
   }
@@ -399,6 +402,7 @@ fn run_native_command_with_fresh_nic(
           dc_cycle_period_ns: None,
           startup_mailbox_plans: [],
           esm_timeout_policies: [],
+          slave_preparations: None,
         }
       }
   }
@@ -407,6 +411,7 @@ fn run_native_command_with_fresh_nic(
   )
   let run_report = run_with_progress_output(
     run_nic,
+    Some(scan_report),
     run_config,
     expected,
     preparation.pdo_ctx,
@@ -431,6 +436,7 @@ fn run_native_command_with_fresh_nic(
 ///|
 fn[N : @hal.Nic] run_with_progress_output(
   nic : N,
+  scan_report_override : @runtime.ScanReport?,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
   pdo_ctx : @protocol.PdoContext,
@@ -446,29 +452,65 @@ fn[N : @hal.Nic] run_with_progress_output(
   let ndjson_sink = CliNdjsonRunProgressSink::new()
   match progress_output {
     Silent =>
-      @runtime.run_with_states_and_settings_prepared_reporting_to(
-        nic,
-        config,
-        expected,
-        pdo_ctx,
-        expected_wkc,
-        settings,
-        startup_state,
-        shutdown_state,
-        startup_preparation_override,
-        timeout,
-        @runtime.NullRunProgressSink::new(),
-      )
+      match scan_report_override {
+        Some(scan_report) =>
+          @runtime.run_with_scan_and_states_and_settings_prepared_reporting_to(
+            nic,
+            scan_report,
+            config,
+            expected,
+            pdo_ctx,
+            expected_wkc,
+            settings,
+            startup_state,
+            shutdown_state,
+            startup_preparation_override,
+            timeout,
+            @runtime.NullRunProgressSink::new(),
+          )
+        None =>
+          @runtime.run_with_states_and_settings_prepared_reporting_to(
+            nic,
+            config,
+            expected,
+            pdo_ctx,
+            expected_wkc,
+            settings,
+            startup_state,
+            shutdown_state,
+            startup_preparation_override,
+            timeout,
+            @runtime.NullRunProgressSink::new(),
+          )
+      }
     Text =>
-      @runtime.run_with_states_and_settings_prepared_reporting_to(
-        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
-        startup_preparation_override, timeout, text_sink,
-      )
+      match scan_report_override {
+        Some(scan_report) =>
+          @runtime.run_with_scan_and_states_and_settings_prepared_reporting_to(
+            nic, scan_report, config, expected, pdo_ctx, expected_wkc, settings,
+            startup_state, shutdown_state, startup_preparation_override, timeout,
+            text_sink,
+          )
+        None =>
+          @runtime.run_with_states_and_settings_prepared_reporting_to(
+            nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state,
+            shutdown_state, startup_preparation_override, timeout, text_sink,
+          )
+      }
     Ndjson =>
-      @runtime.run_with_states_and_settings_prepared_reporting_to(
-        nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state, shutdown_state,
-        startup_preparation_override, timeout, ndjson_sink,
-      )
+      match scan_report_override {
+        Some(scan_report) =>
+          @runtime.run_with_scan_and_states_and_settings_prepared_reporting_to(
+            nic, scan_report, config, expected, pdo_ctx, expected_wkc, settings,
+            startup_state, shutdown_state, startup_preparation_override, timeout,
+            ndjson_sink,
+          )
+        None =>
+          @runtime.run_with_states_and_settings_prepared_reporting_to(
+            nic, config, expected, pdo_ctx, expected_wkc, settings, startup_state,
+            shutdown_state, startup_preparation_override, timeout, ndjson_sink,
+          )
+      }
   }
 }
 
@@ -517,27 +559,86 @@ fn optional_esi_json_startup_preparation(
 }
 
 ///|
-fn resolve_run_startup_preparation_override(
+fn configured_startup_source(args : Array[String]) -> String {
+  match flag_value(args, "--esi-json") {
+    Some(_) => "esi-json"
+    None => "online-sii"
+  }
+}
+
+///|
+fn pdo_force_requested(args : Array[String]) -> Bool raise @hal.EcError {
+  if has_flag(args, "--force-pdo-remap") {
+    return true
+  }
+  match flag_value(args, "--pdo-strategy") {
+    None | Some("prefer-live") => false
+    Some("force-esi") | Some("force-configured") => true
+    Some(value) =>
+      raise @hal.EcError::ConfigMismatch(
+        "invalid PDO strategy: " +
+        value +
+        " (expected prefer-live, force-esi, or force-configured)",
+      )
+  }
+}
+
+///|
+fn apply_pdo_policy_to_preparation(
+  preparation : @runtime.SlaveStartupPreparation,
+  args : Array[String],
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
+  { ..preparation, prefer_live_pdo_state: !pdo_force_requested(args) }
+}
+
+///|
+fn[N : @hal.Nic] resolve_run_startup_preparation_override(
+  nic : N,
   scan_report : @runtime.ScanReport,
   args : Array[String],
+  timeout : @hal.Duration,
 ) -> @runtime.RunStartupPreparation? raise @hal.EcError {
-  match optional_esi_json_startup_preparation(args, pdo_logical_base) {
-    Some(slave_preparation) => {
-      if scan_report.slaves.length() != 1 {
-        raise @hal.EcError::ConfigMismatch(
-          "run --esi-json currently requires exactly one discovered slave",
-        )
-      }
-      let station = scan_report.slaves[0].station_address
-      Some(
-        @runtime.run_startup_preparation_from_slave_preparations(
-          [(station, slave_preparation)],
-          pdo_logical_base,
-        ),
+  let has_esi_json = flag_value(args, "--esi-json") is Some(_)
+  let force_pdo_remap = pdo_force_requested(args)
+  if !has_esi_json && !force_pdo_remap {
+    return None
+  }
+  let slave_preparations : Array[(UInt, @runtime.SlaveStartupPreparation)] = []
+  let mut current_logical_base = pdo_logical_base
+  if has_esi_json {
+    if scan_report.slaves.length() != 1 {
+      raise @hal.EcError::ConfigMismatch(
+        "run --esi-json currently requires exactly one discovered slave",
       )
     }
-    None => None
+    let station = scan_report.slaves[0].station_address
+    let preparation = prepare_station_startup_from_args(
+      nic, args, station, current_logical_base, timeout,
+    )
+    slave_preparations.push((station, preparation))
+  } else {
+    for slave in scan_report.slaves {
+      let preparation = apply_pdo_policy_to_preparation(
+        @runtime.prepare_slave_startup(
+          nic,
+          slave.station_address,
+          current_logical_base,
+          process_data_eeprom_word_count,
+          timeout,
+        ),
+        args,
+      )
+      slave_preparations.push((slave.station_address, preparation))
+      current_logical_base = current_logical_base +
+        preparation.mapping.output_bytes.reinterpret_as_uint() +
+        preparation.mapping.input_bytes.reinterpret_as_uint()
+    }
   }
+  Some(
+    @runtime.run_startup_preparation_from_slave_preparations(
+      slave_preparations, pdo_logical_base,
+    ),
+  )
 }
 
 ///|
@@ -560,10 +661,13 @@ fn[N : @hal.Nic] prepare_station_startup_from_args(
   logical_base : UInt,
   timeout : @hal.Duration,
 ) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
-  match optional_esi_json_startup_preparation(args, logical_base) {
-    Some(preparation) => preparation
-    None => prepare_station_startup(nic, station, logical_base, timeout)
-  }
+  apply_pdo_policy_to_preparation(
+    match optional_esi_json_startup_preparation(args, logical_base) {
+      Some(preparation) => preparation
+      None => prepare_station_startup(nic, station, logical_base, timeout)
+    },
+    args,
+  )
 }
 
 ///|
@@ -619,7 +723,10 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
+    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
+  )
+  println(
+    "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path --esi-json sample.esi.json --force-pdo-remap --json",
   )
   println("Default backend: mock")
   println("Default timeout: 1 ms")
@@ -1512,7 +1619,10 @@ fn[N : @hal.Nic] compute_state_transition_report(
         final_state: None,
         al_error_flag: None,
         status_code: None,
+        raw_status_code: None,
+        control_wkc: None,
         wkc: Some(wkc),
+        pdo_audit: None,
       }
     }
   }
@@ -1528,11 +1638,43 @@ fn[N : @hal.Nic] compute_station_transition_report(
   timeout : @hal.Duration,
 ) -> StateTransitionReport raise @hal.EcError {
   let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
-  if use_path && target == @protocol.Op && current != @protocol.Op {
-    let initial_preparation = prepare_station_startup_from_args(
-      nic, args, station, pdo_logical_base, timeout,
+  let pdo_decision = if use_path &&
+    target_requires_process_data_configuration(target) {
+    Some(
+      resolve_station_startup_decision(
+        nic, args, station, pdo_logical_base, timeout,
+      ),
     )
-    let (final_snapshot, kick_wkc) = transition_station_to_op_with_preparation(
+  } else {
+    None
+  }
+  let path_preparation = if use_path && current != target {
+    match pdo_decision {
+      Some(decision) => Some(decision.preparation)
+      None =>
+        Some(
+          prepare_station_startup_from_args(
+            nic, args, station, pdo_logical_base, timeout,
+          ),
+        )
+    }
+  } else {
+    None
+  }
+  match path_preparation {
+    Some(preparation) =>
+      startup_trace_drain_mailbox(nic, station, preparation.mailbox_config)
+    None => ()
+  }
+  if use_path && target == @protocol.Op && current != @protocol.Op {
+    let initial_preparation = match path_preparation {
+      Some(preparation) => preparation
+      None =>
+        prepare_station_startup_from_args(
+          nic, args, station, pdo_logical_base, timeout,
+        )
+    }
+    let (final_observation, kick_wkc) = transition_station_to_op_with_preparation(
       nic, station, current, initial_preparation, timeout,
     )
     return {
@@ -1540,20 +1682,27 @@ fn[N : @hal.Nic] compute_station_transition_report(
       target,
       station: Some(station),
       current: Some(current),
-      final_state: Some(final_snapshot.state),
-      al_error_flag: Some(final_snapshot.error_indication),
-      status_code: final_snapshot.status_code,
+      final_state: Some(final_observation.state),
+      al_error_flag: Some(final_observation.error_indication),
+      status_code: final_observation.status_code,
+      raw_status_code: final_observation.raw_status_code,
+      control_wkc: Some(final_observation.control_wkc),
       wkc: kick_wkc,
+      pdo_audit: pdo_decision.map(fn(decision) { decision.pdo_audit }),
     }
   }
   if use_path &&
     target == @protocol.SafeOp &&
     current != @protocol.SafeOp &&
     current != @protocol.Op {
-    let preparation = prepare_station_startup_from_args(
-      nic, args, station, pdo_logical_base, timeout,
-    )
-    let final_state = transition_station_to_safeop_with_process_mapping(
+    let preparation = match path_preparation {
+      Some(preparation) => preparation
+      None =>
+        prepare_station_startup_from_args(
+          nic, args, station, pdo_logical_base, timeout,
+        )
+    }
+    let final_observation = transition_station_to_safeop_with_process_mapping_observe(
       nic, station, current, preparation, timeout,
     )
     let final_snapshot = try? @protocol.read_al_status_snapshot(
@@ -1564,27 +1713,51 @@ fn[N : @hal.Nic] compute_station_transition_report(
       target,
       station: Some(station),
       current: Some(current),
-      final_state: match final_snapshot {
-        Ok(snapshot) => Some(snapshot.state)
-        Err(_) => Some(final_state)
+      final_state: match final_observation {
+        Some(observed) => Some(observed.state)
+        None =>
+          match final_snapshot {
+            Ok(snapshot) => Some(snapshot.state)
+            Err(_) => Some(current)
+          }
       },
-      al_error_flag: match final_snapshot {
-        Ok(snapshot) => Some(snapshot.error_indication)
-        Err(_) => None
+      al_error_flag: match final_observation {
+        Some(observed) => Some(observed.error_indication)
+        None =>
+          match final_snapshot {
+            Ok(snapshot) => Some(snapshot.error_indication)
+            Err(_) => None
+          }
       },
-      status_code: match final_snapshot {
-        Ok(snapshot) => snapshot.status_code
-        Err(_) => None
+      status_code: match final_observation {
+        Some(observed) => observed.status_code
+        None =>
+          match final_snapshot {
+            Ok(snapshot) => snapshot.status_code
+            Err(_) => None
+          }
       },
+      raw_status_code: final_observation.bind(fn(observed) {
+        observed.raw_status_code
+      }),
+      control_wkc: final_observation.map(fn(observed) { observed.control_wkc }),
       wkc: None,
+      pdo_audit: pdo_decision.map(fn(decision) { decision.pdo_audit }),
     }
   }
-  let final_state = if use_path {
-    transition_station_to_target_strict_after_recovery(
-      nic, station, target, timeout,
-    )
+  let final_observation = if use_path {
+    match path_preparation {
+      Some(preparation) =>
+        transition_station_to_target_with_preparation_observe(
+          nic, station, target, preparation, timeout,
+        )
+      None =>
+        transition_station_to_target_strict_after_recovery_observe(
+          nic, station, target, timeout,
+        )
+    }
   } else {
-    @protocol.request_state(nic, station, target, timeout)
+    Some(@protocol.request_state_observe(nic, station, target, timeout))
   }
   let final_snapshot = try? @protocol.read_al_status_snapshot(
     nic, station, timeout,
@@ -1598,20 +1771,51 @@ fn[N : @hal.Nic] compute_station_transition_report(
     target,
     station: Some(station),
     current: Some(current),
-    final_state: match final_snapshot {
-      Ok(snapshot) => Some(snapshot.state)
-      Err(_) => Some(final_state)
+    final_state: match final_observation {
+      Some(observed) => Some(observed.state)
+      None =>
+        match final_snapshot {
+          Ok(snapshot) => Some(snapshot.state)
+          Err(_) => Some(current)
+        }
     },
-    al_error_flag: match final_snapshot {
-      Ok(snapshot) => Some(snapshot.error_indication)
-      Err(_) => None
+    al_error_flag: match final_observation {
+      Some(observed) => Some(observed.error_indication)
+      None =>
+        match final_snapshot {
+          Ok(snapshot) => Some(snapshot.error_indication)
+          Err(_) => None
+        }
     },
-    status_code: match final_snapshot {
-      Ok(snapshot) => snapshot.status_code
-      Err(_) => None
+    status_code: match final_observation {
+      Some(observed) => observed.status_code
+      None =>
+        match final_snapshot {
+          Ok(snapshot) => snapshot.status_code
+          Err(_) => None
+        }
     },
+    raw_status_code: final_observation.bind(fn(observed) {
+      observed.raw_status_code
+    }),
+    control_wkc: final_observation.map(fn(observed) { observed.control_wkc }),
     wkc: None,
+    pdo_audit: pdo_decision.map(fn(decision) { decision.pdo_audit }),
   }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery_observe(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
+  }
+  @protocol.transition_to_target_strict_observe(nic, station, target, timeout)
 }
 
 ///|
@@ -1621,30 +1825,112 @@ fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery(
   target : @protocol.EsmState,
   timeout : @hal.Duration,
 ) -> @protocol.EsmState raise @hal.EcError {
-  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
-  if snapshot.error_indication {
-    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
+  match
+    transition_station_to_target_strict_after_recovery_observe(
+      nic, station, target, timeout,
+    ) {
+    Some(observed) => observed.state
+    None => @protocol.read_al_status_snapshot(nic, station, timeout).state
   }
-  @protocol.transition_to_target_strict(nic, station, target, timeout)
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_op_after_recovery(
+fn[N : @hal.Nic] transition_station_to_op_after_recovery_observe(
   nic : N,
   station : UInt,
   pdo_ctx : @protocol.PdoContext,
   timeout : @hal.Duration,
-) -> @protocol.EsmStatusSnapshot raise @hal.EcError {
+) -> @protocol.EsmStateRequestObservation raise @hal.EcError {
   let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
   if snapshot.error_indication {
     ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
   }
-  @protocol.request_state_with_process_data_snapshot(
+  @protocol.request_state_with_process_data_observe(
     nic,
     station,
     @protocol.Op,
     pdo_ctx,
     timeout,
+  )
+}
+
+///|
+fn startup_mailbox_transition_from_route(
+  current : @protocol.EsmState,
+  target : @protocol.EsmState,
+) -> @runtime.StartupCommandTransition? {
+  match (current, target) {
+    (@protocol.Init, @protocol.PreOp) => Some(@runtime.InitToPreOp)
+    (@protocol.Init, @protocol.Boot) => Some(@runtime.InitToBoot)
+    (@protocol.PreOp, @protocol.Init) => Some(@runtime.PreOpToInit)
+    (@protocol.PreOp, @protocol.SafeOp) => Some(@runtime.PreOpToSafeOp)
+    (@protocol.SafeOp, @protocol.Init) => Some(@runtime.SafeOpToInit)
+    (@protocol.SafeOp, @protocol.PreOp) => Some(@runtime.SafeOpToPreOp)
+    (@protocol.SafeOp, @protocol.Op) => Some(@runtime.SafeOpToOp)
+    (@protocol.Op, @protocol.Init) => Some(@runtime.OpToInit)
+    (@protocol.Op, @protocol.PreOp) => Some(@runtime.OpToPreOp)
+    (@protocol.Op, @protocol.SafeOp) => Some(@runtime.OpToSafeOp)
+    (@protocol.Boot, @protocol.Init) => Some(@runtime.BootToInit)
+    _ => None
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_with_startup_mailbox_route_observe(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
+  }
+  let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
+  let path = @protocol.build_strict_transition_route(current, target)
+  let mut path_state = path[0]
+  let mut last_observation : @protocol.EsmStateRequestObservation? = None
+  for i = 1; i < path.length(); i = i + 1 {
+    let next = path[i]
+    match startup_mailbox_transition_from_route(path_state, next) {
+      Some(transition) =>
+        @runtime.apply_startup_mailbox_commands(
+          nic,
+          station,
+          preparation.mailbox_config,
+          preparation.startup_mailbox_commands,
+          transition,
+          timeout,
+        )
+      None => ()
+    }
+    let observed = @protocol.request_state_observe(nic, station, next, timeout)
+    path_state = observed.state
+    last_observation = Some(observed)
+  }
+  last_observation
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_target_with_preparation_observe(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.state == target {
+    return None
+  }
+  if snapshot.state == @protocol.Init || snapshot.state == @protocol.Boot {
+    ignore(
+      @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
+    )
+  }
+  transition_station_with_startup_mailbox_route_observe(
+    nic, station, target, preparation, timeout,
   )
 }
 
@@ -1661,15 +1947,17 @@ fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
     current == @protocol.Op {
     return current
   }
-  ignore(
-    @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
-  )
-  transition_station_to_target_strict_after_recovery(
-    nic,
-    station,
-    @protocol.PreOp,
-    timeout,
-  )
+  match
+    transition_station_to_target_with_preparation_observe(
+      nic,
+      station,
+      @protocol.PreOp,
+      preparation,
+      timeout,
+    ) {
+    Some(observed) => observed.state
+    None => @protocol.read_al_status_snapshot(nic, station, timeout).state
+  }
 }
 
 ///|
@@ -1680,34 +1968,55 @@ fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
   preparation : @runtime.SlaveStartupPreparation,
   timeout : @hal.Duration,
 ) -> @protocol.EsmState raise @hal.EcError {
+  match
+    transition_station_to_safeop_with_process_mapping_observe(
+      nic, station, current, preparation, timeout,
+    ) {
+    Some(observed) => observed.state
+    None => current
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping_observe(
+  nic : N,
+  station : UInt,
+  current : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
   if current == @protocol.SafeOp || current == @protocol.Op {
-    return current
+    return None
   }
   let preop_state = transition_station_to_preop_with_mailbox(
     nic, station, current, preparation, timeout,
   )
   if preop_state == @protocol.SafeOp || preop_state == @protocol.Op {
-    return preop_state
+    return None
   }
+  let process_preparation = refine_station_startup_preparation_in_preop_if_needed(
+    nic,
+    station,
+    Some(preop_state),
+    preparation,
+    timeout,
+  )
   @runtime.apply_presafeop_startup_mailbox_commands(
     nic,
     station,
-    preparation.mailbox_config,
-    preparation.startup_mailbox_commands,
+    process_preparation.mailbox_config,
+    process_preparation.startup_mailbox_commands,
     timeout,
-  )
-  let refined_preparation = @runtime.refine_startup_preparation_in_preop(
-    nic, station, pdo_logical_base, preparation, timeout,
   )
   ignore(
     @runtime.write_process_data_mapping(
       nic,
       station,
-      refined_preparation.mapping,
+      process_preparation.mapping,
       timeout,
     ),
   )
-  transition_station_to_target_strict_after_recovery(
+  transition_station_to_target_strict_after_recovery_observe(
     nic,
     station,
     @protocol.SafeOp,
@@ -1722,17 +2031,17 @@ fn[N : @hal.Nic] transition_station_to_op_with_preparation(
   current : @protocol.EsmState,
   initial_preparation : @runtime.SlaveStartupPreparation,
   timeout : @hal.Duration,
-) -> (@protocol.EsmStatusSnapshot, UInt?) raise @hal.EcError {
+) -> (@protocol.EsmStateRequestObservation, UInt?) raise @hal.EcError {
   let state_before_process_mapping = transition_station_to_preop_with_mailbox(
     nic, station, current, initial_preparation, timeout,
   )
-  let preparation = if state_before_process_mapping == @protocol.PreOp {
-    @runtime.refine_startup_preparation_in_preop(
-      nic, station, pdo_logical_base, initial_preparation, timeout,
-    )
-  } else {
-    initial_preparation
-  }
+  let preparation = refine_station_startup_preparation_in_preop_if_needed(
+    nic,
+    station,
+    Some(state_before_process_mapping),
+    initial_preparation,
+    timeout,
+  )
   let pdo_ctx = @protocol.PdoContext::build(
     [(preparation.mapping, station)],
     pdo_logical_base,
@@ -1772,28 +2081,51 @@ fn[N : @hal.Nic] transition_station_to_op_with_preparation(
   } else {
     None
   }
-  let final_snapshot : @protocol.EsmStatusSnapshot = if state_before_op ==
+  let final_observation : @protocol.EsmStateRequestObservation = if state_before_op ==
     @protocol.Op {
-    { state: state_before_op, error_indication: false, status_code: None }
+    {
+      state: state_before_op,
+      error_indication: false,
+      status_code: None,
+      raw_status_code: None,
+      control_wkc: 0U,
+    }
   } else if has_process_data {
-    transition_station_to_op_after_recovery(nic, station, pdo_ctx, timeout)
-  } else {
-    let final_state = transition_station_to_target_strict_after_recovery(
-      nic,
-      station,
-      @protocol.Op,
-      timeout,
+    transition_station_to_op_after_recovery_observe(
+      nic, station, pdo_ctx, timeout,
     )
-    @protocol.read_al_status_snapshot(nic, station, timeout) catch {
-      _ => { state: final_state, error_indication: false, status_code: None }
+  } else {
+    match
+      transition_station_to_target_strict_after_recovery_observe(
+        nic,
+        station,
+        @protocol.Op,
+        timeout,
+      ) {
+      Some(observed) => observed
+      None => {
+        let final_snapshot = @protocol.read_al_status_snapshot(
+          nic, station, timeout,
+        ) catch {
+          _ =>
+            { state: @protocol.Op, error_indication: false, status_code: None }
+        }
+        {
+          state: final_snapshot.state,
+          error_indication: final_snapshot.error_indication,
+          status_code: final_snapshot.status_code,
+          raw_status_code: None,
+          control_wkc: 0U,
+        }
+      }
     }
   }
-  let final_wkc = if final_snapshot.state == @protocol.Op && has_process_data {
+  let final_wkc = if final_observation.state == @protocol.Op && has_process_data {
     Some(@protocol.pdo_exchange(nic, pdo_ctx, timeout))
   } else {
     kick_before_op
   }
-  (final_snapshot, final_wkc)
+  (final_observation, final_wkc)
 }
 
 ///|
@@ -2537,7 +2869,44 @@ struct StateTransitionReport {
   final_state : @protocol.EsmState?
   al_error_flag : Bool?
   status_code : UInt?
+  raw_status_code : UInt?
+  control_wkc : UInt?
   wkc : UInt?
+  pdo_audit : PdoAuditReport?
+}
+
+///|
+struct PdoMappingObjectReport {
+  index : UInt
+  entries : Array[UInt]
+}
+
+///|
+struct PdoDirectionReport {
+  assignment_index : UInt
+  assigned_pdos : Array[UInt]
+  objects : Array[PdoMappingObjectReport]
+}
+
+///|
+struct PdoAuditReport {
+  plan_source : String
+  policy : String
+  effective_source : String
+  live_detected : Bool?
+  live_differs_from_plan : Bool?
+  live_read_error : String?
+  configured_rx : PdoDirectionReport
+  configured_tx : PdoDirectionReport
+  live_rx : PdoDirectionReport?
+  live_tx : PdoDirectionReport?
+  mismatches : Array[String]
+}
+
+///|
+struct StationStartupDecision {
+  preparation : @runtime.SlaveStartupPreparation
+  pdo_audit : PdoAuditReport
 }
 
 ///|
@@ -2652,6 +3021,7 @@ struct StartupTraceReport {
   final_state : @protocol.EsmState?
   phases : Array[StartupTracePhase]
   transition_error : String?
+  pdo_audit : PdoAuditReport?
 }
 
 ///|
@@ -2806,10 +3176,422 @@ fn[N : @hal.Nic] build_startup_diff_report(
 }
 
 ///|
+fn pdo_policy_name(prefer_live_pdo_state : Bool) -> String {
+  if prefer_live_pdo_state {
+    "prefer-live"
+  } else {
+    "force-configured"
+  }
+}
+
+///|
+fn pdo_effective_source(
+  plan_source : String,
+  prefer_live_pdo_state : Bool,
+  live_detected : Bool,
+) -> String {
+  if !prefer_live_pdo_state {
+    if plan_source == "esi-json" {
+      "forced-esi"
+    } else {
+      "forced-online-sii"
+    }
+  } else if live_detected {
+    "live"
+  } else {
+    plan_source
+  }
+}
+
+///|
+fn pdo_mapping_entry_raw(entry : @mailbox.SiiPdoEntry) -> UInt {
+  entry.entry_index |
+  (entry.subindex.to_uint() << 16) |
+  (entry.bit_length.to_uint() << 24)
+}
+
+///|
+fn normalize_pdo_mapping_entry_raw(raw : UInt) -> UInt {
+  let entry_index = (raw >> 16) & 0xFFFFU
+  let subindex = (raw >> 8) & 0xFFU
+  let bit_length = raw & 0xFFU
+  entry_index | (subindex << 16) | (bit_length << 24)
+}
+
+///|
+fn pdo_direction_from_sii(
+  pdos : Array[@mailbox.SiiPdo],
+  assignment_index : UInt,
+) -> PdoDirectionReport {
+  {
+    assignment_index,
+    assigned_pdos: pdos.map(fn(pdo) { pdo.pdo_index }),
+    objects: pdos.map(fn(pdo) {
+      {
+        index: pdo.pdo_index,
+        entries: pdo.entries.map(fn(entry) { pdo_mapping_entry_raw(entry) }),
+      }
+    }),
+  }
+}
+
+///|
+fn[N : @hal.Nic] pdo_sdo_u32(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> UInt raise @hal.EcError {
+  let payload = startup_trace_sdo_upload(
+    nic, station, mailbox_config, index, subindex, timeout,
+  )
+  match decode_payload_u32_le(payload) {
+    Some(value) => value
+    None =>
+      raise @hal.EcError::MailboxProtocol(
+        "pdo audit: empty payload at 0x" +
+        format_hex(index, 4) +
+        ":" +
+        format_hex(subindex.to_uint(), 2),
+      )
+  }
+}
+
+///|
+fn[N : @hal.Nic] read_live_pdo_direction(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  assignment_index : UInt,
+  timeout : @hal.Duration,
+) -> PdoDirectionReport raise @hal.EcError {
+  let count = pdo_sdo_u32(
+    nic, station, mailbox_config, assignment_index, b'\x00', timeout,
+  ).reinterpret_as_int()
+  let assigned_pdos : Array[UInt] = []
+  let objects : Array[PdoMappingObjectReport] = []
+  for i = 1; i <= count; i = i + 1 {
+    let pdo_index = pdo_sdo_u32(
+        nic,
+        station,
+        mailbox_config,
+        assignment_index,
+        i.to_byte(),
+        timeout,
+      ) &
+      0xFFFFU
+    assigned_pdos.push(pdo_index)
+    let entry_count = pdo_sdo_u32(
+      nic, station, mailbox_config, pdo_index, b'\x00', timeout,
+    ).reinterpret_as_int()
+    let entries : Array[UInt] = []
+    for entry_index = 1
+        entry_index <= entry_count
+        entry_index = entry_index + 1 {
+      entries.push(
+        normalize_pdo_mapping_entry_raw(
+          pdo_sdo_u32(
+            nic,
+            station,
+            mailbox_config,
+            pdo_index,
+            entry_index.to_byte(),
+            timeout,
+          ),
+        ),
+      )
+    }
+    objects.push({ index: pdo_index, entries })
+  }
+  { assignment_index, assigned_pdos, objects }
+}
+
+///|
+fn[N : @hal.Nic] read_live_pdo_reports(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> (PdoDirectionReport, PdoDirectionReport) raise @hal.EcError {
+  let scan_report = @runtime.scan(nic, timeout)
+  let slave = resolve_cli_slave(scan_report, Some(station))
+  let mailbox_session = @runtime.prepare_slave_mailbox_ap(
+    nic,
+    slave.position.reinterpret_as_uint(),
+    station,
+    timeout,
+  )
+  let rx = read_live_pdo_direction(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    0x1C12U,
+    timeout,
+  )
+  let tx = read_live_pdo_direction(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    0x1C13U,
+    timeout,
+  )
+  if mailbox_session.original_state != @protocol.PreOp {
+    ignore(
+      try? @runtime.restore_slave_mailbox_state(
+        nic,
+        station,
+        mailbox_session.original_state,
+        timeout,
+      ),
+    )
+  }
+  (rx, tx)
+}
+
+///|
+fn pdo_uint_arrays_equal(lhs : Array[UInt], rhs : Array[UInt]) -> Bool {
+  if lhs.length() != rhs.length() {
+    return false
+  }
+  for i = 0; i < lhs.length(); i = i + 1 {
+    if lhs[i] != rhs[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn pdo_append_unique(indices : Array[UInt], value : UInt) -> Unit {
+  for existing in indices {
+    if existing == value {
+      return
+    }
+  }
+  indices.push(value)
+}
+
+///|
+fn pdo_direction_object_entries(
+  direction : PdoDirectionReport,
+  index : UInt,
+) -> Array[UInt]? {
+  for object in direction.objects {
+    if object.index == index {
+      return Some(object.entries)
+    }
+  }
+  None
+}
+
+///|
+fn pdo_assignment_indices_text(indices : Array[UInt]) -> String {
+  "[" +
+  join_strings(indices.map(fn(index) { format_hex(index, 4) }), ", ") +
+  "]"
+}
+
+///|
+fn pdo_mapping_entry_summary(raw : UInt) -> String {
+  format_hex(raw & 0xFFFFU, 4) +
+  ":" +
+  format_hex((raw >> 16) & 0xFFU, 2) +
+  "/" +
+  ((raw >> 24) & 0xFFU).to_string()
+}
+
+///|
+fn pdo_mapping_entries_text(entries : Array[UInt]) -> String {
+  "[" +
+  join_strings(
+    entries.map(fn(entry) { pdo_mapping_entry_summary(entry) }),
+    ", ",
+  ) +
+  "]"
+}
+
+///|
+fn pdo_direction_mismatch_messages(
+  configured : PdoDirectionReport,
+  live : PdoDirectionReport,
+) -> Array[String] {
+  let mismatches : Array[String] = []
+  if !pdo_uint_arrays_equal(configured.assigned_pdos, live.assigned_pdos) {
+    mismatches.push(
+      "assignment " +
+      format_hex(configured.assignment_index, 4) +
+      " expected=" +
+      pdo_assignment_indices_text(configured.assigned_pdos) +
+      " actual=" +
+      pdo_assignment_indices_text(live.assigned_pdos),
+    )
+  }
+  let object_indices : Array[UInt] = []
+  for index in configured.assigned_pdos {
+    pdo_append_unique(object_indices, index)
+  }
+  for index in live.assigned_pdos {
+    pdo_append_unique(object_indices, index)
+  }
+  for index in object_indices {
+    let configured_entries = match
+      pdo_direction_object_entries(configured, index) {
+      Some(entries) => entries
+      None => []
+    }
+    let live_entries = match pdo_direction_object_entries(live, index) {
+      Some(entries) => entries
+      None => []
+    }
+    if !pdo_uint_arrays_equal(configured_entries, live_entries) {
+      mismatches.push(
+        "mapping " +
+        format_hex(index, 4) +
+        " expected=" +
+        pdo_mapping_entries_text(configured_entries) +
+        " actual=" +
+        pdo_mapping_entries_text(live_entries),
+      )
+    }
+  }
+  mismatches
+}
+
+///|
+fn[N : @hal.Nic] build_pdo_audit_report(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> PdoAuditReport {
+  let plan_source = configured_startup_source(args)
+  let configured_rx = pdo_direction_from_sii(preparation.sii.rx_pdo, 0x1C12U)
+  let configured_tx = pdo_direction_from_sii(preparation.sii.tx_pdo, 0x1C13U)
+  let live_result : Result[
+    (PdoDirectionReport, PdoDirectionReport),
+    @hal.EcError,
+  ] = try? read_live_pdo_reports(nic, station, timeout)
+  match live_result {
+    Ok((live_rx, live_tx)) => {
+      let mismatches = pdo_direction_mismatch_messages(configured_rx, live_rx)
+      for message in pdo_direction_mismatch_messages(configured_tx, live_tx) {
+        mismatches.push(message)
+      }
+      let live_detected = !live_rx.assigned_pdos.is_empty() ||
+        !live_tx.assigned_pdos.is_empty()
+      {
+        plan_source,
+        policy: pdo_policy_name(preparation.prefer_live_pdo_state),
+        effective_source: pdo_effective_source(
+          plan_source,
+          preparation.prefer_live_pdo_state,
+          live_detected,
+        ),
+        live_detected: Some(live_detected),
+        live_differs_from_plan: Some(!mismatches.is_empty()),
+        live_read_error: None,
+        configured_rx,
+        configured_tx,
+        live_rx: Some(live_rx),
+        live_tx: Some(live_tx),
+        mismatches,
+      }
+    }
+    Err(err) => {
+      let live_detected = false
+      {
+        plan_source,
+        policy: pdo_policy_name(preparation.prefer_live_pdo_state),
+        effective_source: pdo_effective_source(
+          plan_source,
+          preparation.prefer_live_pdo_state,
+          live_detected,
+        ),
+        live_detected: None,
+        live_differs_from_plan: None,
+        live_read_error: Some(err.to_string()),
+        configured_rx,
+        configured_tx,
+        live_rx: None,
+        live_tx: None,
+        mismatches: [],
+      }
+    }
+  }
+}
+
+///|
+fn[N : @hal.Nic] resolve_station_startup_decision(
+  nic : N,
+  args : Array[String],
+  station : UInt,
+  logical_base : UInt,
+  timeout : @hal.Duration,
+) -> StationStartupDecision raise @hal.EcError {
+  let preparation = prepare_station_startup_from_args(
+    nic, args, station, logical_base, timeout,
+  )
+  {
+    preparation,
+    pdo_audit: build_pdo_audit_report(nic, args, station, preparation, timeout),
+  }
+}
+
+///|
 fn mailbox_readback_source(args : Array[String]) -> String {
-  match flag_value(args, "--esi-json") {
-    Some(_) => "esi-json"
-    None => "online-sii"
+  configured_startup_source(args)
+}
+
+///|
+fn startup_trace_source(args : Array[String]) -> String {
+  configured_startup_source(args)
+}
+
+///|
+fn startup_command_reconfigures_pdo_mapping(
+  command : @runtime.StartupMailboxCommand,
+) -> Bool {
+  if command.transition != @runtime.PreOpToSafeOp {
+    return false
+  }
+  if command.index == 0x1C12U || command.index == 0x1C13U {
+    return true
+  }
+  (command.index >= 0x1600U && command.index <= 0x17FFU) ||
+  (command.index >= 0x1A00U && command.index <= 0x1BFFU)
+}
+
+///|
+fn startup_mailbox_commands_need_preop_refinement(
+  commands : Array[@runtime.StartupMailboxCommand],
+) -> Bool {
+  for command in commands {
+    if startup_command_reconfigures_pdo_mapping(command) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn[N : @hal.Nic] refine_station_startup_preparation_in_preop_if_needed(
+  nic : N,
+  station : UInt,
+  state : @protocol.EsmState?,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @runtime.SlaveStartupPreparation {
+  if state == Some(@protocol.PreOp) &&
+    startup_mailbox_commands_need_preop_refinement(
+      preparation.startup_mailbox_commands,
+    ) {
+    @runtime.refine_startup_preparation_in_preop(
+      nic, station, pdo_logical_base, preparation, timeout,
+    )
+  } else {
+    preparation
   }
 }
 
@@ -3005,6 +3787,139 @@ fn startup_trace_od_indices() -> Array[UInt] {
 }
 
 ///|
+let startup_trace_mailbox_max_polls : Int = 32
+
+///|
+let startup_trace_mailbox_drain_limit : Int = 4
+
+///|
+let startup_trace_sdo_max_attempts : Int = 3
+
+///|
+fn startup_trace_should_retry_od_read(err : @hal.EcError) -> Bool {
+  match err {
+    @hal.EcError::MailboxTimeout => true
+    @hal.EcError::MailboxProtocol(message) =>
+      message.contains("stale") || message.contains("counter mismatch")
+    _ => false
+  }
+}
+
+///|
+fn[N : @hal.Nic] startup_trace_drain_mailbox(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+) -> Unit {
+  let zero_timeout = @hal.Duration(0L)
+  for _drain = 0
+      _drain < startup_trace_mailbox_drain_limit
+      _drain = _drain + 1 {
+    let poll_result : Result[Bool, @hal.EcError] = try? @protocol.mailbox_poll(
+      nic, station, mailbox_config, zero_timeout,
+    )
+    match poll_result {
+      Ok(true) =>
+        ignore(
+          try? @protocol.mailbox_recv(
+            nic,
+            station,
+            mailbox_config,
+            zero_timeout,
+            max_polls=1,
+          ),
+        )
+      _ => return
+    }
+  }
+}
+
+///|
+fn[N : @hal.Nic] startup_trace_sdo_upload_once(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let counter = rmsm.begin_transaction()
+  let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
+  let frame = txn.encode()
+  startup_trace_drain_mailbox(nic, station, mailbox_config)
+  @protocol.mailbox_send(nic, station, mailbox_config, frame, timeout)
+  for _stale_attempt = 0
+      _stale_attempt < startup_trace_mailbox_drain_limit
+      _stale_attempt = _stale_attempt + 1 {
+    let response_raw = @protocol.mailbox_recv_rmsm(
+      nic,
+      station,
+      mailbox_config,
+      rmsm,
+      timeout,
+      max_polls=startup_trace_mailbox_max_polls,
+    )
+    let (mbh, resp) = @mailbox.decode_sdo_response(response_raw)
+    if !rmsm.validate_response(mbh.counter) {
+      continue
+    }
+    if resp.command != @mailbox.SdoCommand::UploadResponse {
+      raise @hal.EcError::MailboxProtocol(
+        "startup-trace od read: expected UploadResponse, got " +
+        resp.command.to_string(),
+      )
+    }
+    if resp.index != index || resp.subindex != subindex {
+      raise @hal.EcError::MailboxProtocol(
+        "startup-trace od read: index/subindex mismatch in response",
+      )
+    }
+    if resp.segmented {
+      raise @hal.EcError::MailboxProtocol(
+        "startup-trace od read: segmented response is not supported",
+      )
+    }
+    return resp.data
+  }
+  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+}
+
+///|
+fn[N : @hal.Nic] startup_trace_sdo_upload(
+  nic : N,
+  station : UInt,
+  mailbox_config : @mailbox.MailboxConfig,
+  index : UInt,
+  subindex : Byte,
+  timeout : @hal.Duration,
+) -> Bytes raise @hal.EcError {
+  let mut last_err : @hal.EcError? = None
+  for _attempt = 0
+      _attempt < startup_trace_sdo_max_attempts
+      _attempt = _attempt + 1 {
+    let result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload_once(
+      nic, station, mailbox_config, index, subindex, timeout,
+    )
+    match result {
+      Ok(payload) => return payload
+      Err(err) => {
+        let should_retry = startup_trace_should_retry_od_read(err)
+        last_err = Some(err)
+        if !should_retry {
+          raise err
+        }
+      }
+    }
+  }
+  match last_err {
+    Some(err) => raise err
+    None =>
+      raise @hal.EcError::Internal("startup-trace od read exhausted retries")
+  }
+}
+
+///|
 fn startup_trace_od_entry_failure(
   subindex : Byte,
   err : @hal.EcError,
@@ -3043,9 +3958,8 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
   index : UInt,
   timeout : @hal.Duration,
 ) -> StartupTraceOdObject {
-  let rmsm = @mailbox.Rmsm::new(max_retries=0)
-  let count_result : Result[Bytes, @hal.EcError] = try? @protocol.sdo_upload_retry(
-    nic, station, mailbox_config, rmsm, index, b'\x00', timeout,
+  let count_result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload(
+    nic, station, mailbox_config, index, b'\x00', timeout,
   )
   match count_result {
     Err(err) =>
@@ -3068,8 +3982,8 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
         Some(count) =>
           for i = 1; i <= count.reinterpret_as_int(); i = i + 1 {
             let subindex = i.to_byte()
-            let entry_result : Result[Bytes, @hal.EcError] = try? @protocol.sdo_upload_retry(
-              nic, station, mailbox_config, rmsm, index, subindex, timeout,
+            let entry_result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload(
+              nic, station, mailbox_config, index, subindex, timeout,
             )
             match entry_result {
               Ok(entry_payload) =>
@@ -3259,10 +4173,12 @@ fn[N : @hal.Nic] build_startup_trace_report(
   station : UInt,
   timeout : @hal.Duration,
 ) -> StartupTraceReport raise @hal.EcError {
-  let source = mailbox_readback_source(args)
-  let preparation = prepare_station_startup_from_args(
+  let decision = resolve_station_startup_decision(
     nic, args, station, pdo_logical_base, timeout,
   )
+  let pdo_audit = decision.pdo_audit
+  let source = startup_trace_source(args)
+  let initial_preparation = decision.preparation
   let phases : Array[StartupTracePhase] = []
   phases.push(capture_startup_trace_phase(nic, station, "initial", timeout))
   if has_flag(args, "--reset-init") {
@@ -3277,6 +4193,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
   let initial_state = phases[0].al_state
   let mut phase_state = phases[phases.length() - 1].al_state
   let mut transition_error : String? = None
+  let mut preparation = initial_preparation
   let needs_mailbox_path = match phase_state {
     Some(@protocol.PreOp) | Some(@protocol.SafeOp) | Some(@protocol.Op) => false
     _ => true
@@ -3302,15 +4219,21 @@ fn[N : @hal.Nic] build_startup_trace_report(
           final_state: phases[phases.length() - 1].al_state,
           phases,
           transition_error,
+          pdo_audit: Some(pdo_audit),
         }
       }
     }
-    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? transition_station_to_target_strict_after_recovery(
-      nic,
-      station,
-      @protocol.PreOp,
-      timeout,
-    )
+    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? (match
+      transition_station_with_startup_mailbox_route_observe(
+        nic,
+        station,
+        @protocol.PreOp,
+        preparation,
+        timeout,
+      ) {
+      Some(observed) => observed.state
+      None => @protocol.read_al_status_snapshot(nic, station, timeout).state
+    })
     phases.push(
       startup_trace_phase_with_od(nic, station, "after_preop_request", timeout),
     )
@@ -3325,10 +4248,14 @@ fn[N : @hal.Nic] build_startup_trace_report(
           final_state: phases[phases.length() - 1].al_state,
           phases,
           transition_error,
+          pdo_audit: Some(pdo_audit),
         }
       }
     }
   }
+  preparation = refine_station_startup_preparation_in_preop_if_needed(
+    nic, station, phase_state, preparation, timeout,
+  )
   let needs_process_path = match phase_state {
     Some(@protocol.SafeOp) | Some(@protocol.Op) => false
     _ => true
@@ -3359,16 +4286,14 @@ fn[N : @hal.Nic] build_startup_trace_report(
           final_state: phases[phases.length() - 1].al_state,
           phases,
           transition_error,
+          pdo_audit: Some(pdo_audit),
         }
       }
     }
-    let refined = @runtime.refine_startup_preparation_in_preop(
-      nic, station, pdo_logical_base, preparation, timeout,
-    )
     let process_result : Result[Unit, @hal.EcError] = try? @runtime.write_process_data_mapping(
       nic,
       station,
-      refined.mapping,
+      preparation.mapping,
       timeout,
     )
     phases.push(
@@ -3389,6 +4314,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
           final_state: phases[phases.length() - 1].al_state,
           phases,
           transition_error,
+          pdo_audit: Some(pdo_audit),
         }
       }
     }
@@ -3419,6 +4345,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
     final_state: phases[phases.length() - 1].al_state,
     phases,
     transition_error,
+    pdo_audit: Some(pdo_audit),
   }
 }
 
@@ -3865,6 +4792,68 @@ fn mailbox_readback_report_json(report : MailboxReadbackReport) -> Json {
 }
 
 ///|
+fn pdo_mapping_entry_json(entry : UInt) -> Json {
+  Json::object({
+    "raw": Json::number(entry.to_double()),
+    "raw_hex": Json::string(format_hex(entry, 8)),
+    "summary": Json::string(pdo_mapping_entry_summary(entry)),
+  })
+}
+
+///|
+fn pdo_mapping_object_report_json(object : PdoMappingObjectReport) -> Json {
+  Json::object({
+    "index": Json::number(object.index.to_double()),
+    "index_hex": Json::string(format_hex(object.index, 4)),
+    "entries": Json::array(object.entries.map(pdo_mapping_entry_json)),
+  })
+}
+
+///|
+fn pdo_direction_report_json(direction : PdoDirectionReport) -> Json {
+  Json::object({
+    "assignment_index": Json::number(direction.assignment_index.to_double()),
+    "assignment_index_hex": Json::string(
+      format_hex(direction.assignment_index, 4),
+    ),
+    "assigned_pdos": Json::array(
+      direction.assigned_pdos.map(fn(index) {
+        Json::object({
+          "index": Json::number(index.to_double()),
+          "index_hex": Json::string(format_hex(index, 4)),
+        })
+      }),
+    ),
+    "objects": Json::array(
+      direction.objects.map(pdo_mapping_object_report_json),
+    ),
+  })
+}
+
+///|
+fn pdo_audit_report_json(report : PdoAuditReport) -> Json {
+  Json::object({
+    "plan_source": Json::string(report.plan_source),
+    "policy": Json::string(report.policy),
+    "effective_source": Json::string(report.effective_source),
+    "live_detected": option_bool_json(report.live_detected),
+    "live_differs_from_plan": option_bool_json(report.live_differs_from_plan),
+    "live_read_error": option_string_json(report.live_read_error),
+    "configured_rx": pdo_direction_report_json(report.configured_rx),
+    "configured_tx": pdo_direction_report_json(report.configured_tx),
+    "live_rx": match report.live_rx {
+      Some(value) => pdo_direction_report_json(value)
+      None => Json::null()
+    },
+    "live_tx": match report.live_tx {
+      Some(value) => pdo_direction_report_json(value)
+      None => Json::null()
+    },
+    "mismatches": Json::array(report.mismatches.map(item => Json::string(item))),
+  })
+}
+
+///|
 fn startup_trace_phase_json(phase : StartupTracePhase) -> Json {
   Json::object({
     "name": Json::string(phase.name),
@@ -3959,6 +4948,10 @@ fn startup_trace_report_json(report : StartupTraceReport) -> Json {
     "initial_state": option_esm_state_json(report.initial_state),
     "final_state": option_esm_state_json(report.final_state),
     "transition_error": option_string_json(report.transition_error),
+    "pdo_audit": match report.pdo_audit {
+      Some(value) => pdo_audit_report_json(value)
+      None => Json::null()
+    },
     "phases": Json::array(report.phases.map(startup_trace_phase_json)),
   })
 }
@@ -4144,6 +5137,13 @@ fn startup_trace_report_text(report : StartupTraceReport) -> String {
   match report.transition_error {
     Some(err) => buf.write_string("Transition Error: " + err + "\n\n")
     None => buf.write_string("Transition Error: none\n\n")
+  }
+  match report.pdo_audit {
+    Some(value) => {
+      buf.write_string(pdo_audit_report_text(value))
+      buf.write_string("\n")
+    }
+    None => ()
   }
   for phase in report.phases {
     let phase_state = match phase.al_state {
@@ -6772,7 +7772,9 @@ fn run_fault_json(fault : @runtime.RunFault) -> Json {
       target~,
       current~,
       error_indication~,
-      status_code~
+      status_code~,
+      raw_status_code~,
+      control_wkc~
     ) =>
       Json::object({
         "kind": Json::string("startup-transition-failed"),
@@ -6788,6 +7790,14 @@ fn run_fault_json(fault : @runtime.RunFault) -> Json {
         },
         "status_code": match status_code {
           Some(code) => Json::number(code.to_double())
+          None => Json::null()
+        },
+        "raw_status_code": match raw_status_code {
+          Some(code) => Json::number(code.to_double())
+          None => Json::null()
+        },
+        "control_wkc": match control_wkc {
+          Some(wkc) => Json::number(wkc.to_double())
           None => Json::null()
         },
       })
@@ -6836,8 +7846,20 @@ fn state_transition_report_json(report : StateTransitionReport) -> Json {
       Some(code) => Json::number(code.to_double())
       None => Json::null()
     },
+    "raw_status_code": match report.raw_status_code {
+      Some(code) => Json::number(code.to_double())
+      None => Json::null()
+    },
+    "control_wkc": match report.control_wkc {
+      Some(wkc) => Json::number(wkc.to_double())
+      None => Json::null()
+    },
     "wkc": match report.wkc {
       Some(wkc) => Json::number(wkc.to_double())
+      None => Json::null()
+    },
+    "pdo_audit": match report.pdo_audit {
+      Some(value) => pdo_audit_report_json(value)
       None => Json::null()
     },
     "surface": diagnostic_surface_json(
@@ -6848,7 +7870,10 @@ fn state_transition_report_json(report : StateTransitionReport) -> Json {
         report.final_state,
         report.al_error_flag,
         report.status_code,
-        report.wkc,
+        match report.control_wkc {
+          Some(wkc) => Some(wkc)
+          None => report.wkc
+        },
       ),
     ),
   })
@@ -7031,9 +8056,133 @@ fn state_transition_report_text(report : StateTransitionReport) -> String {
       buf.write_string("AL Status Code: " + format_hex(code, 4) + "\n")
     None => ()
   }
+  match report.raw_status_code {
+    Some(code) =>
+      buf.write_string("Raw AL Status Code: " + format_hex(code, 4) + "\n")
+    None => ()
+  }
+  match report.control_wkc {
+    Some(wkc) => buf.write_string("AL Control WKC: " + wkc.to_string() + "\n")
+    None => ()
+  }
   match report.wkc {
     Some(wkc) => buf.write_string("WKC: " + wkc.to_string() + "\n")
     None => ()
+  }
+  match report.pdo_audit {
+    Some(value) => buf.write_string("\n" + pdo_audit_report_text(value))
+    None => ()
+  }
+  buf.to_string()
+}
+
+///|
+fn pdo_direction_objects_text(direction : PdoDirectionReport) -> String {
+  join_strings(
+    direction.objects.map(fn(object) {
+      format_hex(object.index, 4) +
+      "=" +
+      pdo_mapping_entries_text(object.entries)
+    }),
+    "; ",
+  )
+}
+
+///|
+fn pdo_audit_report_text(report : PdoAuditReport) -> String {
+  let buf = @buffer.new(size_hint=1024)
+  buf.write_string("PDO Audit\n")
+  buf.write_string("---------\n")
+  buf.write_string("Plan Source: " + report.plan_source + "\n")
+  buf.write_string("Policy: " + report.policy + "\n")
+  buf.write_string("Effective Source: " + report.effective_source + "\n")
+  match report.live_detected {
+    Some(value) =>
+      buf.write_string(
+        "Live Detected: " + (if value { "yes" } else { "no" }) + "\n",
+      )
+    None => ()
+  }
+  match report.live_differs_from_plan {
+    Some(value) =>
+      buf.write_string(
+        "Live Differs From Plan: " + (if value { "yes" } else { "no" }) + "\n",
+      )
+    None => ()
+  }
+  match report.live_read_error {
+    Some(err) => buf.write_string("Live Read Error: " + err + "\n")
+    None => ()
+  }
+  buf.write_string(
+    "Configured Rx: " +
+    format_hex(report.configured_rx.assignment_index, 4) +
+    " -> " +
+    pdo_assignment_indices_text(report.configured_rx.assigned_pdos) +
+    "\n",
+  )
+  if !report.configured_rx.objects.is_empty() {
+    buf.write_string(
+      "Configured Rx Objects: " +
+      pdo_direction_objects_text(report.configured_rx) +
+      "\n",
+    )
+  }
+  buf.write_string(
+    "Configured Tx: " +
+    format_hex(report.configured_tx.assignment_index, 4) +
+    " -> " +
+    pdo_assignment_indices_text(report.configured_tx.assigned_pdos) +
+    "\n",
+  )
+  if !report.configured_tx.objects.is_empty() {
+    buf.write_string(
+      "Configured Tx Objects: " +
+      pdo_direction_objects_text(report.configured_tx) +
+      "\n",
+    )
+  }
+  match report.live_rx {
+    Some(direction) => {
+      buf.write_string(
+        "Live Rx: " +
+        format_hex(direction.assignment_index, 4) +
+        " -> " +
+        pdo_assignment_indices_text(direction.assigned_pdos) +
+        "\n",
+      )
+      if !direction.objects.is_empty() {
+        buf.write_string(
+          "Live Rx Objects: " + pdo_direction_objects_text(direction) + "\n",
+        )
+      }
+    }
+    None => ()
+  }
+  match report.live_tx {
+    Some(direction) => {
+      buf.write_string(
+        "Live Tx: " +
+        format_hex(direction.assignment_index, 4) +
+        " -> " +
+        pdo_assignment_indices_text(direction.assigned_pdos) +
+        "\n",
+      )
+      if !direction.objects.is_empty() {
+        buf.write_string(
+          "Live Tx Objects: " + pdo_direction_objects_text(direction) + "\n",
+        )
+      }
+    }
+    None => ()
+  }
+  if report.mismatches.is_empty() {
+    buf.write_string("Mismatches: none\n")
+  } else {
+    buf.write_string("Mismatches:\n")
+    for item in report.mismatches {
+      buf.write_string("- " + item + "\n")
+    }
   }
   buf.to_string()
 }

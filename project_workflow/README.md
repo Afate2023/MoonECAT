@@ -14,9 +14,9 @@
 | **L1** | Foundation（基础骨架） | **9/9 ✅** | 包结构、HAL、帧/PDU、Mock、测试骨架 |
 | **L2** | Protocol Core（协议闭环） | **22/22 ✅** | ESM、PDO、SII/ESI、CoE/SDO、DC、RMSM |
 | **L3** | Product Surface（产品交付） | **15/15 ✅** | Native CLI、ENI/配置、OD、诊断、SII 深读、拓扑 |
-| **L4** | Verification & Hardening | **7/13 ⚠️** | 实机 smoke、NDJSON、长跑、回放 ✅；Linux 实机/ASan/事件溯源回放/HIL ❌ |
+| **L4** | Verification & Hardening | **10/13 ⚠️** | 实机 smoke、NDJSON、长跑、回放、fault injection、monitor/verdict ✅；Linux 实机、ASan、Extism host ❌ |
 
-**ETG.1500 Class B**：17/17 = 100%　｜　**测试**：413+ passing　｜　**三条主线**：A 原生运行时 · B 验证运行时 · C HIL 就绪边界
+**ETG.1500 Class B**：17/17 = 100%　｜　**测试**：1826+ passing　｜　**三条主线**：A 原生运行时 · B 验证运行时 · C HIL 就绪边界
 
 ---
 
@@ -25,8 +25,8 @@
 | 主线 | 优先级 | 目标 | 当前状态 |
 |---|:---:|---|---|
 | **A — Native Runtime Baseline** | P0 | Windows/Linux HAL 统一 · 实机闭环 · 证据矩阵 | ⚠️ Windows Npcap 已跑通，Linux 待实机 |
-| **B — Verification Runtime** | P1 | 事件溯源回放 · fault injection · monitor/verdict · 虚拟从站 | ❌ 规划中，模型基础已有 |
-| **C — HIL-Ready Boundary** | P2 | runtime hook · 多任务 · co-sim adapter · MCU+Linux 时基 | ❌ 规划中 |
+| **B — Verification Runtime** | P1 | 事件溯源回放 · fault injection · monitor/verdict · 虚拟从站 | ⚠️ Phase 1 已闭环，Phase 2 规划中 |
+| **C — HIL-Ready Boundary** | P2 | runtime hook · 多任务 · co-sim adapter · MCU+Linux 时基 | ⚠️ Phase 1 PoC 已完成，Phase 2 规划中 |
 
 详见 [08_integrated_roadmap_and_backlog.md](08_integrated_roadmap_and_backlog.md) §3。
 

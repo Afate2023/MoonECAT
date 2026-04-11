@@ -10,11 +10,6 @@ import {
 } for "test"
 
 options(
-  link: {
-    "native": {
-      "stub-cc-flags": "-IE:/Repos/EtherCAT/MoonECAT/Reference_Project/npcap-sdk-1.16/Include",
-    },
-  },
   "native-stub": [ "platform_stub.c", "zero_copy_stub.c" ],
   targets: {
     "ffi_native.mbt": [ "native" ],

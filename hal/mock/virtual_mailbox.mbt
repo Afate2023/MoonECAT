@@ -187,23 +187,29 @@ fn build_sdo_upload_response(
   data : Bytes,
   counter : Int,
 ) -> Bytes {
-  // CoE header (2) + SDO header (4) + data (up to 4)
-  let data_len = if data.length() > 4 { 4 } else { data.length() }
-  let size_indicator = (4 - data_len) << 2
-  let frame_len = 10
-  let buf = FixedArray::make(frame_len, b'\x00')
-  // Mailbox header (simplified): length(2) + address(2) + channel+cnt(1) + type(1)
-  let mbx_len = frame_len - 6
-  buf[0] = (mbx_len & 0xFF).to_byte()
-  buf[1] = ((mbx_len >> 8) & 0xFF).to_byte()
-  buf[4] = (counter & 0x07).to_byte()
-  buf[5] = b'\x03' // CoE type
-  // CoE SDO response: command specifier 0x02 (upload response) + size + expedited + size_indicator
-  buf[6] = (0x42 | size_indicator).to_byte()
-  buf[7] = (index.reinterpret_as_int() & 0xFF).to_byte()
-  buf[8] = ((index.reinterpret_as_int() >> 8) & 0xFF).to_byte()
-  buf[9] = subindex
-  Bytes::from_array(buf)
+  let payload = if data.length() > 4 {
+    Bytes::makei(4, fn(i) { data[i] })
+  } else {
+    data
+  }
+  let n_unused = 4 - payload.length()
+  let command = b'\x43' | (n_unused.to_byte() << 2)
+  let hdr = build_mailbox_header_bytes(counter, @mailbox.MailboxType::CoE)
+  Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else {
+      match i {
+        6 => b'\x00'
+        7 => b'\x30'
+        8 => command
+        9 => (index & 0xFFU).to_byte()
+        10 => ((index >> 8) & 0xFFU).to_byte()
+        11 => subindex
+        _ => if i - 12 < payload.length() { payload[i - 12] } else { b'\x00' }
+      }
+    }
+  })
 }
 
 ///|
@@ -213,38 +219,64 @@ fn build_sdo_download_response(
   subindex : Byte,
   counter : Int,
 ) -> Bytes {
-  let frame_len = 10
-  let buf = FixedArray::make(frame_len, b'\x00')
-  let mbx_len = frame_len - 6
-  buf[0] = (mbx_len & 0xFF).to_byte()
-  buf[1] = ((mbx_len >> 8) & 0xFF).to_byte()
-  buf[4] = (counter & 0x07).to_byte()
-  buf[5] = b'\x03' // CoE type
-  buf[6] = b'\x60' // Download response
-  buf[7] = (index.reinterpret_as_int() & 0xFF).to_byte()
-  buf[8] = ((index.reinterpret_as_int() >> 8) & 0xFF).to_byte()
-  buf[9] = subindex
-  Bytes::from_array(buf)
+  let hdr = build_mailbox_header_bytes(counter, @mailbox.MailboxType::CoE)
+  Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else {
+      match i {
+        6 => b'\x00'
+        7 => b'\x30'
+        8 => b'\x60'
+        9 => (index & 0xFFU).to_byte()
+        10 => ((index >> 8) & 0xFFU).to_byte()
+        11 => subindex
+        _ => b'\x00'
+      }
+    }
+  })
 }
 
 ///|
 /// Build an SDO abort transfer frame.
 fn build_sdo_abort(index : UInt, subindex : Byte, abort_code : UInt) -> Bytes {
-  let frame_len = 14
-  let buf = FixedArray::make(frame_len, b'\x00')
-  let mbx_len = frame_len - 6
-  buf[0] = (mbx_len & 0xFF).to_byte()
-  buf[1] = ((mbx_len >> 8) & 0xFF).to_byte()
-  buf[5] = b'\x03'
-  buf[6] = b'\x80' // Abort
-  buf[7] = (index.reinterpret_as_int() & 0xFF).to_byte()
-  buf[8] = ((index.reinterpret_as_int() >> 8) & 0xFF).to_byte()
-  buf[9] = subindex
-  buf[10] = (abort_code.reinterpret_as_int() & 0xFF).to_byte()
-  buf[11] = ((abort_code.reinterpret_as_int() >> 8) & 0xFF).to_byte()
-  buf[12] = ((abort_code.reinterpret_as_int() >> 16) & 0xFF).to_byte()
-  buf[13] = ((abort_code.reinterpret_as_int() >> 24) & 0xFF).to_byte()
-  Bytes::from_array(buf)
+  let hdr = build_mailbox_header_bytes(0, @mailbox.MailboxType::CoE)
+  Bytes::makei(16, fn(i) {
+    if i < 6 {
+      hdr[i]
+    } else {
+      match i {
+        6 => b'\x00'
+        7 => b'\x30'
+        8 => b'\x80'
+        9 => (index & 0xFFU).to_byte()
+        10 => ((index >> 8) & 0xFFU).to_byte()
+        11 => subindex
+        12 => (abort_code & 0xFFU).to_byte()
+        13 => ((abort_code >> 8) & 0xFFU).to_byte()
+        14 => ((abort_code >> 16) & 0xFFU).to_byte()
+        15 => ((abort_code >> 24) & 0xFFU).to_byte()
+        _ => b'\x00'
+      }
+    }
+  })
+}
+
+///|
+fn build_mailbox_header_bytes(
+  counter : Int,
+  mb_type : @mailbox.MailboxType,
+) -> Bytes {
+  ignore(counter)
+  let mbh : @mailbox.MailboxHeader = {
+    length: 10U,
+    address: 0U,
+    channel: b'\x00',
+    priority: b'\x00',
+    mb_type,
+    counter: b'\x00',
+  }
+  mbh.to_bytes()
 }
 
 ///|

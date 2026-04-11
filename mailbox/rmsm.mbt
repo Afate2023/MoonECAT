@@ -80,7 +80,8 @@ pub fn Rmsm::begin_retry_transaction(self : Rmsm) -> Byte raise @hal.EcError {
 
 ///|
 /// Validate a received mailbox response counter.
-/// Returns true if this is a valid (new) response; false if it's a repeat.
+/// Returns true if this is a valid (new) response; false if it's a stale or
+/// repeat frame that the caller should discard and continue polling.
 pub fn Rmsm::validate_response(
   self : Rmsm,
   recv_counter : Byte,
@@ -96,19 +97,11 @@ pub fn Rmsm::validate_response(
   }
   // Validate counter matches expectation
   if recv_counter != expected && recv_counter != b'\x00' {
-    // Counter 0 = slave doesn't support counters, always accept
-    self.state = Error(
-      "RMSM: counter mismatch: expected " +
-      expected.to_int().to_string() +
-      " got " +
-      recv_counter.to_int().to_string(),
-    )
-    raise @hal.EcError::MailboxProtocol(
-      "RMSM: counter mismatch: expected " +
-      expected.to_int().to_string() +
-      " got " +
-      recv_counter.to_int().to_string(),
-    )
+    // A non-zero unexpected counter is most often a stale frame from an
+    // earlier transaction that was still queued in the mailbox. Keep waiting
+    // for the current transaction's response and let the caller discard it.
+    self.last_recv_counter = recv_counter
+    return false
   }
   self.last_recv_counter = recv_counter
   self.state = Idle

@@ -16,6 +16,16 @@ pub(all) struct EsmStatusSnapshot {
 } derive(Eq, Debug)
 
 ///|
+/// Final observation from a single AL Control state request.
+pub(all) struct EsmStateRequestObservation {
+  state : EsmState
+  error_indication : Bool
+  status_code : UInt?
+  raw_status_code : UInt?
+  control_wkc : UInt
+} derive(Eq, Show)
+
+///|
 fn decode_al_status_snapshot(
   status : Byte,
   status_code : UInt?,
@@ -36,12 +46,12 @@ fn decode_al_status_snapshot(
 /// Request an ESM state transition on a specific slave (by configured address).
 /// Writes AL Control, then reads AL Status to confirm.
 /// Returns the confirmed state or raises an error.
-pub fn[N : @hal.Nic] request_state(
+pub fn[N : @hal.Nic] request_state_observe(
   nic : N,
   station : UInt,
   target : EsmState,
   timeout : @hal.Duration,
-) -> EsmState raise @hal.EcError {
+) -> EsmStateRequestObservation raise @hal.EcError {
   let current_status = read_al_status_raw_fp(nic, station, timeout)
   if (current_status & b'\x10') != b'\x00' {
     ignore(
@@ -54,7 +64,9 @@ pub fn[N : @hal.Nic] request_state(
     )
   }
   let target_byte = target.to_byte()
-  let _ = request_state_control_fp(nic, station, target_byte, timeout)
+  let (_, control_wkc) = request_state_control_fp_with_wkc(
+    nic, station, target_byte, timeout,
+  )
   let status = wait_for_state_fp(nic, station, target, timeout)
   let actual_state = EsmState::from_byte(status)
   if actual_state != target && (status & b'\x10') != b'\x00' {
@@ -65,26 +77,35 @@ pub fn[N : @hal.Nic] request_state(
       timeout,
     )
     let acknowledged = wait_for_state_fp(nic, station, target, timeout)
-    return EsmState::from_byte(acknowledged)
+    return request_observation_from_status_fp(
+      nic, station, acknowledged, control_wkc, timeout,
+    )
   }
-  actual_state
+  request_observation_from_status_fp(nic, station, status, control_wkc, timeout)
+}
+
+///|
+pub fn[N : @hal.Nic] request_state(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> EsmState raise @hal.EcError {
+  request_state_observe(nic, station, target, timeout).state
 }
 
 ///|
 /// Request an ESM state transition while continuing cyclic PDO exchange,
 /// and return the last confirmed AL snapshot observed during polling.
-pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
+pub fn[N : @hal.Nic] request_state_with_process_data_observe(
   nic : N,
   station : UInt,
   target : EsmState,
   pdo_ctx : PdoContext,
   timeout : @hal.Duration,
-) -> EsmStatusSnapshot raise @hal.EcError {
+) -> EsmStateRequestObservation raise @hal.EcError {
   if pdo_ctx.logical_size <= 0 {
-    let _ = request_state(nic, station, target, timeout)
-    return read_al_status_snapshot(nic, station, timeout) catch {
-      _ => { state: target, error_indication: false, status_code: None }
-    }
+    return request_state_observe(nic, station, target, timeout)
   }
   let current_status = read_al_status_raw_fp(nic, station, timeout)
   if (current_status & b'\x10') != b'\x00' {
@@ -98,10 +119,33 @@ pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
     )
   }
   let target_byte = target.to_byte()
-  let _ = request_state_control_fp(nic, station, target_byte, timeout)
-  wait_for_state_fp_with_process_data_snapshot(
+  let (_, control_wkc) = request_state_control_fp_with_wkc(
+    nic, station, target_byte, timeout,
+  )
+  let snapshot = wait_for_state_fp_with_process_data_snapshot(
     nic, station, target, pdo_ctx, timeout,
   )
+  request_observation_from_snapshot_fp(
+    nic, station, snapshot, control_wkc, timeout,
+  )
+}
+
+///|
+pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  pdo_ctx : PdoContext,
+  timeout : @hal.Duration,
+) -> EsmStatusSnapshot raise @hal.EcError {
+  let observed = request_state_with_process_data_observe(
+    nic, station, target, pdo_ctx, timeout,
+  )
+  {
+    state: observed.state,
+    error_indication: observed.error_indication,
+    status_code: observed.status_code,
+  }
 }
 
 ///|
@@ -117,7 +161,7 @@ pub fn[N : @hal.Nic] request_state_with_process_data(
   pdo_ctx : PdoContext,
   timeout : @hal.Duration,
 ) -> EsmState raise @hal.EcError {
-  let snapshot = request_state_with_process_data_snapshot(
+  let snapshot = request_state_with_process_data_observe(
     nic, station, target, pdo_ctx, timeout,
   )
   if snapshot.state != target && snapshot.error_indication {
@@ -408,13 +452,26 @@ fn[N : @hal.Nic] request_state_control_fp(
   control : Byte,
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
+  let (status, _) = request_state_control_fp_with_wkc(
+    nic, station, control, timeout,
+  )
+  status
+}
+
+///|
+fn[N : @hal.Nic] request_state_control_fp_with_wkc(
+  nic : N,
+  station : UInt,
+  control : Byte,
+  timeout : @hal.Duration,
+) -> (Byte, UInt) raise @hal.EcError {
   let buf = Bytes::from_array([control, b'\x00'])
-  let _ = write_register_fp(nic, station, reg_al_control, buf, timeout)
+  let write_pdu = write_register_fp(nic, station, reg_al_control, buf, timeout)
   let status_pdu = read_register_fp(nic, station, reg_al_status, 2, timeout)
   if status_pdu.data.length() < 1 {
     raise @hal.EcError::EsmStateError("empty AL Status response")
   }
-  status_pdu.data[0]
+  (status_pdu.data[0], write_pdu.wkc)
 }
 
 ///|
@@ -457,6 +514,53 @@ fn[N : @hal.Nic] read_al_status_raw_ap(
     raise @hal.EcError::EsmStateError("empty AL Status response")
   }
   status_pdu.data[0]
+}
+
+///|
+fn[N : @hal.Nic] maybe_read_al_status_code_fp(
+  nic : N,
+  station : UInt,
+  timeout : @hal.Duration,
+) -> UInt? {
+  Some(read_al_status_code(nic, station, timeout)) catch {
+    _ => None
+  }
+}
+
+///|
+fn[N : @hal.Nic] request_observation_from_status_fp(
+  nic : N,
+  station : UInt,
+  status : Byte,
+  control_wkc : UInt,
+  timeout : @hal.Duration,
+) -> EsmStateRequestObservation raise @hal.EcError {
+  let raw_status_code = maybe_read_al_status_code_fp(nic, station, timeout)
+  let snapshot = decode_al_status_snapshot(status, raw_status_code)
+  {
+    state: snapshot.state,
+    error_indication: snapshot.error_indication,
+    status_code: snapshot.status_code,
+    raw_status_code,
+    control_wkc,
+  }
+}
+
+///|
+fn[N : @hal.Nic] request_observation_from_snapshot_fp(
+  nic : N,
+  station : UInt,
+  snapshot : EsmStatusSnapshot,
+  control_wkc : UInt,
+  timeout : @hal.Duration,
+) -> EsmStateRequestObservation {
+  {
+    state: snapshot.state,
+    error_indication: snapshot.error_indication,
+    status_code: snapshot.status_code,
+    raw_status_code: maybe_read_al_status_code_fp(nic, station, timeout),
+    control_wkc,
+  }
 }
 
 ///|
@@ -581,6 +685,75 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
     current = confirmed
   }
   current
+}
+
+///|
+/// Transition through an ESM path and return the final step observation.
+pub fn[N : @hal.Nic] transition_through_observe(
+  nic : N,
+  station : UInt,
+  path : Array[EsmState],
+  timeout : @hal.Duration,
+) -> EsmStateRequestObservation? raise @hal.EcError {
+  if path.is_empty() {
+    raise @hal.EcError::Internal("empty transition path")
+  }
+  let mut current = path[0]
+  let mut last_observation : EsmStateRequestObservation? = None
+  for i = 1; i < path.length(); i = i + 1 {
+    let target = path[i]
+    if !current.can_transition(target) {
+      raise @hal.EcError::EsmTransitionFailed(
+        from=current.to_string(),
+        to=target.to_string(),
+      )
+    }
+    let observed = request_state_observe(nic, station, target, timeout) catch {
+      err => {
+        let _ = try? request_state(nic, station, current, timeout)
+        raise err
+      }
+    }
+    current = observed.state
+    last_observation = Some(observed)
+  }
+  last_observation
+}
+
+///|
+/// Transition through an ESM path using per-target timeout policy and return
+/// the final step observation.
+pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(
+  nic : N,
+  station : UInt,
+  path : Array[EsmState],
+  policy : EsmTimeoutPolicy,
+) -> EsmStateRequestObservation? raise @hal.EcError {
+  if path.is_empty() {
+    raise @hal.EcError::Internal("empty transition path")
+  }
+  let mut current = path[0]
+  let mut last_observation : EsmStateRequestObservation? = None
+  for i = 1; i < path.length(); i = i + 1 {
+    let target = path[i]
+    if !current.can_transition(target) {
+      raise @hal.EcError::EsmTransitionFailed(
+        from=current.to_string(),
+        to=target.to_string(),
+      )
+    }
+    let step_timeout = esm_timeout_for(target, policy)
+    let rollback_timeout = esm_timeout_for(current, policy)
+    let observed = request_state_observe(nic, station, target, step_timeout) catch {
+      err => {
+        let _ = try? request_state(nic, station, current, rollback_timeout)
+        raise err
+      }
+    }
+    current = observed.state
+    last_observation = Some(observed)
+  }
+  last_observation
 }
 
 ///|
@@ -710,6 +883,24 @@ pub fn[N : @hal.Nic] transition_to_target_strict(
 }
 
 ///|
+/// Strict state transition entry point that returns the final request observation.
+pub fn[N : @hal.Nic] transition_to_target_strict_observe(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  timeout : @hal.Duration,
+) -> EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through_observe(nic, station, path, timeout)
+}
+
+///|
 pub fn[N : @hal.Nic] transition_to_target_strict_ap(
   nic : N,
   position : UInt,
@@ -781,6 +972,26 @@ pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(
   }
   let path = build_strict_transition_route(snapshot.state, target)
   transition_through_with_timeout_policy(nic, station, path, policy)
+}
+
+///|
+/// Strict transitions via multi-step route with per-target timeout policy,
+/// returning the final step observation when a control write was issued.
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy_observe(
+  nic : N,
+  station : UInt,
+  target : EsmState,
+  policy : EsmTimeoutPolicy,
+  fallback_timeout : @hal.Duration,
+) -> EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = read_al_status_snapshot(nic, station, fallback_timeout)
+  if snapshot.error_indication {
+    raise @hal.EcError::EsmStateError(
+      "AL error indication is set; clear the error before selecting a new target state",
+    )
+  }
+  let path = build_strict_transition_route(snapshot.state, target)
+  transition_through_with_timeout_policy_observe(nic, station, path, policy)
 }
 
 ///|

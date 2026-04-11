@@ -16,19 +16,7 @@
 /* ── Windows Npcap zero-copy ──────────────────────────────────── */
 #ifdef _WIN32
 
-#include <pcap.h>
-
-/* Shared handle table from platform_stub.c */
-extern pcap_t *g_npcap_handles[32];
-
-/* Shared function pointers from platform_stub.c (dynamic wpcap.dll) */
-typedef int(__cdecl *moonecat_pcap_sendpacket_fn_t)(pcap_t *,
-                                                    const u_char *, int);
-typedef int(__cdecl *moonecat_pcap_next_ex_fn_t)(pcap_t *,
-                                                 struct pcap_pkthdr **,
-                                                 const u_char **);
-extern moonecat_pcap_sendpacket_fn_t g_pcap_sendpacket;
-extern moonecat_pcap_next_ex_fn_t g_pcap_next_ex;
+#include "npcap_compat.h"
 
 /*
  * Receive an Ethernet frame directly into a pre-allocated buffer.

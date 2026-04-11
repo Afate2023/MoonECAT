@@ -52,6 +52,9 @@
 
 最近回填：
 
+- `state/startup-trace live PDO 审计与 mailbox drain` → `a2a99d0` `Audit live PDO state in state and startup trace`
+- `live startup helper 与 DS402 16-bit 模式种子` → `7d0ced3` `Add live startup preparation helper`
+- `启动路径 stale mailbox frame 丢弃与 PDO 长度覆盖` → `e3baf07` `Handle stale mailbox frames in startup paths`
 - `多从站 FMMU 回放 + 故障注入测试，核对完成 L4-11/12/13` → `fa33f01` `test(mock): multi-slave FMMU replay + fault injection tests`
 - `Mock FMMU 逻辑 PDO 路由与多从站回归` → `e1fee13` `feat(mock): add FMMU logical PDO routing`
 - `Raw SII overlay decoder 状态合同` → `b024aec` `feat(sii): expose overlay decoder status`

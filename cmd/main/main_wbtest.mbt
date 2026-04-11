@@ -1196,6 +1196,8 @@ test "cli state transition report uses broadcast when station is omitted" {
   assert_eq(report.current, None)
   assert_eq(report.final_state, None)
   assert_eq(report.status_code, None)
+  assert_eq(report.raw_status_code, None)
+  assert_eq(report.control_wkc, None)
   assert_eq(report.wkc, Some(0U))
 }
 
@@ -1340,6 +1342,183 @@ pub impl @hal.Nic for StrictTransitionNic with close(self) {
 }
 
 ///|
+fn virtual_bus_identity() -> @hal.SlaveIdentity {
+  {
+    vendor_id: 0x2U,
+    product_code: 0x44C2C52U,
+    revision: 0x110000U,
+    serial: 0x0U,
+  }
+}
+
+///|
+fn virtual_bus_sii_eeprom() -> Bytes {
+  let data = FixedArray::make(256, b'\x00')
+  data[16] = b'\x02'
+  data[20] = b'\x52'
+  data[21] = b'\x2C'
+  data[22] = b'\x4C'
+  data[23] = b'\x04'
+  data[26] = b'\x11'
+  data[48] = b'\x00'
+  data[49] = b'\x10'
+  data[50] = b'\x80'
+  data[52] = b'\x80'
+  data[53] = b'\x10'
+  data[54] = b'\x80'
+  data[56] = b'\x0C'
+  data[128] = b'\x1E'
+  data[130] = b'\x08'
+  data[132] = b'\x01'
+  data[133] = b'\x02'
+  data[134] = b'\x03'
+  data[135] = b'\x04'
+  data[137] = b'\x07'
+  data[138] = b'\x01'
+  data[139] = b'\x01'
+  data[148] = b'\x28'
+  data[150] = b'\x01'
+  data[152] = b'\x01'
+  data[153] = b'\x02'
+  data[154] = b'\x29'
+  data[156] = b'\x08'
+  data[158] = b'\x00'
+  data[159] = b'\x10'
+  data[160] = b'\x80'
+  data[162] = b'\x26'
+  data[164] = b'\x01'
+  data[165] = b'\x01'
+  data[166] = b'\x80'
+  data[167] = b'\x10'
+  data[168] = b'\x80'
+  data[170] = b'\x22'
+  data[172] = b'\x01'
+  data[173] = b'\x02'
+  data[174] = b'\xFF'
+  data[175] = b'\xFF'
+  Bytes::makei(data.length(), fn(i) { data[i] })
+}
+
+///|
+fn virtual_bus_route_preparation(
+  commands : Array[@runtime.StartupMailboxCommand],
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
+  let sii = @mailbox.parse_sii_full_info(virtual_bus_sii_eeprom())
+  {
+    mapping: @mailbox.calculate_slave_mapping(virtual_bus_sii_eeprom(), 0U),
+    dc_cycle_period_ns: None,
+    startup_outputs: None,
+    startup_mailbox_commands: commands,
+    mailbox_config: @mailbox.MailboxConfig::from_sii(sii.header),
+    sii,
+    sii_categories: [],
+    prefer_live_pdo_state: true,
+  }
+}
+
+///|
+fn single_virtual_station_nic() -> (@mock.VirtualNic, UInt, @hal.Duration) raise @hal.EcError {
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, virtual_bus_identity(), virtual_bus_sii_eeprom()),
+  ])
+  let nic = @mock.VirtualNic::new(bus)
+  let station = 0x1001U
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, station, timeout)
+  (nic, station, timeout)
+}
+
+///|
+test "cli station mailbox route applies boot and init path commands on virtual bus" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  ignore(@protocol.request_state(nic, station, @protocol.Boot, timeout))
+  let preparation = virtual_bus_route_preparation([
+    {
+      transition: @runtime.BootToInit,
+      index: 0x2000U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x01']),
+    },
+    {
+      transition: @runtime.InitToPreOp,
+      index: 0x2001U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x02']),
+    },
+  ])
+  let observed = transition_station_to_target_with_preparation_observe(
+    nic,
+    station,
+    @protocol.PreOp,
+    preparation,
+    timeout,
+  )
+  guard observed is Some(result) else {
+    fail("expected Boot -> PreOp route observation")
+  }
+  assert_eq(result.state, @protocol.PreOp)
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let first_payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2000U,
+    b'\x00',
+    timeout,
+  )
+  let second_payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2001U,
+    b'\x00',
+    timeout,
+  )
+  assert_eq(first_payload[0], b'\x01')
+  assert_eq(second_payload[0], b'\x02')
+}
+
+///|
+test "cli station mailbox route applies op to safeop command on virtual bus" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  ignore(@protocol.request_state(nic, station, @protocol.PreOp, timeout))
+  ignore(@protocol.request_state(nic, station, @protocol.SafeOp, timeout))
+  ignore(@protocol.request_state(nic, station, @protocol.Op, timeout))
+  let preparation = virtual_bus_route_preparation([
+    {
+      transition: @runtime.OpToSafeOp,
+      index: 0x2002U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x03']),
+    },
+  ])
+  let observed = transition_station_to_target_with_preparation_observe(
+    nic,
+    station,
+    @protocol.SafeOp,
+    preparation,
+    timeout,
+  )
+  guard observed is Some(result) else {
+    fail("expected Op -> SafeOp route observation")
+  }
+  assert_eq(result.state, @protocol.SafeOp)
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2002U,
+    b'\x00',
+    timeout,
+  )
+  assert_eq(payload[0], b'\x03')
+}
+
+///|
 test "cli state path recovers configuration error to init" {
   let nic = StrictTransitionNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
   let timeout = @hal.Duration(1000L)
@@ -1356,6 +1535,8 @@ test "cli state path recovers configuration error to init" {
   assert_eq(report.final_state, Some(@protocol.EsmState::Init))
   assert_eq(report.al_error_flag, Some(false))
   assert_eq(report.status_code, None)
+  assert_eq(report.raw_status_code, None)
+  assert_eq(report.control_wkc, None)
   assert_eq(nic.control_writes.length(), 2)
   assert_eq(
     nic.control_writes[0],
@@ -1374,13 +1555,19 @@ test "cli state transition report json includes station mode fields" {
     final_state: Some(@protocol.SafeOp),
     al_error_flag: Some(false),
     status_code: Some(0U),
+    raw_status_code: Some(0U),
+    control_wkc: Some(1U),
     wkc: None,
+    pdo_audit: None,
   })
   let text = json.stringify(indent=2)
   assert_true(text.contains("\"mode\": \"station-path\""))
   assert_true(text.contains("\"target_state\": \"SafeOp\""))
   assert_true(text.contains("\"station\": 4097"))
   assert_true(text.contains("\"final_state\": \"SafeOp\""))
+  assert_true(text.contains("\"raw_status_code\": 0"))
+  assert_true(text.contains("\"control_wkc\": 1"))
+  assert_true(text.contains("\"pdo_audit\": null"))
   assert_true(text.contains("\"surface\""))
   assert_true(text.contains("\"overall_level\": \"Info\""))
 }
@@ -1395,12 +1582,50 @@ test "cli state transition report text includes broadcast mode and wkc" {
     final_state: None,
     al_error_flag: None,
     status_code: None,
+    raw_status_code: None,
+    control_wkc: None,
     wkc: Some(0U),
+    pdo_audit: None,
   })
   assert_true(text.contains("Mode: broadcast"))
   assert_true(text.contains("Target: Init"))
   assert_true(text.contains("WKC: 0"))
   assert_true(!text.contains("Station:"))
+}
+
+///|
+fn sample_pdo_audit_report() -> PdoAuditReport {
+  {
+    plan_source: "esi-json",
+    policy: "prefer-live",
+    effective_source: "live",
+    live_detected: Some(true),
+    live_differs_from_plan: Some(true),
+    live_read_error: None,
+    configured_rx: {
+      assignment_index: 0x1C12U,
+      assigned_pdos: [0x1602U],
+      objects: [{ index: 0x1602U, entries: [0x10004060U, 0x2000FF60U] }],
+    },
+    configured_tx: {
+      assignment_index: 0x1C13U,
+      assigned_pdos: [0x1A02U],
+      objects: [{ index: 0x1A02U, entries: [0x10004160U, 0x20006460U] }],
+    },
+    live_rx: Some({
+      assignment_index: 0x1C12U,
+      assigned_pdos: [0x1600U],
+      objects: [{ index: 0x1600U, entries: [0x10004060U, 0x20007A60U] }],
+    }),
+    live_tx: Some({
+      assignment_index: 0x1C13U,
+      assigned_pdos: [0x1A00U],
+      objects: [{ index: 0x1A00U, entries: [0x10004160U, 0x20006460U] }],
+    }),
+    mismatches: [
+      "assignment 0x1C12 expected=[0x1602] actual=[0x1600]", "assignment 0x1C13 expected=[0x1A02] actual=[0x1A00]",
+    ],
+  }
 }
 
 ///|
@@ -1669,6 +1894,73 @@ test "cli mailbox readback report text highlights mismatch details" {
 }
 
 ///|
+test "cli mailbox readback source keeps esi-json when requested" {
+  assert_eq(mailbox_readback_source([]), "online-sii")
+  assert_eq(
+    mailbox_readback_source(["--esi-json", "References/sample.esi.json"]),
+    "esi-json",
+  )
+}
+
+///|
+test "cli startup trace source stays online for live path" {
+  assert_eq(startup_trace_source([]), "online-sii")
+  assert_eq(
+    startup_trace_source(["--esi-json", "References/sample.esi.json"]),
+    "esi-json",
+  )
+}
+
+///|
+test "cli startup mailbox commands detect PreOp refinement need for PDO remap" {
+  let commands : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.PreOpToSafeOp,
+      index: 0x1602U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x02']),
+    },
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x08']),
+    },
+  ]
+  assert_true(startup_mailbox_commands_need_preop_refinement(commands))
+}
+
+///|
+test "cli startup mailbox commands skip PreOp refinement without PDO remap" {
+  let commands : Array[@runtime.StartupMailboxCommand] = [
+    {
+      transition: @runtime.SafeOpToOp,
+      index: 0x6060U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x08']),
+    },
+  ]
+  assert_true(!startup_mailbox_commands_need_preop_refinement(commands))
+}
+
+///|
+test "cli startup trace od read retries stale and timeout errors" {
+  assert_true(startup_trace_should_retry_od_read(@hal.EcError::MailboxTimeout))
+  assert_true(
+    startup_trace_should_retry_od_read(
+      @hal.EcError::MailboxProtocol("RMSM: too many stale frames received"),
+    ),
+  )
+}
+
+///|
+test "cli startup trace od read does not retry sdo abort" {
+  assert_true(
+    !startup_trace_should_retry_od_read(@hal.EcError::SdoAbort(0x06020000U)),
+  )
+}
+
+///|
 test "cli startup trace report json includes phases and transition error" {
   let report : StartupTraceReport = {
     station: 0x1001U,
@@ -1715,6 +2007,7 @@ test "cli startup trace report json includes phases and transition error" {
       },
     ],
     transition_error: Some("safeop request failed: StartupTransitionFailed"),
+    pdo_audit: Some(sample_pdo_audit_report()),
   }
   let text = startup_trace_report_json(report).stringify(indent=2)
   assert_true(text.contains("\"phases\""))
@@ -1722,6 +2015,10 @@ test "cli startup trace report json includes phases and transition error" {
   assert_true(text.contains("\"od_objects\""))
   assert_true(text.contains("\"transition_error\""))
   assert_true(text.contains("\"final_state\": \"PreOp\""))
+  assert_true(text.contains("\"pdo_audit\""))
+  assert_true(text.contains("\"effective_source\": \"live\""))
+  assert_true(text.contains("\"assignment_index_hex\": \"0x1C12\""))
+  assert_true(text.contains("\"raw_hex\": \"0x10004060\""))
 }
 
 ///|
@@ -1802,9 +2099,16 @@ test "cli startup trace report text includes phase snapshots" {
       },
     ],
     transition_error: Some("safeop request failed: AL status code 30"),
+    pdo_audit: Some(sample_pdo_audit_report()),
   }
   let text = startup_trace_report_text(report)
   assert_true(text.contains("Startup Trace"))
+  assert_true(text.contains("PDO Audit"))
+  assert_true(text.contains("Effective Source: live"))
+  assert_true(text.contains("Configured Rx: 0x1C12 -> [0x1602]"))
+  assert_true(
+    text.contains("assignment 0x1C12 expected=[0x1602] actual=[0x1600]"),
+  )
   assert_true(text.contains("Source: online-sii"))
   assert_true(text.contains("before_safeop_request"))
   assert_true(text.contains("001E"))

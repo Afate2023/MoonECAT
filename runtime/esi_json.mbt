@@ -669,7 +669,17 @@ fn project_esi_startup_mailbox_commands(
 ///|
 fn map_esi_init_transition(transition : String) -> StartupCommandTransition? {
   match transition {
+    "IP" => Some(InitToPreOp)
+    "IB" => Some(InitToBoot)
+    "PI" => Some(PreOpToInit)
+    "PS" => Some(PreOpToSafeOp)
+    "SI" => Some(SafeOpToInit)
+    "SP" => Some(SafeOpToPreOp)
     "SO" => Some(SafeOpToOp)
+    "OI" => Some(OpToInit)
+    "OP" => Some(OpToPreOp)
+    "OS" => Some(OpToSafeOp)
+    "BI" => Some(BootToInit)
     _ => None
   }
 }

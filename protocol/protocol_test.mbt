@@ -1402,6 +1402,40 @@ test "transition_to_target_strict rotates through legal direct steps" {
 }
 
 ///|
+test "request_state_observe captures raw status code and control wkc" {
+  let nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let timeout = @hal.Duration(1000L)
+  let observed = @protocol.request_state_observe(
+    nic,
+    0x1001U,
+    @protocol.EsmState::PreOp,
+    timeout,
+  )
+  assert_eq(observed.state, @protocol.EsmState::PreOp)
+  assert_true(!observed.error_indication)
+  assert_eq(observed.status_code, None)
+  assert_eq(observed.raw_status_code, Some(0U))
+  assert_eq(observed.control_wkc, 1U)
+}
+
+///|
+test "transition_to_target_strict_with_timeout_policy_observe returns last step observation" {
+  let nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let timeout = @hal.Duration(1000L)
+  let observed = @protocol.transition_to_target_strict_with_timeout_policy_observe(
+    nic,
+    0x1001U,
+    @protocol.EsmState::SafeOp,
+    @protocol.default_esm_timeout_policy(),
+    timeout,
+  )
+  guard observed is Some(value) else { fail("expected final step observation") }
+  assert_eq(value.state, @protocol.EsmState::SafeOp)
+  assert_eq(value.raw_status_code, Some(0U))
+  assert_eq(value.control_wkc, 1U)
+}
+
+///|
 test "request_state_with_process_data keeps sending PDO until Op is confirmed" {
   let nic = EsmOpNeedsPdoNic::new(@protocol.EsmState::SafeOp)
   let timeout = @hal.Duration(1000L)

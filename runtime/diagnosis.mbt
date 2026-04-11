@@ -468,7 +468,9 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
       target~,
       current~,
       error_indication~,
-      status_code~
+      status_code~,
+      raw_status_code~,
+      control_wkc~
     ) => {
       let current_text = match current {
         Some(state) => state.to_string()
@@ -481,6 +483,14 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
       }
       let status_text = match status_code {
         Some(code) => code.to_string()
+        None => "unknown"
+      }
+      let raw_status_text = match raw_status_code {
+        Some(code) => code.to_string()
+        None => "unknown"
+      }
+      let control_wkc_text = match control_wkc {
+        Some(wkc) => wkc.to_string()
         None => "unknown"
       }
       [
@@ -497,7 +507,11 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
           " error_flag=" +
           error_text +
           " status_code=" +
-          status_text,
+          status_text +
+          " raw_status_code=" +
+          raw_status_text +
+          " control_wkc=" +
+          control_wkc_text,
         },
       ]
     }
@@ -1160,36 +1174,43 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
     try? @protocol.mailbox_send(nic, station, mb_config, frame, timeout),
     stage + ".mailbox_send_fp",
   )
-  let response_raw = diagnosis_mailbox_recv_fp(
-    nic,
-    station,
-    mb_config,
-    rmsm,
-    timeout,
-    stage + ".mailbox_recv_fp",
-  )
-  let decoded = diagnosis_timeout_step(
-    try? @mailbox.decode_sdo_response(response_raw),
-    stage + ".decode_sdo_response",
-  )
-  let (mbh, resp) = decoded
-  diagnosis_accept_response_counter(rmsm, mbh.counter)
-  if resp.command != @mailbox.SdoCommand::UploadResponse {
-    raise @hal.EcError::MailboxProtocol(
-      stage + ": expected UploadResponse, got " + resp.command.to_string(),
+  for _stale_attempt = 0
+      _stale_attempt < 4
+      _stale_attempt = _stale_attempt + 1 {
+    let response_raw = diagnosis_mailbox_recv_fp(
+      nic,
+      station,
+      mb_config,
+      rmsm,
+      timeout,
+      stage + ".mailbox_recv_fp",
     )
-  }
-  if resp.index != index || resp.subindex != subindex {
-    raise @hal.EcError::MailboxProtocol(
-      stage + ": index/subindex mismatch in response",
+    let decoded = diagnosis_timeout_step(
+      try? @mailbox.decode_sdo_response(response_raw),
+      stage + ".decode_sdo_response",
     )
+    let (mbh, resp) = decoded
+    if !diagnosis_accept_response_counter(rmsm, mbh.counter) {
+      continue
+    }
+    if resp.command != @mailbox.SdoCommand::UploadResponse {
+      raise @hal.EcError::MailboxProtocol(
+        stage + ": expected UploadResponse, got " + resp.command.to_string(),
+      )
+    }
+    if resp.index != index || resp.subindex != subindex {
+      raise @hal.EcError::MailboxProtocol(
+        stage + ": index/subindex mismatch in response",
+      )
+    }
+    if resp.segmented {
+      raise @hal.EcError::MailboxProtocol(
+        stage + ": segmented response is not supported in diagnosis path",
+      )
+    }
+    return resp.data
   }
-  if resp.segmented {
-    raise @hal.EcError::MailboxProtocol(
-      stage + ": segmented response is not supported in diagnosis path",
-    )
-  }
-  resp.data
+  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
 }
 
 ///|
@@ -1283,13 +1304,14 @@ fn diagnosis_register_snapshot(result : Result[@protocol.Pdu, Error]) -> String 
 fn diagnosis_accept_response_counter(
   rmsm : @mailbox.Rmsm,
   counter : Byte,
-) -> Unit raise @hal.EcError {
+) -> Bool raise @hal.EcError {
   let validation = try? rmsm.validate_response(counter)
   match validation {
-    Ok(_) => ()
+    Ok(is_new) => is_new
     Err(@hal.EcError::MailboxProtocol(message)) =>
       if message.contains("counter mismatch") {
         rmsm.reset()
+        false
       } else {
         raise @hal.EcError::MailboxProtocol(message)
       }

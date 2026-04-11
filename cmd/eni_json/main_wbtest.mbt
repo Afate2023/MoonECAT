@@ -176,6 +176,93 @@ test "eni-json converter preserves device-level pdos for offline sii projection"
   assert_eq(report.startup_mailbox_commands[0].index, 0x6060U)
 }
 
+///|
+test "eni-json converter preserves PS initcmd and 16-bit pdo bitlen" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0001</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000002" RevisionNo="#x00000003">demo</Type>
+    #|        <Name>demo</Name>
+    #|        <Profile><ProfileNo>402</ProfileNo></Profile>
+    #|        <Fmmu>Outputs</Fmmu>
+    #|        <Fmmu>Inputs</Fmmu>
+    #|        <Sm DefaultSize="64" StartAddress="#x1000" ControlByte="#x26" Enable="1">MBoxOut</Sm>
+    #|        <Sm DefaultSize="64" StartAddress="#x1400" ControlByte="#x22" Enable="1">MBoxIn</Sm>
+    #|        <Sm DefaultSize="0" StartAddress="#x1100" ControlByte="#x64" Enable="1">Outputs</Sm>
+    #|        <Sm DefaultSize="0" StartAddress="#x1200" ControlByte="#x20" Enable="1">Inputs</Sm>
+    #|        <RxPdo Sm="2"><Index>#x1600</Index><Name>Outputs</Name><Entry><Index>#x6060</Index><SubIndex>0</SubIndex><BitLen>16</BitLen><Name>ModesOfOperation</Name><DataType>INT</DataType></Entry></RxPdo>
+    #|        <TxPdo Sm="3"><Index>#x1A00</Index><Name>Inputs</Name><Entry><Index>#x6041</Index><SubIndex>0</SubIndex><BitLen>16</BitLen><Name>StatusWord</Name><DataType>UINT</DataType></Entry></TxPdo>
+    #|        <Mailbox><CoE PdoAssign="1" PdoConfig="1"><InitCmd><Transition>PS</Transition><Index>#x1C12</Index><SubIndex>0</SubIndex><Data>010016</Data></InitCmd></CoE></Mailbox>
+    #|      </Device>
+    #|    </Devices>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.devices[0].init_commands.length(), 1)
+  assert_eq(document.devices[0].init_commands[0].transition, "PS")
+  assert_eq(document.devices[0].rx_pdos[0].entries[0].bit_length, b'\x10')
+  let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
+  assert_eq(report.rx_pdo[0].entries[0].bit_length, b'\x10')
+  assert_eq(report.startup_mailbox_commands.length() > 0, true)
+  assert_eq(
+    report.startup_mailbox_commands[0].transition,
+    @runtime.PreOpToSafeOp,
+  )
+  assert_eq(report.startup_mailbox_commands[0].index, 0x1C12U)
+}
+
+///|
+test "eni-json converter expands multi-transition initcmd across switch path" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<EtherCATInfo>
+    #|  <Vendor><Id>#x0001</Id></Vendor>
+    #|  <Descriptions>
+    #|    <Devices>
+    #|      <Device Physics="YY">
+    #|        <Type ProductCode="#x00000002" RevisionNo="#x00000003">demo</Type>
+    #|        <Name>demo</Name>
+    #|        <Profile><ProfileNo>402</ProfileNo></Profile>
+    #|        <Mailbox>
+    #|          <CoE>
+    #|            <InitCmd>
+    #|              <Transition>IP</Transition>
+    #|              <Transition>PS</Transition>
+    #|              <Transition>SO</Transition>
+    #|              <Transition>OI</Transition>
+    #|              <Index>#x1C12</Index>
+    #|              <SubIndex>0</SubIndex>
+    #|              <Data>010016</Data>
+    #|            </InitCmd>
+    #|          </CoE>
+    #|        </Mailbox>
+    #|      </Device>
+    #|    </Devices>
+    #|  </Descriptions>
+    #|</EtherCATInfo>
+  let json_text = convert_esi_xml_to_json_string(xml)
+  let document = @runtime.parse_esi_json_document(json_text)
+  assert_eq(document.devices[0].init_commands.length(), 4)
+  assert_eq(document.devices[0].init_commands[0].transition, "IP")
+  assert_eq(document.devices[0].init_commands[1].transition, "PS")
+  assert_eq(document.devices[0].init_commands[2].transition, "SO")
+  assert_eq(document.devices[0].init_commands[3].transition, "OI")
+  let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
+  assert_eq(report.startup_mailbox_commands.length(), 4)
+  assert_eq(report.startup_mailbox_commands[0].transition, @runtime.InitToPreOp)
+  assert_eq(
+    report.startup_mailbox_commands[1].transition,
+    @runtime.PreOpToSafeOp,
+  )
+  assert_eq(report.startup_mailbox_commands[2].transition, @runtime.SafeOpToOp)
+  assert_eq(report.startup_mailbox_commands[3].transition, @runtime.OpToInit)
+}
+
 // ===== Batch 13: coverage gaps in esi_projection =====
 
 ///|

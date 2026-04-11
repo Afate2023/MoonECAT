@@ -53,6 +53,8 @@ type StartupTraceReport
 
 type StateTransitionReport
 
+type StationStartupDecision
+
 // Type aliases
 
 // Traits

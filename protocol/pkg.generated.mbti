@@ -304,7 +304,11 @@ pub fn[N : @hal.Nic] request_state_ap(N, UInt, EsmState, @hal.Duration) -> EsmSt
 
 pub fn[N : @hal.Nic] request_state_aware(N, UInt, EsmState, device_emulation? : Bool, @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] request_state_observe(N, UInt, EsmState, @hal.Duration) -> EsmStateRequestObservation raise @hal.EcError
+
 pub fn[N : @hal.Nic] request_state_with_process_data(N, UInt, EsmState, PdoContext, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] request_state_with_process_data_observe(N, UInt, EsmState, PdoContext, @hal.Duration) -> EsmStateRequestObservation raise @hal.EcError
 
 pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(N, UInt, EsmState, PdoContext, @hal.Duration) -> EsmStatusSnapshot raise @hal.EcError
 
@@ -346,13 +350,21 @@ pub fn[N : @hal.Nic] transition_through(N, UInt, Array[EsmState], @hal.Duration)
 
 pub fn[N : @hal.Nic] transition_through_ap(N, UInt, Array[EsmState], @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] transition_through_observe(N, UInt, Array[EsmState], @hal.Duration) -> EsmStateRequestObservation? raise @hal.EcError
+
 pub fn[N : @hal.Nic] transition_through_with_timeout_policy(N, UInt, Array[EsmState], EsmTimeoutPolicy) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(N, UInt, Array[EsmState], EsmTimeoutPolicy) -> EsmStateRequestObservation? raise @hal.EcError
 
 pub fn[N : @hal.Nic] transition_to_target_strict(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
 pub fn[N : @hal.Nic] transition_to_target_strict_ap(N, UInt, EsmState, @hal.Duration) -> EsmState raise @hal.EcError
 
+pub fn[N : @hal.Nic] transition_to_target_strict_observe(N, UInt, EsmState, @hal.Duration) -> EsmStateRequestObservation? raise @hal.EcError
+
 pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(N, UInt, EsmState, EsmTimeoutPolicy, @hal.Duration) -> EsmState raise @hal.EcError
+
+pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy_observe(N, UInt, EsmState, EsmTimeoutPolicy, @hal.Duration) -> EsmStateRequestObservation? raise @hal.EcError
 
 pub let wkc_len : Int
 
@@ -454,6 +466,14 @@ pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
 pub fn EsmState::to_string(Self) -> String
 pub impl Show for EsmState
+
+pub(all) struct EsmStateRequestObservation {
+  state : EsmState
+  error_indication : Bool
+  status_code : UInt?
+  raw_status_code : UInt?
+  control_wkc : UInt
+} derive(Eq, Show)
 
 pub(all) struct EsmStatusSnapshot {
   state : EsmState

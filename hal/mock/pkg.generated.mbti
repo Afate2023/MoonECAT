@@ -3,6 +3,7 @@ package "afate/MoonECAT/hal/mock"
 
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/mailbox",
   "afate/MoonECAT/runtime",
   "moonbitlang/core/debug",
 }

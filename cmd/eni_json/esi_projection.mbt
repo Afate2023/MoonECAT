@@ -42,6 +42,7 @@ fn parse_esi_document_projection(
   let mut current_entry : @runtime.EsiJsonPdoEntry? = None
   let mut current_dc = empty_esi_dc_projection()
   let mut current_init_command = empty_esi_init_command_projection()
+  let mut current_init_transitions : Array[String] = []
 
   while true {
     let event = reader.read_event() catch {
@@ -189,6 +190,7 @@ fn parse_esi_document_projection(
             "InitCmd" => {
               in_init_cmd = true
               current_init_command = empty_esi_init_command_projection()
+              current_init_transitions = []
             }
             "RxPdo" =>
               current_pdo = Some({
@@ -470,8 +472,10 @@ fn parse_esi_document_projection(
                 parse_esi_numeric(text, "Device/Profile/ProfileNo"),
               ),
             }
-          Some("initcmd-transition") =>
+          Some("initcmd-transition") => {
             current_init_command = { ..current_init_command, transition: text }
+            push_unique_init_transition(current_init_transitions, text)
+          }
           Some("initcmd-index") =>
             current_init_command = {
               ..current_init_command,
@@ -644,10 +648,18 @@ fn parse_esi_document_projection(
               in_dc_op_mode = false
             }
           "InitCmd" => {
-            if current_init_command.transition != "" {
+            if current_init_transitions.length() > 0 {
+              for transition in current_init_transitions {
+                current_device.init_commands.push({
+                  ..current_init_command,
+                  transition,
+                })
+              }
+            } else if current_init_command.transition != "" {
               current_device.init_commands.push(current_init_command)
             }
             current_init_command = empty_esi_init_command_projection()
+            current_init_transitions = []
             in_init_cmd = false
           }
           "Slot" => {
@@ -662,6 +674,7 @@ fn parse_esi_document_projection(
             current_entry = None
             current_dc = empty_esi_dc_projection()
             current_init_command = empty_esi_init_command_projection()
+            current_init_transitions = []
             current_text_target = None
             in_device = false
             in_dc_op_mode = false
@@ -786,6 +799,17 @@ fn empty_esi_device_projection() -> @runtime.EsiJsonDevice {
 ///|
 fn empty_esi_init_command_projection() -> @runtime.EsiJsonInitCommand {
   { transition: "", index: 0U, subindex: b'\x00', data: b"" }
+}
+
+///|
+fn push_unique_init_transition(
+  transitions : Array[String],
+  transition : String,
+) -> Unit {
+  if transitions.iter().any(fn(value) { value == transition }) {
+    return
+  }
+  transitions.push(transition)
 }
 
 ///|
