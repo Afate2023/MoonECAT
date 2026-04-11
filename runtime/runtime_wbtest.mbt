@@ -3693,9 +3693,24 @@ test "map_esi_init_transition SO" {
 }
 
 ///|
-test "map_esi_init_transition PS returns None" {
+test "map_esi_init_transition PS" {
   let result = map_esi_init_transition("PS")
-  assert_eq(result, None)
+  assert_true(result is Some(PreOpToSafeOp))
+}
+
+///|
+test "map_esi_init_transition supports all legal ESM path codes" {
+  assert_eq(map_esi_init_transition("IP"), Some(InitToPreOp))
+  assert_eq(map_esi_init_transition("IB"), Some(InitToBoot))
+  assert_eq(map_esi_init_transition("PI"), Some(PreOpToInit))
+  assert_eq(map_esi_init_transition("PS"), Some(PreOpToSafeOp))
+  assert_eq(map_esi_init_transition("SI"), Some(SafeOpToInit))
+  assert_eq(map_esi_init_transition("SP"), Some(SafeOpToPreOp))
+  assert_eq(map_esi_init_transition("SO"), Some(SafeOpToOp))
+  assert_eq(map_esi_init_transition("OI"), Some(OpToInit))
+  assert_eq(map_esi_init_transition("OP"), Some(OpToPreOp))
+  assert_eq(map_esi_init_transition("OS"), Some(OpToSafeOp))
+  assert_eq(map_esi_init_transition("BI"), Some(BootToInit))
 }
 
 ///|
@@ -4494,6 +4509,59 @@ test "project_esi_startup_mailbox_commands unknown transition" {
   }
   let cmds = project_esi_startup_mailbox_commands(device2)
   assert_eq(cmds.length(), 0)
+}
+
+///|
+test "project_esi_startup_mailbox_commands maps PS to PreOpToSafeOp" {
+  let device = {
+    ..make_minimal_esi_device(),
+    init_commands: [
+      {
+        transition: "PS",
+        index: 0x1C12U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x01', b'\x00', b'\x16']),
+      },
+    ],
+  }
+  let cmds = project_esi_startup_mailbox_commands(device)
+  assert_eq(cmds.length(), 1)
+  assert_eq(cmds[0].transition, PreOpToSafeOp)
+  assert_eq(cmds[0].index, 0x1C12U)
+  assert_eq(cmds[0].subindex, b'\x00')
+  assert_eq(cmds[0].data, Bytes::from_array([b'\x01', b'\x00', b'\x16']))
+}
+
+///|
+test "project_esi_startup_mailbox_commands preserves all mapped transitions" {
+  let device = {
+    ..make_minimal_esi_device(),
+    init_commands: [
+      {
+        transition: "IP",
+        index: 0x0120U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x01']),
+      },
+      {
+        transition: "OP",
+        index: 0x0130U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x02']),
+      },
+      {
+        transition: "BI",
+        index: 0x0140U,
+        subindex: b'\x00',
+        data: Bytes::from_array([b'\x03']),
+      },
+    ],
+  }
+  let cmds = project_esi_startup_mailbox_commands(device)
+  assert_eq(cmds.length(), 3)
+  assert_eq(cmds[0].transition, InitToPreOp)
+  assert_eq(cmds[1].transition, OpToPreOp)
+  assert_eq(cmds[2].transition, BootToInit)
 }
 
 ///|

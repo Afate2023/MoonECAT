@@ -100,8 +100,17 @@ pub(all) struct SlaveStartupPreparation {
 
 ///|
 pub(all) enum StartupCommandTransition {
+  InitToPreOp
+  InitToBoot
+  PreOpToInit
   PreOpToSafeOp
+  SafeOpToInit
+  SafeOpToPreOp
   SafeOpToOp
+  OpToInit
+  OpToPreOp
+  OpToSafeOp
+  BootToInit
 } derive(Eq, Show)
 
 ///|
@@ -2292,8 +2301,17 @@ fn startup_mailbox_transition_target(
   transition : StartupCommandTransition,
 ) -> @protocol.EsmState {
   match transition {
+    InitToPreOp => @protocol.PreOp
+    InitToBoot => @protocol.Boot
+    PreOpToInit => @protocol.Init
     PreOpToSafeOp => @protocol.SafeOp
+    SafeOpToInit => @protocol.Init
+    SafeOpToPreOp => @protocol.PreOp
     SafeOpToOp => @protocol.Op
+    OpToInit => @protocol.Init
+    OpToPreOp => @protocol.PreOp
+    OpToSafeOp => @protocol.SafeOp
+    BootToInit => @protocol.Init
   }
 }
 
@@ -2302,8 +2320,17 @@ fn startup_mailbox_transition_current(
   transition : StartupCommandTransition,
 ) -> @protocol.EsmState? {
   match transition {
+    InitToPreOp => Some(@protocol.Init)
+    InitToBoot => Some(@protocol.Init)
+    PreOpToInit => Some(@protocol.PreOp)
     PreOpToSafeOp => Some(@protocol.PreOp)
+    SafeOpToInit => Some(@protocol.SafeOp)
+    SafeOpToPreOp => Some(@protocol.SafeOp)
     SafeOpToOp => Some(@protocol.SafeOp)
+    OpToInit => Some(@protocol.Op)
+    OpToPreOp => Some(@protocol.Op)
+    OpToSafeOp => Some(@protocol.Op)
+    BootToInit => Some(@protocol.Boot)
   }
 }
 

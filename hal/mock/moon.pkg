@@ -1,5 +1,6 @@
 import {
   "afate/MoonECAT/hal",
+  "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",
 }

@@ -1240,8 +1240,17 @@ pub(all) struct SmWatchdogValidation {
 } derive(Eq, Show)
 
 pub(all) enum StartupCommandTransition {
+  InitToPreOp
+  InitToBoot
+  PreOpToInit
   PreOpToSafeOp
+  SafeOpToInit
+  SafeOpToPreOp
   SafeOpToOp
+  OpToInit
+  OpToPreOp
+  OpToSafeOp
+  BootToInit
 } derive(Eq, Show)
 
 pub(all) struct StartupMailboxCommand {

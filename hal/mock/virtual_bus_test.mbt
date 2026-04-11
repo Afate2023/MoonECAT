@@ -172,6 +172,36 @@ test "VirtualBus: ESM state transition Init -> PreOp" {
 }
 
 ///|
+test "VirtualBus: CoE SDO roundtrip uses mailbox SM windows" {
+  let identity = @fixtures.sample_ek1100_identity()
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, identity, @fixtures.sample_sii_eeprom()),
+  ])
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  ignore(@protocol.request_state(nic, 0x1001U, @protocol.PreOp, timeout))
+  let mailbox_config = @mailbox.MailboxConfig::from_sii(
+    @mailbox.parse_sii_header(@fixtures.sample_sii_eeprom()),
+  )
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  @protocol.sdo_download_retry(
+    nic,
+    0x1001U,
+    mailbox_config,
+    rmsm,
+    0x2000U,
+    b'\x00',
+    Bytes::from_array([b'\x2A']),
+    timeout,
+  )
+  let payload = @protocol.sdo_upload_retry(
+    nic, 0x1001U, mailbox_config, rmsm, 0x2000U, b'\x00', timeout,
+  )
+  assert_eq(payload[0], b'\x2A')
+}
+
+///|
 test "VirtualBus: SII EEPROM read via register access" {
   let id = ek1100_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])

@@ -1648,18 +1648,27 @@ fn[N : @hal.Nic] compute_station_transition_report(
   } else {
     None
   }
-  match pdo_decision {
-    Some(decision) =>
-      startup_trace_drain_mailbox(
-        nic,
-        station,
-        decision.preparation.mailbox_config,
-      )
+  let path_preparation = if use_path && current != target {
+    match pdo_decision {
+      Some(decision) => Some(decision.preparation)
+      None =>
+        Some(
+          prepare_station_startup_from_args(
+            nic, args, station, pdo_logical_base, timeout,
+          ),
+        )
+    }
+  } else {
+    None
+  }
+  match path_preparation {
+    Some(preparation) =>
+      startup_trace_drain_mailbox(nic, station, preparation.mailbox_config)
     None => ()
   }
   if use_path && target == @protocol.Op && current != @protocol.Op {
-    let initial_preparation = match pdo_decision {
-      Some(decision) => decision.preparation
+    let initial_preparation = match path_preparation {
+      Some(preparation) => preparation
       None =>
         prepare_station_startup_from_args(
           nic, args, station, pdo_logical_base, timeout,
@@ -1686,8 +1695,8 @@ fn[N : @hal.Nic] compute_station_transition_report(
     target == @protocol.SafeOp &&
     current != @protocol.SafeOp &&
     current != @protocol.Op {
-    let preparation = match pdo_decision {
-      Some(decision) => decision.preparation
+    let preparation = match path_preparation {
+      Some(preparation) => preparation
       None =>
         prepare_station_startup_from_args(
           nic, args, station, pdo_logical_base, timeout,
@@ -1737,9 +1746,16 @@ fn[N : @hal.Nic] compute_station_transition_report(
     }
   }
   let final_observation = if use_path {
-    transition_station_to_target_strict_after_recovery_observe(
-      nic, station, target, timeout,
-    )
+    match path_preparation {
+      Some(preparation) =>
+        transition_station_to_target_with_preparation_observe(
+          nic, station, target, preparation, timeout,
+        )
+      None =>
+        transition_station_to_target_strict_after_recovery_observe(
+          nic, station, target, timeout,
+        )
+    }
   } else {
     Some(@protocol.request_state_observe(nic, station, target, timeout))
   }
@@ -1839,6 +1855,86 @@ fn[N : @hal.Nic] transition_station_to_op_after_recovery_observe(
 }
 
 ///|
+fn startup_mailbox_transition_from_route(
+  current : @protocol.EsmState,
+  target : @protocol.EsmState,
+) -> @runtime.StartupCommandTransition? {
+  match (current, target) {
+    (@protocol.Init, @protocol.PreOp) => Some(@runtime.InitToPreOp)
+    (@protocol.Init, @protocol.Boot) => Some(@runtime.InitToBoot)
+    (@protocol.PreOp, @protocol.Init) => Some(@runtime.PreOpToInit)
+    (@protocol.PreOp, @protocol.SafeOp) => Some(@runtime.PreOpToSafeOp)
+    (@protocol.SafeOp, @protocol.Init) => Some(@runtime.SafeOpToInit)
+    (@protocol.SafeOp, @protocol.PreOp) => Some(@runtime.SafeOpToPreOp)
+    (@protocol.SafeOp, @protocol.Op) => Some(@runtime.SafeOpToOp)
+    (@protocol.Op, @protocol.Init) => Some(@runtime.OpToInit)
+    (@protocol.Op, @protocol.PreOp) => Some(@runtime.OpToPreOp)
+    (@protocol.Op, @protocol.SafeOp) => Some(@runtime.OpToSafeOp)
+    (@protocol.Boot, @protocol.Init) => Some(@runtime.BootToInit)
+    _ => None
+  }
+}
+
+///|
+fn[N : @hal.Nic] transition_station_with_startup_mailbox_route_observe(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.error_indication {
+    ignore(@protocol.recover_al_error_for_transition(nic, station, timeout))
+  }
+  let current = @protocol.read_al_status_snapshot(nic, station, timeout).state
+  let path = @protocol.build_strict_transition_route(current, target)
+  let mut path_state = path[0]
+  let mut last_observation : @protocol.EsmStateRequestObservation? = None
+  for i = 1; i < path.length(); i = i + 1 {
+    let next = path[i]
+    match startup_mailbox_transition_from_route(path_state, next) {
+      Some(transition) =>
+        @runtime.apply_startup_mailbox_commands(
+          nic,
+          station,
+          preparation.mailbox_config,
+          preparation.startup_mailbox_commands,
+          transition,
+          timeout,
+        )
+      None => ()
+    }
+    let observed = @protocol.request_state_observe(nic, station, next, timeout)
+    path_state = observed.state
+    last_observation = Some(observed)
+  }
+  last_observation
+}
+
+///|
+fn[N : @hal.Nic] transition_station_to_target_with_preparation_observe(
+  nic : N,
+  station : UInt,
+  target : @protocol.EsmState,
+  preparation : @runtime.SlaveStartupPreparation,
+  timeout : @hal.Duration,
+) -> @protocol.EsmStateRequestObservation? raise @hal.EcError {
+  let snapshot = @protocol.read_al_status_snapshot(nic, station, timeout)
+  if snapshot.state == target {
+    return None
+  }
+  if snapshot.state == @protocol.Init || snapshot.state == @protocol.Boot {
+    ignore(
+      @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
+    )
+  }
+  transition_station_with_startup_mailbox_route_observe(
+    nic, station, target, preparation, timeout,
+  )
+}
+
+///|
 fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
   nic : N,
   station : UInt,
@@ -1851,15 +1947,17 @@ fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
     current == @protocol.Op {
     return current
   }
-  ignore(
-    @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
-  )
-  transition_station_to_target_strict_after_recovery(
-    nic,
-    station,
-    @protocol.PreOp,
-    timeout,
-  )
+  match
+    transition_station_to_target_with_preparation_observe(
+      nic,
+      station,
+      @protocol.PreOp,
+      preparation,
+      timeout,
+    ) {
+    Some(observed) => observed.state
+    None => @protocol.read_al_status_snapshot(nic, station, timeout).state
+  }
 }
 
 ///|
@@ -4125,12 +4223,17 @@ fn[N : @hal.Nic] build_startup_trace_report(
         }
       }
     }
-    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? transition_station_to_target_strict_after_recovery(
-      nic,
-      station,
-      @protocol.PreOp,
-      timeout,
-    )
+    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? (match
+      transition_station_with_startup_mailbox_route_observe(
+        nic,
+        station,
+        @protocol.PreOp,
+        preparation,
+        timeout,
+      ) {
+      Some(observed) => observed.state
+      None => @protocol.read_al_status_snapshot(nic, station, timeout).state
+    })
     phases.push(
       startup_trace_phase_with_od(nic, station, "after_preop_request", timeout),
     )

@@ -1342,6 +1342,183 @@ pub impl @hal.Nic for StrictTransitionNic with close(self) {
 }
 
 ///|
+fn virtual_bus_identity() -> @hal.SlaveIdentity {
+  {
+    vendor_id: 0x2U,
+    product_code: 0x44C2C52U,
+    revision: 0x110000U,
+    serial: 0x0U,
+  }
+}
+
+///|
+fn virtual_bus_sii_eeprom() -> Bytes {
+  let data = FixedArray::make(256, b'\x00')
+  data[16] = b'\x02'
+  data[20] = b'\x52'
+  data[21] = b'\x2C'
+  data[22] = b'\x4C'
+  data[23] = b'\x04'
+  data[26] = b'\x11'
+  data[48] = b'\x00'
+  data[49] = b'\x10'
+  data[50] = b'\x80'
+  data[52] = b'\x80'
+  data[53] = b'\x10'
+  data[54] = b'\x80'
+  data[56] = b'\x0C'
+  data[128] = b'\x1E'
+  data[130] = b'\x08'
+  data[132] = b'\x01'
+  data[133] = b'\x02'
+  data[134] = b'\x03'
+  data[135] = b'\x04'
+  data[137] = b'\x07'
+  data[138] = b'\x01'
+  data[139] = b'\x01'
+  data[148] = b'\x28'
+  data[150] = b'\x01'
+  data[152] = b'\x01'
+  data[153] = b'\x02'
+  data[154] = b'\x29'
+  data[156] = b'\x08'
+  data[158] = b'\x00'
+  data[159] = b'\x10'
+  data[160] = b'\x80'
+  data[162] = b'\x26'
+  data[164] = b'\x01'
+  data[165] = b'\x01'
+  data[166] = b'\x80'
+  data[167] = b'\x10'
+  data[168] = b'\x80'
+  data[170] = b'\x22'
+  data[172] = b'\x01'
+  data[173] = b'\x02'
+  data[174] = b'\xFF'
+  data[175] = b'\xFF'
+  Bytes::makei(data.length(), fn(i) { data[i] })
+}
+
+///|
+fn virtual_bus_route_preparation(
+  commands : Array[@runtime.StartupMailboxCommand],
+) -> @runtime.SlaveStartupPreparation raise @hal.EcError {
+  let sii = @mailbox.parse_sii_full_info(virtual_bus_sii_eeprom())
+  {
+    mapping: @mailbox.calculate_slave_mapping(virtual_bus_sii_eeprom(), 0U),
+    dc_cycle_period_ns: None,
+    startup_outputs: None,
+    startup_mailbox_commands: commands,
+    mailbox_config: @mailbox.MailboxConfig::from_sii(sii.header),
+    sii,
+    sii_categories: [],
+    prefer_live_pdo_state: true,
+  }
+}
+
+///|
+fn single_virtual_station_nic() -> (@mock.VirtualNic, UInt, @hal.Duration) raise @hal.EcError {
+  let bus = @mock.VirtualBus::new([
+    @mock.VirtualSlave::new(0, virtual_bus_identity(), virtual_bus_sii_eeprom()),
+  ])
+  let nic = @mock.VirtualNic::new(bus)
+  let station = 0x1001U
+  let timeout = @hal.Duration(50_000_000L)
+  @protocol.assign_station_address(nic, 0U, station, timeout)
+  (nic, station, timeout)
+}
+
+///|
+test "cli station mailbox route applies boot and init path commands on virtual bus" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  ignore(@protocol.request_state(nic, station, @protocol.Boot, timeout))
+  let preparation = virtual_bus_route_preparation([
+    {
+      transition: @runtime.BootToInit,
+      index: 0x2000U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x01']),
+    },
+    {
+      transition: @runtime.InitToPreOp,
+      index: 0x2001U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x02']),
+    },
+  ])
+  let observed = transition_station_to_target_with_preparation_observe(
+    nic,
+    station,
+    @protocol.PreOp,
+    preparation,
+    timeout,
+  )
+  guard observed is Some(result) else {
+    fail("expected Boot -> PreOp route observation")
+  }
+  assert_eq(result.state, @protocol.PreOp)
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let first_payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2000U,
+    b'\x00',
+    timeout,
+  )
+  let second_payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2001U,
+    b'\x00',
+    timeout,
+  )
+  assert_eq(first_payload[0], b'\x01')
+  assert_eq(second_payload[0], b'\x02')
+}
+
+///|
+test "cli station mailbox route applies op to safeop command on virtual bus" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  ignore(@protocol.request_state(nic, station, @protocol.PreOp, timeout))
+  ignore(@protocol.request_state(nic, station, @protocol.SafeOp, timeout))
+  ignore(@protocol.request_state(nic, station, @protocol.Op, timeout))
+  let preparation = virtual_bus_route_preparation([
+    {
+      transition: @runtime.OpToSafeOp,
+      index: 0x2002U,
+      subindex: b'\x00',
+      data: Bytes::from_array([b'\x03']),
+    },
+  ])
+  let observed = transition_station_to_target_with_preparation_observe(
+    nic,
+    station,
+    @protocol.SafeOp,
+    preparation,
+    timeout,
+  )
+  guard observed is Some(result) else {
+    fail("expected Op -> SafeOp route observation")
+  }
+  assert_eq(result.state, @protocol.SafeOp)
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  let payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    preparation.mailbox_config,
+    rmsm,
+    0x2002U,
+    b'\x00',
+    timeout,
+  )
+  assert_eq(payload[0], b'\x03')
+}
+
+///|
 test "cli state path recovers configuration error to init" {
   let nic = StrictTransitionNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
   let timeout = @hal.Duration(1000L)

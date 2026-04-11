@@ -23,6 +23,14 @@ pub struct VirtualSlave {
   /// Process data memory backing SM2/SM3 (separate from register file).
   /// Indexed by physical address relative to SM physical_start.
   process_data : FixedArray[Byte]
+  /// CoE mailbox object dictionary and response state.
+  mailbox : VirtualMailbox
+  /// Mailbox defaults parsed from SII, used before SM0/SM1 are rewritten.
+  default_mailbox_config : @mailbox.MailboxConfig
+  /// True when a mailbox response is ready in SM1.
+  mut mailbox_ready : Bool
+  /// Pending mailbox response frame, padded to the SM1 size on demand.
+  mut pending_mailbox_response : Bytes
 } derive(Show)
 
 ///|
@@ -45,6 +53,18 @@ let fmmu_entry_size : Int = 16
 /// Max FMMU entries in an ESC (typically 8 or 16).
 let max_fmmu_entries : Int = 8
 
+///|
+let sm_window_size : Int = @protocol.sm_entry_size
+
+///|
+let sm_status_offset : Int = 5
+
+///|
+let sm_activate_offset : Int = 6
+
+///|
+let mailbox_status_bit : Byte = b'\x08'
+
 // SM constants (0x0800 base, 8-byte stride, 4 entries max)
 // are reserved for future SM validation logic.
 
@@ -66,6 +86,11 @@ pub fn VirtualSlave::new(
   regs[0x0110] = b'\x35'
   regs[0x0111] = b'\x00'
   // Store identity in SII words but also keep station_address
+  let default_mailbox_config = try @mailbox.parse_sii_header(sii_eeprom) catch {
+    _ => zero_mailbox_config()
+  } noraise {
+    sii => @mailbox.MailboxConfig::from_sii(sii)
+  }
   let slave : VirtualSlave = {
     position,
     registers: regs,
@@ -73,11 +98,268 @@ pub fn VirtualSlave::new(
     al_state: b'\x01', // Init
     station_address: 0U,
     process_data: FixedArray::make(process_data_size, b'\x00'),
+    mailbox: VirtualMailbox::new(),
+    default_mailbox_config,
+    mailbox_ready: false,
+    pending_mailbox_response: Bytes::new(0),
   }
   // Write SII word 8-9 identity match comes from parsing the eeprom.
   // No need to duplicate — the SII eeprom already has identity fields.
   ignore(identity)
+  slave.initialize_mailbox_sm_registers()
   slave
+}
+
+///|
+fn zero_mailbox_config() -> @mailbox.MailboxConfig {
+  {
+    out_address: 0U,
+    out_size: 0U,
+    out_sm_index: 0,
+    in_address: 0U,
+    in_size: 0U,
+    in_sm_index: 1,
+  }
+}
+
+///|
+fn sm_window_base(sm_index : Int) -> Int {
+  @protocol.reg_sm_base.reinterpret_as_int() + sm_index * sm_window_size
+}
+
+///|
+fn read_u16_le_from_registers(
+  registers : FixedArray[Byte],
+  offset : Int,
+) -> UInt {
+  registers[offset].to_uint() | (registers[offset + 1].to_uint() << 8)
+}
+
+///|
+fn VirtualSlave::initialize_mailbox_sm_registers(self : VirtualSlave) -> Unit {
+  if !self.default_mailbox_config.is_valid() {
+    return
+  }
+  self.set_sm_window(
+    self.default_mailbox_config.out_sm_index,
+    self.default_mailbox_config.out_address,
+    self.default_mailbox_config.out_size,
+    b'\x26',
+    false,
+  )
+  self.set_sm_window(
+    self.default_mailbox_config.in_sm_index,
+    self.default_mailbox_config.in_address,
+    self.default_mailbox_config.in_size,
+    b'\x22',
+    false,
+  )
+}
+
+///|
+fn VirtualSlave::set_sm_window(
+  self : VirtualSlave,
+  sm_index : Int,
+  start : UInt,
+  length : UInt,
+  control : Byte,
+  ready : Bool,
+) -> Unit {
+  let base = sm_window_base(sm_index)
+  if base + sm_window_size > esc_reg_size {
+    return
+  }
+  self.registers[base] = (start & 0xFFU).to_byte()
+  self.registers[base + 1] = ((start >> 8) & 0xFFU).to_byte()
+  self.registers[base + 2] = (length & 0xFFU).to_byte()
+  self.registers[base + 3] = ((length >> 8) & 0xFFU).to_byte()
+  self.registers[base + 4] = control
+  self.registers[base + sm_status_offset] = if ready {
+    mailbox_status_bit
+  } else {
+    b'\x00'
+  }
+  self.registers[base + sm_activate_offset] = b'\x01'
+  self.registers[base + 7] = b'\x00'
+}
+
+///|
+fn VirtualSlave::current_mailbox_config(
+  self : VirtualSlave,
+) -> @mailbox.MailboxConfig {
+  let out_base = sm_window_base(0)
+  let in_base = sm_window_base(1)
+  if in_base + sm_window_size <= esc_reg_size {
+    let out_address = read_u16_le_from_registers(self.registers, out_base)
+    let out_size = read_u16_le_from_registers(self.registers, out_base + 2)
+    let in_address = read_u16_le_from_registers(self.registers, in_base)
+    let in_size = read_u16_le_from_registers(self.registers, in_base + 2)
+    let current : @mailbox.MailboxConfig = {
+      out_address,
+      out_size,
+      out_sm_index: 0,
+      in_address,
+      in_size,
+      in_sm_index: 1,
+    }
+    if current.is_valid() {
+      return current
+    }
+  }
+  self.default_mailbox_config
+}
+
+///|
+fn mailbox_range_overlaps(
+  offset : Int,
+  length : Int,
+  start : UInt,
+  size : UInt,
+) -> Bool {
+  let range_start = start.reinterpret_as_int()
+  let range_end = range_start + size.reinterpret_as_int()
+  offset < range_end && offset + length > range_start
+}
+
+///|
+fn VirtualSlave::update_mailbox_sm_status(self : VirtualSlave) -> Unit {
+  let cfg = self.current_mailbox_config()
+  if !cfg.is_valid() {
+    return
+  }
+  let out_base = sm_window_base(cfg.out_sm_index)
+  let in_base = sm_window_base(cfg.in_sm_index)
+  if out_base + sm_status_offset < esc_reg_size {
+    self.registers[out_base + sm_status_offset] = b'\x00'
+  }
+  if in_base + sm_status_offset < esc_reg_size {
+    self.registers[in_base + sm_status_offset] = if self.mailbox_ready {
+      mailbox_status_bit
+    } else {
+      b'\x00'
+    }
+  }
+}
+
+///|
+fn VirtualSlave::write_physical_range(
+  self : VirtualSlave,
+  offset : Int,
+  data : Bytes,
+) -> Unit {
+  for i in 0..<data.length() {
+    let addr = offset + i
+    if addr >= 0 && addr < process_data_size {
+      self.process_data[addr] = data[i]
+    }
+  }
+}
+
+///|
+fn pad_mailbox_frame(frame : Bytes, size : Int) -> Bytes {
+  Bytes::makei(size, fn(i) {
+    if i < frame.length() {
+      frame[i]
+    } else {
+      b'\x00'
+    }
+  })
+}
+
+///|
+fn VirtualSlave::download_request_data_length(
+  self : VirtualSlave,
+  index : UInt,
+  subindex : Byte,
+) -> Int {
+  match self.mailbox.find_od(index, subindex) {
+    Some(entry) if entry.data.length() > 0 && entry.data.length() < 4 =>
+      entry.data.length()
+    _ => 4
+  }
+}
+
+///|
+fn VirtualSlave::load_pending_mailbox_response(
+  self : VirtualSlave,
+  cfg : @mailbox.MailboxConfig,
+) -> Unit {
+  if !cfg.is_valid() || self.pending_mailbox_response.length() <= 0 {
+    return
+  }
+  self.write_physical_range(
+    cfg.in_address.reinterpret_as_int(),
+    self.pending_mailbox_response,
+  )
+}
+
+///|
+fn VirtualSlave::handle_mailbox_request(
+  self : VirtualSlave,
+  cfg : @mailbox.MailboxConfig,
+) -> Unit {
+  if !cfg.is_valid() {
+    return
+  }
+  let request = self.read_process_data(
+    cfg.out_address.reinterpret_as_int(),
+    cfg.out_size.reinterpret_as_int(),
+  )
+  let response = try @mailbox.MailboxHeader::from_bytes(request) catch {
+    _ => Bytes::new(0)
+  } noraise {
+    mbh =>
+      if mbh.mb_type == @mailbox.MailboxType::CoE && request.length() >= 12 {
+        let command = request[8]
+        let index = request[9].to_uint() | (request[10].to_uint() << 8)
+        let subindex = request[11]
+        if command == b'\x40' {
+          match self.mailbox.handle_sdo_upload(index, subindex) {
+            Some(frame) => frame
+            None => Bytes::new(0)
+          }
+        } else if ((command >> 5) & b'\x07') == b'\x01' {
+          let data_len = self.download_request_data_length(index, subindex)
+          let payload = Bytes::makei(data_len, fn(i) {
+            if 12 + i < request.length() {
+              request[12 + i]
+            } else {
+              b'\x00'
+            }
+          })
+          self.mailbox.handle_sdo_download(index, subindex, payload)
+        } else {
+          Bytes::new(0)
+        }
+      } else {
+        Bytes::new(0)
+      }
+  }
+  self.pending_mailbox_response = if response.length() > 0 {
+    pad_mailbox_frame(response, cfg.in_size.reinterpret_as_int())
+  } else {
+    Bytes::new(0)
+  }
+  self.mailbox_ready = self.pending_mailbox_response.length() > 0
+  self.load_pending_mailbox_response(cfg)
+  self.update_mailbox_sm_status()
+}
+
+///|
+fn VirtualSlave::clear_mailbox_response_if_read(
+  self : VirtualSlave,
+  cfg : @mailbox.MailboxConfig,
+  offset : Int,
+  length : Int,
+) -> Unit {
+  if !self.mailbox_ready || !cfg.is_valid() {
+    return
+  }
+  if mailbox_range_overlaps(offset, length, cfg.in_address, cfg.in_size) {
+    self.mailbox_ready = false
+    self.pending_mailbox_response = Bytes::new(0)
+    self.update_mailbox_sm_status()
+  }
 }
 
 ///|
@@ -87,14 +369,24 @@ pub fn VirtualSlave::read_reg(
   offset : Int,
   length : Int,
 ) -> Bytes {
+  let cfg = self.current_mailbox_config()
+  self.update_mailbox_sm_status()
+  if self.mailbox_ready &&
+    mailbox_range_overlaps(offset, length, cfg.in_address, cfg.in_size) {
+    self.load_pending_mailbox_response(cfg)
+  }
   let buf = FixedArray::make(length, b'\x00')
   for i in 0..<length {
     let addr = offset + i
     if addr < esc_reg_size {
       buf[i] = self.registers[addr]
+    } else if addr >= 0 && addr < process_data_size {
+      buf[i] = self.process_data[addr]
     }
   }
-  Bytes::makei(length, fn(i) { buf[i] })
+  let result = Bytes::makei(length, fn(i) { buf[i] })
+  self.clear_mailbox_response_if_read(cfg, offset, length)
+  result
 }
 
 ///|
@@ -108,6 +400,8 @@ pub fn VirtualSlave::write_reg(
     let addr = offset + i
     if addr < esc_reg_size {
       self.registers[addr] = data[i]
+    } else if addr >= 0 && addr < process_data_size {
+      self.process_data[addr] = data[i]
     }
   }
   // Side-effect: station address write at 0x0010
@@ -153,6 +447,15 @@ pub fn VirtualSlave::write_reg(
   // Side-effect: SII control write at 0x0502 → handle EEPROM read
   if offset <= 0x0502 && offset + data.length() > 0x0502 {
     self.handle_sii_access()
+  }
+  let cfg = self.current_mailbox_config()
+  if mailbox_range_overlaps(
+      offset,
+      data.length(),
+      cfg.out_address,
+      cfg.out_size,
+    ) {
+    self.handle_mailbox_request(cfg)
   }
 }
 
