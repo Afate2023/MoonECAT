@@ -314,6 +314,10 @@ pub struct VirtualSlave {
   mut al_state : Byte
   mut station_address : UInt
   process_data : FixedArray[Byte]
+  mailbox : VirtualMailbox
+  default_mailbox_config : @mailbox.MailboxConfig
+  mut mailbox_ready : Bool
+  mut pending_mailbox_response : Bytes
 } derive(@debug.Debug)
 pub fn VirtualSlave::active_fmmus(Self) -> Array[FmmuEntry]
 pub fn VirtualSlave::get_fmmu(Self, Int) -> FmmuEntry

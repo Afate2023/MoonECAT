@@ -37,6 +37,12 @@ type OdBrowseQuery
 
 type OdBrowseReport
 
+type PdoAuditReport
+
+type PdoDirectionReport
+
+type PdoMappingObjectReport
+
 type RunProgressOutput derive(Eq, @debug.Debug)
 pub fn RunProgressOutput::to_string(Self) -> String
 pub impl Show for RunProgressOutput

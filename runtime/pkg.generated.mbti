@@ -1410,6 +1410,10 @@ pub(all) enum StartupCommandTransition {
   SafeOpToInit
   SafeOpToPreOp
   SafeOpToOp
+  OpToInit
+  OpToPreOp
+  OpToSafeOp
+  BootToInit
 } derive(Eq, @debug.Debug)
 pub fn StartupCommandTransition::to_string(Self) -> String
 pub impl Show for StartupCommandTransition
