@@ -1,9 +1,11 @@
 
 # Script to generate impl Show for T that delegates to Debug
 # For each package directory with types that derive(Debug), 
-# create or append show_bridge.mbt with Show impls
+# create or overwrite show_bridge.mbt with Show impls
 
-$root = "E:\MoonECAT"
+param(
+    [string]$root = (Split-Path $PSScriptRoot -Parent)
+)
 $excludePatterns = @("*\_build*", "*Reference_Project*", "*References*", "*.mooncakes*", "*scripts*", "*fixtures*", "*docs*")
 
 # Collect all type definitions with derive(Debug) per package directory
@@ -104,9 +106,11 @@ foreach ($dir in $packageTypes.Keys) {
             $paramNames = ($params -split ',\s*' | ForEach-Object { ($_ -split '\s*:\s*')[0].Trim() })
             $constraints = ($paramNames | ForEach-Object { "$_ : Debug" }) -join ", "
             $typeExpr = "$name[$($paramNames -join ', ')]"
-            $content += "///|`nimpl[$constraints] Show for $typeExpr with output(self, logger) {`n  logger.write_string(@debug.render(Debug::to_repr(self)))`n}`n`n"
+            $content += "///|`npub impl[$constraints] Show for $typeExpr with output(self, logger) {`n  logger.write_string(@debug.render(Debug::to_repr(self)))`n}`n`n"
+            $content += "///|`npub fn ${name}::to_string[$constraints](self : $typeExpr) -> String {`n  @debug.render(Debug::to_repr(self))`n}`n`n"
         } else {
-            $content += "///|`nimpl Show for $name with output(self, logger) {`n  logger.write_string(@debug.render(Debug::to_repr(self)))`n}`n`n"
+            $content += "///|`npub impl Show for $name with output(self, logger) {`n  logger.write_string(@debug.render(Debug::to_repr(self)))`n}`n`n"
+            $content += "///|`npub fn ${name}::to_string(self : $name) -> String {`n  @debug.render(Debug::to_repr(self))`n}`n`n"
         }
     }
     
