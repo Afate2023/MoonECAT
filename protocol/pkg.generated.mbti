@@ -473,7 +473,9 @@ pub(all) struct EsmStateRequestObservation {
   status_code : UInt?
   raw_status_code : UInt?
   control_wkc : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn EsmStateRequestObservation::to_string(Self) -> String
+pub impl Show for EsmStateRequestObservation
 
 pub(all) struct EsmStatusSnapshot {
   state : EsmState

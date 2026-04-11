@@ -544,8 +544,7 @@ void moonecat_windows_npcap_close(int32_t handle_id) {
 #include <sys/time.h>
 #include <unistd.h>
 
-
-static int g_linux_raw_handles[32] = {0};
+int g_linux_raw_handles[32] = {0};
 
 static int32_t moonecat_linux_errno_code(int err) {
   switch (err) {
