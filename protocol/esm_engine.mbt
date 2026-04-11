@@ -23,7 +23,7 @@ pub(all) struct EsmStateRequestObservation {
   status_code : UInt?
   raw_status_code : UInt?
   control_wkc : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 fn decode_al_status_snapshot(

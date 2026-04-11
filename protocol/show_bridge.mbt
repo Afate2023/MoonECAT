@@ -217,3 +217,12 @@ pub impl Show for MutablePdoContext with output(self, logger) {
 pub fn MutablePdoContext::to_string(self : MutablePdoContext) -> String {
   @debug.render(Debug::to_repr(self))
 }
+
+pub impl Show for EsmStateRequestObservation with output(self, logger) {
+  logger.write_string(@debug.render(Debug::to_repr(self)))
+}
+
+///|
+pub fn EsmStateRequestObservation::to_string(self : EsmStateRequestObservation) -> String {
+  @debug.render(Debug::to_repr(self))
+}
