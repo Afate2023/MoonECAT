@@ -13,7 +13,7 @@ pub(all) struct EsmStatusSnapshot {
   state : EsmState
   error_indication : Bool
   status_code : UInt?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Final observation from a single AL Control state request.
@@ -574,7 +574,7 @@ pub(all) struct EsmTimeoutPolicy {
   safeop : @hal.Duration?
   op : @hal.Duration?
   boot : @hal.Duration?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Return the baseline ESM transition timeout for a given target state.

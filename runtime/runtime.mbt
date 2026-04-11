@@ -11,7 +11,7 @@ pub(all) struct CycleResult {
   expected_wkc : UInt
   /// Whether the cycle succeeded (wkc >= expected_wkc).
   ok : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// DC (Distributed Clock) synchronization state placeholder.
@@ -24,7 +24,7 @@ pub(all) enum DcState {
   Locked
   /// DC error: PLL lost sync.
   Drifting(Int64)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Runtime orchestrator: manages the full lifecycle from scan to cyclic PDO.
@@ -59,7 +59,7 @@ pub(all) struct Runtime {
   mut emergency_stations : Array[(UInt, @mailbox.MailboxConfig)]
   /// EoE Virtual Switch engine.
   eoe_switch : EoeSwitch
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {

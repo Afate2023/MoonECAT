@@ -118,7 +118,7 @@ pub(all) struct HilSessionSummary {
   terminated : Bool
   termination_reason : String
   final_sim_time_ns : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn hil_session_summary(session : HilSession) -> HilSessionSummary {

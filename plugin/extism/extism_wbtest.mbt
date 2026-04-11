@@ -559,7 +559,7 @@ test "run_with_mock error path returns error_response" {
     timeout_ns: None,
     payload: Json::object({}),
   }
-  let resp = run_with_mock(req, fn(_nic, _timeout) {
+  let resp = run_with_mock(req, (_nic, _timeout) => {
     raise @hal.EcError::RecvTimeout
   })
   assert_eq(resp.ok, false)

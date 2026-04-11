@@ -7,7 +7,7 @@ pub(all) enum EsmState {
   Op
   /// Bootstrap state for firmware update (optional)
   Boot
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// ESM state register values.
@@ -64,7 +64,7 @@ pub(all) enum AddressMode {
   ConfiguredStation(UInt)
   /// Logical addressing: FMMU-mapped address space.
   Logical(UInt)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Human-readable description of an AL Status Code per ETG.1000.6 Table 11.

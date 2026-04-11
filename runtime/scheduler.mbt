@@ -5,7 +5,7 @@ pub(all) enum RunMode {
   FreeRun
   /// DC-synchronized: locks to distributed clock.
   DcSync
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// RuntimeState tracks the overall master state.
@@ -16,7 +16,7 @@ pub(all) enum RuntimeState {
   Running(RunMode)
   Stopping
   Error(@hal.EcError)
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Telemetry holds runtime diagnostic counters.
@@ -30,7 +30,7 @@ pub(all) struct Telemetry {
   mut irq_events : Int64
   mut dc_delay_updates : Int64
   mut emergency_events : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn Telemetry::new() -> Telemetry {

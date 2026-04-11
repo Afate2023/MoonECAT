@@ -203,7 +203,7 @@ pub(all) struct SlaveInfo {
   dl_status : UInt
   /// SII data read from EEPROM
   mut sii : @mailbox.SiiData?
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Result of a bus scan operation.
@@ -212,7 +212,7 @@ pub(all) struct ScanResult {
   slave_count : Int
   /// Detailed information per slave
   slaves : Array[SlaveInfo]
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Count the number of slaves on the bus by sending a BRD to register 0x0000.

@@ -14,7 +14,7 @@ pub(all) struct ProcessImage {
   output_size : Int
   /// Total input size in bytes.
   input_size : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn ProcessImage::new(output_size : Int, input_size : Int) -> ProcessImage {
@@ -44,7 +44,7 @@ pub(all) struct PdoMapping {
   input_offset : Int
   /// Number of input bytes.
   input_length : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// PDO exchange context: holds the process image and all mappings.
@@ -58,14 +58,14 @@ pub(all) struct PdoContext {
   /// When true, use separate LRD + LWR instead of LRW.
   /// Set when any slave in the group sets the SII PreferNotLRW flag.
   mut block_lrw : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Result of one PDO exchange, including WKC and datagram IRQ.
 pub(all) struct PdoExchangeResult {
   wkc : UInt
   irq : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build a PdoContext from a list of slave mappings.

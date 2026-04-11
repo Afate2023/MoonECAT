@@ -9,7 +9,7 @@ pub(all) struct HostCapabilityContract {
   file_read : Bool
   file_write : Bool
   shared_memory : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn required_host_contract(

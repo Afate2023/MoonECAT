@@ -9,7 +9,7 @@ pub(all) enum AddressType {
   Configured
   Broadcast
   Logical
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build a PDU address from auto-increment position (negative offset from first slave).

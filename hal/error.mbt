@@ -25,4 +25,4 @@ pub(all) suberror EcError {
   // General errors
   NotSupported(String)
   Internal(String)
-} derive(Show)
+} derive(Debug)

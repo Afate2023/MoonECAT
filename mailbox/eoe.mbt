@@ -40,7 +40,7 @@ pub(all) enum EoeFrameType {
   GetAddrFilterReq
   /// Get address filter response.
   GetAddrFilterResp
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn EoeFrameType::to_uint(self : EoeFrameType) -> UInt {
@@ -88,7 +88,7 @@ pub(all) enum EoeResult {
   NoDhcpSupport
   NoFilterSupport
   Unknown(UInt)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn EoeResult::from_uint(v : UInt) -> EoeResult {
@@ -130,7 +130,7 @@ pub(all) enum EoeResponse {
   )
   /// Set/Get IP parameter response with result code.
   EoeIpResponse(result~ : EoeResult, data~ : Bytes)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build frameinfo1 LE u16 value.

@@ -9,7 +9,7 @@ pub(all) struct FmmuConfig {
   physical_start_bit : Byte
   direction : FmmuDirection
   activate : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum FmmuDirection {
@@ -18,7 +18,7 @@ pub(all) enum FmmuDirection {
   MailboxState
   DynamicOutputs
   DynamicInputs
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SyncManager (SM) configuration entry.
@@ -29,7 +29,7 @@ pub(all) struct SmConfig {
   status : Byte
   activate : Byte
   sm_type : SmType
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum SmType {
@@ -40,4 +40,4 @@ pub(all) enum SmType {
   DynamicProcessDataOut
   DynamicProcessDataIn
   Unused
-} derive(Eq, Show)
+} derive(Eq, Debug)

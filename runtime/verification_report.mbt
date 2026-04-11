@@ -12,7 +12,7 @@ pub(all) struct ReportEntry {
   event_type : String
   detail : String
   verdict : Verdict
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// VerificationReport collects all data needed to render a final report.
@@ -25,7 +25,7 @@ pub(all) struct VerificationReport {
   timeline : Array[ReportEntry]
   fault_injections : Array[String]
   metadata : Array[(String, String)]
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn VerificationReport::new(title : String) -> VerificationReport {

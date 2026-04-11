@@ -11,7 +11,7 @@ pub(all) enum RunPhase {
   Operational
   Stopping
   Done
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum RunFault {
@@ -30,7 +30,7 @@ pub(all) enum RunFault {
   )
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 priv struct TransitionAttemptObservation {
@@ -47,7 +47,7 @@ pub(all) struct RunLoopSettings {
   cycle_period_ns : Int64?
   output_period_ns : Int64?
   max_consecutive_timeouts : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn RunLoopSettings::fixed_cycles(cycles : Int) -> RunLoopSettings {
@@ -84,7 +84,7 @@ pub(all) struct RunReport {
   telemetry : Telemetry
   final_phase : RunPhase
   fault : RunFault?
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub(all) struct SlaveStartupPreparation {
@@ -111,7 +111,7 @@ pub(all) enum StartupCommandTransition {
   OpToPreOp
   OpToSafeOp
   BootToInit
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct StartupMailboxCommand {
@@ -119,14 +119,14 @@ pub(all) struct StartupMailboxCommand {
   index : UInt
   subindex : Byte
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct StationStartupMailboxPlan {
   station : UInt
   mailbox_config : @mailbox.MailboxConfig
   commands : Array[StartupMailboxCommand]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct RunStartupPreparation {
@@ -205,14 +205,14 @@ enum OperationalStartupStep {
   WarmupProcessData
   ValidateSmWatchdog
   TransitionToOp
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 enum StartupRecoveryStrategy {
   RetryTargetPath
   RollbackToInit
   HoldSafeOp
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn master_config_with_optional_dc(
@@ -3018,7 +3018,7 @@ pub(all) struct SmWatchdogValidation {
   station : UInt
   config : @protocol.SmWatchdogConfig
   watchdog_active : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Read and validate SM Watchdog configuration for all stations before SafeOp→Op.

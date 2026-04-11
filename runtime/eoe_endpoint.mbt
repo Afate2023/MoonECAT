@@ -45,7 +45,7 @@ pub(all) struct QueueEndpoint {
   max_depth : Int
   /// Whether this endpoint is active.
   mut up : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// A frame in the endpoint queue, tagged with the destination/source station.
@@ -54,7 +54,7 @@ pub(all) struct EoeEndpointFrame {
   station : UInt
   /// Raw Ethernet frame bytes.
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn QueueEndpoint::new(max_depth? : Int = 64) -> QueueEndpoint {

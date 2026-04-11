@@ -3,6 +3,7 @@ package "afate/MoonECAT/hal/native"
 
 import {
   "afate/MoonECAT/hal",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -75,7 +76,9 @@ pub(all) enum NativeBackendKind {
   Auto
   LinuxRawSocket
   WindowsNpcap
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn NativeBackendKind::to_string(Self) -> String
+pub impl Show for NativeBackendKind
 
 pub(all) struct NativeInterfaceInfo {
   name : String
@@ -85,22 +88,28 @@ pub(all) struct NativeInterfaceInfo {
   connected : Bool
   wireless : Bool
   index : Int?
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn NativeInterfaceInfo::to_string(Self) -> String
+pub impl Show for NativeInterfaceInfo
 
 pub(all) struct NativeInterfaceListing {
   backend : NativeBackendKind
   interfaces : Array[NativeInterfaceInfo]
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn NativeInterfaceListing::to_string(Self) -> String
+pub impl Show for NativeInterfaceListing
 
 pub(all) struct NativeNic {
   config : NativeNicConfig
   mut handle_id : Int
   mut is_open : Bool
   mut last_sent : Bytes
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn NativeNic::new(NativeNicConfig) -> Self
 pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError
+pub fn NativeNic::to_string(Self) -> String
 pub impl @hal.Nic for NativeNic
+pub impl Show for NativeNic
 
 pub(all) struct NativeNicConfig {
   interface_name : String
@@ -108,7 +117,9 @@ pub(all) struct NativeNicConfig {
   snaplen : Int
   promisc : Bool
   timeout_ms : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn NativeNicConfig::to_string(Self) -> String
+pub impl Show for NativeNicConfig
 
 pub(all) struct NativeZeroCopyNic {
   config : NativeNicConfig

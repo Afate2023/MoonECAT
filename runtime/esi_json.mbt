@@ -32,7 +32,7 @@ pub(all) struct EsiJsonMailbox {
   foe : Bool
   soe : Bool
   voe : Bool
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonSmEntry {
@@ -42,7 +42,7 @@ pub(all) struct EsiJsonSmEntry {
   status : Byte
   enable : Bool
   sm_type : String
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonPdoEntry {
@@ -52,7 +52,7 @@ pub(all) struct EsiJsonPdoEntry {
   bit_length : Byte
   name : String
   data_type_name : String
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonPdo {
@@ -62,7 +62,7 @@ pub(all) struct EsiJsonPdo {
   sync_manager : Byte
   name : String
   entries : Array[EsiJsonPdoEntry]
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonDcMode {
@@ -72,13 +72,13 @@ pub(all) struct EsiJsonDcMode {
   cycle_time_sync0 : UInt
   sync0_factor : Int
   sync1_factor : Int
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonSelectedModule {
   module_ident : UInt
   slot_index : Int
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonInitCommand {
@@ -86,7 +86,7 @@ pub(all) struct EsiJsonInitCommand {
   index : UInt
   subindex : Byte
   data : Bytes
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonDevice {
@@ -111,7 +111,7 @@ pub(all) struct EsiJsonDevice {
   init_commands : Array[EsiJsonInitCommand]
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonModule {
@@ -119,13 +119,13 @@ pub(all) struct EsiJsonModule {
   module_name : String
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiJsonDocument {
   devices : Array[EsiJsonDevice]
   modules : Array[EsiJsonModule]
-} derive(Eq, Show, ToJson)
+} derive(Eq, Debug, ToJson)
 
 ///|
 pub(all) struct EsiOfflineSiiReport {

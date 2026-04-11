@@ -164,7 +164,7 @@ pub(all) struct SdoTransaction {
   station : UInt
   /// SDO request to send.
   request : SdoRequest
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SdoResponse holds a decoded SDO response.
@@ -181,7 +181,7 @@ pub(all) struct SdoResponse {
   last_segment : Bool
   /// Total transfer size if provided by initiate upload response.
   complete_size : UInt?
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build a complete mailbox frame for an SDO request (expedited).
@@ -408,7 +408,7 @@ pub fn decode_sdo_response(
 /// MailboxCounter manages the mailbox session counter cycling (1-7, wrapping).
 pub(all) struct MailboxCounter {
   mut value : Byte
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn MailboxCounter::new() -> MailboxCounter {
@@ -709,7 +709,7 @@ pub(all) struct SdoInfoResponse {
   incomplete : Bool
   fragments_left : UInt
   payload : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SDO Info object description (Get OD response body).
@@ -719,7 +719,7 @@ pub(all) struct SdoInfoObjectDescription {
   object_code : Byte
   max_subindex : Byte
   name : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// SDO Info entry description (Get OE response body).
@@ -731,7 +731,7 @@ pub(all) struct SdoInfoEntryDescription {
   bit_length : UInt
   access : UInt
   name : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Decode SDO Info response frame (service=0x08).

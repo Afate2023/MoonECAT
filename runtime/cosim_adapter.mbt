@@ -18,7 +18,7 @@
 ///|
 /// SimTime represents simulation time in nanoseconds since simulation start.
 /// Distinct from HAL Timestamp to decouple real-time from simulated time.
-pub(all) struct SimTime(Int64) derive(Eq, Show, Compare)
+pub(all) struct SimTime(Int64) derive(Eq, Debug, Compare)
 
 ///|
 pub fn SimTime::zero() -> SimTime {
@@ -49,7 +49,7 @@ pub(all) enum SimStepResult {
   Terminated(String)
   /// Simulation error (e.g., solver divergence).
   Error(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// CoSimAdapter — the trait that external plant/controller models implement.
@@ -92,7 +92,7 @@ pub(all) struct CoSimConfig {
   output_size : Int
   /// Total input image size in bytes.
   input_size : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// LoopbackCoSimAdapter — trivial adapter that copies outputs to inputs.

@@ -110,7 +110,7 @@ pub(all) struct SmWatchdogConfig {
   pdata_status : Bool
   /// Process Data watchdog counter (register 0x0442). Increments on each event.
   pdata_counter : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Read SM Watchdog configuration from ESC registers.
@@ -206,7 +206,7 @@ pub(all) struct PortErrorCounters {
   forwarded_rx_errors : UInt
   /// Lost link events on this port (link-down transitions).
   lost_link_count : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// DL/Physical layer error counters snapshot (ESC registers 0x0300–0x0313).
@@ -217,7 +217,7 @@ pub(all) struct DlErrorCounters {
   ecat_pu_errors : UInt
   /// PDI interface error counter (register 0x030D).
   pdi_errors : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Read DL/Physical layer error counters from ESC registers using configured station addressing.

@@ -5,7 +5,7 @@
 pub(all) struct TopologyFingerprint {
   slave_count : Int
   identity_hash : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// TopologyFingerprintMatch describes how two fingerprints differ.
@@ -13,7 +13,7 @@ pub(all) enum TopologyFingerprintMatch {
   Identical
   SlaveCountChanged(expected~ : Int, actual~ : Int)
   IdentityChanged
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 fn hash_identity(

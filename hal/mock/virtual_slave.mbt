@@ -31,7 +31,7 @@ pub struct VirtualSlave {
   mut mailbox_ready : Bool
   /// Pending mailbox response frame, padded to the SM1 size on demand.
   mut pending_mailbox_response : Bytes
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Maximum ESC register space to model (covers 0x0000..0x0FFF).
@@ -497,7 +497,7 @@ pub(all) struct FmmuEntry {
   /// 0x01 = read (slave→master), 0x02 = write (master→slave)
   direction : Int
   activate : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Read and parse FMMU entry n from the register file.

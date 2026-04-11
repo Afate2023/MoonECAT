@@ -42,7 +42,7 @@ pub enum QualityTrend {
   Stable
   /// 正在恶化
   Degrading
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// 质量评级
@@ -57,7 +57,7 @@ pub enum QualityGrade {
   Poor
   /// 严重 (<250)
   Critical
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// 从综合分推导评级

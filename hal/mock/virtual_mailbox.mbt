@@ -12,7 +12,7 @@ pub(all) struct OdEntry {
   subindex : Byte
   data : Bytes
   access : OdAccess
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// OdAccess flags for object dictionary entries.
@@ -20,7 +20,7 @@ pub(all) enum OdAccess {
   ReadOnly
   ReadWrite
   WriteOnly
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// VirtualMailbox holds the mailbox emulation state for one VirtualSlave.
@@ -35,7 +35,7 @@ pub(all) struct VirtualMailbox {
   mut counter : Int
   /// Pending emergency messages to emit.
   emergencies : Array[EmergencyEvent]
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// EmergencyEvent describes a scheduled CoE Emergency message.
@@ -46,7 +46,7 @@ pub(all) struct EmergencyEvent {
   /// Cycle at which to emit this emergency (0 = immediately).
   at_cycle : Int64
   mut emitted : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn VirtualMailbox::new() -> VirtualMailbox {

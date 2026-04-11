@@ -14,7 +14,7 @@ pub(all) struct SlaveMapping {
   output_bytes : Int
   /// Total bytes of input (slave→master) process data for this slave.
   input_bytes : Int
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 /// Compute SmConfig array from SII SM entries and mailbox header info.

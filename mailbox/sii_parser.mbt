@@ -584,7 +584,7 @@ pub(all) struct SiiGeneral {
   physical_port_2 : Byte
   physical_port_3 : Byte
   physical_memory_address : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parse the General category data.
@@ -733,7 +733,7 @@ pub(all) struct SiiSmEntry {
   status : Byte
   activate : Byte
   sm_type : SmType
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parse the SyncManager category data.

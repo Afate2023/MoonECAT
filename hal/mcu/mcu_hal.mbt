@@ -21,7 +21,7 @@ pub(all) enum McuPlatform {
   Stm32H7Lan9252
   /// Generic placeholder for bring-up
   Generic
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// MCU NIC configuration.
@@ -36,7 +36,7 @@ pub(all) struct McuNicConfig {
   tx_irq : Int
   /// DMA ring buffer entry count (must be power of 2).
   ring_size : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn McuNicConfig::default(platform : McuPlatform) -> McuNicConfig {
@@ -59,7 +59,7 @@ pub(all) struct McuNic {
   mut opened : Bool
   mut tx_count : Int64
   mut rx_count : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn McuNic::new(config : McuNicConfig) -> McuNic {
@@ -103,7 +103,7 @@ pub(all) struct McuClock {
   platform : McuPlatform
   /// Timer frequency in Hz (e.g., 400_000_000 for 400 MHz).
   timer_freq_hz : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn McuClock::new(platform : McuPlatform, timer_freq_hz : Int64) -> McuClock {
@@ -131,7 +131,7 @@ pub impl @hal.Clock for McuClock with sleep(self, dur) {
 pub(all) struct McuZeroCopyNic {
   config : McuNicConfig
   mut opened : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn McuZeroCopyNic::new(config : McuNicConfig) -> McuZeroCopyNic {

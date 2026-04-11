@@ -34,7 +34,7 @@ struct EoeReassemblyBuffer {
   mut last_seen : Bool
   /// Number of fragments expected (set when last fragment arrives).
   mut expected_count : UInt
-} derive(Show)
+} derive(Debug)
 
 ///|
 fn EoeReassemblyBuffer::new(frame_number : UInt) -> EoeReassemblyBuffer {
@@ -110,7 +110,7 @@ pub(all) struct EoeStationContext {
   mut tx_frame_number : UInt
   /// Mailbox counter for EoE frames (1–7 wrap, 0 reserved).
   mut mb_counter : Byte
-} derive(Show)
+} derive(Debug)
 
 ///|
 fn EoeStationContext::new(
@@ -193,7 +193,7 @@ pub(all) struct EoeReceivedFrame {
   station : UInt
   /// Reassembled Ethernet frame bytes.
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// EoE Virtual Switch state.
@@ -210,7 +210,7 @@ pub(all) struct EoeSwitch {
   mut rx_frames_complete : Int64
   /// Telemetry: reassembly errors (unexpected fragment, etc.).
   mut rx_errors : Int64
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn EoeSwitch::new() -> EoeSwitch {

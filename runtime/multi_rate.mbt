@@ -25,7 +25,7 @@ pub(all) struct MultiRateAnalysis {
   worst_case_output_bytes : Int
   /// Total input bytes that could be read in the worst-case cycle.
   worst_case_input_bytes : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 fn gcd(a : Int, b : Int) -> Int {

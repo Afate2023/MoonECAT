@@ -38,7 +38,7 @@ pub(all) struct MutableProcessImage {
   inputs : FixedArray[Byte]
   output_size : Int
   input_size : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Create a new MutableProcessImage with pre-allocated buffers.

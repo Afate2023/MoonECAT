@@ -12,7 +12,7 @@ pub(all) enum RmsmState {
   WaitingForResponse(Byte)
   /// Transaction completed with an error; can be reset.
   Error(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Per-slave Resilient Mailbox State Machine.
@@ -32,7 +32,7 @@ pub(all) struct Rmsm {
   mut repeat_request : Bool
   /// True while waiting for the SubDevice to mirror RepeatAck.
   mut awaiting_repeat_ack : Bool
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub fn Rmsm::new(max_retries? : Int = 3) -> Rmsm {

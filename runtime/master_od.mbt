@@ -15,14 +15,14 @@ pub(all) enum MasterOdDataType {
   Integer32
   VisibleString
   OctetString
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Access mode for an OD entry.
 pub(all) enum MasterOdAccess {
   ReadOnly
   ReadWrite
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// One entry in the master object dictionary.
@@ -33,7 +33,7 @@ pub(all) struct MasterOdEntry {
   data_type : MasterOdDataType
   access : MasterOdAccess
   value : MasterOdValue
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Value stored (or computed) for an OD entry.
@@ -44,13 +44,13 @@ pub(all) enum MasterOdValue {
   I32(Int)
   Str(String)
   Raw(Bytes)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// The master object dictionary: a flat list of entries.
 pub(all) struct MasterObjectDictionary {
   entries : Array[MasterOdEntry]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Identity used when building the master's own 0x1018.
@@ -59,7 +59,7 @@ pub(all) struct MasterIdentity {
   product_code : UInt
   revision : UInt
   serial : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn default_master_identity() -> MasterIdentity {

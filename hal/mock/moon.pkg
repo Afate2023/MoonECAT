@@ -3,6 +3,7 @@ import {
   "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",
+  "moonbitlang/core/debug",
 }
 
 import {

@@ -3,6 +3,7 @@ package "afate/MoonECAT/mailbox"
 
 import {
   "afate/MoonECAT/hal",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -117,13 +118,17 @@ pub(all) enum CoeService {
   TxPdo
   RxPdo
   Emergency
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn CoeService::to_string(Self) -> String
+pub impl Show for CoeService
 
 pub(all) struct EmergencyMessage {
   error_code : UInt
   error_register : Byte
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn EmergencyMessage::to_string(Self) -> String
+pub impl Show for EmergencyMessage
 
 pub(all) enum EoeFrameType {
   FragData
@@ -136,14 +141,18 @@ pub(all) enum EoeFrameType {
   GetIpResp
   GetAddrFilterReq
   GetAddrFilterResp
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn EoeFrameType::from_uint(UInt) -> Self raise @hal.EcError
+pub fn EoeFrameType::to_string(Self) -> String
 pub fn EoeFrameType::to_uint(Self) -> UInt
+pub impl Show for EoeFrameType
 
 pub(all) enum EoeResponse {
   EoeFragment(frame_type~ : EoeFrameType, last_fragment~ : Bool, frag_number~ : UInt, frame_offset~ : UInt, frame_number~ : UInt, data~ : Bytes)
   EoeIpResponse(result~ : EoeResult, data~ : Bytes)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn EoeResponse::to_string(Self) -> String
+pub impl Show for EoeResponse
 
 pub(all) enum EoeResult {
   Success
@@ -153,9 +162,11 @@ pub(all) enum EoeResult {
   NoDhcpSupport
   NoFilterSupport
   Unknown(UInt)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn EoeResult::from_uint(UInt) -> Self
+pub fn EoeResult::to_string(Self) -> String
 pub fn EoeResult::to_uint(Self) -> UInt
+pub impl Show for EoeResult
 
 pub(all) struct FmmuConfig {
   logical_start : UInt
@@ -166,8 +177,10 @@ pub(all) struct FmmuConfig {
   physical_start_bit : Byte
   direction : FmmuDirection
   activate : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn FmmuConfig::to_bytes(Self) -> Bytes
+pub fn FmmuConfig::to_string(Self) -> String
+pub impl Show for FmmuConfig
 
 pub(all) enum FmmuDirection {
   Outputs
@@ -175,7 +188,9 @@ pub(all) enum FmmuDirection {
   MailboxState
   DynamicOutputs
   DynamicInputs
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn FmmuDirection::to_string(Self) -> String
+pub impl Show for FmmuDirection
 
 pub(all) enum FoeErrorCode {
   NotDefined
@@ -194,9 +209,11 @@ pub(all) enum FoeErrorCode {
   InvalidFirmware
   FlashError
   Unknown(UInt)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn FoeErrorCode::from_uint(UInt) -> Self
+pub fn FoeErrorCode::to_string(Self) -> String
 pub fn FoeErrorCode::to_uint(Self) -> UInt
+pub impl Show for FoeErrorCode
 
 pub(all) enum FoeOpCode {
   Read
@@ -205,16 +222,20 @@ pub(all) enum FoeOpCode {
   Ack
   Error
   Busy
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn FoeOpCode::from_byte(Byte) -> Self raise @hal.EcError
 pub fn FoeOpCode::to_byte(Self) -> Byte
+pub fn FoeOpCode::to_string(Self) -> String
+pub impl Show for FoeOpCode
 
 pub(all) enum FoeResponse {
   FoeData(packet_number~ : UInt, data~ : Bytes)
   FoeAck(packet_number~ : UInt)
   FoeError(code~ : FoeErrorCode, text~ : String)
   FoeBusy
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn FoeResponse::to_string(Self) -> String
+pub impl Show for FoeResponse
 
 pub(all) struct MailboxConfig {
   out_address : UInt
@@ -223,15 +244,19 @@ pub(all) struct MailboxConfig {
   in_address : UInt
   in_size : UInt
   in_sm_index : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn MailboxConfig::from_sii(SiiData) -> Self
 pub fn MailboxConfig::is_valid(Self) -> Bool
+pub fn MailboxConfig::to_string(Self) -> String
+pub impl Show for MailboxConfig
 
 pub(all) struct MailboxCounter {
   mut value : Byte
-} derive(Show)
+} derive(@debug.Debug)
 pub fn MailboxCounter::new() -> Self
 pub fn MailboxCounter::next(Self) -> Byte
+pub fn MailboxCounter::to_string(Self) -> String
+pub impl Show for MailboxCounter
 
 pub(all) struct MailboxHeader {
   length : UInt
@@ -240,19 +265,23 @@ pub(all) struct MailboxHeader {
   priority : Byte
   mb_type : MailboxType
   counter : Byte
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn MailboxHeader::from_bytes(Bytes) -> Self raise @hal.EcError
 pub fn MailboxHeader::to_bytes(Self) -> Bytes
+pub fn MailboxHeader::to_string(Self) -> String
+pub impl Show for MailboxHeader
 
 pub(all) struct MailboxRepeatState {
   request : Bool
   acknowledge : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn MailboxRepeatState::apply_to_activate_byte(Self, Byte) -> Byte
 pub fn MailboxRepeatState::apply_to_pdi_control_byte(Self, Byte) -> Byte
 pub fn MailboxRepeatState::from_sync_manager_bytes(Byte, Byte) -> Self
 pub fn MailboxRepeatState::is_acknowledged(Self) -> Bool
+pub fn MailboxRepeatState::to_string(Self) -> String
 pub fn MailboxRepeatState::toggle_request(Self) -> Bool
+pub impl Show for MailboxRepeatState
 
 pub(all) enum MailboxType {
   Err
@@ -262,8 +291,10 @@ pub(all) enum MailboxType {
   FoE
   SoE
   VoE
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn MailboxType::to_byte(Self) -> Byte
+pub fn MailboxType::to_string(Self) -> String
+pub impl Show for MailboxType
 
 pub(all) struct Rmsm {
   counter : MailboxCounter
@@ -273,7 +304,7 @@ pub(all) struct Rmsm {
   mut last_recv_counter : Byte
   mut repeat_request : Bool
   mut awaiting_repeat_ack : Bool
-} derive(Show)
+} derive(@debug.Debug)
 pub fn Rmsm::awaits_repeat_ack(Self) -> Bool
 pub fn Rmsm::begin_read_repeat(Self, Byte) -> Byte raise @hal.EcError
 pub fn Rmsm::begin_retry_transaction(Self) -> Byte raise @hal.EcError
@@ -285,13 +316,17 @@ pub fn Rmsm::observe_repeat_ack(Self, Byte) -> Bool
 pub fn Rmsm::record_timeout(Self) -> Bool
 pub fn Rmsm::reset(Self) -> Unit
 pub fn Rmsm::reset_for_retry(Self) -> Unit
+pub fn Rmsm::to_string(Self) -> String
 pub fn Rmsm::validate_response(Self, Byte) -> Bool raise @hal.EcError
+pub impl Show for Rmsm
 
 pub(all) enum RmsmState {
   Idle
   WaitingForResponse(Byte)
   Error(String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn RmsmState::to_string(Self) -> String
+pub impl Show for RmsmState
 
 pub(all) enum SdoCommand {
   DownloadRequest
@@ -299,7 +334,9 @@ pub(all) enum SdoCommand {
   UploadRequest
   UploadResponse
   AbortTransfer
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoCommand::to_string(Self) -> String
+pub impl Show for SdoCommand
 
 pub(all) struct SdoInfoEntryDescription {
   index : UInt
@@ -309,7 +346,9 @@ pub(all) struct SdoInfoEntryDescription {
   bit_length : UInt
   access : UInt
   name : String
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoInfoEntryDescription::to_string(Self) -> String
+pub impl Show for SdoInfoEntryDescription
 
 pub(all) struct SdoInfoObjectDescription {
   index : UInt
@@ -317,14 +356,18 @@ pub(all) struct SdoInfoObjectDescription {
   object_code : Byte
   max_subindex : Byte
   name : String
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoInfoObjectDescription::to_string(Self) -> String
+pub impl Show for SdoInfoObjectDescription
 
 pub(all) struct SdoInfoResponse {
   opcode : Byte
   incomplete : Bool
   fragments_left : UInt
   payload : Bytes
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoInfoResponse::to_string(Self) -> String
+pub impl Show for SdoInfoResponse
 
 pub(all) struct SdoRequest {
   index : UInt
@@ -332,7 +375,9 @@ pub(all) struct SdoRequest {
   command : SdoCommand
   data : Bytes
   complete_access : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoRequest::to_string(Self) -> String
+pub impl Show for SdoRequest
 
 pub(all) struct SdoResponse {
   index : UInt
@@ -343,14 +388,18 @@ pub(all) struct SdoResponse {
   toggle : Bool
   last_segment : Bool
   complete_size : UInt?
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SdoResponse::to_string(Self) -> String
+pub impl Show for SdoResponse
 
 pub(all) struct SdoTransaction {
   counter : Byte
   station : UInt
   request : SdoRequest
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SdoTransaction::encode(Self) -> Bytes
+pub fn SdoTransaction::to_string(Self) -> String
+pub impl Show for SdoTransaction
 
 pub(all) enum SiiCategory {
   Strings
@@ -369,7 +418,9 @@ pub(all) enum SiiCategory {
   VendorInformation
   Images
   Raw
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiCategory::to_string(Self) -> String
+pub impl Show for SiiCategory
 
 pub(all) enum SiiCategoryClass {
   StandardKnown
@@ -377,16 +428,20 @@ pub(all) enum SiiCategoryClass {
   DeviceSpecific
   VendorSpecific
   ApplicationSpecific
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiCategoryClass::label(Self) -> String
+pub fn SiiCategoryClass::to_string(Self) -> String
+pub impl Show for SiiCategoryClass
 
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
   type_code : UInt
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiCategoryEntry::category_class(Self) -> SiiCategoryClass
 pub fn SiiCategoryEntry::overlay_candidate(Self) -> SiiOverlayCandidate?
+pub fn SiiCategoryEntry::to_string(Self) -> String
+pub impl Show for SiiCategoryEntry
 
 pub(all) struct SiiData {
   vendor_id : UInt
@@ -414,7 +469,7 @@ pub(all) struct SiiData {
   esc_config_b6 : UInt
   checksum_b : UInt
   esc_config_b_present : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiData::production_week(Self) -> Int
 pub fn SiiData::production_weekday(Self) -> Int
 pub fn SiiData::production_year(Self) -> Int
@@ -424,6 +479,8 @@ pub fn SiiData::supports_eoe(Self) -> Bool
 pub fn SiiData::supports_foe(Self) -> Bool
 pub fn SiiData::supports_soe(Self) -> Bool
 pub fn SiiData::supports_voe(Self) -> Bool
+pub fn SiiData::to_string(Self) -> String
+pub impl Show for SiiData
 
 pub(all) struct SiiDcClock {
   cycle_time_0 : UInt
@@ -434,7 +491,9 @@ pub(all) struct SiiDcClock {
   sync0_cycle_factor : Int
   name_idx : Byte
   description_idx : Byte
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiDcClock::to_string(Self) -> String
+pub impl Show for SiiDcClock
 
 pub(all) struct SiiFmmuEx {
   op_only : Bool
@@ -442,7 +501,9 @@ pub(all) struct SiiFmmuEx {
   su_defined : Bool
   sync_manager : Byte
   sync_unit : Byte
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiFmmuEx::to_string(Self) -> String
+pub impl Show for SiiFmmuEx
 
 pub(all) struct SiiFullInfo {
   eeprom : Bytes
@@ -460,7 +521,9 @@ pub(all) struct SiiFullInfo {
   tx_pdo : Array[SiiPdo]
   rx_pdo : Array[SiiPdo]
   dc_clocks : Array[SiiDcClock]
-} derive(Show)
+} derive(@debug.Debug)
+pub fn SiiFullInfo::to_string(Self) -> String
+pub impl Show for SiiFullInfo
 
 pub(all) struct SiiGeneral {
   group_idx : Byte
@@ -482,7 +545,7 @@ pub(all) struct SiiGeneral {
   physical_port_2 : Byte
   physical_port_3 : Byte
   physical_memory_address : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiGeneral::identification_method(Self) -> Int
 pub fn SiiGeneral::is_op_only(Self) -> Bool
 pub fn SiiGeneral::prefers_not_lrw(Self) -> Bool
@@ -495,22 +558,28 @@ pub fn SiiGeneral::supports_coe_upload_at_startup(Self) -> Bool
 pub fn SiiGeneral::supports_identification_ado(Self) -> Bool
 pub fn SiiGeneral::supports_identification_physical_memory(Self) -> Bool
 pub fn SiiGeneral::supports_mailbox_data_link_layer(Self) -> Bool
+pub fn SiiGeneral::to_string(Self) -> String
+pub impl Show for SiiGeneral
 
 pub(all) struct SiiOverlayCandidate {
   scope : SiiOverlayScope
   type_code : UInt
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiOverlayCandidate::decoder_name(Self) -> String?
 pub fn SiiOverlayCandidate::dispatch_key(Self) -> String
 pub fn SiiOverlayCandidate::status_label(Self) -> String
+pub fn SiiOverlayCandidate::to_string(Self) -> String
+pub impl Show for SiiOverlayCandidate
 
 pub(all) enum SiiOverlayScope {
   DeviceSpecific
   VendorSpecific
   ApplicationSpecific
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiOverlayScope::label(Self) -> String
+pub fn SiiOverlayScope::to_string(Self) -> String
+pub impl Show for SiiOverlayScope
 
 pub(all) struct SiiPdo {
   pdo_index : UInt
@@ -520,7 +589,7 @@ pub(all) struct SiiPdo {
   name_idx : Byte
   flags : UInt
   entries : Array[SiiPdoEntry]
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiPdo::is_default(Self) -> Bool
 pub fn SiiPdo::is_depend_on_slot(Self) -> Bool
 pub fn SiiPdo::is_depend_on_slot_group(Self) -> Bool
@@ -529,6 +598,8 @@ pub fn SiiPdo::is_mandatory(Self) -> Bool
 pub fn SiiPdo::is_module_align(Self) -> Bool
 pub fn SiiPdo::is_overwritten_by_module(Self) -> Bool
 pub fn SiiPdo::is_virtual_content(Self) -> Bool
+pub fn SiiPdo::to_string(Self) -> String
+pub impl Show for SiiPdo
 
 pub(all) struct SiiPdoEntry {
   entry_index : UInt
@@ -537,7 +608,9 @@ pub(all) struct SiiPdoEntry {
   data_type : Byte
   bit_length : Byte
   flags : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiPdoEntry::to_string(Self) -> String
+pub impl Show for SiiPdoEntry
 
 pub(all) struct SiiPreamble {
   pdi_control : UInt
@@ -547,8 +620,10 @@ pub(all) struct SiiPreamble {
   configured_station_alias : UInt
   checksum : UInt
   checksum_ok : Bool
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiPreamble::sync_impulse_length_ns(Self) -> UInt
+pub fn SiiPreamble::to_string(Self) -> String
+pub impl Show for SiiPreamble
 
 pub(all) struct SiiSmEntry {
   physical_start : UInt
@@ -557,13 +632,17 @@ pub(all) struct SiiSmEntry {
   status : Byte
   activate : Byte
   sm_type : SmType
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiSmEntry::to_string(Self) -> String
+pub impl Show for SiiSmEntry
 
 pub(all) struct SiiStandardMetadata {
   eeprom_size_raw : UInt
   version : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SiiStandardMetadata::eeprom_size_bytes(Self) -> UInt
+pub fn SiiStandardMetadata::to_string(Self) -> String
+pub impl Show for SiiStandardMetadata
 
 pub(all) struct SiiSyncUnit {
   separate_su : Bool
@@ -571,7 +650,9 @@ pub(all) struct SiiSyncUnit {
   depend_on_input_state : Bool
   frame_repeat_support : Bool
   raw_flags : Byte
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiSyncUnit::to_string(Self) -> String
+pub impl Show for SiiSyncUnit
 
 pub(all) struct SiiTimeouts {
   preop_timeout_ms : UInt
@@ -580,14 +661,18 @@ pub(all) struct SiiTimeouts {
   back_to_safeop_timeout_ms : UInt
   mailbox_request_timeout_ms : UInt
   mailbox_response_timeout_ms : UInt
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SiiTimeouts::to_string(Self) -> String
+pub impl Show for SiiTimeouts
 
 pub(all) struct SlaveMapping {
   sm_configs : Array[SmConfig]
   fmmu_configs : Array[FmmuConfig]
   output_bytes : Int
   input_bytes : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SlaveMapping::to_string(Self) -> String
+pub impl Show for SlaveMapping
 
 pub(all) struct SmConfig {
   physical_start : UInt
@@ -596,8 +681,10 @@ pub(all) struct SmConfig {
   status : Byte
   activate : Byte
   sm_type : SmType
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SmConfig::to_bytes(Self) -> Bytes
+pub fn SmConfig::to_string(Self) -> String
+pub impl Show for SmConfig
 
 pub(all) enum SmType {
   MailboxOut
@@ -607,7 +694,9 @@ pub(all) enum SmType {
   DynamicProcessDataOut
   DynamicProcessDataIn
   Unused
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SmType::to_string(Self) -> String
+pub impl Show for SmType
 
 pub(all) enum SoeElementFlag {
   DataState
@@ -618,8 +707,10 @@ pub(all) enum SoeElementFlag {
   Max
   Value
   Default
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SoeElementFlag::to_byte(Self) -> Byte
+pub fn SoeElementFlag::to_string(Self) -> String
+pub impl Show for SoeElementFlag
 
 pub(all) enum SoeOpCode {
   ReadReq
@@ -628,16 +719,20 @@ pub(all) enum SoeOpCode {
   WriteRes
   Notification
   Emergency
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn SoeOpCode::from_uint(UInt) -> Self raise @hal.EcError
+pub fn SoeOpCode::to_string(Self) -> String
 pub fn SoeOpCode::to_uint(Self) -> UInt
+pub impl Show for SoeOpCode
 
 pub(all) enum SoeResponse {
   SoeReadData(drive_no~ : UInt, element_flags~ : Byte, idn~ : UInt, incomplete~ : Bool, data~ : Bytes)
   SoeWriteAck(drive_no~ : UInt, element_flags~ : Byte, idn~ : UInt)
   SoeError(drive_no~ : UInt, idn~ : UInt, error_code~ : UInt)
   SoeNotification(drive_no~ : UInt, idn~ : UInt, data~ : Bytes)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub fn SoeResponse::to_string(Self) -> String
+pub impl Show for SoeResponse
 
 // Type aliases
 

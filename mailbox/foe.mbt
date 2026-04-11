@@ -29,7 +29,7 @@ pub(all) enum FoeOpCode {
   Error
   /// Slave→Host: busy, retry the last request.
   Busy
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn FoeOpCode::to_byte(self : FoeOpCode) -> Byte {
@@ -78,7 +78,7 @@ pub(all) enum FoeErrorCode {
   InvalidFirmware
   FlashError
   Unknown(UInt)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn FoeErrorCode::from_uint(code : UInt) -> FoeErrorCode {
@@ -135,7 +135,7 @@ pub(all) enum FoeResponse {
   FoeError(code~ : FoeErrorCode, text~ : String)
   /// Busy: slave requests host to re-send.
   FoeBusy
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Encode a FoE Read request (upload: host wants to read file from slave).

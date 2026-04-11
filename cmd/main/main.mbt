@@ -4,14 +4,14 @@ enum CliBackend {
   NativeAuto
   NativeWindowsNpcap
   NativeLinuxRaw
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 enum RunProgressOutput {
   Silent
   Text
   Ndjson
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 let pdo_logical_base : UInt = 0x1000U

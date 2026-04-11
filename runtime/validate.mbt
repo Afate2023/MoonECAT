@@ -23,14 +23,14 @@ pub(all) enum ValidationResult {
   OptionalMissing(position~ : Int, group_id~ : UInt?)
   /// Extra slave found that was not expected.
   Extra(position~ : Int)
-} derive(Show)
+} derive(Debug)
 
 ///|
 pub(all) enum ValidateGrade {
   Pass
   Warn
   Block
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum ValidateDifferenceCategory {
@@ -38,7 +38,7 @@ pub(all) enum ValidateDifferenceCategory {
   Identity
   Configuration
   Informational
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// ValidateReport holds the full validation result.
@@ -51,7 +51,7 @@ pub(all) struct ValidateReport {
   differences : Array[ConfigurationDifference]
   all_ok : Bool
   grade : ValidateGrade
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// Validate that a scan report matches an expected slave configuration.

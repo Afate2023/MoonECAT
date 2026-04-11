@@ -17,7 +17,7 @@ pub(all) enum SiiCategory {
   VendorInformation
   Images
   Raw
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Stable export classification for SII categories.
@@ -27,7 +27,7 @@ pub(all) enum SiiCategoryClass {
   DeviceSpecific
   VendorSpecific
   ApplicationSpecific
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Dispatch scope for future typed overlays on raw SII categories.
@@ -35,14 +35,14 @@ pub(all) enum SiiOverlayScope {
   DeviceSpecific
   VendorSpecific
   ApplicationSpecific
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct SiiOverlayCandidate {
   scope : SiiOverlayScope
   type_code : UInt
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SiiCategoryClass::label(self : SiiCategoryClass) -> String {
@@ -190,7 +190,7 @@ pub(all) struct SiiData {
   esc_config_b6 : UInt
   checksum_b : UInt
   esc_config_b_present : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SiiData::production_year(self : SiiData) -> Int {
@@ -217,7 +217,7 @@ pub(all) struct SiiPreamble {
   configured_station_alias : UInt
   checksum : UInt
   checksum_ok : Bool
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SiiPreamble::sync_impulse_length_ns(self : SiiPreamble) -> UInt {
@@ -229,7 +229,7 @@ pub fn SiiPreamble::sync_impulse_length_ns(self : SiiPreamble) -> UInt {
 pub(all) struct SiiStandardMetadata {
   eeprom_size_raw : UInt
   version : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub fn SiiStandardMetadata::eeprom_size_bytes(
@@ -250,7 +250,7 @@ pub(all) struct SiiDcClock {
   sync0_cycle_factor : Int
   name_idx : Byte
   description_idx : Byte
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parsed SII PDO descriptor (TxPdo/RxPdo category).
@@ -262,7 +262,7 @@ pub(all) struct SiiPdo {
   name_idx : Byte
   flags : UInt
   entries : Array[SiiPdoEntry]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Single entry within a PDO descriptor.
@@ -273,7 +273,7 @@ pub(all) struct SiiPdoEntry {
   data_type : Byte
   bit_length : Byte
   flags : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parsed SII timeout category (ETG.2010 Table 13), values in milliseconds.
@@ -284,7 +284,7 @@ pub(all) struct SiiTimeouts {
   back_to_safeop_timeout_ms : UInt
   mailbox_request_timeout_ms : UInt
   mailbox_response_timeout_ms : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parsed SII FMMU_EX category element (ETG.2010 Table 10).
@@ -294,7 +294,7 @@ pub(all) struct SiiFmmuEx {
   su_defined : Bool
   sync_manager : Byte
   sync_unit : Byte
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parsed SII SyncUnit category element (ETG.2010 Table 14).
@@ -304,7 +304,7 @@ pub(all) struct SiiSyncUnit {
   depend_on_input_state : Bool
   frame_repeat_support : Bool
   raw_flags : Byte
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// A parsed SII category with its type tag and raw data.
@@ -312,7 +312,7 @@ pub(all) struct SiiCategoryEntry {
   category : SiiCategory
   type_code : UInt
   data : Bytes
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Aggregated SII view shared by CLI, runtime, and offline projection paths.
@@ -332,4 +332,4 @@ pub(all) struct SiiFullInfo {
   tx_pdo : Array[SiiPdo]
   rx_pdo : Array[SiiPdo]
   dc_clocks : Array[SiiDcClock]
-} derive(Show)
+} derive(Debug)

@@ -36,4 +36,4 @@ pub(all) struct EcFrame {
   dst_mac : FixedArray[Byte] // 6 bytes
   src_mac : FixedArray[Byte] // 6 bytes
   pdus : Array[Pdu]
-} derive(Eq, Show)
+} derive(Eq, Debug)

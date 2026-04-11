@@ -9,7 +9,7 @@ pub(all) struct RunProgress {
   output_period_ns : Int
   telemetry : Telemetry
   consecutive_timeouts : Int
-} derive(Show)
+} derive(Debug)
 
 ///|
 /// RunProgressSink receives structured run-loop progress events.
