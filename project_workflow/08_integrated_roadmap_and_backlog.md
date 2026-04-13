@@ -91,7 +91,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L3-15 | 多后端发布物矩阵文档 | M8 | `5583dcb` |
 | L3-16 | 零拷贝 PDO CLI 命令 `run-zc`（Mock + Native 后端） | M8 | `6814e4e` |
 | L3-17 | 主站对象字典浏览 `master-od` CLI 命令 | M8 | `6814e4e` |
-| L3-18 | 虚拟从站模板路线 B-15（ESI JSON → VirtualSlaveTemplate → run-virtual） | M8 | 🔄 |
+| L3-18 | 虚拟从站模板路线 B-15（ESI JSON → VirtualSlaveTemplate → run-virtual） | M8 | `7740e82` |
 
 ### L4 — Verification & Hardening ⚠️ 部分完成
 
@@ -172,9 +172,9 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 - ✅ VirtualSlave 可完成 `scan → state → run`（VirtualBus 多从站仿真）；2026-04-01 再按 SOES 风格补齐 FMMU logical addressing / process-data 路由，覆盖单从站与多从站 LRD/LWR/LRW、Init→Op 生命周期和 PDO 回归（commit: `e1fee13`，验证：`moon test --target wasm-gc hal/mock` = `48/48`、`moon test --target wasm-gc hal hal/mock protocol mailbox fixtures` = `310/310`、`moon test --target wasm-gc .` = `2/2`）
 - ✅ topology fingerprint 冻结（TopologyFingerprint + SlavePresence）
 
-#### B 阶段二（规划中）：深度验证与场景扩展
+#### B 阶段二（✅ 已完成）：深度验证与场景扩展
 
-> 阶段一证明了"能录、能放、能判"；阶段二目标是形成**可组合的验证场景库**，使 MoonECAT 成为协议一致性测试的执行引擎。
+> 阶段一证明了"能录、能放、能判"；阶段二形成了**可组合的验证场景库**，MoonECAT 已成为协议一致性测试的执行引擎。
 
 | 编号 | 任务 | 优先级 | 状态 | 涉及目录 |
 |---|---|---|---|---|
@@ -186,7 +186,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | B-12 | CLI `replay` 命令（从 NDJSON trace 文件回放并输出 verdict） | P1 | ✅ | cmd/main/：replay, scenario, jitter-profile, auto-tune 4 条 CLI 命令，commit `6213ee6` |
 | B-13 | Wasm-GC fuzzing 最小框架（随机 Event 生成 + crash oracle） | P2 | ✅ | hal/mock/, runtime/ |
 | B-14 | 验证报告生成器（HTML/Markdown 格式，含 verdict 时间线 + fault 注入点标注） | P2 | ✅ | runtime/, cmd/main/ |
-| B-15 | 虚拟从站模板路线（ESI JSON → VirtualSlaveTemplate → VirtualBus → run-virtual） | P1 | 🔄 | hal/mock/, runtime/, cmd/main/ |
+| B-15 | 虚拟从站模板路线（ESI JSON → VirtualSlaveTemplate → VirtualBus → run-virtual） | P1 | ✅ `7740e82` | hal/mock/, runtime/, cmd/main/ |
 
 **B-7 复合场景编排设计**：
 ```
@@ -223,20 +223,20 @@ Scenario {
 | B-15.3 | ESI JSON → `EsiOfflineSiiReport`（含 synthesized `eeprom: Bytes`） | ✅ | `build_offline_sii_report()` 生成完整 EEPROM + SiiFullInfo |
 | B-15.4 | `VirtualSlave::new(position, identity, sii_eeprom)` 接受原始 EEPROM | ✅ | 自动解析 mailbox config、初始化 SM0/SM1 |
 | B-15.5 | `startup_preparation_from_esi_offline_report()` 启动配置 | ✅ | SM/FMMU/PDO mapping + startup mailbox commands |
-| B-15.6 | `VirtualSlaveTemplate` 结构 + `from_esi_report()` 工厂方法 | 🔄 | **新增**：hal/mock/virtual_slave_template.mbt |
-| B-15.7 | `virtual_slave_templates_from_esi_document()` 批量生成 | 🔄 | **新增**：从 EsiJsonDocument 生成全部模板 |
-| B-15.8 | `VirtualBus::from_esi_json()` 便捷构造 | 🔄 | **新增**：JSON string → VirtualBus 一步到位 |
-| B-15.9 | CLI `run-virtual` 命令（`--esi-json <path>` + 标准运行参数） | 🔄 | **新增**：cmd/main/ 集成 |
-| B-15.10 | 集成测试：ESI JSON → VirtualBus → scan → run → verdict | 🔄 | **新增**：端到端闭环验证 |
+| B-15.6 | `VirtualSlaveTemplate` 结构 + `from_esi_report()` 工厂方法 | ✅ | `7740e82`：hal/mock/virtual_slave_template.mbt |
+| B-15.7 | `virtual_slave_templates_from_esi_document()` 批量生成 | ✅ | `7740e82`：从 EsiJsonDocument 生成全部模板 |
+| B-15.8 | `VirtualBus::from_esi_json()` 便捷构造 | ✅ | `7740e82`：JSON string → VirtualBus 一步到位 |
+| B-15.9 | CLI `run-virtual` 命令（`--esi-json <path>` + 标准运行参数） | ✅ | `7740e82`：cmd/main/ 集成 |
+| B-15.10 | 集成测试：ESI JSON → VirtualBus → scan → run → verdict | ✅ | `7740e82`：3 个端到端测试（identity/EEPROM 校验 + scan discover + startup preparation） |
 
-关键洞察：`EsiOfflineSiiReport.eeprom` 生成的合成 Bytes 可直接馈入 `VirtualSlave::new`，桥接已完成 ~70%。
+**B-15 附注**：实现过程发现并修复两个隐藏缺陷——(1) `build_offline_sii_report` 生成全零 EEPROM，新增 `serialize_sii_to_eeprom()` 将 SII 结构写入字节流；(2) VirtualSlave `handle_sii_access` 仅检查 8 位寄存器 bit 0，而协议 SII 读命令位于 16 位控制字 bit 8（`sii_ctrl_read_cmd = 0x0100U`），已修复为双触发兼容。
 
-**B 阶段二收口条件**：
-- 复合场景可声明式定义并自动验证
-- NicEventLog 可 NDJSON ↔ 文件双向无损往返
-- `moonecat replay trace.ndjson --json` 输出与原录制一致的 verdict
-- VirtualSlave 可完成 SDO upload roundtrip
-- 至少 1 个用户自定义 monitor 的集成测试
+**B 阶段二收口条件**（✅ 全部满足）：
+- ✅ 复合场景可声明式定义并自动验证（`Scenario` + `FaultRule[]` + `ExpectedVerdict`，hal/mock/scenario.mbt）
+- ✅ NicEventLog 可 NDJSON ↔ 文件双向无损往返（`to_ndjson()` / `from_ndjson()`，hal/mock/event_persistence.mbt + roundtrip 测试）
+- ✅ `moonecat replay trace.ndjson --json` 输出与原录制一致的 verdict（`run_replay_command()`，cmd/main/main.mbt）
+- ✅ VirtualSlave 可完成 SDO upload roundtrip（`VirtualMailbox::handle_sdo_upload/download`，hal/mock/virtual_mailbox.mbt + 测试）
+- ✅ 至少 1 个用户自定义 monitor 的集成测试（`MonitorRegistry::register()` + `MonitorFn`，hal/mock/b_phase2_test.mbt）
 
 ### 主线 C：HIL-Ready Runtime Boundary（P2 优先级）
 
@@ -508,7 +508,7 @@ MoonECAT CLI 按操作语义分为五个层级：
 |---|---|---|---|
 | **MA — Native Runtime Baseline** | 主线 A | A-1 ~ A-6 | L4 验证加固 |
 | **MB1 — Verification Runtime 基础** | 主线 B 阶段一 | B-1 ~ B-6 | ✅ L4 验证加固 |
-| **MB2 — Verification Runtime 深度** | 主线 B 阶段二 | B-7 ~ B-14 | ✅ B-7~B-14 全部完成，含 B-12 CLI replay/scenario/jitter-profile/auto-tune |
+| **MB2 — Verification Runtime 深度** | 主线 B 阶段二 | B-7 ~ B-15 | ✅ B-7~B-15 全部完成，含 B-12 CLI 4 命令 + B-15 虚拟从站模板路线 `7740e82` |
 | **MC1 — HIL-Ready Boundary 合同** | 主线 C 阶段一 | C-1 ~ C-8 | ✅ 全部完成 |
 | **MC2 — HIL-Ready Boundary 实战** | 主线 C 阶段二 | C-9 ~ C-14 | ✅ 全部完成 |
 | **MD — Remote Capability** | 主线 D | D-1 ~ D-10 | L3 远程闭环 |
