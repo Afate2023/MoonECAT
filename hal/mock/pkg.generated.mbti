@@ -21,6 +21,10 @@ pub fn nic_event_from_json(String) -> NicEvent?
 
 pub fn nic_event_to_json(NicEvent) -> String
 
+pub fn virtual_slave_templates_from_esi_document(@runtime.EsiJsonDocument) -> Array[VirtualSlaveTemplate] raise @hal.EcError
+
+pub fn virtual_slave_templates_from_esi_json(String) -> Array[VirtualSlaveTemplate] raise @hal.EcError
+
 // Errors
 
 // Types and methods
@@ -273,6 +277,8 @@ pub impl Show for ScenarioResult
 pub struct VirtualBus {
   slaves : Array[VirtualSlave]
 } derive(@debug.Debug)
+pub fn VirtualBus::from_esi_json(String) -> (Self, Array[VirtualSlaveTemplate]) raise @hal.EcError
+pub fn VirtualBus::from_templates(Array[VirtualSlaveTemplate]) -> Self
 pub fn VirtualBus::get_slave(Self, Int) -> VirtualSlave?
 pub fn VirtualBus::new(Array[VirtualSlave]) -> Self
 pub fn VirtualBus::process_frame(Self, Bytes) -> Bytes raise @hal.EcError
@@ -329,6 +335,14 @@ pub fn VirtualSlave::to_string(Self) -> String
 pub fn VirtualSlave::write_process_data(Self, Int, FixedArray[Byte], Int, Int) -> Unit
 pub fn VirtualSlave::write_reg(Self, Int, Bytes) -> Unit
 pub impl Show for VirtualSlave
+
+pub(all) struct VirtualSlaveTemplate {
+  identity : @hal.SlaveIdentity
+  sii_eeprom : Bytes
+  startup_preparation : @runtime.SlaveStartupPreparation
+}
+pub fn VirtualSlaveTemplate::from_esi_report(@runtime.EsiOfflineSiiReport, UInt) -> Self
+pub fn VirtualSlaveTemplate::to_virtual_slave(Self, Int) -> VirtualSlave
 
 // Type aliases
 

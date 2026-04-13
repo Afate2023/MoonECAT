@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, run-zc, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
+/// Commands: list-if, scan, validate, run, run-zc, run-virtual, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -323,6 +323,32 @@ fn cli_main() -> Unit raise @hal.EcError {
     return
   }
 
+  if command == "run-virtual" {
+    let esi_json_path = require_cli_file_flag(args, "--esi-json", "ESI JSON")
+    let json_content = load_esi_json_text(esi_json_path)
+    let until_fault = has_flag(args, "--until-fault")
+    let progress_ndjson = has_flag(args, "--progress-ndjson")
+    let settings = resolve_run_loop_settings(
+      args, as_json, until_fault, progress_ndjson,
+    )
+    let progress_output = resolve_run_progress_output(
+      as_json,
+      progress_ndjson,
+      settings.output_period_ns,
+    )
+    let startup_state = optional_esm_state_flag(
+      args,
+      "--startup-state",
+      @protocol.Op,
+    )
+    let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
+    run_virtual_command(
+      json_content, as_json, startup_state, shutdown_state, settings, progress_output,
+      timeout,
+    )
+    return
+  }
+
   match backend {
     Mock =>
       run_command_with_nic(
@@ -604,6 +630,75 @@ fn build_mutable_pdo_context_from_preparation(
     )
   }
   @protocol.MutablePdoContext::build(slave_mappings, pdo_ctx.logical_base)
+}
+
+///|
+/// run-virtual: build VirtualBus from ESI JSON, scan, configure, and run.
+fn run_virtual_command(
+  json_content : String,
+  as_json : Bool,
+  startup_state : @protocol.EsmState,
+  shutdown_state : @protocol.EsmState?,
+  settings : @runtime.RunLoopSettings,
+  progress_output : RunProgressOutput,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let (bus, templates) = @mock.VirtualBus::from_esi_json(json_content)
+  let nic = @mock.VirtualNic::new(bus)
+  // Phase 1: scan to discover virtual slaves + assign station addresses
+  let scan_report = @runtime.scan(nic, timeout)
+  let expected = expected_from_scan(scan_report)
+  // Phase 2: build startup preparation from ESI templates
+  let startup_preparation = if target_requires_process_data_configuration(
+      startup_state,
+    ) &&
+    templates.length() > 0 {
+    let slave_preparations : Array[(UInt, @runtime.SlaveStartupPreparation)] = []
+    for i = 0; i < templates.length(); i = i + 1 {
+      if i < scan_report.slaves.length() {
+        let station = scan_report.slaves[i].station_address
+        slave_preparations.push((station, templates[i].startup_preparation))
+      }
+    }
+    Some(
+      @runtime.run_startup_preparation_from_slave_preparations(
+        slave_preparations, pdo_logical_base,
+      ),
+    )
+  } else {
+    None
+  }
+  // Phase 3: run loop
+  let (pdo_ctx, expected_wkc) = match startup_preparation {
+    Some(p) => (p.pdo_ctx, p.expected_wkc)
+    None => (@protocol.PdoContext::build([], 0U), 0U)
+  }
+  let run_config = match startup_preparation {
+    Some(p) => @runtime.master_config_with_optional_dc(p.dc_cycle_period_ns)
+    None => @hal.MasterConfig::default()
+  }
+  let run_report = run_with_progress_output(
+    nic,
+    Some(scan_report),
+    run_config,
+    expected,
+    pdo_ctx,
+    expected_wkc,
+    settings,
+    startup_state,
+    shutdown_state,
+    startup_preparation,
+    progress_output,
+    timeout,
+  )
+  nic.close()
+  if as_json && progress_output != Ndjson {
+    println(run_report_json(run_report).stringify(indent=2))
+  } else if as_json {
+    println(run_report_ndjson(run_report).stringify())
+  } else {
+    println(run_report.format())
+  }
 }
 
 ///|
@@ -931,7 +1026,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|run-zc|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
+    "Usage: moonecat <list-if|scan|validate|run|run-zc|run-virtual|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path --esi-json sample.esi.json --force-pdo-remap --json",
@@ -1018,6 +1113,9 @@ fn print_usage() -> Unit {
   println("  moon run cmd/main run-zc -- --backend mock --cycles 1000 --json")
   println(
     "  moon run cmd/main run-zc -- --backend native --if <interface> --cycles 1000 --startup-state op --shutdown-state init --pool-capacity 32 --json",
+  )
+  println(
+    "  moon run cmd/main run-virtual -- --esi-json sample.esi.json --cycles 100 --json",
   )
 }
 

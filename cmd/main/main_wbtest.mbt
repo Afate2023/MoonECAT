@@ -2633,3 +2633,55 @@ test "cli expected fmmu report encodes computed config" {
   assert_eq(report.type_register, b'\x02')
   assert_eq(report.activate, b'\x01')
 }
+
+///|
+test "virtual slave template from ESI JSON produces valid identity and EEPROM" {
+  let json_text = sample_esi_json_text()
+  let templates = @mock.virtual_slave_templates_from_esi_json(json_text)
+  assert_true(templates.length() > 0)
+  let template = templates[0]
+  assert_eq(template.identity.vendor_id, 1894U)
+  assert_eq(template.identity.product_code, 2320U)
+  assert_eq(template.identity.revision, 1U)
+  assert_true(template.sii_eeprom.length() > 0)
+  assert_true(
+    template.startup_preparation.mapping.output_bytes > 0 ||
+    template.startup_preparation.mapping.input_bytes > 0,
+  )
+}
+
+///|
+test "VirtualBus from ESI JSON scans and discovers slaves" {
+  let json_text = sample_esi_json_text()
+  let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
+  assert_eq(templates.length(), 1)
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  let scan_report = @runtime.scan(nic, timeout)
+  assert_eq(scan_report.slave_count, 1)
+  let slave = scan_report.slaves[0]
+  assert_eq(slave.vendor_id, 1894U)
+  assert_eq(slave.product_code, 2320U)
+  nic.close()
+}
+
+///|
+test "run-virtual builds RunStartupPreparation from templates" {
+  let json_text = sample_esi_json_text()
+  let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
+  let nic = @mock.VirtualNic::new(bus)
+  let timeout = @hal.Duration(50_000_000L)
+  let scan_report = @runtime.scan(nic, timeout)
+  let slave_preparations : Array[(UInt, @runtime.SlaveStartupPreparation)] = []
+  for i = 0; i < templates.length(); i = i + 1 {
+    if i < scan_report.slaves.length() {
+      let station = scan_report.slaves[i].station_address
+      slave_preparations.push((station, templates[i].startup_preparation))
+    }
+  }
+  let preparation = @runtime.run_startup_preparation_from_slave_preparations(
+    slave_preparations, 0x1000U,
+  )
+  assert_true(preparation.expected_wkc > 0U)
+  nic.close()
+}

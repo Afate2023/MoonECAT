@@ -599,15 +599,19 @@ fn build_offline_sii_report(
     minimum_eeprom_size(categories),
   )
   let normalized_byte_size = max_uint(byte_size, 128U)
-  let eeprom = Bytes::makei(normalized_byte_size.reinterpret_as_int(), fn(_) {
-    b'\x00'
-  })
   let preamble = build_sii_preamble(device)
   let standard : @mailbox.SiiStandardMetadata = {
     eeprom_size_raw: encode_eeprom_size_raw(normalized_byte_size),
     version: 1U,
   }
   let header = build_sii_header(device, sync_managers)
+  let eeprom = serialize_sii_to_eeprom(
+    normalized_byte_size.reinterpret_as_int(),
+    preamble,
+    standard,
+    header,
+    categories,
+  )
   let sii : @mailbox.SiiFullInfo = {
     eeprom,
     preamble,
@@ -999,6 +1003,83 @@ fn map_esi_json_sm_type(sm_type : String) -> @mailbox.SmType {
     "dynamic-process-data-in" => DynamicProcessDataIn
     _ => Unused
   }
+}
+
+///|
+fn write_sii_word(
+  eeprom : FixedArray[Byte],
+  word_offset : Int,
+  value : UInt,
+) -> Unit {
+  let byte_offset = word_offset * 2
+  if byte_offset + 1 < eeprom.length() {
+    eeprom[byte_offset] = (value & 0xFFU).reinterpret_as_int().to_byte()
+    eeprom[byte_offset + 1] = ((value >> 8) & 0xFFU)
+      .reinterpret_as_int()
+      .to_byte()
+  }
+}
+
+///|
+fn write_sii_dword(
+  eeprom : FixedArray[Byte],
+  word_offset : Int,
+  value : UInt,
+) -> Unit {
+  write_sii_word(eeprom, word_offset, value & 0xFFFFU)
+  write_sii_word(eeprom, word_offset + 1, (value >> 16) & 0xFFFFU)
+}
+
+///|
+fn serialize_sii_to_eeprom(
+  size : Int,
+  preamble : @mailbox.SiiPreamble,
+  standard : @mailbox.SiiStandardMetadata,
+  header : @mailbox.SiiData,
+  categories : Array[@mailbox.SiiCategoryEntry],
+) -> Bytes {
+  let buf : FixedArray[Byte] = FixedArray::make(size, b'\x00')
+  // Preamble: words 0-7
+  write_sii_word(buf, 0, preamble.pdi_control)
+  write_sii_word(buf, 1, preamble.pdi_config)
+  write_sii_word(buf, 2, preamble.sync_impulse_length_raw)
+  write_sii_word(buf, 3, preamble.pdi_config2)
+  write_sii_word(buf, 4, preamble.configured_station_alias)
+  // Header: words 8+
+  write_sii_dword(buf, 8, header.vendor_id)
+  write_sii_dword(buf, 10, header.product_code)
+  write_sii_dword(buf, 12, header.revision)
+  write_sii_dword(buf, 14, header.serial)
+  write_sii_word(buf, 20, header.bootstrap_rx_offset)
+  write_sii_word(buf, 21, header.bootstrap_rx_size)
+  write_sii_word(buf, 22, header.bootstrap_tx_offset)
+  write_sii_word(buf, 23, header.bootstrap_tx_size)
+  write_sii_word(buf, 24, header.mailbox_rx_offset)
+  write_sii_word(buf, 25, header.mailbox_rx_size)
+  write_sii_word(buf, 26, header.mailbox_tx_offset)
+  write_sii_word(buf, 27, header.mailbox_tx_size)
+  write_sii_word(buf, 28, header.mailbox_protocols)
+  // Standard metadata: words 62-63
+  write_sii_word(buf, 62, standard.eeprom_size_raw)
+  write_sii_word(buf, 63, standard.version)
+  // Categories: word 64+
+  let mut word_pos = 64
+  for entry in categories {
+    let data_byte_len = entry.data.length()
+    let size_words = (data_byte_len + 1) / 2
+    write_sii_word(buf, word_pos, entry.type_code)
+    write_sii_word(buf, word_pos + 1, size_words.reinterpret_as_uint())
+    let byte_pos = (word_pos + 2) * 2
+    for i in 0..<data_byte_len {
+      if byte_pos + i < buf.length() {
+        buf[byte_pos + i] = entry.data[i]
+      }
+    }
+    word_pos = word_pos + 2 + size_words
+  }
+  // End marker
+  write_sii_word(buf, word_pos, 0xFFFFU)
+  Bytes::makei(size, fn(i) { buf[i] })
 }
 
 ///|

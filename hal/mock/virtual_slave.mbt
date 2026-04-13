@@ -462,10 +462,12 @@ pub fn VirtualSlave::write_reg(
 ///|
 /// Handle SII EEPROM access triggered by writing to the SII control register.
 fn VirtualSlave::handle_sii_access(self : VirtualSlave) -> Unit {
-  let control = self.registers[0x0502]
-  let cmd = (control.to_int() >> 0) & 0x07
-  // Bit 0 = Read, Bit 1 = Write (simplified: we only handle read)
-  if (cmd & 0x01) != 0 {
+  let control = self.registers[0x0502].to_int() |
+    (self.registers[0x0503].to_int() << 8)
+  // Bit 8 = Read (ETG.1000.4 SII Control/Status, 0x0100 in 16-bit word).
+  // Also accept bit 0 for single-byte legacy trigger (0x01 at 0x0502).
+  let is_read = (control & 0x0100) != 0 || (control & 0x01) != 0
+  if is_read {
     // Read command: word address from 0x0504-0x0507
     let word_addr = self.registers[0x0504].to_int() |
       (self.registers[0x0505].to_int() << 8) |
@@ -480,8 +482,9 @@ fn VirtualSlave::handle_sii_access(self : VirtualSlave) -> Unit {
         self.registers[0x0508 + i] = b'\xFF'
       }
     }
-    // Clear busy bit, set command-complete/ready
+    // Clear busy/command bits
     self.registers[0x0502] = b'\x00'
+    self.registers[0x0503] = b'\x00'
   }
 }
 
