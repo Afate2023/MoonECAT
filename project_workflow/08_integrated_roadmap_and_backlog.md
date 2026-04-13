@@ -91,6 +91,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L3-15 | 多后端发布物矩阵文档 | M8 | `5583dcb` |
 | L3-16 | 零拷贝 PDO CLI 命令 `run-zc`（Mock + Native 后端） | M8 | `6814e4e` |
 | L3-17 | 主站对象字典浏览 `master-od` CLI 命令 | M8 | `6814e4e` |
+| L3-18 | 虚拟从站模板路线 B-15（ESI JSON → VirtualSlaveTemplate → run-virtual） | M8 | 🔄 |
 
 ### L4 — Verification & Hardening ⚠️ 部分完成
 
@@ -185,6 +186,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | B-12 | CLI `replay` 命令（从 NDJSON trace 文件回放并输出 verdict） | P1 | ✅ | cmd/main/：replay, scenario, jitter-profile, auto-tune 4 条 CLI 命令，commit `6213ee6` |
 | B-13 | Wasm-GC fuzzing 最小框架（随机 Event 生成 + crash oracle） | P2 | ✅ | hal/mock/, runtime/ |
 | B-14 | 验证报告生成器（HTML/Markdown 格式，含 verdict 时间线 + fault 注入点标注） | P2 | ✅ | runtime/, cmd/main/ |
+| B-15 | 虚拟从站模板路线（ESI JSON → VirtualSlaveTemplate → VirtualBus → run-virtual） | P1 | 🔄 | hal/mock/, runtime/, cmd/main/ |
 
 **B-7 复合场景编排设计**：
 ```
@@ -207,6 +209,27 @@ Scenario {
 - 新增：SDO upload/download 模拟（预置对象字典表）
 - 新增：Emergency 消息主动注入（可配时序触发）
 - 新增：邮箱计数器/重复请求 RMSM 回环测试
+
+**B-15 虚拟从站模板路线**：
+
+> 目标：从 ESI JSON（离线投影）自动生成 VirtualSlave 模板集，搭建 VirtualBus，实现无硬件全流程 scan → validate → state → run 闭环。
+
+已完成基础设施审计：
+
+| 子步骤 | 描述 | 状态 | 说明 |
+|---|---|---|---|
+| B-15.1 | ESI XML → ESI JSON 转换 | ✅ | `cmd/eni_json/` 已实现完整投影 |
+| B-15.2 | ESI JSON 解析 → `EsiJsonDocument` | ✅ | `runtime/esi_json.mbt` 全部 pub(all) 类型 |
+| B-15.3 | ESI JSON → `EsiOfflineSiiReport`（含 synthesized `eeprom: Bytes`） | ✅ | `build_offline_sii_report()` 生成完整 EEPROM + SiiFullInfo |
+| B-15.4 | `VirtualSlave::new(position, identity, sii_eeprom)` 接受原始 EEPROM | ✅ | 自动解析 mailbox config、初始化 SM0/SM1 |
+| B-15.5 | `startup_preparation_from_esi_offline_report()` 启动配置 | ✅ | SM/FMMU/PDO mapping + startup mailbox commands |
+| B-15.6 | `VirtualSlaveTemplate` 结构 + `from_esi_report()` 工厂方法 | 🔄 | **新增**：hal/mock/virtual_slave_template.mbt |
+| B-15.7 | `virtual_slave_templates_from_esi_document()` 批量生成 | 🔄 | **新增**：从 EsiJsonDocument 生成全部模板 |
+| B-15.8 | `VirtualBus::from_esi_json()` 便捷构造 | 🔄 | **新增**：JSON string → VirtualBus 一步到位 |
+| B-15.9 | CLI `run-virtual` 命令（`--esi-json <path>` + 标准运行参数） | 🔄 | **新增**：cmd/main/ 集成 |
+| B-15.10 | 集成测试：ESI JSON → VirtualBus → scan → run → verdict | 🔄 | **新增**：端到端闭环验证 |
+
+关键洞察：`EsiOfflineSiiReport.eeprom` 生成的合成 Bytes 可直接馈入 `VirtualSlave::new`，桥接已完成 ~70%。
 
 **B 阶段二收口条件**：
 - 复合场景可声明式定义并自动验证
@@ -342,6 +365,7 @@ MoonECAT CLI 按操作语义分为五个层级：
 | **操控层** | `state` | ESM 状态转换 | Native | 文本/JSON |
 | | `run` | 完整生命周期运行 | All | RunReport + NDJSON |
 | | `run-zc` | 零拷贝 PDO 周期运行 | All | RunReport JSON |
+| | `run-virtual` | ESI JSON 驱动虚拟从站运行 | Mock(Virtual) | RunReport JSON |
 | | `startup-trace` | 启动序列追踪 | Native | trace JSON |
 | | `startup-diff` | 启动序列差异分析 | Native | diff JSON |
 | | `mailbox-readback` | 邮箱弹性层验证 | Native | 文本/JSON |
@@ -414,6 +438,7 @@ MoonECAT CLI 按操作语义分为五个层级：
   validate           ✓      ✓       ✓        ✓
   run                ✓      ✓       ✓        ✓
   run-zc             ✓      ✓       ─        ─
+  run-virtual        ─      ─       ─        ✓
   read-sii           ─      ✓       ✓        ─
   diagnosis          ─      ✓       ✓        ─
   od                 ─      ✓       ✓        ─
