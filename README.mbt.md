@@ -103,6 +103,9 @@ moon run cmd/main run -- --backend native --if <interface> --until-fault --json 
 moon run cmd/main run-zc -- --backend mock --cycles 1000 --json
 moon run cmd/main run-zc -- --backend native --if <interface> --cycles 1000 --pool-capacity 32 --json
 
+# Virtual slave bus from ESI JSON (offline simulation)
+moon run cmd/main run-virtual -- --esi-json sample.esi.json --cycles 1000 --json
+
 # Startup sequence tracing
 moon run cmd/main startup-trace -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --json
 
@@ -191,6 +194,7 @@ moon run cmd/eni_json -- --input References/sample.xml --kind esi --output sampl
 - **Distributed Clock**: SYNC0 configuration + FRMW drift compensation + propagation delay
 - **ENI/ESI tooling**: XML→JSON converter with unified configuration model
 - **VirtualBus**: Multi-slave protocol-level simulation with SDO/Emergency emulation
+- **VirtualSlaveTemplate**: ESI JSON → synthesized EEPROM → VirtualSlave pipeline
 
 ## Documentation
 
