@@ -21,7 +21,7 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
+/// Commands: list-if, scan, validate, run, run-zc, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
 fn main {
   let _ = cli_main() catch {
     err => {
@@ -305,6 +305,24 @@ fn cli_main() -> Unit raise @hal.EcError {
     return
   }
 
+  if command == "run-zc" {
+    let cycles = require_int_flag(args, "--cycles", 100)
+    let pool_capacity = require_int_flag(args, "--pool-capacity", 16)
+    match backend {
+      Mock => run_zc_mock_command(cycles, pool_capacity, as_json, timeout)
+      _ =>
+        run_zc_native_command(
+          resolve_native_cli_config(args, backend, timeout),
+          args,
+          cycles,
+          pool_capacity,
+          as_json,
+          timeout,
+        )
+    }
+    return
+  }
+
   match backend {
     Mock =>
       run_command_with_nic(
@@ -431,6 +449,196 @@ fn run_native_command_with_fresh_nic(
   } else {
     println(run_report.format())
   }
+}
+
+///|
+/// run-zc mock backend: create MockZeroCopyNic, run N zero-copy PDO cycles.
+fn run_zc_mock_command(
+  cycles : Int,
+  pool_capacity : Int,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  let pool = @hal.FramePool::new(capacity=pool_capacity)
+  let nic = @mock.MockZeroCopyNic::new(pool)
+  let ctx = @protocol.MutablePdoContext::build([], 0U)
+  let mut ok_count = 0
+  let mut timeout_count = 0L
+  let mut wkc_errors = 0L
+  for _i = 0; _i < cycles; _i = _i + 1 {
+    let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout) catch {
+      @hal.EcError::RecvTimeout => {
+        timeout_count = timeout_count + 1L
+        continue
+      }
+      err => raise err
+    }
+    if result.wkc >= 0U {
+      ok_count = ok_count + 1
+    } else {
+      wkc_errors = wkc_errors + 1L
+    }
+  }
+  nic.close()
+  let report = zc_run_report(cycles, ok_count, timeout_count, wkc_errors)
+  if as_json {
+    println(report.stringify(indent=2))
+  } else {
+    println(zc_run_report_text(cycles, ok_count, timeout_count, wkc_errors))
+  }
+}
+
+///|
+/// run-zc native backend: scan with Nic, transition states, then zero-copy PDO hot loop.
+fn run_zc_native_command(
+  config : @native.NativeNicConfig,
+  args : Array[String],
+  cycles : Int,
+  pool_capacity : Int,
+  as_json : Bool,
+  timeout : @hal.Duration,
+) -> Unit raise @hal.EcError {
+  // Phase 1: probe/scan using standard Nic
+  let probe_nic = @native.NativeNic::open_with_config(config)
+  let scan_report = @runtime.scan(probe_nic, timeout)
+  probe_nic.close()
+  // Phase 2: state transitions using standard Nic
+  let setup_nic = @native.NativeNic::open_with_config(config)
+  let startup_state = optional_esm_state_flag(
+    args,
+    "--startup-state",
+    @protocol.Op,
+  )
+  let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
+  let stations = scan_report.slaves.map(fn(s) { s.station_address })
+  let preparation = if target_requires_process_data_configuration(startup_state) {
+    @runtime.build_run_startup_preparation(
+      setup_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count, timeout,
+    )
+  } else {
+    {
+      pdo_ctx: @protocol.PdoContext::build([], 0U),
+      expected_wkc: 0U,
+      dc_cycle_period_ns: None,
+      startup_mailbox_plans: [],
+      esm_timeout_policies: [],
+      slave_preparations: None,
+    }
+  }
+  // Transition to target state
+  if scan_report.slave_count > 0 {
+    for station in stations {
+      ignore(
+        try? @protocol.transition_to_target_strict(
+          setup_nic, station, startup_state, timeout,
+        ),
+      )
+    }
+  }
+  setup_nic.close()
+  // Phase 3: zero-copy hot loop using NativeZeroCopyNic
+  let pool = @hal.FramePool::new(capacity=pool_capacity)
+  let zc_nic = @native.NativeZeroCopyNic::open_with_config(config, pool)
+  // Build MutablePdoContext from the same slave mappings
+  let zc_ctx = build_mutable_pdo_context_from_preparation(preparation)
+  let mut ok_count = 0
+  let mut timeout_count = 0L
+  let mut wkc_errors = 0L
+  for _i = 0; _i < cycles; _i = _i + 1 {
+    let result = @protocol.pdo_exchange_zero_copy(zc_nic, zc_ctx, timeout) catch {
+      @hal.EcError::RecvTimeout => {
+        timeout_count = timeout_count + 1L
+        continue
+      }
+      err => raise err
+    }
+    if result.wkc >= preparation.expected_wkc {
+      ok_count = ok_count + 1
+    } else {
+      wkc_errors = wkc_errors + 1L
+    }
+  }
+  zc_nic.close()
+  // Phase 4: shutdown using standard Nic
+  match shutdown_state {
+    Some(target) => {
+      let shutdown_nic = @native.NativeNic::open_with_config(config)
+      for station in stations {
+        ignore(
+          try? @protocol.transition_to_target_strict(
+            shutdown_nic, station, target, timeout,
+          ),
+        )
+      }
+      shutdown_nic.close()
+    }
+    None => ()
+  }
+  let report = zc_run_report(cycles, ok_count, timeout_count, wkc_errors)
+  if as_json {
+    println(report.stringify(indent=2))
+  } else {
+    println(zc_run_report_text(cycles, ok_count, timeout_count, wkc_errors))
+  }
+}
+
+///|
+/// Build MutablePdoContext from a RunStartupPreparation (reuses slave mappings).
+fn build_mutable_pdo_context_from_preparation(
+  preparation : @runtime.RunStartupPreparation,
+) -> @protocol.MutablePdoContext {
+  // Mirror the slave mappings from PdoContext into MutablePdoContext
+  let pdo_ctx = preparation.pdo_ctx
+  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
+  for m in pdo_ctx.mappings {
+    slave_mappings.push(
+      (
+        {
+          sm_configs: [],
+          fmmu_configs: [],
+          output_bytes: m.output_length,
+          input_bytes: m.input_length,
+        },
+        m.station,
+      ),
+    )
+  }
+  @protocol.MutablePdoContext::build(slave_mappings, pdo_ctx.logical_base)
+}
+
+///|
+fn zc_run_report(
+  cycles : Int,
+  ok_count : Int,
+  timeout_count : Int64,
+  wkc_errors : Int64,
+) -> Json {
+  Json::object({
+    "command": Json::string("run-zc"),
+    "mode": Json::string("zero-copy"),
+    "cycles_requested": Json::number(cycles.to_double()),
+    "cycles_ok": Json::number(ok_count.to_double()),
+    "timeouts": Json::number(timeout_count.to_double()),
+    "wkc_errors": Json::number(wkc_errors.to_double()),
+  })
+}
+
+///|
+fn zc_run_report_text(
+  cycles : Int,
+  ok_count : Int,
+  timeout_count : Int64,
+  wkc_errors : Int64,
+) -> String {
+  let buf = @buffer.new(size_hint=256)
+  buf.write_string("MoonECAT Zero-Copy Run Report\n")
+  buf.write_string("=============================\n")
+  buf.write_string("Mode: zero-copy (FramePool + FixedArray)\n")
+  buf.write_string("Cycles requested: " + cycles.to_string() + "\n")
+  buf.write_string("Cycles OK: " + ok_count.to_string() + "\n")
+  buf.write_string("Timeouts: " + timeout_count.to_string() + "\n")
+  buf.write_string("WKC errors: " + wkc_errors.to_string() + "\n")
+  buf.to_string()
 }
 
 ///|
@@ -723,7 +931,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>]",
+    "Usage: moonecat <list-if|scan|validate|run|run-zc|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path --esi-json sample.esi.json --force-pdo-remap --json",
@@ -807,6 +1015,10 @@ fn print_usage() -> Unit {
     "  moon run cmd/main cycle-perf -- --trace session.ndjson --period-ns 1000000 --json",
   )
   println("  moon run cmd/main comm-quality -- --trace session.ndjson --json")
+  println("  moon run cmd/main run-zc -- --backend mock --cycles 1000 --json")
+  println(
+    "  moon run cmd/main run-zc -- --backend native --if <interface> --cycles 1000 --startup-state op --shutdown-state init --pool-capacity 32 --json",
+  )
 }
 
 ///|

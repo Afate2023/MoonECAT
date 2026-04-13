@@ -24,11 +24,10 @@ pub fn NativeZeroCopyNic::new(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
-  name : String,
+pub fn NativeZeroCopyNic::open_with_config(
+  config : NativeNicConfig,
   pool : @hal.FramePool,
 ) -> NativeZeroCopyNic raise @hal.EcError {
-  let config = default_native_config(name)
   let backend = resolve_native_backend(config.backend)
   let handle_id = match backend {
     WindowsNpcap => windows_npcap_open(config)
@@ -36,6 +35,15 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
     Auto => raise native_not_supported("zero-copy open")
   }
   { config, pool, handle_id, is_open: true, resolved_backend: backend }
+}
+
+///|
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
+  name : String,
+  pool : @hal.FramePool,
+) -> NativeZeroCopyNic raise @hal.EcError {
+  let config = default_native_config(name)
+  NativeZeroCopyNic::open_with_config(config, pool)
 }
 
 ///|
