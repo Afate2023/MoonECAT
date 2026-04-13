@@ -27,7 +27,7 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 
 ---
 
-## 2. 已完成事项审计（截至 2026-03-31）
+## 2. 已完成事项审计（截至 2026-04-14）
 
 ### L1 — Foundation ✅ 完成
 
@@ -89,6 +89,8 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L3-13 | SII category class 导出 + overlay 挂载点 + decoder 状态合同 | M8 | `ff93f64` / `ca0a906` / `b024aec` |
 | L3-14 | Extism 插件骨架 + envelope + Mock 回放入口 | M8 | `2484759` / `9cc3456` |
 | L3-15 | 多后端发布物矩阵文档 | M8 | `5583dcb` |
+| L3-16 | 零拷贝 PDO CLI 命令 `run-zc`（Mock + Native 后端） | M8 | `6814e4e` |
+| L3-17 | 主站对象字典浏览 `master-od` CLI 命令 | M8 | `6814e4e` |
 
 ### L4 — Verification & Hardening ⚠️ 部分完成
 
@@ -334,16 +336,23 @@ MoonECAT CLI 按操作语义分为五个层级：
 | **诊断层** | `read-sii` | SII EEPROM 深读 | Native | 文本/JSON |
 | | `diagnosis` | 统一诊断表面 | Native | DiagnosticIssue[] |
 | | `od` | 对象字典浏览 | Native | OD tree JSON |
+| | `master-od` | 主站对象字典浏览 | All | OD tree JSON |
 | | `esc-regs` | ESC 寄存器原始转储 | Native | hex/JSON |
 | | `expected-regs` | 预期 vs 实际寄存器对比 | Native | diff JSON |
 | **操控层** | `state` | ESM 状态转换 | Native | 文本/JSON |
 | | `run` | 完整生命周期运行 | All | RunReport + NDJSON |
+| | `run-zc` | 零拷贝 PDO 周期运行 | All | RunReport JSON |
 | | `startup-trace` | 启动序列追踪 | Native | trace JSON |
 | | `startup-diff` | 启动序列差异分析 | Native | diff JSON |
 | | `mailbox-readback` | 邮箱弹性层验证 | Native | 文本/JSON |
-| **验证层** ⭐新增 | `replay` | 从 trace 文件回放并判定 | All | Verdict + JSON |
+| **验证层** | `replay` | 从 trace 文件回放并判定 | All | Verdict + JSON |
 | | `scenario` | 执行复合验证场景 | Mock/Virtual | Verdict[] + report |
-| **远程层** ⭐新增 | `serve` | 启动远程 HAL 服务器 | Native | 状态日志 |
+| **分析层** | `jitter-profile` | DC 抖动分析 | 离线 trace | 直方图 JSON |
+| | `auto-tune` | PDO 同步参数在线识别 | Mock + 策略 | 调优建议 JSON |
+| | `topo-health` | 拓扑健康分析 | 离线 trace | 健康评分 JSON |
+| | `cycle-perf` | 周期性能分析 | 离线 trace | 统计 JSON |
+| | `comm-quality` | 通信质量评分 | 离线 trace | 质量评分 JSON |
+| **远程层** ⭐规划中 | `serve` | 启动远程 HAL 服务器 | Native | 状态日志 |
 
 ### 6.2 统一参数规范
 
@@ -371,12 +380,13 @@ MoonECAT CLI 按操作语义分为五个层级：
 
 **运行控制**：
 ```
---cycles <N>                  # PDO 周期数（run 命令）
+--cycles <N>                  # PDO 周期数（run/run-zc 命令）
 --until-fault                 # 持续运行直到故障
 --startup-state <state>       # 启动目标 ESM 状态
 --shutdown-state <state>      # 关闭目标 ESM 状态
 --timeout <ms>                # 命令超时（毫秒）
 --cycle-period <ns>           # 手动覆盖周期时间
+--pool-capacity <N>           # 零拷贝帧池容量（run-zc 命令，默认 16）
 ```
 
 **验证参数** ⭐新增：
@@ -403,9 +413,11 @@ MoonECAT CLI 按操作语义分为五个层级：
   scan               ✓      ✓       ✓        ✓
   validate           ✓      ✓       ✓        ✓
   run                ✓      ✓       ✓        ✓
+  run-zc             ✓      ✓       ─        ─
   read-sii           ─      ✓       ✓        ─
   diagnosis          ─      ✓       ✓        ─
   od                 ─      ✓       ✓        ─
+  master-od          ✓      ✓       ✓        ✓
   state              ─      ✓       ✓        ✓
   esc-regs           ─      ✓       ✓        ─
   expected-regs      ─      ✓       ✓        ─
@@ -415,6 +427,11 @@ MoonECAT CLI 按操作语义分为五个层级：
   esi-sii            ✓      ✓       ─        ─
   replay             ✓      ─       ─        ✓
   scenario           ✓      ─       ─        ✓
+  jitter-profile     ✓      ─       ─        ─
+  auto-tune          ✓      ─       ─        ─
+  topo-health        ✓      ─       ─        ─
+  cycle-perf         ✓      ─       ─        ─
+  comm-quality       ✓      ─       ─        ─
   serve              ─      ✓       ─        ─
 ```
 
