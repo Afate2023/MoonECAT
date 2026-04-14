@@ -73,33 +73,33 @@ pub fn encode_soe_read_req(Byte, UInt, Byte, UInt) -> Bytes
 
 pub fn encode_soe_write_req(Byte, UInt, Byte, UInt, Bytes) -> Bytes
 
-pub fn parse_sii_categories(Bytes) -> Array[SiiCategoryEntry]
+pub fn parse_sii_categories(BytesView) -> Array[SiiCategoryEntry]
 
-pub fn parse_sii_dc(Bytes) -> SiiDcClock raise @hal.EcError
+pub fn parse_sii_dc(BytesView) -> SiiDcClock raise @hal.EcError
 
-pub fn parse_sii_fmmu(Bytes) -> Array[FmmuDirection]
+pub fn parse_sii_fmmu(BytesView) -> Array[FmmuDirection]
 
-pub fn parse_sii_fmmu_ex(Bytes) -> Array[SiiFmmuEx]
+pub fn parse_sii_fmmu_ex(BytesView) -> Array[SiiFmmuEx]
 
 pub fn parse_sii_full_info(Bytes) -> SiiFullInfo raise @hal.EcError
 
-pub fn parse_sii_general(Bytes) -> SiiGeneral raise @hal.EcError
+pub fn parse_sii_general(BytesView) -> SiiGeneral raise @hal.EcError
 
-pub fn parse_sii_header(Bytes) -> SiiData raise @hal.EcError
+pub fn parse_sii_header(BytesView) -> SiiData raise @hal.EcError
 
-pub fn parse_sii_pdo(Bytes) -> Array[SiiPdo]
+pub fn parse_sii_pdo(BytesView) -> Array[SiiPdo]
 
-pub fn parse_sii_preamble(Bytes) -> SiiPreamble raise @hal.EcError
+pub fn parse_sii_preamble(BytesView) -> SiiPreamble raise @hal.EcError
 
-pub fn parse_sii_sm(Bytes) -> Array[SiiSmEntry]
+pub fn parse_sii_sm(BytesView) -> Array[SiiSmEntry]
 
-pub fn parse_sii_standard_metadata(Bytes) -> SiiStandardMetadata raise @hal.EcError
+pub fn parse_sii_standard_metadata(BytesView) -> SiiStandardMetadata raise @hal.EcError
 
-pub fn parse_sii_strings(Bytes) -> Array[String]
+pub fn parse_sii_strings(BytesView) -> Array[String]
 
-pub fn parse_sii_sync_units(Bytes) -> Array[SiiSyncUnit]
+pub fn parse_sii_sync_units(BytesView) -> Array[SiiSyncUnit]
 
-pub fn parse_sii_timeouts(Bytes) -> SiiTimeouts raise @hal.EcError
+pub fn parse_sii_timeouts(BytesView) -> SiiTimeouts raise @hal.EcError
 
 pub fn sdo_abort_code_description(UInt) -> String
 
@@ -436,7 +436,7 @@ pub impl Show for SiiCategoryClass
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
   type_code : UInt
-  data : Bytes
+  data : BytesView
 } derive(Eq, @debug.Debug)
 pub fn SiiCategoryEntry::category_class(Self) -> SiiCategoryClass
 pub fn SiiCategoryEntry::overlay_candidate(Self) -> SiiOverlayCandidate?
@@ -506,7 +506,7 @@ pub fn SiiFmmuEx::to_string(Self) -> String
 pub impl Show for SiiFmmuEx
 
 pub(all) struct SiiFullInfo {
-  eeprom : Bytes
+  eeprom : BytesView
   preamble : SiiPreamble
   standard : SiiStandardMetadata
   header : SiiData
@@ -564,7 +564,7 @@ pub impl Show for SiiGeneral
 pub(all) struct SiiOverlayCandidate {
   scope : SiiOverlayScope
   type_code : UInt
-  data : Bytes
+  data : BytesView
 } derive(Eq, @debug.Debug)
 pub fn SiiOverlayCandidate::decoder_name(Self) -> String?
 pub fn SiiOverlayCandidate::dispatch_key(Self) -> String

@@ -41,7 +41,7 @@ pub(all) enum SiiOverlayScope {
 pub(all) struct SiiOverlayCandidate {
   scope : SiiOverlayScope
   type_code : UInt
-  data : Bytes
+  data : BytesView
 } derive(Eq, Debug)
 
 ///|
@@ -311,13 +311,13 @@ pub(all) struct SiiSyncUnit {
 pub(all) struct SiiCategoryEntry {
   category : SiiCategory
   type_code : UInt
-  data : Bytes
+  data : BytesView
 } derive(Eq, Debug)
 
 ///|
 /// Aggregated SII view shared by CLI, runtime, and offline projection paths.
 pub(all) struct SiiFullInfo {
-  eeprom : Bytes
+  eeprom : BytesView
   preamble : SiiPreamble
   standard : SiiStandardMetadata
   header : SiiData

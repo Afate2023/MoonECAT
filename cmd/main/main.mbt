@@ -6433,7 +6433,7 @@ fn production_weekday_name(weekday : Int) -> String {
 }
 
 ///|
-fn bytes_preview_hex(data : Bytes, max_bytes : Int) -> String {
+fn bytes_preview_hex(data : BytesView, max_bytes : Int) -> String {
   let buf = @buffer.new(size_hint=max_bytes * 3)
   let limit = if data.length() < max_bytes { data.length() } else { max_bytes }
   for i = 0; i < limit; i = i + 1 {

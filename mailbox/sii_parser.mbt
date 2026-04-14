@@ -186,8 +186,8 @@ let sii_cat_end : UInt = 0xFFFFU
 let sii_cat_legacy_end : UInt = 0x7FFFU
 
 ///|
-/// Helper: read a little-endian UInt16 from a Bytes at a word offset.
-fn read_sii_word(data : Bytes, word_offset : Int) -> UInt {
+/// Helper: read a little-endian UInt16 from a BytesView at a word offset.
+fn read_sii_word(data : BytesView, word_offset : Int) -> UInt {
   let byte_offset = word_offset * 2
   if byte_offset + 1 >= data.length() {
     return 0U
@@ -198,13 +198,13 @@ fn read_sii_word(data : Bytes, word_offset : Int) -> UInt {
 
 ///|
 /// Helper: read a little-endian UInt32 from two consecutive words.
-fn read_sii_dword(data : Bytes, word_offset : Int) -> UInt {
+fn read_sii_dword(data : BytesView, word_offset : Int) -> UInt {
   read_sii_word(data, word_offset) |
   (read_sii_word(data, word_offset + 1) << 16)
 }
 
 ///|
-fn read_sii_word_at_byte(data : Bytes, byte_offset : Int) -> UInt {
+fn read_sii_word_at_byte(data : BytesView, byte_offset : Int) -> UInt {
   if byte_offset + 1 >= data.length() {
     return 0U
   }
@@ -213,13 +213,13 @@ fn read_sii_word_at_byte(data : Bytes, byte_offset : Int) -> UInt {
 }
 
 ///|
-fn read_sii_dword_at_byte(data : Bytes, byte_offset : Int) -> UInt {
+fn read_sii_dword_at_byte(data : BytesView, byte_offset : Int) -> UInt {
   read_sii_word_at_byte(data, byte_offset) |
   (read_sii_word_at_byte(data, byte_offset + 2) << 16)
 }
 
 ///|
-fn read_sii_i16_at_byte(data : Bytes, byte_offset : Int) -> Int {
+fn read_sii_i16_at_byte(data : BytesView, byte_offset : Int) -> Int {
   let value = read_sii_word_at_byte(data, byte_offset).reinterpret_as_int()
   if value >= 0x8000 {
     value - 0x10000
@@ -243,7 +243,7 @@ fn crc8_update(crc : Int, value : Byte) -> Int {
 
 ///|
 /// Parse the fixed SII preamble.
-pub fn parse_sii_preamble(data : Bytes) -> SiiPreamble raise @hal.EcError {
+pub fn parse_sii_preamble(data : BytesView) -> SiiPreamble raise @hal.EcError {
   if data.length() < 16 {
     raise @hal.EcError::SiiReadFailed(
       "SII preamble too short: " + data.length().to_string() + " bytes",
@@ -266,7 +266,7 @@ pub fn parse_sii_preamble(data : Bytes) -> SiiPreamble raise @hal.EcError {
 
 ///|
 /// Parse the fixed SII header fields from raw EEPROM data.
-pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
+pub fn parse_sii_header(data : BytesView) -> SiiData raise @hal.EcError {
   // Standard header is complete at word 28. Vendor Info and Area B are optional
   // extensions that may not be present in shorter SII reads.
   if data.length() < 58 {
@@ -352,7 +352,7 @@ pub fn parse_sii_header(data : Bytes) -> SiiData raise @hal.EcError {
 ///|
 /// Parse standard SII metadata fields after the mailbox configuration block.
 pub fn parse_sii_standard_metadata(
-  data : Bytes,
+  data : BytesView,
 ) -> SiiStandardMetadata raise @hal.EcError {
   if data.length() < 128 {
     raise @hal.EcError::SiiReadFailed(
@@ -390,7 +390,7 @@ fn category_from_code(code : UInt) -> SiiCategory {
 
 ///|
 /// Parse all SII categories from the category area of EEPROM data.
-pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
+pub fn parse_sii_categories(data : BytesView) -> Array[SiiCategoryEntry] {
   let categories : Array[SiiCategoryEntry] = []
   let mut word_offset = sii_category_start
   while word_offset * 2 + 3 < data.length() {
@@ -407,7 +407,7 @@ pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
       categories.push({
         category: category_from_code(cat_type),
         type_code: cat_type,
-        data: Bytes::makei(cat_size_bytes, fn(i) { data[cat_data_start + i] }),
+        data: data[cat_data_start:cat_data_start + cat_size_bytes],
       })
     }
     word_offset = word_offset + 2 + cat_size_words.reinterpret_as_int()
@@ -419,10 +419,11 @@ pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
 /// Parse the complete SII model once and expose all commonly used projections.
 /// Single-pass dispatch over categories to avoid 10 separate linear scans.
 pub fn parse_sii_full_info(data : Bytes) -> SiiFullInfo raise @hal.EcError {
-  let preamble = parse_sii_preamble(data)
-  let standard = parse_sii_standard_metadata(data)
-  let header = parse_sii_header(data)
-  let categories = parse_sii_categories(data)
+  let view = data[:]
+  let preamble = parse_sii_preamble(view)
+  let standard = parse_sii_standard_metadata(view)
+  let header = parse_sii_header(view)
+  let categories = parse_sii_categories(view)
   // Single-pass: collect all category projections in one iteration
   let mut strings : Array[String] = []
   let mut general : SiiGeneral? = None
@@ -480,7 +481,7 @@ pub fn parse_sii_full_info(data : Bytes) -> SiiFullInfo raise @hal.EcError {
     }
   }
   {
-    eeprom: data,
+    eeprom: view,
     preamble,
     standard,
     header,
@@ -524,7 +525,7 @@ pub(all) struct SiiGeneral {
 
 ///|
 /// Parse the General category data.
-pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
+pub fn parse_sii_general(data : BytesView) -> SiiGeneral raise @hal.EcError {
   if data.length() < 16 {
     raise @hal.EcError::EsiParseFailed(
       "General category too short: " + data.length().to_string(),
@@ -591,7 +592,7 @@ pub fn parse_sii_general(data : Bytes) -> SiiGeneral raise @hal.EcError {
 
 ///|
 /// Parse the Timeouts category data (ETG.2010 Table 13).
-pub fn parse_sii_timeouts(data : Bytes) -> SiiTimeouts raise @hal.EcError {
+pub fn parse_sii_timeouts(data : BytesView) -> SiiTimeouts raise @hal.EcError {
   if data.length() < 16 {
     raise @hal.EcError::EsiParseFailed(
       "Timeouts category too short: " + data.length().to_string(),
@@ -610,7 +611,7 @@ pub fn parse_sii_timeouts(data : Bytes) -> SiiTimeouts raise @hal.EcError {
 ///|
 /// Parse the FMMU category data. Each entry is 1 byte indicating FMMU usage.
 /// Per ETG1000.6 Table 22: 0x01 = Outputs, 0x02 = Inputs, 0x03 = mailbox state.
-pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
+pub fn parse_sii_fmmu(data : BytesView) -> Array[FmmuDirection] {
   let result : Array[FmmuDirection] = []
   for i = 0; i < data.length(); i = i + 1 {
     match data[i] {
@@ -627,7 +628,7 @@ pub fn parse_sii_fmmu(data : Bytes) -> Array[FmmuDirection] {
 
 ///|
 /// Parse the FMMU_EX category data (ETG.2010 Table 10).
-pub fn parse_sii_fmmu_ex(data : Bytes) -> Array[SiiFmmuEx] {
+pub fn parse_sii_fmmu_ex(data : BytesView) -> Array[SiiFmmuEx] {
   let result : Array[SiiFmmuEx] = []
   let mut offset = 0
   while offset + 4 <= data.length() {
@@ -646,7 +647,7 @@ pub fn parse_sii_fmmu_ex(data : Bytes) -> Array[SiiFmmuEx] {
 
 ///|
 /// Parse the SyncUnit category data (ETG.2010 Table 14).
-pub fn parse_sii_sync_units(data : Bytes) -> Array[SiiSyncUnit] {
+pub fn parse_sii_sync_units(data : BytesView) -> Array[SiiSyncUnit] {
   let result : Array[SiiSyncUnit] = []
   for raw_flags in data {
     result.push({
@@ -673,7 +674,7 @@ pub(all) struct SiiSmEntry {
 
 ///|
 /// Parse the SyncManager category data.
-pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
+pub fn parse_sii_sm(data : BytesView) -> Array[SiiSmEntry] {
   let result : Array[SiiSmEntry] = []
   let entry_size = 8
   let mut offset = 0
@@ -709,7 +710,7 @@ pub fn parse_sii_sm(data : Bytes) -> Array[SiiSmEntry] {
 ///|
 /// Parse the Strings category data (ETG1000.6 Table 20).
 /// Returns an array of strings indexed from 1 (index 0 is unused by convention).
-pub fn parse_sii_strings(data : Bytes) -> Array[String] {
+pub fn parse_sii_strings(data : BytesView) -> Array[String] {
   let result : Array[String] = []
   if data.length() < 1 {
     return result
@@ -725,7 +726,8 @@ pub fn parse_sii_strings(data : Bytes) -> Array[String] {
     if offset + str_len > data.length() {
       break
     }
-    let bytes = Bytes::makei(str_len, fn(j) { data[offset + j] })
+    let slice = data[offset:offset + str_len]
+    let bytes = slice.to_bytes()
     let decoded : Result[String, Error] = try? @utf8.decode(bytes)
     match decoded {
       Ok(text) => result.push(text)
@@ -739,7 +741,7 @@ pub fn parse_sii_strings(data : Bytes) -> Array[String] {
 ///|
 /// Parse TxPdo or RxPdo category data (ETG1000.6 Tables 24+25).
 /// Each PDO has a fixed 8-byte header followed by nEntry × 8-byte entries.
-pub fn parse_sii_pdo(data : Bytes) -> Array[SiiPdo] {
+pub fn parse_sii_pdo(data : BytesView) -> Array[SiiPdo] {
   let result : Array[SiiPdo] = []
   let mut offset = 0
   while offset + 8 <= data.length() {
@@ -787,7 +789,7 @@ pub fn parse_sii_pdo(data : Bytes) -> Array[SiiPdo] {
 
 ///|
 /// Parse a DC clock category entry.
-pub fn parse_sii_dc(data : Bytes) -> SiiDcClock raise @hal.EcError {
+pub fn parse_sii_dc(data : BytesView) -> SiiDcClock raise @hal.EcError {
   if data.length() < 24 {
     raise @hal.EcError::EsiParseFailed(
       "DC category too short: " + data.length().to_string(),
