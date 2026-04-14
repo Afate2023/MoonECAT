@@ -9,4 +9,5 @@ import {
   "afate/MoonECAT/fixtures",
   "afate/MoonECAT/hal",
   "afate/MoonECAT/hal/mock",
+  "moonbitlang/core/bench",
 } for "test"
