@@ -416,149 +416,85 @@ pub fn parse_sii_categories(data : Bytes) -> Array[SiiCategoryEntry] {
 }
 
 ///|
-fn collect_sii_strings(categories : Array[SiiCategoryEntry]) -> Array[String] {
-  for category in categories {
-    if category.category == Strings {
-      return parse_sii_strings(category.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_general(categories : Array[SiiCategoryEntry]) -> SiiGeneral? {
-  for category in categories {
-    if category.category == General {
-      let parsed : Result[SiiGeneral, Error] = try? parse_sii_general(
-        category.data,
-      )
-      match parsed {
-        Ok(general) => return Some(general)
-        Err(_) => ()
-      }
-    }
-  }
-  None
-}
-
-///|
-fn collect_sii_timeouts(categories : Array[SiiCategoryEntry]) -> SiiTimeouts? {
-  for category in categories {
-    if category.category == Timeouts {
-      let parsed : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(
-        category.data,
-      )
-      match parsed {
-        Ok(timeouts) => return Some(timeouts)
-        Err(_) => ()
-      }
-    }
-  }
-  None
-}
-
-///|
-fn collect_sii_fmmu(
-  categories : Array[SiiCategoryEntry],
-) -> Array[FmmuDirection] {
-  for category in categories {
-    if category.category == Fmmu {
-      return parse_sii_fmmu(category.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_fmmu_ex(
-  categories : Array[SiiCategoryEntry],
-) -> Array[SiiFmmuEx] {
-  for category in categories {
-    if category.category == FmmuEx {
-      return parse_sii_fmmu_ex(category.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_sync_managers(
-  categories : Array[SiiCategoryEntry],
-) -> Array[SiiSmEntry] {
-  for category in categories {
-    if category.category == SyncManager {
-      return parse_sii_sm(category.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_sync_units(
-  categories : Array[SiiCategoryEntry],
-) -> Array[SiiSyncUnit] {
-  for category in categories {
-    if category.category == SyncUnit {
-      return parse_sii_sync_units(category.data)
-    }
-  }
-  []
-}
-
-///|
-fn collect_sii_pdo(
-  categories : Array[SiiCategoryEntry],
-  target : SiiCategory,
-) -> Array[SiiPdo] {
-  let pdos : Array[SiiPdo] = []
-  for category in categories {
-    if category.category == target {
-      for pdo in parse_sii_pdo(category.data) {
-        pdos.push(pdo)
-      }
-    }
-  }
-  pdos
-}
-
-///|
-fn collect_sii_dc(categories : Array[SiiCategoryEntry]) -> Array[SiiDcClock] {
-  let dc_clocks : Array[SiiDcClock] = []
-  for category in categories {
-    if category.category == Dc {
-      let parsed : Result[SiiDcClock, Error] = try? parse_sii_dc(category.data)
-      match parsed {
-        Ok(clock) => dc_clocks.push(clock)
-        Err(_) => ()
-      }
-    }
-  }
-  dc_clocks
-}
-
-///|
 /// Parse the complete SII model once and expose all commonly used projections.
+/// Single-pass dispatch over categories to avoid 10 separate linear scans.
 pub fn parse_sii_full_info(data : Bytes) -> SiiFullInfo raise @hal.EcError {
   let preamble = parse_sii_preamble(data)
   let standard = parse_sii_standard_metadata(data)
   let header = parse_sii_header(data)
   let categories = parse_sii_categories(data)
+  // Single-pass: collect all category projections in one iteration
+  let mut strings : Array[String] = []
+  let mut general : SiiGeneral? = None
+  let mut timeouts : SiiTimeouts? = None
+  let mut fmmu : Array[FmmuDirection] = []
+  let mut fmmu_ex : Array[SiiFmmuEx] = []
+  let mut sync_managers : Array[SiiSmEntry] = []
+  let mut sync_units : Array[SiiSyncUnit] = []
+  let tx_pdo : Array[SiiPdo] = []
+  let rx_pdo : Array[SiiPdo] = []
+  let dc_clocks : Array[SiiDcClock] = []
+  for category in categories {
+    match category.category {
+      Strings => strings = parse_sii_strings(category.data)
+      General => {
+        let parsed : Result[SiiGeneral, Error] = try? parse_sii_general(
+          category.data,
+        )
+        match parsed {
+          Ok(g) => general = Some(g)
+          Err(_) => ()
+        }
+      }
+      Timeouts => {
+        let parsed : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(
+          category.data,
+        )
+        match parsed {
+          Ok(t) => timeouts = Some(t)
+          Err(_) => ()
+        }
+      }
+      Fmmu => fmmu = parse_sii_fmmu(category.data)
+      FmmuEx => fmmu_ex = parse_sii_fmmu_ex(category.data)
+      SyncManager => sync_managers = parse_sii_sm(category.data)
+      SyncUnit => sync_units = parse_sii_sync_units(category.data)
+      TxPdo =>
+        for pdo in parse_sii_pdo(category.data) {
+          tx_pdo.push(pdo)
+        }
+      RxPdo =>
+        for pdo in parse_sii_pdo(category.data) {
+          rx_pdo.push(pdo)
+        }
+      Dc => {
+        let parsed : Result[SiiDcClock, Error] = try? parse_sii_dc(
+          category.data,
+        )
+        match parsed {
+          Ok(clock) => dc_clocks.push(clock)
+          Err(_) => ()
+        }
+      }
+      _ => ()
+    }
+  }
   {
     eeprom: data,
     preamble,
     standard,
     header,
     categories,
-    strings: collect_sii_strings(categories),
-    general: collect_sii_general(categories),
-    timeouts: collect_sii_timeouts(categories),
-    fmmu: collect_sii_fmmu(categories),
-    fmmu_ex: collect_sii_fmmu_ex(categories),
-    sync_managers: collect_sii_sync_managers(categories),
-    sync_units: collect_sii_sync_units(categories),
-    tx_pdo: collect_sii_pdo(categories, TxPdo),
-    rx_pdo: collect_sii_pdo(categories, RxPdo),
-    dc_clocks: collect_sii_dc(categories),
+    strings,
+    general,
+    timeouts,
+    fmmu,
+    fmmu_ex,
+    sync_managers,
+    sync_units,
+    tx_pdo,
+    rx_pdo,
+    dc_clocks,
   }
 }
 
