@@ -1,5 +1,7 @@
 # Native FFI Safety Notes
 
+> **实现状态（2025-07）**：本文档描述的保守所有权模型已完整落地于 `hal/native/`。FFI 句柄生命周期由 MoonBit 端管理，`platform_stub.c` 提供公共桥接，wasm-gc 后端有 fallback 安全路径。
+
 本文档记录 MoonECAT Native 后端当前的 FFI ownership、句柄释放责任与最小内存安全验证路径。
 
 ## 1. 当前句柄策略

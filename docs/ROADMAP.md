@@ -32,13 +32,20 @@ MoonECAT 后续路线分为三条主线：
 
 MoonECAT 当前更适合被定义为：
 
-> **Class B 主站骨架已成，正在从协议正确性工程迈向可实机闭环的验证运行时。**
+> **Class B 主站核心已全面实现，验证运行时已建成，正在从功能完成走向实机闭环全覆盖与文档规范化。**
 
-这意味着后续工作优先级应从“继续横向补功能”切换为：
+具体而言：
+- 协议核心（帧编解码、ESM、DC、PDO、SDO、FoE、EEPROM、SII 全类别解析）功能完整
+- 验证基础设施（虚拟总线/从站、故障注入、录制回放、场景执行器、monitor/verdict）**已全面实现**，超出原始路线预期
+- Native 后端（Windows Npcap）已有实机闭环证据；Linux Raw Socket FFI 已实现，实机验证待补
+- HIL/Co-Sim 框架（hook、adapter、timebase、task schedule）已就绪，PoC 演示待收口
+- CLI 功能完整（8 个子命令），Extism 插件边界已设计
 
-1. 先把 Native 主线收成稳定基线
-2. 再把验证能力做成原生能力
-3. 最后把 HIL 所需边界提前冻结
+后续重点不再是"把验证能力做出来"（已完成），而应是：
+
+1. **补齐 Linux 实机证据** — 完成双平台对等验证
+2. **规范化输出 schema 与合同文档** — 把实现转化为稳定交付
+3. **收口 HIL PoC** — 验证端到端闭环
 
 ---
 
@@ -127,30 +134,42 @@ MoonECAT 在未来 HIL 系统中的定位应是：
 
 ---
 
-## 6. 优先级排序
+## 6. 优先级排序与完成度
 
-### P0：必须优先完成
-- Native HAL 语义统一
-- Linux Raw Socket 实机闭环
-- Native trace / NDJSON schema 冻结
-- `run --until-fault` 正式化
-- Native FFI 生命周期与失败路径测试
-- Native CLI 证据矩阵
+> 以下完成度标注基于 2025-07 代码实际状态。
+>
+> - ✅ 已完成 / 已达预期
+> - 🔶 大部分完成，剩余收尾
+> - ⬜ 尚未开始或仅有骨架
 
-### P1：形成验证平台差异化
-- fault injection API
-- deterministic replay
-- monitor / verdict
-- 虚拟从站
-- topology fingerprint / Hot Connect
-- 扩展 `DiagnosticSurface`
+### P0：必须优先完成 — Native Runtime Baseline
+| 条目 | 状态 | 说明 |
+|------|------|------|
+| Native HAL 语义统一 | 🔶 | Windows Npcap + Linux Raw Socket 双后端共享 `Nic`/`ZeroCopyNic` trait; `EcError` 17 变体覆盖; 零拷贝后端已实现; 尚需对齐部分边界行为文档 |
+| Linux Raw Socket 实机闭环 | 🔶 | FFI 桩 + fallback 体系完成; AF_PACKET send/recv/list 路径已实现; 实机证据待补(Windows 已有 BACKEND_RELEASE_MATRIX 实机记录) |
+| Native trace / NDJSON schema 冻结 | 🔶 | `run --progress-ndjson` 已实现; schema 尚未作为正式规范文档化 |
+| `run --until-fault` 正式化 | ✅ | `run --until-fault` 已实现并集成于 CLI; 输出 stop reason / first fault / fault count |
+| Native FFI 生命周期与失败路径测试 | 🔶 | Native FFI 安全模型有文档(NATIVE_FFI_SAFETY.md); handle 生命周期由保守所有权管理; 需更多失败路径测试 |
+| Native CLI 证据矩阵 | 🔶 | BACKEND_RELEASE_MATRIX.md 记录了 Windows Npcap 实机证据(2026-03-11, 2026-03-14); Linux 实机证据待补 |
 
-### P2：为 HIL 做边界冻结
-- runtime hook 模型
-- multiple tasks / process-image partitioning 接口
-- co-sim adapter contract
-- communication-closed-loop HIL PoC
-- MCU + Linux clock contract
+### P1：形成验证平台差异化 — Verification Runtime
+| 条目 | 状态 | 说明 |
+|------|------|------|
+| fault injection API | ✅ | `FaultInjection` 模型已实现于 hal/mock/: drop/delay/corrupt/WKC mismatch; 条件/定时触发; `FaultNic` 包装器 |
+| deterministic replay | ✅ | `RecordingNic` + `ReplayNic` 已实现; 支持帧录制与确定性回放 |
+| monitor / verdict | ✅ | `Monitor` trait + `Verdict`(Pass/Warn/Fail/Block) + `MonitorRegistry` + 内建 monitors 已实现 |
+| 虚拟从站 | ✅ | `VirtualSlave` + `VirtualSlaveTemplate` + `VirtualBus` + `VirtualMailbox` 已实现; 支持多从站场景 |
+| topology fingerprint / Hot Connect | ✅ | `TopologyFingerprint` + `TopologyHealthAnalyzer` 已实现; 支持 hash/match/diff |
+| 扩展 `DiagnosticSurface` | ✅ | `DiagnosticSurface` 统一事实层已实现: 汇聚 AL/WKC/timeout/topology/config/telemetry; 支持 issue 分级与结构化诊断 |
+
+### P2：为 HIL 做边界冻结 — HIL-Ready Runtime Boundary
+| 条目 | 状态 | 说明 |
+|------|------|------|
+| runtime hook 模型 | ✅ | `HilCycleHook` + `HilSession` 已实现; 支持 process image / cycle / event hook |
+| multiple tasks / process-image partitioning 接口 | ✅ | `TaskSchedule` + `MultiRateAnalysis` + `ProcessImageSlice` 已实现 |
+| co-sim adapter contract | ✅ | `CoSimAdapter` trait (step/reset/snapshot/restore) 已实现; `LoopbackCoSimAdapter` 作为参考实现 |
+| communication-closed-loop HIL PoC | 🔶 | HIL 框架就绪(`HilSession` + `ExternalProcessBridge`); 完整 PoC 闭环演示待完成 |
+| MCU + Linux clock contract | ✅ | `Timebase` + `TimebaseSync` + `VirtualTimebase` 已实现; MCU HAL 有 `McuHal` trait 骨架 |
 
 ---
 
@@ -171,3 +190,15 @@ MoonECAT 在未来 HIL 系统中的定位应是：
 MoonECAT 的后期路线应概括为：
 
 > **先把 Native 主站做成可信执行器，再把验证能力做成原生能力，最后把它接成 MCU + Linux 协同 HIL 的通信内核。**
+
+---
+
+## 9. 当前进度总结（2025-07 快照）
+
+| 主线 | 总体完成度 | 关键里程碑 |
+|------|-----------|-----------|
+| A. Native Runtime Baseline | **~75%** | Windows Npcap 实机闭环已达成; Linux Raw Socket FFI 已实现; CLI 8 个子命令可用; 剩余：Linux 实机验证、schema 规范文档化 |
+| B. Verification Runtime | **~95%** | fault injection / replay / monitor-verdict / virtual slave / topology fingerprint / DiagnosticSurface 全部已实现 |
+| C. HIL-Ready Runtime Boundary | **~85%** | HIL hook / co-sim adapter / task schedule / timebase 全部已实现; 剩余：完整 PoC 闭环演示 |
+
+**整体评估**：MoonECAT 已从"协议骨架"演进为功能完整的可验证 Native EtherCAT 主站运行时。P1 验证能力已全面实现并超出原始路线预期。P0 和 P2 剩余工作主要集中在实机验证闭环与文档规范化。

@@ -1,5 +1,7 @@
 # MoonECAT SII Full Read Design
 
+> **实现状态（2025-07）**：本设计已全面落地。`mailbox/sii_parser.mbt` + `mailbox/sii.mbt` + `mailbox/sii_flags.mbt` 实现了完整的 SII 三层解析（A: preamble/B: fixed header+area/C: full category）。已支持 Strings(10)/General(30)/FMMU(40)/SyncM(41)/FMMU_EX(42)/SyncUnit(43)/TxPDO(50)/RxPDO(51)/DC(60)/Timeouts(70) 深解析，未识别类别保留为 `Raw`。`SiiFullInfo` 聚合模型、`SiiCategoryClass`/`SiiOverlayCandidate` 框架均已实现。CLI `read-sii` 命令可输出结构化 JSON。
+
 本文档定义 MoonECAT 的 SII 完整类别深读计划。目标不是再做一套 ESI 解析器，而是把实时链路上的 EEPROM 读取、现有 mailbox SII parser、CLI 输出和后续配置工具消费统一到一条稳定路径，并把 ETG.2010 规定的类别覆盖范围拆成可执行阶段。
 
 ## 1. 设计目标

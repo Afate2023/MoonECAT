@@ -1,5 +1,7 @@
 # 零拷贝 HAL 设计（C-6 ~ C-8）
 
+> **实现状态（2025-07）**：本设计已全面落地。`FramePool` + `FrameRef` + `FrameState` 状态机已实现于 `hal/`；`ZeroCopyNic` trait 已定义；`ZeroCopyMockNic` 测试双已实现；`zero_copy_codec.mbt` 和 `zero_copy_pdo.mbt` 已实现于 `protocol/`；Native 零拷贝后端已实现于 `hal/native/`。
+
 > 本文档定义 MoonECAT 零拷贝帧管理架构，目标是消除 PDO 周期热路径中的全部 `Bytes` 堆分配。
 
 ---

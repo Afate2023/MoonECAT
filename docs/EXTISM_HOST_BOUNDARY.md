@@ -1,5 +1,7 @@
 # Extism Host Boundary
 
+> **实现状态（2025-07）**：边界设计已落地于 `plugin/extism/`（8 个文件）。`HostCapabilityContract` 已定义，`PluginRequest`/`PluginResponse` envelope 协议已实现，`scan_entry`/`validate_entry`/`run_entry` 入口已存根。实际宿主函数绑定待接入 Extism PDK。
+
 This document defines the host/plugin boundary for running MoonECAT as an Extism plugin.
 Scope is boundary design and constraints only; concrete plugin wiring is intentionally deferred.
 
