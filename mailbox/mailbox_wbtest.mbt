@@ -365,87 +365,67 @@ test "SdoCommand to_byte AbortTransfer arm" {
   assert_eq(SdoCommand::AbortTransfer.to_byte(), b'\x80')
 }
 
-// ===== Batch 15: sii_parser collect_sii_* uncovered paths =====
+// ===== Batch 15: sii_parser sub-parser direct coverage =====
 
 ///|
-test "collect_sii_strings returns parsed strings" {
+test "parse_sii_strings returns parsed strings" {
   // Strings category data: 1 string of length 2 "AB"
   let data = b"\x01\x02\x41\x42"
-  let cats : Array[SiiCategoryEntry] = [
-    { category: Strings, type_code: 10U, data },
-  ]
-  let result = collect_sii_strings(cats)
+  let result = parse_sii_strings(data)
   assert_eq(result.length(), 1)
   assert_eq(result[0], "AB")
 }
 
 ///|
-test "collect_sii_general Err branch" {
-  // General category with data too short to parse (< 16 bytes)
+test "parse_sii_general Err on short data" {
+  // General data too short to parse (< 16 bytes) → raises
   let data = Bytes::make(4, 0)
-  let cats : Array[SiiCategoryEntry] = [
-    { category: General, type_code: 30U, data },
-  ]
-  let result = collect_sii_general(cats)
-  // parse_sii_general raises on short data, collect_sii_general catches => None
-  assert_true(result is None)
+  let result : Result[SiiGeneral, Error] = try? parse_sii_general(data)
+  assert_true(result is Err(_))
 }
 
 ///|
-test "collect_sii_timeouts with valid data" {
+test "parse_sii_timeouts with valid data" {
   // Timeouts category needs 16 bytes
   let data = Bytes::make(16, 0)
-  let cats : Array[SiiCategoryEntry] = [
-    { category: Timeouts, type_code: 70U, data },
-  ]
-  let result = collect_sii_timeouts(cats)
-  assert_true(result is Some(_))
+  let result : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(data)
+  assert_true(result is Ok(_))
 }
 
 ///|
-test "collect_sii_timeouts Err branch with corrupt data" {
-  // Data too short (< 16) → parse_sii_timeouts raises → Err → silently ignored
+test "parse_sii_timeouts Err on short data" {
+  // Data too short (< 16) → raises
   let data = Bytes::make(4, 0)
-  let cats : Array[SiiCategoryEntry] = [
-    { category: Timeouts, type_code: 70U, data },
-  ]
-  let result = collect_sii_timeouts(cats)
-  assert_true(result is None)
+  let result : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(data)
+  assert_true(result is Err(_))
 }
 
 ///|
-test "collect_sii_dc Err branch with corrupt data" {
-  // Data too short (< 24) → parse_sii_dc raises → Err → silently ignored
+test "parse_sii_dc Err on short data" {
+  // Data too short (< 24) → raises
   let data = Bytes::make(4, 0)
-  let cats : Array[SiiCategoryEntry] = [{ category: Dc, type_code: 60U, data }]
-  let result = collect_sii_dc(cats)
-  assert_eq(result.length(), 0)
+  let result : Result[SiiDcClock, Error] = try? parse_sii_dc(data)
+  assert_true(result is Err(_))
 }
 
 ///|
-test "collect_sii_fmmu_ex with valid data" {
+test "parse_sii_fmmu_ex with valid data" {
   // Each FmmuEx entry is 4 bytes: 2 flags + sm + su
   let data = b"\x03\x00\x01\x02"
-  let cats : Array[SiiCategoryEntry] = [
-    { category: FmmuEx, type_code: 42U, data },
-  ]
-  let result = collect_sii_fmmu_ex(cats)
+  let result = parse_sii_fmmu_ex(data)
   assert_eq(result.length(), 1)
 }
 
 ///|
-test "collect_sii_sync_units with valid data" {
+test "parse_sii_sync_units with valid data" {
   // Each SyncUnit entry is 1 byte of flags
   let data = b"\x05"
-  let cats : Array[SiiCategoryEntry] = [
-    { category: SyncUnit, type_code: 43U, data },
-  ]
-  let result = collect_sii_sync_units(cats)
+  let result = parse_sii_sync_units(data)
   assert_eq(result.length(), 1)
 }
 
 ///|
-test "collect_sii_pdo with TxPdo data" {
+test "parse_sii_pdo with TxPdo data" {
   // Minimal PDO: 8-byte header with 0 entries
   let buf = @buffer.new()
   // pdo_index (2 LE)
@@ -463,20 +443,16 @@ test "collect_sii_pdo with TxPdo data" {
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let cats : Array[SiiCategoryEntry] = [
-    { category: TxPdo, type_code: 50U, data },
-  ]
-  let result = collect_sii_pdo(cats, TxPdo)
+  let result = parse_sii_pdo(data)
   assert_eq(result.length(), 1)
 }
 
 ///|
-test "collect_sii_dc with valid dc data" {
+test "parse_sii_dc with valid dc data" {
   // DC category needs 24 bytes
   let data = Bytes::make(24, 0)
-  let cats : Array[SiiCategoryEntry] = [{ category: Dc, type_code: 60U, data }]
-  let result = collect_sii_dc(cats)
-  assert_eq(result.length(), 1)
+  let result : Result[SiiDcClock, Error] = try? parse_sii_dc(data)
+  assert_true(result is Ok(_))
 }
 
 ///|
