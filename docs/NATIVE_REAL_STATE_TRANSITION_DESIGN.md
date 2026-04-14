@@ -1,6 +1,6 @@
 # Native Real-NIC State Transition Design
 
-> **实现状态（2025-07）**：ESM 状态迁移引擎已全面实现于 `protocol/esm_engine.mbt` + `protocol/esm_extensions.mbt`，包含 `request_state`（10+ 目标状态变体）、`transition_through`、`broadcast_state`、`observe_state_transition`，支持 timeout policy 和 override。CLI `state` 命令已实现广播与定点迁移。Windows Npcap 实机验证已通过。Linux 实机验证待补。
+> **实现状态（2026-04-14）**：ESM 状态迁移引擎已全面实现于 `protocol/esm_engine.mbt` + `protocol/esm_extensions.mbt`，包含 `request_state`（10+ 目标状态变体）、`transition_through`、`broadcast_state`、`observe_state_transition`，支持 timeout policy 和 override。CLI `state` 命令已实现广播与定点迁移。Windows Npcap 实机验证已通过。Linux 实机验证待补。
 
 本文档聚焦两件仍在推进中的 Native 主题：
 

@@ -1,6 +1,6 @@
 # Extism / WASM Backend Plan
 
-> **实现状态（2025-07）**：`plugin/extism/` 已实现边界设计和占位入口（`HostCapabilityContract` + envelope 协议 + scan/validate/run entry stubs）。实际 Extism PDK 绑定和完整验证闭环待推进。
+> **实现状态（2026-04-14）**：`plugin/extism/` 已实现边界设计和占位入口（`HostCapabilityContract` + envelope 协议 + scan/validate/run entry stubs）。实际 Extism PDK 绑定和完整验证闭环待推进。
 
 本文件把 MoonECAT 的 Extism / WASM 后端从“边界定义”推进到“可实施计划”。
 它建立在 [docs/EXTISM_HOST_BOUNDARY.md](docs/EXTISM_HOST_BOUNDARY.md) 之上，目标是明确包边界、导出入口、宿主协定和最小验证闭环。
