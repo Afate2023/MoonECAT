@@ -17,6 +17,55 @@ test "bench: SII parsing pipeline" (b : @bench.T) {
 }
 
 ///|
+/// Benchmark: Individual sub-parser performance (isolated from full_info).
+test "bench: SII sub-parsers isolated" (b : @bench.T) {
+  let eeprom = @fixtures.sample_sii_eeprom_with_pdo()
+  let categories = @mailbox.parse_sii_categories(eeprom)
+  // Find specific categories for isolated benchmarks
+  let mut strings_data : BytesView = b""[:]
+  let mut general_data : BytesView = b""[:]
+  let mut fmmu_data : BytesView = b""[:]
+  let mut sm_data : BytesView = b""[:]
+  let mut pdo_data : BytesView = b""[:]
+  for cat in categories {
+    match cat.category {
+      Strings => strings_data = cat.data
+      General => general_data = cat.data
+      Fmmu => fmmu_data = cat.data
+      SyncManager => sm_data = cat.data
+      TxPdo => pdo_data = cat.data
+      _ => ()
+    }
+  }
+  if strings_data.length() > 0 {
+    b.bench(name="parse_sii_strings", fn() {
+      b.keep(@mailbox.parse_sii_strings(strings_data))
+    })
+  }
+  if general_data.length() > 0 {
+    b.bench(name="parse_sii_general", fn() {
+      b.keep(@mailbox.parse_sii_general(general_data) catch { _ => panic() })
+    })
+  }
+  if fmmu_data.length() > 0 {
+    b.bench(name="parse_sii_fmmu", fn() {
+      b.keep(@mailbox.parse_sii_fmmu(fmmu_data))
+    })
+  }
+  if sm_data.length() > 0 {
+    b.bench(name="parse_sii_sm", fn() { b.keep(@mailbox.parse_sii_sm(sm_data)) })
+  }
+  if pdo_data.length() > 0 {
+    b.bench(name="parse_sii_pdo", fn() {
+      b.keep(@mailbox.parse_sii_pdo(pdo_data))
+    })
+  }
+  b.bench(name="parse_sii_standard_metadata", fn() {
+    b.keep(@mailbox.parse_sii_standard_metadata(eeprom) catch { _ => panic() })
+  })
+}
+
+///|
 /// Benchmark: SII parsing with process-data EEPROM (more categories).
 test "bench: SII full parse with PDO categories" (b : @bench.T) {
   let eeprom = @fixtures.sample_sii_eeprom_with_pdo()
