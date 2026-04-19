@@ -85,8 +85,20 @@ moon test hal/native/native_test.mbt --target native
 
 - Windows Npcap：接口枚举、open/send/recv/close、运行时动态加载已实现
 - Linux Raw Socket：接口枚举、open/send/recv/close 已实现
-- 真实 `scan/validate/run` 回归尚未补成自动化硬件测试
+- 真实 `scan/validate/run` 回归通过 `scripts/regression-real-device.ps1` 驱动；`--record <ndjson>` 把帧级事件流落盘，`scripts/replay-diff.ps1` 把同一份 NDJSON 通过 `cmd/main replay --trace ... --json` 重放并与 live `run-summary` 做稳定字段（slave_count / topology_fingerprint / verdict）比对
 - CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
+- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现（包括 `NativeNic`）包成可记录链路，不再局限于 `VirtualNic`
+
+### EoE / FoE（L3 交付面）
+
+| 协议 | 库层实现 | 测试覆盖 | 现状 |
+| --- | --- | --- | --- |
+| **EoE** | `mailbox/eoe.mbt`（帧编解码 + EoeResult） + `mailbox/eoe_switch.mbt` / `eoe_endpoint.mbt` / `eoe_relay.mbt`（Virtual Switch 引擎） + `mailbox/eoe_async/`（异步桥） | `runtime/runtime_test.mbt`、`runtime/runtime_wbtest.mbt`、`mailbox/mailbox_test.mbt` 中含 fragment/IP request/response、Virtual Switch 端点路由、relay 调度等多组用例 | ✅ 帧层 + Virtual Switch 已闭环；CLI 暴露面后续按 feature pack 增量交付，**不阻塞 Native Library L3 验收** |
+| **FoE** | `mailbox/foe.mbt`（FoeOpCode/ErrorCode/Response） + `protocol/foe_transaction.mbt`（download/upload + RMSM 计数器 + Busy 重试） | `protocol/integration_test.mbt`（含 download/upload 多包 + Busy 重试 + 错误码端到端用例）、`mailbox/mailbox_test.mbt` | ✅ FoE FP+AP 多包传输事务已闭环；CLI 暴露面后续按 feature pack 增量交付，**不阻塞 Native Library L3 验收** |
+
+> EoE/FoE 已正式纳入 Native Library L3 交付面（库层 API + 库内事务 +
+> 库层测试）。CLI 子命令（如 `eoe-bridge`、`foe-download`/`foe-upload`）
+> 列入后续 feature pack，不在 L3 验收闸门内，但库层契约必须保持稳定。
 
 ## 3. Extism Plugin
 

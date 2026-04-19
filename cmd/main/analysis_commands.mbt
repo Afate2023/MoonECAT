@@ -14,6 +14,139 @@ fn load_trace_file(path : String) -> String raise @hal.EcError {
 }
 
 ///|
+fn load_scan_report_file(
+  path : String,
+) -> @runtime.ScanReport raise @hal.EcError {
+  let json_content = load_trace_file(path)
+  let parsed = @json.parse(json_content[:]) catch {
+    err =>
+      raise @hal.EcError::ConfigMismatch(
+        "failed to parse scan JSON " + path + ": " + err.to_string(),
+      )
+  }
+  parse_scan_report_json(parsed)
+}
+
+///|
+fn parse_scan_report_json(
+  json : Json,
+) -> @runtime.ScanReport raise @hal.EcError {
+  guard json
+    is { "slave_count": slave_count_json, "slaves": Array(slaves_json), .. } else {
+    raise @hal.EcError::ConfigMismatch(
+      "scan JSON decode failed: missing slave_count/slaves",
+    )
+  }
+  let slaves = slaves_json.map(slave_json => {
+    parse_scan_report_slave_json(slave_json)
+  })
+  let slave_count = decode_scan_json_int(slave_count_json)
+  if slave_count != slaves.length() {
+    raise @hal.EcError::ConfigMismatch(
+      "scan JSON decode failed: slave_count mismatch",
+    )
+  }
+  { slave_count, slaves }
+}
+
+///|
+fn parse_scan_report_slave_json(
+  json : Json,
+) -> @runtime.SlaveReport raise @hal.EcError {
+  guard json
+    is {
+      "position": position_json,
+      "station_address": station_address_json,
+      "alias_address"? : alias_address_json,
+      "vendor_id": vendor_id_json,
+      "product_code": product_code_json,
+      "revision": revision_json,
+      "serial": serial_json,
+      "identification": identification_json,
+      ..
+    } else {
+    raise @hal.EcError::ConfigMismatch(
+      "scan JSON decode failed: invalid slave entry",
+    )
+  }
+  {
+    position: decode_scan_json_int(position_json),
+    station_address: decode_scan_json_uint(station_address_json),
+    alias_address: decode_optional_scan_json_uint(alias_address_json),
+    vendor_id: decode_scan_json_uint(vendor_id_json),
+    product_code: decode_scan_json_uint(product_code_json),
+    revision: decode_scan_json_uint(revision_json),
+    serial: decode_scan_json_uint(serial_json),
+    identification: decode_scan_json_uint(identification_json),
+  }
+}
+
+///|
+fn decode_scan_json_int(json : Json) -> Int raise @hal.EcError {
+  let decoded : Int = @json.from_json(json) catch {
+    err =>
+      raise @hal.EcError::ConfigMismatch(
+        "scan JSON decode failed: " + err.to_string(),
+      )
+  }
+  decoded
+}
+
+///|
+fn decode_scan_json_uint(json : Json) -> UInt raise @hal.EcError {
+  let decoded : UInt = @json.from_json(json) catch {
+    err =>
+      raise @hal.EcError::ConfigMismatch(
+        "scan JSON decode failed: " + err.to_string(),
+      )
+  }
+  decoded
+}
+
+///|
+fn decode_optional_scan_json_uint(json : Json?) -> UInt? raise @hal.EcError {
+  match json {
+    None | Some(Null) => None
+    Some(value) => Some(decode_scan_json_uint(value))
+  }
+}
+
+///|
+fn resolve_replay_scan_report(
+  ndjson_text : String,
+  args : Array[String],
+  timeout : @hal.Duration,
+) -> @runtime.ScanReport raise @hal.EcError {
+  match flag_value(args, "--scan-json") {
+    Some(path) => load_scan_report_file(path)
+    None => {
+      let probe_log = @mock.NicEventLog::from_ndjson(ndjson_text)
+      let probe_nic = @mock.ReplayNic::from_log(probe_log)
+      let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
+        probe_nic, timeout,
+      )
+      probe_nic.close()
+      match scan_report_result {
+        Ok(report) => report
+        Err(_) => { slave_count: 0, slaves: [] }
+      }
+    }
+  }
+}
+
+///|
+fn empty_run_startup_preparation() -> @runtime.RunStartupPreparation {
+  {
+    pdo_ctx: @protocol.PdoContext::build([], 0U),
+    expected_wkc: 0U,
+    dc_cycle_period_ns: None,
+    startup_mailbox_plans: [],
+    esm_timeout_policies: [],
+    slave_preparations: None,
+  }
+}
+
+///|
 /// B-12: replay command — load NDJSON trace, replay through runtime, output verdict.
 fn run_replay_command(
   ndjson_text : String,
@@ -22,44 +155,67 @@ fn run_replay_command(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let log = @mock.NicEventLog::from_ndjson(ndjson_text)
-  // Two ReplayNics from same data: one for probe/scan, one for actual run
-  let probe_log = @mock.NicEventLog::from_ndjson(ndjson_text)
-  let probe_nic = @mock.ReplayNic::from_log(probe_log)
-  let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
-    probe_nic, timeout,
-  )
-  probe_nic.close()
-  let scan_report = match scan_report_result {
-    Ok(report) => report
-    Err(_) => { slave_count: 0, slaves: [] }
+  // Bound replay by the recording length so it terminates even when the
+  // captured run had no fault (and there are zero PDO mappings to drive a
+  // RecvTimeout-based recovery exit). `--cycles` overrides if provided.
+  let recording_len = log.len()
+  let default_cycles = if recording_len > 0 { recording_len } else { 1 }
+  let requested_cycles = require_int_flag(args, "--cycles", default_cycles)
+  let settings = if has_flag(args, "--until-fault") {
+    @runtime.RunLoopSettings::until_fault()
+  } else {
+    @runtime.RunLoopSettings::fixed_cycles(requested_cycles)
   }
-  let expected = expected_from_scan(scan_report)
-  let run_nic = @mock.ReplayNic::from_log(log)
-  let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let settings = @runtime.RunLoopSettings::until_fault()
   let startup_state = optional_esm_state_flag(
     args,
     "--startup-state",
     @protocol.Op,
   )
   let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
-  let run_report = @runtime.run_with_states_and_settings(
+  let scan_report = resolve_replay_scan_report(ndjson_text, args, timeout)
+  let expected = expected_from_scan(scan_report)
+  let run_nic = @mock.ReplayNic::from_log(log)
+  let startup_preparation_override = if target_requires_process_data_configuration(
+      startup_state,
+    ) {
+    resolve_run_startup_preparation_override(
+      run_nic, scan_report, args, timeout,
+    )
+  } else {
+    None
+  }
+  let preparation = match startup_preparation_override {
+    Some(prepared) => prepared
+    None => empty_run_startup_preparation()
+  }
+  let run_config = @runtime.master_config_with_optional_dc(
+    preparation.dc_cycle_period_ns,
+  )
+  let run_report = run_with_progress_output(
     run_nic,
-    @hal.MasterConfig::default(),
+    Some(scan_report),
+    run_config,
     expected,
-    pdo_ctx,
-    0U,
+    preparation.pdo_ctx,
+    preparation.expected_wkc,
     settings,
     startup_state,
     shutdown_state,
+    startup_preparation_override,
+    Silent,
     timeout,
   )
+  let remaining_events = run_nic.remaining()
   run_nic.close()
   let verdict = derive_run_verdict(run_report)
   if as_json {
-    println(replay_report_json(run_report, verdict).stringify(indent=2))
+    println(
+      replay_report_json(run_report, verdict, remaining_events).stringify(
+        indent=2,
+      ),
+    )
   } else {
-    println(replay_report_text(run_report, verdict))
+    println(replay_report_text(run_report, verdict, remaining_events))
   }
 }
 
@@ -76,20 +232,30 @@ fn derive_run_verdict(report : @runtime.RunReport) -> String {
 }
 
 ///|
-fn replay_report_json(report : @runtime.RunReport, verdict : String) -> Json {
+fn replay_report_json(
+  report : @runtime.RunReport,
+  verdict : String,
+  remaining_events : Int,
+) -> Json {
   Json::object({
     "command": Json::string("replay"),
     "verdict": Json::string(verdict),
+    "remaining_events": Json::number(remaining_events.to_double()),
     "run": run_report_json(report),
   })
 }
 
 ///|
-fn replay_report_text(report : @runtime.RunReport, verdict : String) -> String {
+fn replay_report_text(
+  report : @runtime.RunReport,
+  verdict : String,
+  remaining_events : Int,
+) -> String {
   let buf = @buffer.new(size_hint=256)
   buf.write_string("MoonECAT Replay Report\n")
   buf.write_string("======================\n")
   buf.write_string("Verdict: " + verdict + "\n")
+  buf.write_string("Remaining events: " + remaining_events.to_string() + "\n")
   buf.write_string(report.format())
   buf.to_string()
 }

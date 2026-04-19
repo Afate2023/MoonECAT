@@ -5,29 +5,55 @@ fn run_mock_command_with_fresh_nic(
   shutdown_state : @protocol.EsmState?,
   settings : @runtime.RunLoopSettings,
   progress_output : RunProgressOutput,
+  record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @mock.MockNic::new()
   let scan_report = @runtime.scan(probe_nic, timeout)
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
-  let run_nic = @mock.MockNic::new()
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
-  let run_report = run_with_progress_output(
-    run_nic,
-    None,
-    @hal.MasterConfig::default(),
-    expected,
-    pdo_ctx,
-    0U,
-    settings,
-    startup_state,
-    shutdown_state,
-    None,
-    progress_output,
-    timeout,
-  )
-  run_nic.close()
+  let run_report = match record_path {
+    None => {
+      let run_nic = @mock.MockNic::new()
+      let report = run_with_progress_output(
+        run_nic,
+        None,
+        @hal.MasterConfig::default(),
+        expected,
+        pdo_ctx,
+        0U,
+        settings,
+        startup_state,
+        shutdown_state,
+        None,
+        progress_output,
+        timeout,
+      )
+      run_nic.close()
+      report
+    }
+    Some(path) => {
+      let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+      let report = run_with_progress_output(
+        recorder,
+        None,
+        @hal.MasterConfig::default(),
+        expected,
+        pdo_ctx,
+        0U,
+        settings,
+        startup_state,
+        shutdown_state,
+        None,
+        progress_output,
+        timeout,
+      )
+      @hal.Nic::close(recorder)
+      write_recording_log(path, recorder.get_log(), scan_report)
+      report
+    }
+  }
   if as_json && progress_output != Ndjson {
     println(run_report_json(run_report).stringify(indent=2))
   } else if as_json {
@@ -46,6 +72,7 @@ fn run_native_command_with_fresh_nic(
   shutdown_state : @protocol.EsmState?,
   settings : @runtime.RunLoopSettings,
   progress_output : RunProgressOutput,
+  record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let probe_nic = @native.NativeNic::open_with_config(config)
@@ -84,21 +111,46 @@ fn run_native_command_with_fresh_nic(
   let run_config = @runtime.master_config_with_optional_dc(
     preparation.dc_cycle_period_ns,
   )
-  let run_report = run_with_progress_output(
-    run_nic,
-    Some(scan_report),
-    run_config,
-    expected,
-    preparation.pdo_ctx,
-    preparation.expected_wkc,
-    settings,
-    startup_state,
-    shutdown_state,
-    startup_preparation_override,
-    progress_output,
-    timeout,
-  )
-  run_nic.close()
+  let run_report = match record_path {
+    None => {
+      let report = run_with_progress_output(
+        run_nic,
+        Some(scan_report),
+        run_config,
+        expected,
+        preparation.pdo_ctx,
+        preparation.expected_wkc,
+        settings,
+        startup_state,
+        shutdown_state,
+        startup_preparation_override,
+        progress_output,
+        timeout,
+      )
+      run_nic.close()
+      report
+    }
+    Some(path) => {
+      let recorder = @mock.RecordingNicAdapter::wrap(run_nic)
+      let report = run_with_progress_output(
+        recorder,
+        Some(scan_report),
+        run_config,
+        expected,
+        preparation.pdo_ctx,
+        preparation.expected_wkc,
+        settings,
+        startup_state,
+        shutdown_state,
+        startup_preparation_override,
+        progress_output,
+        timeout,
+      )
+      @hal.Nic::close(recorder)
+      write_recording_log(path, recorder.get_log(), scan_report)
+      report
+    }
+  }
   if as_json && progress_output != Ndjson {
     println(run_report_json(run_report).stringify(indent=2))
   } else if as_json {
@@ -272,6 +324,7 @@ fn run_virtual_command(
   shutdown_state : @protocol.EsmState?,
   settings : @runtime.RunLoopSettings,
   progress_output : RunProgressOutput,
+  record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_content)
@@ -308,21 +361,46 @@ fn run_virtual_command(
     Some(p) => @runtime.master_config_with_optional_dc(p.dc_cycle_period_ns)
     None => @hal.MasterConfig::default()
   }
-  let run_report = run_with_progress_output(
-    nic,
-    Some(scan_report),
-    run_config,
-    expected,
-    pdo_ctx,
-    expected_wkc,
-    settings,
-    startup_state,
-    shutdown_state,
-    startup_preparation,
-    progress_output,
-    timeout,
-  )
-  nic.close()
+  let run_report = match record_path {
+    None => {
+      let report = run_with_progress_output(
+        nic,
+        Some(scan_report),
+        run_config,
+        expected,
+        pdo_ctx,
+        expected_wkc,
+        settings,
+        startup_state,
+        shutdown_state,
+        startup_preparation,
+        progress_output,
+        timeout,
+      )
+      nic.close()
+      report
+    }
+    Some(path) => {
+      let recorder = @mock.RecordingNicAdapter::wrap(nic)
+      let report = run_with_progress_output(
+        recorder,
+        Some(scan_report),
+        run_config,
+        expected,
+        pdo_ctx,
+        expected_wkc,
+        settings,
+        startup_state,
+        shutdown_state,
+        startup_preparation,
+        progress_output,
+        timeout,
+      )
+      @hal.Nic::close(recorder)
+      write_recording_log(path, recorder.get_log(), scan_report)
+      report
+    }
+  }
   if as_json && progress_output != Ndjson {
     println(run_report_json(run_report).stringify(indent=2))
   } else if as_json {
@@ -453,6 +531,29 @@ fn target_requires_process_data_configuration(
   target : @protocol.EsmState,
 ) -> Bool {
   target is @protocol.SafeOp || target is @protocol.Op
+}
+
+///|
+/// Write a captured NicEventLog to disk as NDJSON with a header line carrying
+/// scan-derived metadata so consumers can sanity-check the trace before replay.
+fn write_recording_log(
+  path : String,
+  log : @mock.NicEventLog,
+  scan_report : @runtime.ScanReport,
+) -> Unit raise @hal.EcError {
+  let fingerprint = @runtime.topology_fingerprint(scan_report)
+  let ndjson = log.to_ndjson_with_header(
+    slave_count=scan_report.slave_count,
+    fingerprint=fingerprint.to_string(),
+  )
+  let result : Result[Unit, Error] = try? @fs.write_string_to_file(path, ndjson)
+  match result {
+    Ok(_) => ()
+    Err(err) =>
+      raise @hal.EcError::ConfigMismatch(
+        "failed to write recording NDJSON " + path + ": " + err.to_string(),
+      )
+  }
 }
 
 ///|

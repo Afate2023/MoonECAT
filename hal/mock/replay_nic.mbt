@@ -29,12 +29,22 @@ pub impl @hal.Nic for ReplayNic with open_(name) {
 }
 
 ///|
-pub impl @hal.Nic for ReplayNic with send(self, _data) {
+pub impl @hal.Nic for ReplayNic with send(self, data) {
   if self.cursor >= self.log.len() {
     raise @hal.EcError::SendFailed("replay log exhausted")
   }
   match self.log.events[self.cursor] {
-    Sent(_recorded, n) => {
+    Sent(recorded, n) => {
+      if recorded != data {
+        raise @hal.EcError::SendFailed(
+          "replay send mismatch at cursor " +
+          self.cursor.to_string() +
+          ": recorded_len=" +
+          recorded.length().to_string() +
+          ", actual_len=" +
+          data.length().to_string(),
+        )
+      }
       self.cursor += 1
       n
     }

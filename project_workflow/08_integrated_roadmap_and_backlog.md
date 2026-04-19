@@ -92,6 +92,9 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L3-16 | 零拷贝 PDO CLI 命令 `run-zc`（Mock + Native 后端） | M8 | `6814e4e` |
 | L3-17 | 主站对象字典浏览 `master-od` CLI 命令 | M8 | `6814e4e` |
 | L3-18 | 虚拟从站模板路线 B-15（ESI JSON → VirtualSlaveTemplate → run-virtual） | M8 | `7740e82` |
+| L3-19 | EoE 库层交付（帧编解码 + Virtual Switch 引擎 + 异步桥；Native Library L3 验收范围内） | M8 | `mailbox/eoe.mbt` / `mailbox/eoe_switch.mbt` / `mailbox/eoe_endpoint.mbt` / `mailbox/eoe_relay.mbt` / `mailbox/eoe_async/` |
+| L3-20 | FoE 库层交付（帧编解码 + download/upload FP+AP 多包事务 + RMSM 计数 + Busy 重试；Native Library L3 验收范围内） | M8 | `mailbox/foe.mbt` / `protocol/foe_transaction.mbt` / `protocol/integration_test.mbt` |
+| L3-21 | 真机回归 + NDJSON→Replay 闭环验证脚本（`scripts/regression-real-device.ps1` + `scripts/replay-diff.ps1` + `RecordingNicAdapter[N]` + `run --record`） | M8 | `hal/mock/recording_nic_adapter.mbt` / `cmd/main/run_commands.mbt` / `cmd/main/analysis_commands.mbt` |
 
 ### L4 — Verification & Hardening ⚠️ 部分完成
 

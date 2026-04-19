@@ -2120,6 +2120,43 @@ test "cli startup trace report text includes phase snapshots" {
 }
 
 ///|
+test "parse scan report json roundtrip" {
+  let report : @runtime.ScanReport = {
+    slave_count: 1,
+    slaves: [
+      {
+        position: 0,
+        station_address: 4097U,
+        alias_address: Some(0U),
+        vendor_id: 0x00556326U,
+        product_code: 40200U,
+        revision: 2025070500U,
+        serial: 0U,
+        identification: 0U,
+      },
+    ],
+  }
+  let json = @json.parse(scan_report_json(report).stringify(indent=2)[:]) catch {
+    _ => panic()
+  }
+  assert_eq(parse_scan_report_json(json), report)
+}
+
+///|
+test "parse scan report json rejects invalid shape" {
+  let json = @json.parse("{}"[:]) catch { _ => panic() }
+  let mut caught = false
+  ignore(parse_scan_report_json(json)) catch {
+    @hal.EcError::ConfigMismatch(msg) => {
+      assert_true(msg.contains("scan JSON decode failed"))
+      caught = true
+    }
+    _ => ()
+  }
+  assert_true(caught)
+}
+
+///|
 test "cli run report json includes shared surface telemetry" {
   let report : @runtime.RunReport = {
     scan: { slave_count: 0, slaves: [] },

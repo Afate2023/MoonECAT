@@ -221,10 +221,12 @@ fn try_handle_run_cli_command(
       @protocol.Op,
     )
     let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
+    let record_path = flag_value(args, "--record")
     match backend {
       Mock =>
         run_mock_command_with_fresh_nic(
-          as_json, startup_state, shutdown_state, settings, progress_output, timeout,
+          as_json, startup_state, shutdown_state, settings, progress_output, record_path,
+          timeout,
         )
       _ =>
         run_native_command_with_fresh_nic(
@@ -235,6 +237,7 @@ fn try_handle_run_cli_command(
           shutdown_state,
           settings,
           progress_output,
+          record_path,
           timeout,
         )
     }
@@ -278,9 +281,10 @@ fn try_handle_run_cli_command(
       @protocol.Op,
     )
     let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
+    let record_path = flag_value(args, "--record")
     run_virtual_command(
       json_content, as_json, startup_state, shutdown_state, settings, progress_output,
-      timeout,
+      record_path, timeout,
     )
     return true
   }

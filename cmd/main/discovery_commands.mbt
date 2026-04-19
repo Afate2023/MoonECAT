@@ -51,7 +51,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|run-zc|run-virtual|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--trace <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
+    "Usage: moonecat <list-if|scan|validate|run|run-zc|run-virtual|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--record <path>] [--trace <path>] [--scan-json <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path --esi-json sample.esi.json --force-pdo-remap --json",
@@ -122,7 +122,9 @@ fn print_usage() -> Unit {
   println(
     "  moon run cmd/main startup-trace -- --backend native --if <interface> --station 4097 --esi-json sample.esi.json --device-index 0 --reset-init --json",
   )
-  println("  moon run cmd/main replay -- --trace session.ndjson --json")
+  println(
+    "  moon run cmd/main replay -- --trace session.ndjson --scan-json 02-scan.json --startup-state preop --shutdown-state init --cycles 200 --json",
+  )
   println(
     "  moon run cmd/main scenario -- --scenario basic-timeout --cycles 200 --json",
   )
