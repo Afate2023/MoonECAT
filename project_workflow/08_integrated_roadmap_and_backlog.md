@@ -117,6 +117,19 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 
 ## 3. 三条主线路线图
 
+### 当前物理包映射
+
+为避免 `runtime/` 根包继续承载 analysis / simulation / HIL 的实现细节，当前代码布局按主线职责收口为以下物理边界：
+
+| 包路径 | 对齐主线 | 当前职责 |
+|---|---|---|
+| `runtime/` | 主线 A + 主线 B | 运行时编排、Native/Verification 产品面、diagnostic/replay/monitor/fault/report/CLI 直接消费的根运行时能力 |
+| `runtime/analysis/` | ME Analysis Engine | 抖动剖析、PDO auto-tune、拓扑健康、周期性能、通信质量评分 |
+| `runtime/simulation/` | 主线 C | ProcessImage 分区、多速率调度、时基同步、漂移补偿、co-sim 适配与零拷贝切片辅助 |
+| `runtime/hil/` | 主线 C | CycleHook / HilSession / HilCycleHook / HIL JSON 导出等通信闭环边界 |
+
+约束：新实现优先落到对应子包；`runtime/` 根包仅保留 orchestration 与被主线 A/B 直接消费的共享表面，不再回填 analysis/simulation/hil 的 facade 型重复实现。
+
 ### 主线 A：Native Runtime Baseline（P0 优先级）
 
 目标：把 Windows Npcap 与 Linux Raw Socket 收敛成同一 Native HAL 合同，形成稳定实机闭环与运行证据。

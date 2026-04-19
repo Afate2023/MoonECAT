@@ -84,11 +84,13 @@ pub fn hil_session_to_json(session : HilSession) -> String {
 }
 
 ///|
-fn step_result_to_parts(result : SimStepResult) -> (String, String, Int64) {
+fn step_result_to_parts(
+  result : @simulation.SimStepResult,
+) -> (String, String, Int64) {
   match result {
-    Ok(st) => ("ok", "", st.to_ns())
-    Terminated(reason) => ("terminated", reason, 0L)
-    Error(msg) => ("error", msg, 0L)
+    @simulation.SimStepResult::Ok(st) => ("ok", "", st.to_ns())
+    @simulation.SimStepResult::Terminated(reason) => ("terminated", reason, 0L)
+    @simulation.SimStepResult::Error(msg) => ("error", msg, 0L)
   }
 }
 
@@ -127,12 +129,12 @@ pub fn hil_session_summary(session : HilSession) -> HilSessionSummary {
   let mut final_time = 0L
   for step in session.step_log {
     match step {
-      Ok(st) => {
+      @simulation.SimStepResult::Ok(st) => {
         ok = ok + 1
         final_time = st.to_ns()
       }
-      Terminated(_) => ok = ok + 1
-      Error(_) => err = err + 1
+      @simulation.SimStepResult::Terminated(_) => ok = ok + 1
+      @simulation.SimStepResult::Error(_) => err = err + 1
     }
   }
   {

@@ -5,19 +5,16 @@ import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
+  "afate/MoonECAT/runtime/hil",
   "moonbitlang/core/debug",
 }
 
 // Values
-pub fn analyze_multi_rate(TaskSchedule) -> MultiRateAnalysis
-
 pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
 
 pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
-
-pub fn average_probe(Array[ProbeResult]) -> ProbeResult
 
 pub fn[N : @hal.Nic] bridge_eoe_cycle(EoeSwitch, QueueEndpoint, N, @hal.Duration) -> (Int, Int)
 
@@ -25,15 +22,7 @@ pub fn build_master_od(MasterIdentity, ScanReport?, Telemetry?, DiagnosticSurfac
 
 pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
-pub fn build_task_schedule(Int64, Array[TaskDescriptor]) -> TaskSchedule?
-
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
-
-pub fn compute_probe_result(UInt, Int64, Int64, Int64) -> ProbeResult
-
-pub fn compute_quality_score(Array[QualityDimension]) -> (Int, Array[(String, Int)])
-
-pub fn compute_sync_offsets(AutoTuneConfig, ProbeResult) -> SyncOffsetRecommendation
 
 pub fn configuration_from_eni_json(String) -> ConfigurationModel raise @hal.EcError
 
@@ -45,11 +34,7 @@ pub fn configuration_to_eni_json(ConfigurationModel) -> Json
 
 pub fn configuration_to_eni_json_string(ConfigurationModel, indent? : Int) -> String
 
-pub fn cycle_timing_report(Int64, Int64, Int64, ClockDomain) -> CycleTimingReport
-
 pub fn dc_cycle_period_ns(@mailbox.SiiDcClock) -> Int64?
-
-pub fn decode_step_response(Bytes, Int) -> (Byte, Bytes)
 
 pub fn default_master_identity() -> MasterIdentity
 
@@ -63,8 +48,6 @@ pub fn diagnostic_surface_from_state_transition(UInt?, @protocol.EsmState, @prot
 
 pub fn diagnostic_surface_from_validate(ScanReport, ValidateReport) -> DiagnosticSurface
 
-pub fn encode_step_request(Int64, Int64, Bytes, Int) -> Bytes
-
 pub fn enrich_surface_with_fingerprint(DiagnosticSurface, TopologyFingerprint) -> DiagnosticSurface
 
 pub fn enrich_surface_with_monitors(DiagnosticSurface, Array[MonitorResult], Verdict) -> DiagnosticSurface
@@ -73,15 +56,7 @@ pub fn eoe_max_fragment_size(@mailbox.MailboxConfig) -> Int
 
 pub fn esi_json_to_string(EsiJsonDocument, indent? : Int) -> String
 
-pub fn estimate_cable_length(Int64) -> Double
-
 pub fn fingerprint_match(TopologyFingerprint, TopologyFingerprint) -> TopologyFingerprintMatch
-
-pub fn grade_from_score(Int) -> LinkGrade
-
-pub fn hil_session_summary(HilSession) -> HilSessionSummary
-
-pub fn hil_session_to_json(HilSession) -> String
 
 pub fn master_config_with_optional_dc(Int64?) -> @hal.MasterConfig
 
@@ -109,8 +84,6 @@ pub fn parse_esi_json_document(String) -> EsiJsonDocument raise @hal.EcError
 
 pub fn parse_u32_payload(Bytes) -> UInt raise @hal.EcError
 
-pub fn partition_by_slave(@protocol.PdoContext) -> Array[(UInt, ProcessImageSlice)]
-
 pub fn plan_scan_station_addresses_with_strategy(Array[ObservedSlaveAddress], ScanStationAddressStrategy) -> Array[UInt] raise @hal.EcError
 
 pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
@@ -120,8 +93,6 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) ->
 pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(N, UInt, UInt, @hal.Duration) -> MailboxSession raise @hal.EcError
 
 pub fn[N : @hal.Nic] prepare_slave_startup(N, UInt, UInt, Int, @hal.Duration) -> SlaveStartupPreparation raise @hal.EcError
-
-pub fn quality_grade_from_score(Int) -> QualityGrade
 
 pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
@@ -138,8 +109,6 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_fp(N, UInt, Int, @hal.Duration) -> B
 pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
 pub fn[N : @hal.Nic] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
-
-pub fn read_slice_inputs(@protocol.ProcessImage, ProcessImageSlice) -> Bytes
 
 pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(N, UInt, UInt, SlaveStartupPreparation, @hal.Duration) -> SlaveStartupPreparation
 
@@ -179,17 +148,9 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> Sca
 
 pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
 
-pub fn score_dimension(QualityDimension) -> Int
-
-pub fn slice_from_mapping(@protocol.PdoMapping, @protocol.ProcessImage) -> ProcessImageSlice?
-
-pub fn slice_inputs_view(@hal.MutableProcessImage, ProcessImageSlice) -> (FixedArray[Byte], Int, Int)
-
 pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
 
 pub fn startup_preparation_from_esi_offline_report(EsiOfflineSiiReport, UInt) -> SlaveStartupPreparation
-
-pub fn tasks_due_at_cycle(TaskSchedule, Int64) -> Array[TaskDescriptor]
 
 pub fn topology_fingerprint(ScanReport) -> TopologyFingerprint
 
@@ -198,10 +159,6 @@ pub fn topology_fingerprint_from_config(ConfigurationModel) -> TopologyFingerpri
 pub fn validate(ScanReport, Array[@hal.SlaveConfig]) -> ValidateReport
 
 pub fn validate_configuration(ConfigurationModel, ConfigurationModel) -> ValidateReport
-
-pub fn validate_multi_rate(TaskSchedule, max_hyperperiod? : Int, max_tasks_per_cycle? : Int, max_io_bytes_per_cycle? : Int) -> Array[String]
-
-pub fn validate_recommendations(AutoTuneResult, Int64) -> Array[String]
 
 pub fn validation_difference_category(ConfigurationDifference) -> ValidateDifferenceCategory
 
@@ -215,84 +172,9 @@ pub fn[N : @hal.Nic] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.
 
 pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> Unit
-
-pub fn write_slice_outputs_inplace(@hal.MutableProcessImage, ProcessImageSlice, FixedArray[Byte], Int) -> Unit
-
 // Errors
 
 // Types and methods
-pub struct AutoTuneConfig {
-  probe_iterations : Int
-  probe_timeout_ns : Int64
-  strategy : TuningStrategy
-  cycle_time_ns : Int64
-  sync0_base_offset_ns : Int64
-  sync1_enabled : Bool
-  sync1_delta_ns : Int64
-  safety_margin_permille : Int
-}
-pub fn AutoTuneConfig::aggressive() -> Self
-pub fn AutoTuneConfig::conservative() -> Self
-pub fn AutoTuneConfig::default() -> Self
-
-pub struct AutoTuneResult {
-  recommendations : Array[SyncOffsetRecommendation]
-  probe_data : Array[ProbeResult]
-  reference_station : UInt
-  measurement_duration_ns : Int64
-  success : Bool
-  messages : Array[String]
-}
-pub fn AutoTuneResult::to_json(Self) -> String
-
-pub(all) enum BridgeState {
-  Disconnected
-  Connected
-  Terminated(String)
-  Error(String)
-} derive(Eq, @debug.Debug)
-pub fn BridgeState::to_string(Self) -> String
-pub impl Show for BridgeState
-
-pub(all) enum BridgeTransport {
-  UnixSocket(String)
-  NamedPipe(String)
-  SharedMemory(name~ : String, size~ : Int)
-} derive(@debug.Debug)
-pub fn BridgeTransport::to_string(Self) -> String
-pub impl Show for BridgeTransport
-
-pub(all) enum ClockDomain {
-  Mcu
-  Linux
-  Fpga
-  Virtual
-} derive(Eq, @debug.Debug)
-pub fn ClockDomain::to_string(Self) -> String
-pub impl Show for ClockDomain
-
-pub(all) struct CoSimConfig {
-  cycle_period_ns : Int64
-  slave_count : Int
-  output_size : Int
-  input_size : Int
-} derive(Eq, @debug.Debug)
-pub fn CoSimConfig::to_string(Self) -> String
-pub impl Show for CoSimConfig
-
-pub struct CommQualityScorer {
-  history : Array[Int]
-  mut history_pos : Int
-  history_size : Int
-  mut prev_window_avg : Int
-  mut sample_count : Int64
-}
-pub fn CommQualityScorer::new(history_size? : Int) -> Self
-pub fn CommQualityScorer::record_score(Self, Int) -> Unit
-pub fn CommQualityScorer::score_from_telemetry(Self, Int64, Int64, Int64, Int64, jitter_p99_abs_ns? : Int64, nominal_period_ns? : Int64) -> QualityScore
-pub fn CommQualityScorer::trend(Self) -> QualityTrend
-
 pub(all) struct ConfigurationComparisonReport {
   expected_source : ConfigurationSource
   actual_source : ConfigurationSource
@@ -379,119 +261,6 @@ pub(all) struct ConfigurationSurfaceSummary {
 pub fn ConfigurationSurfaceSummary::to_string(Self) -> String
 pub impl Show for ConfigurationSurfaceSummary
 
-pub(all) enum CycleDirective {
-  Continue
-  SkipCycle
-  StopGraceful
-} derive(Eq, @debug.Debug)
-pub fn CycleDirective::to_string(Self) -> String
-pub impl Show for CycleDirective
-
-pub struct CyclePerfAnalyzer {
-  nominal_period_ns : Int64
-  deadline_tolerance_ns : Int64
-  histogram : JitterHistogram
-  mut total_cycles : Int64
-  mut min_ns : Int64
-  mut max_ns : Int64
-  mut sum_ns : Int64
-  mut sum_sq_ns : Int64
-  mut deadline_misses : Int64
-  mut total_tx : Int64
-  mut total_rx : Int64
-  mut last_ts : Int64
-  mut started : Bool
-  window : Array[Int64]
-  mut window_pos : Int
-  window_size : Int
-  mut prev_window_mean : Int64
-}
-pub fn CyclePerfAnalyzer::new(Int64, deadline_tolerance_ns? : Int64, window_size? : Int, histogram_bin_width? : Int64, histogram_bins? : Int) -> Self
-pub fn CyclePerfAnalyzer::record(Self, Int64, tx_frames? : Int, rx_frames? : Int) -> Unit
-pub fn CyclePerfAnalyzer::record_duration(Self, Int64) -> Unit
-pub fn CyclePerfAnalyzer::reset(Self) -> Unit
-pub fn CyclePerfAnalyzer::stats(Self) -> CyclePerfStats
-pub fn CyclePerfAnalyzer::trend(Self) -> PerfTrend
-
-pub(all) struct CyclePerfSample {
-  cycle : Int64
-  duration_ns : Int64
-  deadline_miss : Bool
-  tx_frames : Int
-  rx_frames : Int
-}
-
-pub(all) struct CyclePerfStats {
-  total_cycles : Int64
-  min_ns : Int64
-  max_ns : Int64
-  mean_ns : Int64
-  stddev_ns : Int64
-  deadline_misses : Int64
-  deadline_miss_rate_permille : Int
-  total_tx : Int64
-  total_rx : Int64
-  p50_ns : Int64
-  p95_ns : Int64
-  p99_ns : Int64
-}
-pub fn CyclePerfStats::to_json(Self) -> String
-
-pub(all) struct CycleResult {
-  wkc : UInt
-  expected_wkc : UInt
-  ok : Bool
-} derive(Eq, @debug.Debug)
-pub fn CycleResult::to_string(Self) -> String
-pub impl Show for CycleResult
-
-pub(all) struct CycleSnapshot {
-  cycle : Int64
-  result : CycleResult?
-  dc_state : DcState
-  recovery_pending : Bool
-} derive(@debug.Debug)
-pub fn CycleSnapshot::to_string(Self) -> String
-pub impl Show for CycleSnapshot
-
-pub(all) struct CycleTimingReport {
-  nominal_period_ns : Int64
-  actual_period_ns : Int64
-  jitter_ns : Int64
-  domain : ClockDomain
-} derive(Eq, @debug.Debug)
-pub fn CycleTimingReport::to_string(Self) -> String
-pub impl Show for CycleTimingReport
-
-pub struct DcJitterProfiler {
-  nominal_period_ns : Int64
-  histogram : JitterHistogram
-  recent_samples : Array[JitterSample]
-  mut write_pos : Int
-  mut count : Int64
-  mut min_dev : Int64
-  mut max_dev : Int64
-  mut sum_dev : Int64
-  mut sum_sq_dev : Int64
-  mut last_timestamp_ns : Int64
-  mut started : Bool
-}
-pub fn DcJitterProfiler::is_within_tolerance(Self, Int64, Int64) -> Bool
-pub fn DcJitterProfiler::new(Int64, bin_width? : Int64, num_bins? : Int, recent_capacity? : Int) -> Self
-pub fn DcJitterProfiler::record_timestamp(Self, Int64) -> Unit
-pub fn DcJitterProfiler::reset(Self) -> Unit
-pub fn DcJitterProfiler::stats(Self) -> JitterStats
-pub fn DcJitterProfiler::to_json(Self) -> String
-
-pub(all) enum DcState {
-  Disabled
-  Measuring
-  Locked
-  Drifting(Int64)
-} derive(@debug.Debug)
-pub fn DcState::to_string(Self) -> String
-pub impl Show for DcState
-
 pub(all) struct DiagnosisSession {
   original_state : @protocol.EsmState
   observed_state : @protocol.EsmState?
@@ -558,53 +327,6 @@ pub(all) struct DiagnosticSurface {
 } derive(Eq, @debug.Debug)
 pub fn DiagnosticSurface::to_string(Self) -> String
 pub impl Show for DiagnosticSurface
-
-pub(all) struct DomainTimestamp {
-  domain : ClockDomain
-  ns : Int64
-} derive(Eq, @debug.Debug)
-pub fn DomainTimestamp::to_string(Self) -> String
-pub impl Show for DomainTimestamp
-
-pub(all) struct DriftCompensationGains {
-  kp_num : Int64
-  kp_den : Int64
-  ki_num : Int64
-  ki_den : Int64
-} derive(Eq, @debug.Debug)
-pub fn DriftCompensationGains::aggressive() -> Self
-pub fn DriftCompensationGains::conservative() -> Self
-pub fn DriftCompensationGains::default() -> Self
-pub fn DriftCompensationGains::to_string(Self) -> String
-pub impl Show for DriftCompensationGains
-
-pub(all) struct DriftCompensationReport {
-  update_count : Int64
-  last_error_ns : Int64
-  integral_error_ns : Int64
-  total_correction_ns : Int64
-  estimated_drift_ppb : Int64
-  converged : Bool
-} derive(@debug.Debug)
-pub fn DriftCompensationReport::to_string(Self) -> String
-pub impl Show for DriftCompensationReport
-
-pub(all) struct DriftCompensator {
-  gains : DriftCompensationGains
-  target_offset_ns : Int64
-  mut integral_error_ns : Int64
-  mut last_error_ns : Int64
-  mut total_correction_ns : Int64
-  mut update_count : Int64
-  max_integral_ns : Int64
-  mut active : Bool
-} derive(@debug.Debug)
-pub fn DriftCompensator::compensate(Self, TimebaseSync, Int64, Int64) -> Int64
-pub fn DriftCompensator::new(gains? : DriftCompensationGains, target_offset_ns? : Int64, max_integral_ns? : Int64) -> Self
-pub fn DriftCompensator::report(Self, TimebaseSync) -> DriftCompensationReport
-pub fn DriftCompensator::reset(Self) -> Unit
-pub fn DriftCompensator::to_string(Self) -> String
-pub impl Show for DriftCompensator
 
 pub(all) struct EoeEndpointFrame {
   station : UInt
@@ -830,111 +552,6 @@ pub(all) struct EsiOfflineSiiReport {
   categories : Array[@mailbox.SiiCategoryEntry]
 }
 
-pub(all) struct ExternalBridgeConfig {
-  transport : BridgeTransport
-  step_timeout_ns : Int64
-  auto_launch : Bool
-  launch_command : String
-  launch_cwd : String
-} derive(@debug.Debug)
-pub fn ExternalBridgeConfig::named_pipe(String) -> Self
-pub fn ExternalBridgeConfig::shared_memory(String, Int) -> Self
-pub fn ExternalBridgeConfig::to_string(Self) -> String
-pub fn ExternalBridgeConfig::unix_socket(String) -> Self
-pub impl Show for ExternalBridgeConfig
-
-pub(all) struct ExternalProcessBridge {
-  config : ExternalBridgeConfig
-  mut state : BridgeState
-  mut output_size : Int
-  mut input_size : Int
-  mut step_count : Int64
-  mut total_latency_ns : Int64
-} derive(@debug.Debug)
-pub fn ExternalProcessBridge::avg_latency_ns(Self) -> Int64
-pub fn ExternalProcessBridge::new(ExternalBridgeConfig) -> Self
-pub fn ExternalProcessBridge::to_string(Self) -> String
-pub impl Show for ExternalProcessBridge
-
-pub(all) struct HilCycleHook[A] {
-  adapter : A
-  session : HilSession
-}
-pub fn[A] HilCycleHook::new(A, HilSession) -> Self[A]
-pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A]
-
-pub(all) struct HilSession {
-  mut sim_time : SimTime
-  cycle_period_ns : Int64
-  schedule : TaskSchedule
-  step_log : Array[SimStepResult]
-  mut terminated : Bool
-  mut termination_reason : String
-}
-pub fn HilSession::get_sim_time(Self) -> SimTime
-pub fn HilSession::get_termination_reason(Self) -> String
-pub fn HilSession::is_terminated(Self) -> Bool
-pub fn HilSession::new(Int64, TaskSchedule) -> Self
-pub fn HilSession::step_count(Self) -> Int
-
-pub(all) struct HilSessionSummary {
-  total_steps : Int
-  ok_steps : Int
-  error_steps : Int
-  terminated : Bool
-  termination_reason : String
-  final_sim_time_ns : Int64
-} derive(@debug.Debug)
-pub fn HilSessionSummary::to_string(Self) -> String
-pub impl Show for HilSessionSummary
-
-pub struct JitterHistogram {
-  bin_width : Int64
-  center_index : Int
-  counts : Array[Int64]
-  mut total : Int64
-  range_min_ns : Int64
-  range_max_ns : Int64
-}
-pub fn JitterHistogram::new(bin_width? : Int64, num_bins? : Int) -> Self
-pub fn JitterHistogram::percentile(Self, Int) -> Int64
-pub fn JitterHistogram::record(Self, Int64) -> Unit
-
-pub struct JitterSample {
-  cycle : Int64
-  actual_ns : Int64
-  deviation_ns : Int64
-}
-
-pub struct JitterStats {
-  count : Int64
-  min_ns : Int64
-  max_ns : Int64
-  sum_ns : Int64
-  sum_sq_ns : Int64
-  mean_ns : Int64
-  p50_ns : Int64
-  p95_ns : Int64
-  p99_ns : Int64
-  peak_to_peak_ns : Int64
-}
-
-pub enum LinkGrade {
-  Excellent
-  Good
-  Fair
-  Poor
-  Critical
-} derive(Eq, @debug.Debug)
-pub fn LinkGrade::to_string(Self) -> String
-pub impl Show for LinkGrade
-
-pub struct LoopbackCoSimAdapter {
-  mut sim_time : SimTime
-}
-pub fn LoopbackCoSimAdapter::new() -> Self
-pub impl CoSimAdapter for LoopbackCoSimAdapter
-
 pub(all) struct MailboxSession {
   original_state : @protocol.EsmState
   mailbox_config : @mailbox.MailboxConfig
@@ -1022,31 +639,6 @@ pub(all) struct MonitorResult {
 pub fn MonitorResult::to_string(Self) -> String
 pub impl Show for MonitorResult
 
-pub struct MultiChannelJitterProfiler {
-  channels : Array[(String, DcJitterProfiler)]
-}
-pub fn MultiChannelJitterProfiler::add_channel(Self, String, Int64, bin_width? : Int64) -> Unit
-pub fn MultiChannelJitterProfiler::new() -> Self
-pub fn MultiChannelJitterProfiler::record(Self, Int, Int64) -> Unit
-pub fn MultiChannelJitterProfiler::summary_json(Self) -> String
-
-pub(all) struct MultiRateAnalysis {
-  hyperperiod : Int
-  worst_case_tasks_per_cycle : Int
-  peak_cycles : Array[Int]
-  is_harmonic : Bool
-  worst_case_output_bytes : Int
-  worst_case_input_bytes : Int
-} derive(@debug.Debug)
-pub fn MultiRateAnalysis::to_string(Self) -> String
-pub impl Show for MultiRateAnalysis
-
-pub struct NullCycleHook {
-  _unused : Unit
-}
-pub fn NullCycleHook::new() -> Self
-pub impl CycleHook for NullCycleHook
-
 pub struct NullRunProgressSink {
   _unused : Unit
 }
@@ -1063,74 +655,6 @@ pub impl Show for ObservedSlaveAddress
 type OperationalStartupStep derive(Eq, @debug.Debug)
 pub fn OperationalStartupStep::to_string(Self) -> String
 pub impl Show for OperationalStartupStep
-
-pub struct PdoAutoTuner {
-  config : AutoTuneConfig
-  probe_history : Array[Array[ProbeResult]]
-  mut result : AutoTuneResult?
-}
-pub fn PdoAutoTuner::analyze(Self, Array[UInt], Array[Array[ProbeResult]]) -> AutoTuneResult
-pub fn PdoAutoTuner::new(config? : AutoTuneConfig) -> Self
-
-pub enum PerfTrend {
-  Stable
-  Improving
-  Degrading
-} derive(Eq, @debug.Debug)
-pub fn PerfTrend::to_string(Self) -> String
-pub impl Show for PerfTrend
-
-pub struct ProbeResult {
-  station : UInt
-  forward_delay_ns : Int64
-  reverse_delay_ns : Int64
-  round_trip_ns : Int64
-  recv_time_port0 : Int64
-  recv_time_port1 : Int64
-}
-
-pub(all) struct ProcessImageSlice {
-  output_offset : Int
-  output_length : Int
-  input_offset : Int
-  input_length : Int
-} derive(Eq, @debug.Debug)
-pub fn ProcessImageSlice::to_string(Self) -> String
-pub impl Show for ProcessImageSlice
-
-pub(all) struct QualityDimension {
-  name : String
-  value : Int64
-  good_threshold : Int64
-  bad_threshold : Int64
-  weight : Int
-}
-
-pub enum QualityGrade {
-  Excellent
-  Good
-  Acceptable
-  Poor
-  Critical
-} derive(Eq, @debug.Debug)
-pub fn QualityGrade::to_string(Self) -> String
-pub impl Show for QualityGrade
-
-pub(all) struct QualityScore {
-  overall : Int
-  dimensions : Array[(String, Int)]
-  trend : QualityTrend
-  grade : QualityGrade
-}
-pub fn QualityScore::to_json(Self) -> String
-
-pub enum QualityTrend {
-  Improving
-  Stable
-  Degrading
-} derive(Eq, @debug.Debug)
-pub fn QualityTrend::to_string(Self) -> String
-pub impl Show for QualityTrend
 
 pub(all) struct QueueEndpoint {
   tx_pending : Array[EoeEndpointFrame]
@@ -1248,7 +772,7 @@ pub(all) struct Runtime {
   mut consecutive_wkc_errors : Int
   mut max_consecutive_timeouts : Int
   mut consecutive_timeouts : Int
-  mut dc_state : DcState
+  mut dc_state : @hil.DcState
   mut dc_reference_station : UInt?
   mut dc_stations : Array[UInt]
   mut dc_cycle_counter : Int
@@ -1264,7 +788,7 @@ pub fn Runtime::new(@hal.MasterConfig) -> Self
 pub fn Runtime::record_retry(Self) -> Unit
 pub fn Runtime::record_timeout(Self) -> Unit
 pub fn Runtime::reset_error_counter(Self) -> Unit
-pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> CycleResult raise @hal.EcError
+pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> @hil.CycleResult raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(Self, N, Int, @hal.Duration, Int?) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(Self, N, Int, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
@@ -1316,24 +840,6 @@ pub(all) enum ScanStationAddressStrategy {
 pub fn ScanStationAddressStrategy::to_string(Self) -> String
 pub impl Show for ScanStationAddressStrategy
 
-pub(all) enum SimStepResult {
-  Ok(SimTime)
-  Terminated(String)
-  Error(String)
-} derive(Eq, @debug.Debug)
-pub fn SimStepResult::to_string(Self) -> String
-pub impl Show for SimStepResult
-
-pub(all) struct SimTime(Int64) derive(Compare, Eq, @debug.Debug)
-pub fn SimTime::advance(Self, Int64) -> Self
-pub fn SimTime::from_ns(Int64) -> Self
-#deprecated
-pub fn SimTime::inner(Self) -> Int64
-pub fn SimTime::to_ns(Self) -> Int64
-pub fn SimTime::to_string(Self) -> String
-pub fn SimTime::zero() -> Self
-pub impl Show for SimTime
-
 pub(all) struct SlaveDiagnosis {
   station_address : UInt
   al_state : @protocol.EsmState?
@@ -1345,30 +851,6 @@ pub(all) struct SlaveDiagnosis {
 } derive(Eq, @debug.Debug)
 pub fn SlaveDiagnosis::to_string(Self) -> String
 pub impl Show for SlaveDiagnosis
-
-pub(all) struct SlaveHealthAccumulator {
-  station : UInt
-  position : Int
-  propagation_delay_ns : Int64
-  mut tx_frames : Int64
-  mut rx_frames : Int64
-  mut timeouts : Int64
-  mut wkc_errors : Int64
-}
-
-pub(all) struct SlaveHealthSnapshot {
-  station : UInt
-  position : Int
-  propagation_delay_ns : Int64
-  estimated_cable_length_m : Double
-  tx_frames : Int64
-  rx_frames : Int64
-  timeouts : Int64
-  wkc_errors : Int64
-  loss_rate_permille : Int
-  health_score : Int
-  grade : LinkGrade
-}
 
 pub(all) struct SlaveReport {
   position : Int
@@ -1451,30 +933,6 @@ pub(all) struct StationStartupMailboxPlan {
 pub fn StationStartupMailboxPlan::to_string(Self) -> String
 pub impl Show for StationStartupMailboxPlan
 
-pub struct SyncOffsetRecommendation {
-  station : UInt
-  sync0_offset_ns : Int64
-  sync1_offset_ns : Int64
-  sync0_cycle_ns : Int64
-  propagation_delay_ns : Int64
-}
-
-pub(all) struct TaskDescriptor {
-  name : String
-  priority : Int
-  cycle_divisor : Int
-  slice : ProcessImageSlice
-} derive(Eq, @debug.Debug)
-pub fn TaskDescriptor::to_string(Self) -> String
-pub impl Show for TaskDescriptor
-
-pub(all) struct TaskSchedule {
-  base_period_ns : Int64
-  tasks : Array[TaskDescriptor]
-} derive(Eq, @debug.Debug)
-pub fn TaskSchedule::to_string(Self) -> String
-pub impl Show for TaskSchedule
-
 pub(all) struct Telemetry {
   mut cycles : Int64
   mut tx_frames : Int64
@@ -1491,21 +949,6 @@ pub fn Telemetry::reset(Self) -> Unit
 pub fn Telemetry::to_string(Self) -> String
 pub impl Show for Telemetry
 
-pub(all) struct TimebaseSync {
-  reference_domain : ClockDomain
-  local_domain : ClockDomain
-  mut offset_ns : Int64
-  mut drift_ppb : Int64
-  mut sync_count : Int64
-  mut last_sync_ns : Int64
-} derive(Eq, @debug.Debug)
-pub fn TimebaseSync::new(ClockDomain, ClockDomain) -> Self
-pub fn TimebaseSync::to_local(Self, Int64) -> Int64
-pub fn TimebaseSync::to_reference(Self, Int64) -> Int64
-pub fn TimebaseSync::to_string(Self) -> String
-pub fn TimebaseSync::update(Self, Int64, Int64) -> Unit
-pub impl Show for TimebaseSync
-
 pub(all) struct TopologyFingerprint {
   slave_count : Int
   identity_hash : Int64
@@ -1520,35 +963,6 @@ pub(all) enum TopologyFingerprintMatch {
 } derive(Eq, @debug.Debug)
 pub fn TopologyFingerprintMatch::to_string(Self) -> String
 pub impl Show for TopologyFingerprintMatch
-
-pub struct TopologyHealthAnalyzer {
-  slave_stats : Array[SlaveHealthAccumulator]
-  weight_loss : Int
-  weight_timeout : Int
-  weight_wkc : Int
-}
-pub fn TopologyHealthAnalyzer::add_slave(Self, UInt, Int, Int64) -> Unit
-pub fn TopologyHealthAnalyzer::analyze(Self) -> TopologyHealthReport
-pub fn TopologyHealthAnalyzer::ingest_telemetry(Self, Int, Int64, Int64, Int64, Int64) -> Unit
-pub fn TopologyHealthAnalyzer::new(weight_loss? : Int, weight_timeout? : Int, weight_wkc? : Int) -> Self
-pub fn TopologyHealthAnalyzer::record_cycle(Self, Int, Int64, Int64, Bool, Bool) -> Unit
-
-pub(all) struct TopologyHealthReport {
-  slaves : Array[SlaveHealthSnapshot]
-  bottleneck_index : Int?
-  system_health_score : Int
-  system_grade : LinkGrade
-  max_propagation_delay_ns : Int64
-  total_cable_length_m : Double
-  warnings : Array[String]
-}
-pub fn TopologyHealthReport::to_json(Self) -> String
-
-pub enum TuningStrategy {
-  Conservative
-  Balanced
-  Aggressive
-}
 
 pub(all) enum ValidateDifferenceCategory {
   Topology
@@ -1625,31 +1039,9 @@ pub fn VerificationReport::to_markdown(Self) -> String
 pub fn VerificationReport::to_string(Self) -> String
 pub impl Show for VerificationReport
 
-pub struct VirtualTimebase {
-  mut current_ns : Int64
-}
-pub fn VirtualTimebase::advance(Self, Int64) -> Unit
-pub fn VirtualTimebase::new() -> Self
-pub fn VirtualTimebase::set(Self, Int64) -> Unit
-pub impl Timebase for VirtualTimebase
-
 // Type aliases
 
 // Traits
-pub(open) trait CoSimAdapter {
-  init_(Self, CoSimConfig) -> Unit
-  write_outputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
-  step(Self, SimTime, Int64) -> SimStepResult
-  read_inputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
-  shutdown(Self) -> Unit
-}
-
-pub(open) trait CycleHook {
-  on_pre_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
-  on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
-  on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
-}
-
 pub(open) trait EoeEndpoint {
   read_frame(Self) -> Bytes?
   write_frame(Self, Bytes) -> Bool
@@ -1658,12 +1050,5 @@ pub(open) trait EoeEndpoint {
 
 pub(open) trait RunProgressSink {
   emit(Self, RunProgress) -> Unit
-}
-
-pub(open) trait Timebase {
-  domain(Self) -> ClockDomain
-  now_ns(Self) -> Int64
-  resolution_ns(Self) -> Int64
-  is_monotonic(Self) -> Bool
 }
 

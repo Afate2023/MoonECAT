@@ -3,30 +3,6 @@
 /// ESM management, timeout governance, and diagnostic collection.
 
 ///|
-/// CycleResult holds the outcome of one PDO cycle.
-pub(all) struct CycleResult {
-  /// Working counter from the PDO exchange.
-  wkc : UInt
-  /// Expected working counter (sum of all mapped slaves).
-  expected_wkc : UInt
-  /// Whether the cycle succeeded (wkc >= expected_wkc).
-  ok : Bool
-} derive(Eq, Debug)
-
-///|
-/// DC (Distributed Clock) synchronization state placeholder.
-pub(all) enum DcState {
-  /// DC not active.
-  Disabled
-  /// DC initializing: offsets being measured.
-  Measuring
-  /// DC synchronized: PLL locked.
-  Locked
-  /// DC error: PLL lost sync.
-  Drifting(Int64)
-} derive(Debug)
-
-///|
 /// Runtime orchestrator: manages the full lifecycle from scan to cyclic PDO.
 pub(all) struct Runtime {
   /// Current state of the runtime.
@@ -48,7 +24,7 @@ pub(all) struct Runtime {
   /// Current consecutive receive timeout count.
   mut consecutive_timeouts : Int
   /// DC synchronization state.
-  mut dc_state : DcState
+  mut dc_state : @hil.DcState
   /// Reference station for FRMW drift compensation.
   mut dc_reference_station : UInt?
   /// DC station set used for runtime delay re-estimation.
@@ -73,7 +49,7 @@ pub fn Runtime::new(config : @hal.MasterConfig) -> Runtime {
     consecutive_wkc_errors: 0,
     max_consecutive_timeouts: 5,
     consecutive_timeouts: 0,
-    dc_state: Disabled,
+    dc_state: @hil.Disabled,
     dc_reference_station: None,
     dc_stations: [],
     dc_cycle_counter: 0,
@@ -98,18 +74,18 @@ pub fn[N : @hal.Nic] Runtime::init_dc(
   timeout : @hal.Duration,
 ) -> Bool raise @hal.EcError {
   if !self.config.dc_enabled {
-    self.dc_state = Disabled
+    self.dc_state = @hil.Disabled
     self.dc_reference_station = None
     self.dc_stations = []
     return false
   }
   if stations.length() == 0 {
-    self.dc_state = Disabled
+    self.dc_state = @hil.Disabled
     self.dc_reference_station = None
     self.dc_stations = []
     return false
   }
-  self.dc_state = Measuring
+  self.dc_state = @hil.Measuring
   let init = @protocol.dc_configure_linear(
     nic,
     stations,
@@ -122,13 +98,13 @@ pub fn[N : @hal.Nic] Runtime::init_dc(
       self.dc_reference_station = Some(info.reference_station)
       self.dc_stations = stations
       self.dc_cycle_counter = 0
-      self.dc_state = Locked
+      self.dc_state = @hil.Locked
       true
     }
     None => {
       self.dc_reference_station = None
       self.dc_stations = []
-      self.dc_state = Disabled
+      self.dc_state = @hil.Disabled
       false
     }
   }
@@ -199,7 +175,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,
-) -> CycleResult raise @hal.EcError {
+) -> @hil.CycleResult raise @hal.EcError {
   guard self.pdo_ctx is Some(ctx) else {
     raise @hal.EcError::Internal("PDO context not configured")
   }
@@ -210,7 +186,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
     match self.dc_reference_station {
       Some(station) =>
         @protocol.dc_compensate_cycle(nic, station, timeout) catch {
-          _ => self.dc_state = Drifting(1L)
+          _ => self.dc_state = @hil.Drifting(1L)
         }
       None => ()
     }
@@ -226,7 +202,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
               self.dc_stations,
               timeout,
             ) catch {
-              _ => self.dc_state = Drifting(2L)
+              _ => self.dc_state = @hil.Drifting(2L)
             }
             self.telemetry.dc_delay_updates = self.telemetry.dc_delay_updates +
               1L
@@ -269,7 +245,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycle(
 pub fn Runtime::needs_recovery(self : Runtime) -> Bool {
   self.consecutive_wkc_errors >= self.max_wkc_errors ||
   self.consecutive_timeouts >= self.max_consecutive_timeouts ||
-  self.dc_state is Drifting(_)
+  self.dc_state is @hil.Drifting(_)
 }
 
 ///|
@@ -385,7 +361,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(
     )
     if self.needs_recovery() {
       match self.dc_state {
-        Drifting(delta_ns) =>
+        @hil.Drifting(delta_ns) =>
           self.set_state(
             Error(
               @hal.EcError::Internal(
@@ -488,7 +464,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reportin
     )
     if self.needs_recovery() {
       match self.dc_state {
-        Drifting(delta_ns) =>
+        @hil.Drifting(delta_ns) =>
           self.set_state(
             Error(
               @hal.EcError::Internal(

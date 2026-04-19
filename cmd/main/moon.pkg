@@ -6,6 +6,7 @@ import {
   "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",
+  "afate/MoonECAT/runtime/analysis" @analysis,
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",

@@ -1,0 +1,6 @@
+import {
+  "afate/MoonECAT/hal",
+  "afate/MoonECAT/protocol",
+  "afate/MoonECAT/runtime/simulation" @simulation,
+  "moonbitlang/core/debug",
+}

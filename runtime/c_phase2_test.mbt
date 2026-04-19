@@ -1,21 +1,21 @@
 ///|
 test "ExternalBridgeConfig unix_socket defaults" {
-  let cfg = @runtime.ExternalBridgeConfig::unix_socket("/tmp/cosim.sock")
+  let cfg = @simulation.ExternalBridgeConfig::unix_socket("/tmp/cosim.sock")
   inspect(cfg.auto_launch, content="false")
   inspect(cfg.step_timeout_ns, content="1000000000")
 }
 
 ///|
 test "ExternalProcessBridge avg_latency_ns zero" {
-  let cfg = @runtime.ExternalBridgeConfig::unix_socket("/tmp/test.sock")
-  let bridge = @runtime.ExternalProcessBridge::new(cfg)
+  let cfg = @simulation.ExternalBridgeConfig::unix_socket("/tmp/test.sock")
+  let bridge = @simulation.ExternalProcessBridge::new(cfg)
   inspect(bridge.avg_latency_ns(), content="0")
 }
 
 ///|
 test "encode_step_request wire format" {
   let outputs = Bytes::make(4, b'\xAA')
-  let encoded = @runtime.encode_step_request(1000L, 500L, outputs, 4)
+  let encoded = @simulation.encode_step_request(1000L, 500L, outputs, 4)
   // Total = 16 (headers) + 4 (outputs) = 20 bytes
   inspect(encoded.length(), content="20")
   // Last 4 bytes should be 0xAA
@@ -27,7 +27,7 @@ test "encode_step_request wire format" {
 test "decode_step_response ok" {
   // Status 0x00 + 2 input bytes
   let data = Bytes::make(3, b'\x00')
-  let (status, inputs) = @runtime.decode_step_response(data, 2)
+  let (status, inputs) = @simulation.decode_step_response(data, 2)
   inspect(status, content="b'\\x00'")
   inspect(inputs.length(), content="2")
 }
@@ -35,14 +35,14 @@ test "decode_step_response ok" {
 ///|
 test "decode_step_response empty input" {
   let data = Bytes::new(0)
-  let (status, inputs) = @runtime.decode_step_response(data, 4)
+  let (status, inputs) = @simulation.decode_step_response(data, 4)
   inspect(status, content="b'\\xFF'")
   inspect(inputs.length(), content="4")
 }
 
 ///|
 test "analyze_multi_rate harmonic schedule" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "fast",
       priority: 0,
@@ -77,8 +77,11 @@ test "analyze_multi_rate harmonic schedule" {
       },
     },
   ]
-  let schedule : @runtime.TaskSchedule = { base_period_ns: 1_000_000L, tasks }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let schedule : @simulation.TaskSchedule = {
+    base_period_ns: 1_000_000L,
+    tasks,
+  }
+  let analysis = @simulation.analyze_multi_rate(schedule)
   inspect(analysis.hyperperiod, content="8")
   inspect(analysis.is_harmonic, content="true")
   // At cycle 0, all 3 tasks run
@@ -87,7 +90,7 @@ test "analyze_multi_rate harmonic schedule" {
 
 ///|
 test "validate_multi_rate passes valid schedule" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "axis_1",
       priority: 0,
@@ -111,15 +114,18 @@ test "validate_multi_rate passes valid schedule" {
       },
     },
   ]
-  let schedule : @runtime.TaskSchedule = { base_period_ns: 1_000_000L, tasks }
-  let errors = @runtime.validate_multi_rate(schedule)
+  let schedule : @simulation.TaskSchedule = {
+    base_period_ns: 1_000_000L,
+    tasks,
+  }
+  let errors = @simulation.validate_multi_rate(schedule)
   inspect(errors.length(), content="0")
 }
 
 ///|
 test "DriftCompensator basic convergence" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
-  let comp = @runtime.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
+  let comp = @simulation.DriftCompensator::new()
   // Simulate 20 sync updates with constant offset of 500ns
   for i = 0; i < 20; i = i + 1 {
     let ref_ns = (i * 1_000_000).to_int64()
@@ -144,8 +150,8 @@ test "DriftCompensator basic convergence" {
 
 ///|
 test "DriftCompensator reset" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
-  let comp = @runtime.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
+  let comp = @simulation.DriftCompensator::new()
   let _ = comp.compensate(sync, 0L, 100L)
   comp.reset()
   inspect(comp.update_count, content="0")
@@ -154,7 +160,7 @@ test "DriftCompensator reset" {
 
 ///|
 test "hil_session_to_json basic" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -170,14 +176,14 @@ test "hil_session_to_json basic" {
       },
     ],
   }
-  let session = @runtime.HilSession::new(1_000_000L, schedule)
+  let session = @hil.HilSession::new(1_000_000L, schedule)
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(1_000_000L)),
   )
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(2_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(2_000_000L)),
   )
-  let json = @runtime.hil_session_to_json(session)
+  let json = @hil.hil_session_to_json(session)
   inspect(json.contains("\"version\": \"1.0\""), content="true")
   inspect(json.contains("\"test_task\""), content="true")
   inspect(json.contains("\"total_steps\": 2"), content="true")
@@ -185,19 +191,19 @@ test "hil_session_to_json basic" {
 
 ///|
 test "hil_session_summary counts" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [],
   }
-  let session = @runtime.HilSession::new(1_000_000L, schedule)
+  let session = @hil.HilSession::new(1_000_000L, schedule)
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(1_000_000L)),
   )
-  session.step_log.push(@runtime.SimStepResult::Error("solver diverged"))
+  session.step_log.push(@simulation.SimStepResult::Error("solver diverged"))
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(3_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(3_000_000L)),
   )
-  let summary = @runtime.hil_session_summary(session)
+  let summary = @hil.hil_session_summary(session)
   inspect(summary.total_steps, content="3")
   inspect(summary.ok_steps, content="2")
   inspect(summary.error_steps, content="1")

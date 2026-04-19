@@ -3,49 +3,49 @@
 
 ///|
 test "NullCycleHook on_pre_cycle returns Continue" {
-  let hook = @runtime.NullCycleHook::new()
-  let snap : @runtime.CycleSnapshot = {
+  let hook = @hil.NullCycleHook::new()
+  let snap : @hil.CycleSnapshot = {
     cycle: 0L,
     result: None,
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_pre_cycle(snap, ctx), @runtime.Continue)
+  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
 test "NullCycleHook on_post_cycle returns Continue" {
-  let hook = @runtime.NullCycleHook::new()
-  let snap : @runtime.CycleSnapshot = {
+  let hook = @hil.NullCycleHook::new()
+  let snap : @hil.CycleSnapshot = {
     cycle: 42L,
     result: Some({ wkc: 3U, expected_wkc: 3U, ok: true }),
-    dc_state: @runtime.Locked,
+    dc_state: @hil.Locked,
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_post_cycle(snap, ctx), @runtime.Continue)
+  assert_eq(hook.on_post_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
 test "NullCycleHook on_fault returns Continue" {
-  let hook = @runtime.NullCycleHook::new()
-  let snap : @runtime.CycleSnapshot = {
+  let hook = @hil.NullCycleHook::new()
+  let snap : @hil.CycleSnapshot = {
     cycle: 1L,
     result: None,
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: true,
   }
-  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @runtime.Continue)
+  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
 }
 
 ///|
 test "CycleDirective equality" {
-  assert_eq(@runtime.Continue, @runtime.Continue)
-  assert_eq(@runtime.SkipCycle, @runtime.SkipCycle)
-  assert_eq(@runtime.StopGraceful, @runtime.StopGraceful)
-  assert_true(@runtime.Continue != @runtime.SkipCycle)
-  assert_true(@runtime.Continue != @runtime.StopGraceful)
+  assert_eq(@hil.Continue, @hil.Continue)
+  assert_eq(@hil.SkipCycle, @hil.SkipCycle)
+  assert_eq(@hil.StopGraceful, @hil.StopGraceful)
+  assert_true(@hil.Continue != @hil.SkipCycle)
+  assert_true(@hil.Continue != @hil.StopGraceful)
 }
 
 // ── C-2: TaskPartition tests ──────────────────────────────────────────
@@ -62,7 +62,7 @@ test "slice_from_mapping valid mapping" {
     input_length: 2,
   }
   let image = @protocol.ProcessImage::new(8, 8)
-  guard @runtime.slice_from_mapping(mapping, image) is Some(slice) else {
+  guard @simulation.slice_from_mapping(mapping, image) is Some(slice) else {
     fail("expected Some")
   }
   assert_eq(slice.output_offset, 0)
@@ -83,7 +83,7 @@ test "slice_from_mapping rejects out-of-bounds output" {
     input_length: 2,
   }
   let image = @protocol.ProcessImage::new(8, 8)
-  assert_true(@runtime.slice_from_mapping(mapping, image) is None)
+  assert_true(@simulation.slice_from_mapping(mapping, image) is None)
 }
 
 ///|
@@ -98,7 +98,7 @@ test "slice_from_mapping rejects out-of-bounds input" {
     input_length: 4,
   }
   let image = @protocol.ProcessImage::new(8, 8)
-  assert_true(@runtime.slice_from_mapping(mapping, image) is None)
+  assert_true(@simulation.slice_from_mapping(mapping, image) is None)
 }
 
 ///|
@@ -116,7 +116,7 @@ test "partition_by_slave returns per-slave slices" {
     ],
     0x1000U,
   )
-  let parts = @runtime.partition_by_slave(ctx)
+  let parts = @simulation.partition_by_slave(ctx)
   assert_eq(parts.length(), 2)
   assert_eq(parts[0].0, 0x1001U)
   assert_eq(parts[0].1.output_offset, 0)
@@ -128,7 +128,7 @@ test "partition_by_slave returns per-slave slices" {
 
 ///|
 test "build_task_schedule rejects zero divisor" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "t1",
       priority: 0,
@@ -141,12 +141,12 @@ test "build_task_schedule rejects zero divisor" {
       },
     },
   ]
-  assert_true(@runtime.build_task_schedule(1_000_000L, tasks) is None)
+  assert_true(@simulation.build_task_schedule(1_000_000L, tasks) is None)
 }
 
 ///|
 test "build_task_schedule rejects duplicate names" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "dup",
       priority: 0,
@@ -170,12 +170,12 @@ test "build_task_schedule rejects duplicate names" {
       },
     },
   ]
-  assert_true(@runtime.build_task_schedule(1_000_000L, tasks) is None)
+  assert_true(@simulation.build_task_schedule(1_000_000L, tasks) is None)
 }
 
 ///|
 test "build_task_schedule rejects overlapping output slices" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "a",
       priority: 0,
@@ -199,12 +199,12 @@ test "build_task_schedule rejects overlapping output slices" {
       },
     },
   ]
-  assert_true(@runtime.build_task_schedule(1_000_000L, tasks) is None)
+  assert_true(@simulation.build_task_schedule(1_000_000L, tasks) is None)
 }
 
 ///|
 test "build_task_schedule sorts by priority" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "low",
       priority: 10,
@@ -228,7 +228,7 @@ test "build_task_schedule sorts by priority" {
       },
     },
   ]
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected Some")
   }
   assert_eq(sched.tasks[0].name, "high")
@@ -237,7 +237,7 @@ test "build_task_schedule sorts by priority" {
 
 ///|
 test "tasks_due_at_cycle respects divisor" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "every",
       priority: 0,
@@ -272,21 +272,21 @@ test "tasks_due_at_cycle respects divisor" {
       },
     },
   ]
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected Some")
   }
   // Cycle 0: all due
-  let due0 = @runtime.tasks_due_at_cycle(sched, 0L)
+  let due0 = @simulation.tasks_due_at_cycle(sched, 0L)
   assert_eq(due0.length(), 3)
   // Cycle 1: only "every"
-  let due1 = @runtime.tasks_due_at_cycle(sched, 1L)
+  let due1 = @simulation.tasks_due_at_cycle(sched, 1L)
   assert_eq(due1.length(), 1)
   assert_eq(due1[0].name, "every")
   // Cycle 2: "every" + "half"
-  let due2 = @runtime.tasks_due_at_cycle(sched, 2L)
+  let due2 = @simulation.tasks_due_at_cycle(sched, 2L)
   assert_eq(due2.length(), 2)
   // Cycle 4: all three
-  let due4 = @runtime.tasks_due_at_cycle(sched, 4L)
+  let due4 = @simulation.tasks_due_at_cycle(sched, 4L)
   assert_eq(due4.length(), 3)
 }
 
@@ -295,13 +295,13 @@ test "read_slice_inputs reads correct region" {
   let image = @protocol.ProcessImage::new(0, 8)
   // Manually set inputs
   image.inputs = Bytes::makei(8, fn(i) { i.to_byte() })
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 0,
     input_offset: 2,
     input_length: 4,
   }
-  let data = @runtime.read_slice_inputs(image, slice)
+  let data = @simulation.read_slice_inputs(image, slice)
   assert_eq(data.length(), 4)
   assert_eq(data[0], b'\x02')
   assert_eq(data[1], b'\x03')
@@ -312,13 +312,13 @@ test "read_slice_inputs reads correct region" {
 ///|
 test "read_slice_inputs with zero length returns empty bytes" {
   let image = @protocol.ProcessImage::new(0, 8)
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 0,
     input_offset: 0,
     input_length: 0,
   }
-  let data = @runtime.read_slice_inputs(image, slice)
+  let data = @simulation.read_slice_inputs(image, slice)
   assert_eq(data.length(), 0)
 }
 
@@ -327,14 +327,14 @@ test "write_slice_outputs writes correct region" {
   let image = @protocol.ProcessImage::new(8, 0)
   // Fill outputs with 0xFF
   image.outputs = Bytes::makei(8, fn(_i) { b'\xFF' })
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 2,
     output_length: 3,
     input_offset: 0,
     input_length: 0,
   }
   let data = Bytes::makei(3, fn(i) { (i + 0xA0).to_byte() })
-  @runtime.write_slice_outputs(image, slice, data)
+  @simulation.write_slice_outputs(image, slice, data)
   // Bytes outside slice should remain 0xFF
   assert_eq(image.outputs[0], b'\xFF')
   assert_eq(image.outputs[1], b'\xFF')
@@ -350,19 +350,19 @@ test "write_slice_outputs writes correct region" {
 
 ///|
 test "SimTime arithmetic" {
-  let t0 = @runtime.SimTime::zero()
+  let t0 = @simulation.SimTime::zero()
   assert_eq(t0.to_ns(), 0L)
   let t1 = t0.advance(1_000_000L)
   assert_eq(t1.to_ns(), 1_000_000L)
-  let t2 = @runtime.SimTime::from_ns(5_000_000L)
+  let t2 = @simulation.SimTime::from_ns(5_000_000L)
   assert_eq(t2.to_ns(), 5_000_000L)
   assert_true(t0 < t2)
 }
 
 ///|
 test "LoopbackCoSimAdapter copies outputs to inputs" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let config : @runtime.CoSimConfig = {
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let config : @simulation.CoSimConfig = {
     cycle_period_ns: 1_000_000L,
     slave_count: 1,
     output_size: 4,
@@ -371,15 +371,15 @@ test "LoopbackCoSimAdapter copies outputs to inputs" {
   adapter.init_(config)
   let image = @protocol.ProcessImage::new(4, 4)
   image.outputs = Bytes::makei(4, fn(i) { (i + 1).to_byte() })
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 4,
     input_offset: 0,
     input_length: 4,
   }
   adapter.write_outputs(image, slice)
-  let result = adapter.step(@runtime.SimTime::zero(), 1_000_000L)
-  assert_true(result is @runtime.Ok(_))
+  let result = adapter.step(@simulation.SimTime::zero(), 1_000_000L)
+  assert_true(result is @simulation.SimStepResult::Ok(_))
   adapter.read_inputs(image, slice)
   // After loopback, inputs should mirror outputs
   assert_eq(image.inputs[0], b'\x01')
@@ -390,18 +390,18 @@ test "LoopbackCoSimAdapter copies outputs to inputs" {
 
 ///|
 test "LoopbackCoSimAdapter step advances sim time" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let r1 = adapter.step(@runtime.SimTime::zero(), 1_000_000L)
-  guard r1 is @runtime.Ok(t1) else { fail("expected Ok") }
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let r1 = adapter.step(@simulation.SimTime::zero(), 1_000_000L)
+  guard r1 is @simulation.SimStepResult::Ok(t1) else { fail("expected Ok") }
   assert_eq(t1.to_ns(), 1_000_000L)
   let r2 = adapter.step(t1, 1_000_000L)
-  guard r2 is @runtime.Ok(t2) else { fail("expected Ok") }
+  guard r2 is @simulation.SimStepResult::Ok(t2) else { fail("expected Ok") }
   assert_eq(t2.to_ns(), 2_000_000L)
 }
 
 ///|
 test "LoopbackCoSimAdapter shutdown is safe" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
   adapter.shutdown()
 }
 
@@ -409,7 +409,7 @@ test "LoopbackCoSimAdapter shutdown is safe" {
 
 ///|
 test "HilSession initial state" {
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "axis1",
       priority: 0,
@@ -422,10 +422,10 @@ test "HilSession initial state" {
       },
     },
   ]
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected schedule")
   }
-  let session = @runtime.HilSession::new(1_000_000L, sched)
+  let session = @hil.HilSession::new(1_000_000L, sched)
   assert_eq(session.sim_time.to_ns(), 0L)
   assert_eq(session.terminated, false)
   assert_eq(session.step_log.length(), 0)
@@ -433,8 +433,8 @@ test "HilSession initial state" {
 
 ///|
 test "HilCycleHook on_pre_cycle returns Continue" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "axis1",
       priority: 0,
@@ -447,15 +447,15 @@ test "HilCycleHook on_pre_cycle returns Continue" {
       },
     },
   ]
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected schedule")
   }
-  let session = @runtime.HilSession::new(1_000_000L, sched)
-  let hook = @runtime.HilCycleHook::new(adapter, session)
-  let snap : @runtime.CycleSnapshot = {
+  let session = @hil.HilSession::new(1_000_000L, sched)
+  let hook = @hil.HilCycleHook::new(adapter, session)
+  let snap : @hil.CycleSnapshot = {
     cycle: 0L,
     result: None,
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build(
@@ -467,13 +467,13 @@ test "HilCycleHook on_pre_cycle returns Continue" {
     ],
     0x1000U,
   )
-  assert_eq(hook.on_pre_cycle(snap, ctx), @runtime.Continue)
+  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
 test "HilCycleHook on_post_cycle advances sim time via adapter" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let tasks : Array[@runtime.TaskDescriptor] = [
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let tasks : Array[@simulation.TaskDescriptor] = [
     {
       name: "axis1",
       priority: 0,
@@ -486,15 +486,15 @@ test "HilCycleHook on_post_cycle advances sim time via adapter" {
       },
     },
   ]
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected schedule")
   }
-  let session = @runtime.HilSession::new(1_000_000L, sched)
-  let hook = @runtime.HilCycleHook::new(adapter, session)
-  let snap : @runtime.CycleSnapshot = {
+  let session = @hil.HilSession::new(1_000_000L, sched)
+  let hook = @hil.HilCycleHook::new(adapter, session)
+  let snap : @hil.CycleSnapshot = {
     cycle: 0L,
     result: Some({ wkc: 1U, expected_wkc: 1U, ok: true }),
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build(
@@ -507,57 +507,57 @@ test "HilCycleHook on_post_cycle advances sim time via adapter" {
     0x1000U,
   )
   let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, @runtime.Continue)
+  assert_eq(directive, @hil.Continue)
   assert_eq(hook.session.sim_time.to_ns(), 1_000_000L)
   assert_eq(hook.session.step_log.length(), 1)
 }
 
 ///|
 test "HilCycleHook on_fault returns Continue" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let tasks : Array[@runtime.TaskDescriptor] = []
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let tasks : Array[@simulation.TaskDescriptor] = []
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected schedule")
   }
-  let session = @runtime.HilSession::new(1_000_000L, sched)
-  let hook = @runtime.HilCycleHook::new(adapter, session)
-  let snap : @runtime.CycleSnapshot = {
+  let session = @hil.HilSession::new(1_000_000L, sched)
+  let hook = @hil.HilCycleHook::new(adapter, session)
+  let snap : @hil.CycleSnapshot = {
     cycle: 0L,
     result: None,
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: false,
   }
-  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @runtime.Continue)
+  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
 }
 
 ///|
 test "HilCycleHook returns StopGraceful when terminated" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
-  let tasks : Array[@runtime.TaskDescriptor] = []
-  guard @runtime.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
+  let tasks : Array[@simulation.TaskDescriptor] = []
+  guard @simulation.build_task_schedule(1_000_000L, tasks) is Some(sched) else {
     fail("expected schedule")
   }
-  let session = @runtime.HilSession::new(1_000_000L, sched)
+  let session = @hil.HilSession::new(1_000_000L, sched)
   session.terminated = true
-  let hook = @runtime.HilCycleHook::new(adapter, session)
-  let snap : @runtime.CycleSnapshot = {
+  let hook = @hil.HilCycleHook::new(adapter, session)
+  let snap : @hil.CycleSnapshot = {
     cycle: 0L,
     result: None,
-    dc_state: @runtime.Disabled,
+    dc_state: @hil.Disabled,
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_pre_cycle(snap, ctx), @runtime.StopGraceful)
-  assert_eq(hook.on_post_cycle(snap, ctx), @runtime.StopGraceful)
+  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.StopGraceful)
+  assert_eq(hook.on_post_cycle(snap, ctx), @hil.StopGraceful)
 }
 
 // ── C-5: Timebase tests ──────────────────────────────────────────────
 
 ///|
 test "VirtualTimebase starts at zero and advances" {
-  let tb = @runtime.VirtualTimebase::new()
+  let tb = @simulation.VirtualTimebase::new()
   assert_eq(tb.now_ns(), 0L)
-  assert_eq(tb.domain(), @runtime.Virtual)
+  assert_eq(tb.domain(), @simulation.Virtual)
   assert_true(tb.is_monotonic())
   assert_eq(tb.resolution_ns(), 1L)
   tb.advance(1_000_000L)
@@ -568,14 +568,14 @@ test "VirtualTimebase starts at zero and advances" {
 
 ///|
 test "VirtualTimebase set overrides current time" {
-  let tb = @runtime.VirtualTimebase::new()
+  let tb = @simulation.VirtualTimebase::new()
   tb.set(42_000_000L)
   assert_eq(tb.now_ns(), 42_000_000L)
 }
 
 ///|
 test "TimebaseSync initial state is zero offset" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
   assert_eq(sync.offset_ns, 0L)
   assert_eq(sync.drift_ppb, 0L)
   assert_eq(sync.sync_count, 0L)
@@ -583,7 +583,7 @@ test "TimebaseSync initial state is zero offset" {
 
 ///|
 test "TimebaseSync update computes offset" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
   // First measurement: reference=1000, local=1050 → offset=50
   sync.update(1000L, 1050L)
   assert_eq(sync.offset_ns, 50L)
@@ -594,7 +594,7 @@ test "TimebaseSync update computes offset" {
 
 ///|
 test "TimebaseSync update computes drift" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
   sync.update(1_000_000L, 1_000_100L) // offset=100, last_sync_ns=1_000_000
   // After 1ms, local drifted to offset=200 → drift = 100ns/1_000_000ns * 1e9 = 100_000 ppb
   sync.update(2_000_000L, 2_000_200L)
@@ -604,7 +604,7 @@ test "TimebaseSync update computes drift" {
 
 ///|
 test "TimebaseSync to_local and to_reference are inverse" {
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
   sync.update(0L, 500L) // offset=500
   let local_ = sync.to_local(1000L)
   assert_eq(local_, 1500L)
@@ -614,34 +614,34 @@ test "TimebaseSync to_local and to_reference are inverse" {
 
 ///|
 test "ClockDomain equality" {
-  assert_eq(@runtime.Mcu, @runtime.Mcu)
-  assert_eq(@runtime.Linux, @runtime.Linux)
-  assert_eq(@runtime.Fpga, @runtime.Fpga)
-  assert_eq(@runtime.Virtual, @runtime.Virtual)
-  assert_true(@runtime.Mcu != @runtime.Linux)
+  assert_eq(@simulation.Mcu, @simulation.Mcu)
+  assert_eq(@simulation.Linux, @simulation.Linux)
+  assert_eq(@simulation.Fpga, @simulation.Fpga)
+  assert_eq(@simulation.Virtual, @simulation.Virtual)
+  assert_true(@simulation.Mcu != @simulation.Linux)
 }
 
 ///|
 test "CycleTimingReport jitter calculation" {
-  let report = @runtime.cycle_timing_report(
+  let report = @simulation.cycle_timing_report(
     1_000_000L,
     0L,
     1_000_500L,
-    @runtime.Mcu,
+    @simulation.Mcu,
   )
   assert_eq(report.nominal_period_ns, 1_000_000L)
   assert_eq(report.actual_period_ns, 1_000_500L)
   assert_eq(report.jitter_ns, 500L)
-  assert_eq(report.domain, @runtime.Mcu)
+  assert_eq(report.domain, @simulation.Mcu)
 }
 
 ///|
 test "CycleTimingReport negative jitter normalized to positive" {
-  let report = @runtime.cycle_timing_report(
+  let report = @simulation.cycle_timing_report(
     1_000_000L,
     0L,
     999_500L,
-    @runtime.Linux,
+    @simulation.Linux,
   )
   assert_eq(report.actual_period_ns, 999_500L)
   assert_eq(report.jitter_ns, 500L)
@@ -649,11 +649,11 @@ test "CycleTimingReport negative jitter normalized to positive" {
 
 ///|
 test "LoopbackCoSimAdapter read_inputs output shorter than input" {
-  let adapter = @runtime.LoopbackCoSimAdapter::new()
+  let adapter = @simulation.LoopbackCoSimAdapter::new()
   let image = @protocol.ProcessImage::new(2, 4)
   image.outputs = b"\xAA\xBB"
   image.inputs = b"\x11\x22\x33\x44"
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 2,
     input_offset: 0,

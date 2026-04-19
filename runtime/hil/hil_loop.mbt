@@ -21,13 +21,13 @@
 /// HilSession holds the state for one HIL closed-loop run.
 pub(all) struct HilSession {
   /// The co-simulation adapter (plant model).
-  mut sim_time : SimTime
+  mut sim_time : @simulation.SimTime
   /// Cycle period in nanoseconds (from MasterConfig).
   cycle_period_ns : Int64
   /// Task schedule for multi-rate execution.
-  schedule : TaskSchedule
+  schedule : @simulation.TaskSchedule
   /// Accumulated step results for post-analysis.
-  step_log : Array[SimStepResult]
+  step_log : Array[@simulation.SimStepResult]
   /// Whether the session has been terminated by the plant model.
   mut terminated : Bool
   /// Termination reason, if any.
@@ -37,10 +37,10 @@ pub(all) struct HilSession {
 ///|
 pub fn HilSession::new(
   cycle_period_ns : Int64,
-  schedule : TaskSchedule,
+  schedule : @simulation.TaskSchedule,
 ) -> HilSession {
   {
-    sim_time: SimTime::zero(),
+    sim_time: @simulation.SimTime::zero(),
     cycle_period_ns,
     schedule,
     step_log: [],
@@ -52,7 +52,7 @@ pub fn HilSession::new(
 ///|
 /// HilCycleHook — CycleHook implementation that drives a CoSimAdapter.
 ///
-/// Generic over `A : CoSimAdapter` so the plant model is monomorphized
+/// Generic over `A : @simulation.CoSimAdapter` so the plant model is monomorphized
 /// into the hook → zero dispatch overhead in the PDO hot path.
 pub(all) struct HilCycleHook[A] {
   adapter : A
@@ -68,7 +68,7 @@ pub fn[A] HilCycleHook::new(
 }
 
 ///|
-pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
   self,
   snap,
   ctx,
@@ -77,7 +77,7 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
     return StopGraceful
   }
   // Determine which tasks are due this cycle
-  let due = tasks_due_at_cycle(self.session.schedule, snap.cycle)
+  let due = @simulation.tasks_due_at_cycle(self.session.schedule, snap.cycle)
   // For each due task, write outputs from adapter into PI
   for task in due {
     A::write_outputs(self.adapter, ctx.image, task.slice)
@@ -86,7 +86,7 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
 }
 
 ///|
-pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
   self,
   _snap,
   ctx,
@@ -106,16 +106,16 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
   )
   self.session.step_log.push(result)
   match result {
-    Ok(new_time) => {
+    @simulation.SimStepResult::Ok(new_time) => {
       self.session.sim_time = new_time
       Continue
     }
-    Terminated(reason) => {
+    @simulation.SimStepResult::Terminated(reason) => {
       self.session.terminated = true
       self.session.termination_reason = reason
       StopGraceful
     }
-    Error(reason) => {
+    @simulation.SimStepResult::Error(reason) => {
       self.session.terminated = true
       self.session.termination_reason = reason
       StopGraceful
@@ -124,7 +124,7 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
 }
 
 ///|
-pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_fault(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_fault(
   self,
   _snap,
   _err,
@@ -135,7 +135,7 @@ pub impl[A : CoSimAdapter] CycleHook for HilCycleHook[A] with on_fault(
 
 ///|
 /// Get the current simulation time from the HIL session.
-pub fn HilSession::get_sim_time(self : HilSession) -> SimTime {
+pub fn HilSession::get_sim_time(self : HilSession) -> @simulation.SimTime {
   self.sim_time
 }
 

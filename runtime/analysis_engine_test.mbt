@@ -4,7 +4,7 @@
 // === 4.1 DC Jitter Profiling ===
 
 test "JitterHistogram basic record" {
-  let h = @runtime.JitterHistogram::new(bin_width=100L, num_bins=101)
+  let h = @analysis.JitterHistogram::new(bin_width=100L, num_bins=101)
   h.record(0L)
   h.record(50L)
   h.record(-50L)
@@ -13,13 +13,13 @@ test "JitterHistogram basic record" {
 
 ///|
 test "JitterHistogram percentile empty" {
-  let h = @runtime.JitterHistogram::new()
+  let h = @analysis.JitterHistogram::new()
   inspect(h.percentile(50), content="0")
 }
 
 ///|
 test "JitterHistogram percentile centered" {
-  let h = @runtime.JitterHistogram::new(bin_width=100L, num_bins=101)
+  let h = @analysis.JitterHistogram::new(bin_width=100L, num_bins=101)
   // Record 100 samples at deviation=0
   for _i = 0; _i < 100; _i = _i + 1 {
     h.record(0L)
@@ -30,7 +30,7 @@ test "JitterHistogram percentile centered" {
 
 ///|
 test "JitterHistogram percentile spread" {
-  let h = @runtime.JitterHistogram::new(bin_width=100L, num_bins=201)
+  let h = @analysis.JitterHistogram::new(bin_width=100L, num_bins=201)
   // Record deviations from -1000 to +1000 in steps of 100
   for d = -1000; d <= 1000; d = d + 100 {
     h.record(d.to_int64())
@@ -42,7 +42,7 @@ test "JitterHistogram percentile spread" {
 
 ///|
 test "DcJitterProfiler record timestamps with no jitter" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   // Perfect 1ms intervals
   for i = 0; i < 11; i = i + 1 {
     p.record_timestamp((i * 1_000_000).to_int64())
@@ -57,7 +57,7 @@ test "DcJitterProfiler record timestamps with no jitter" {
 
 ///|
 test "DcJitterProfiler record timestamps with jitter" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L, bin_width=10L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L, bin_width=10L)
   // Simulate jittery timestamps: 0, 1000050, 1999980, 3000100, 3999900
   p.record_timestamp(0L)
   p.record_timestamp(1_000_050L)
@@ -74,7 +74,7 @@ test "DcJitterProfiler record timestamps with jitter" {
 
 ///|
 test "DcJitterProfiler stats empty" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   let s = p.stats()
   inspect(s.count, content="0")
   inspect(s.mean_ns, content="0")
@@ -82,7 +82,7 @@ test "DcJitterProfiler stats empty" {
 
 ///|
 test "DcJitterProfiler is_within_tolerance" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   // Perfect timing
   for i = 0; i < 101; i = i + 1 {
     p.record_timestamp((i * 1_000_000).to_int64())
@@ -93,7 +93,7 @@ test "DcJitterProfiler is_within_tolerance" {
 
 ///|
 test "DcJitterProfiler to_json" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   p.record_timestamp(0L)
   p.record_timestamp(1_000_000L)
   p.record_timestamp(2_000_000L)
@@ -104,7 +104,7 @@ test "DcJitterProfiler to_json" {
 
 ///|
 test "DcJitterProfiler reset" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   p.record_timestamp(0L)
   p.record_timestamp(1_000_050L)
   p.reset()
@@ -114,7 +114,7 @@ test "DcJitterProfiler reset" {
 
 ///|
 test "MultiChannelJitterProfiler basic" {
-  let mc = @runtime.MultiChannelJitterProfiler::new()
+  let mc = @analysis.MultiChannelJitterProfiler::new()
   mc.add_channel("tx", 1_000_000L)
   mc.add_channel("rx", 1_000_000L)
   // Record on channel 0 (tx)
@@ -132,7 +132,7 @@ test "MultiChannelJitterProfiler basic" {
 
 ///|
 test "AutoTuneConfig default values" {
-  let cfg = @runtime.AutoTuneConfig::default()
+  let cfg = @analysis.AutoTuneConfig::default()
   inspect(cfg.probe_iterations, content="10")
   inspect(cfg.cycle_time_ns, content="1000000")
   inspect(cfg.sync1_enabled, content="false")
@@ -140,7 +140,7 @@ test "AutoTuneConfig default values" {
 
 ///|
 test "compute_probe_result" {
-  let p = @runtime.compute_probe_result(1U, 100L, 250L, 0L)
+  let p = @analysis.compute_probe_result(1U, 100L, 250L, 0L)
   inspect(p.forward_delay_ns, content="100")
   inspect(p.reverse_delay_ns, content="150")
   inspect(p.round_trip_ns, content="250")
@@ -148,34 +148,34 @@ test "compute_probe_result" {
 
 ///|
 test "average_probe single" {
-  let probes : Array[@runtime.ProbeResult] = [
-    @runtime.compute_probe_result(1U, 100L, 200L, 0L),
+  let probes : Array[@analysis.ProbeResult] = [
+    @analysis.compute_probe_result(1U, 100L, 200L, 0L),
   ]
-  let avg = @runtime.average_probe(probes)
+  let avg = @analysis.average_probe(probes)
   inspect(avg.forward_delay_ns, content="100")
   inspect(avg.round_trip_ns, content="200")
 }
 
 ///|
 test "average_probe multiple" {
-  let probes : Array[@runtime.ProbeResult] = [
-    @runtime.compute_probe_result(1U, 100L, 200L, 0L),
-    @runtime.compute_probe_result(1U, 200L, 400L, 0L),
-    @runtime.compute_probe_result(1U, 150L, 300L, 0L),
+  let probes : Array[@analysis.ProbeResult] = [
+    @analysis.compute_probe_result(1U, 100L, 200L, 0L),
+    @analysis.compute_probe_result(1U, 200L, 400L, 0L),
+    @analysis.compute_probe_result(1U, 150L, 300L, 0L),
   ]
-  let avg = @runtime.average_probe(probes)
+  let avg = @analysis.average_probe(probes)
   inspect(avg.forward_delay_ns, content="150")
   inspect(avg.round_trip_ns, content="300")
 }
 
 ///|
 test "PdoAutoTuner analyze single station" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [1U]
-  let probes : Array[Array[@runtime.ProbeResult]] = [
+  let probes : Array[Array[@analysis.ProbeResult]] = [
     [
-      @runtime.compute_probe_result(1U, 100L, 200L, 0L),
-      @runtime.compute_probe_result(1U, 120L, 240L, 0L),
+      @analysis.compute_probe_result(1U, 100L, 200L, 0L),
+      @analysis.compute_probe_result(1U, 120L, 240L, 0L),
     ],
   ]
   let result = tuner.analyze(stations, probes)
@@ -189,10 +189,10 @@ test "PdoAutoTuner analyze single station" {
 
 ///|
 test "PdoAutoTuner analyze missing data" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [1U, 2U]
-  let probes : Array[Array[@runtime.ProbeResult]] = [
-    [@runtime.compute_probe_result(1U, 100L, 200L, 0L)],
+  let probes : Array[Array[@analysis.ProbeResult]] = [
+    [@analysis.compute_probe_result(1U, 100L, 200L, 0L)],
   ]
   let result = tuner.analyze(stations, probes)
   inspect(result.success, content="false")
@@ -201,34 +201,34 @@ test "PdoAutoTuner analyze missing data" {
 
 ///|
 test "validate_recommendations within limit" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [1U]
-  let probes : Array[Array[@runtime.ProbeResult]] = [
-    [@runtime.compute_probe_result(1U, 100L, 200L, 0L)],
+  let probes : Array[Array[@analysis.ProbeResult]] = [
+    [@analysis.compute_probe_result(1U, 100L, 200L, 0L)],
   ]
   let result = tuner.analyze(stations, probes)
-  let errors = @runtime.validate_recommendations(result, 2_000_000L)
+  let errors = @analysis.validate_recommendations(result, 2_000_000L)
   inspect(errors.length(), content="0")
 }
 
 ///|
 test "validate_recommendations exceeds limit" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [1U]
-  let probes : Array[Array[@runtime.ProbeResult]] = [
-    [@runtime.compute_probe_result(1U, 100L, 200L, 0L)],
+  let probes : Array[Array[@analysis.ProbeResult]] = [
+    [@analysis.compute_probe_result(1U, 100L, 200L, 0L)],
   ]
   let result = tuner.analyze(stations, probes)
-  let errors = @runtime.validate_recommendations(result, 500L)
+  let errors = @analysis.validate_recommendations(result, 500L)
   inspect(errors.length() > 0, content="true")
 }
 
 ///|
 test "AutoTuneResult to_json" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [1U]
-  let probes : Array[Array[@runtime.ProbeResult]] = [
-    [@runtime.compute_probe_result(1U, 100L, 200L, 0L)],
+  let probes : Array[Array[@analysis.ProbeResult]] = [
+    [@analysis.compute_probe_result(1U, 100L, 200L, 0L)],
   ]
   let result = tuner.analyze(stations, probes)
   let json = result.to_json()

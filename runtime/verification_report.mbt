@@ -195,3 +195,19 @@ pub fn VerificationReport::to_json(self : VerificationReport) -> String {
   buf.write_string("]}")
   buf.to_string()
 }
+
+///|
+fn escape_json(s : String) -> String {
+  let buf = StringBuilder::new()
+  for ch in s.to_array() {
+    match ch {
+      '"' => buf.write_string("\\\"")
+      '\\' => buf.write_string("\\\\")
+      '\n' => buf.write_string("\\n")
+      '\r' => buf.write_string("\\r")
+      '\t' => buf.write_string("\\t")
+      _ => buf.write_char(ch)
+    }
+  }
+  buf.to_string()
+}
