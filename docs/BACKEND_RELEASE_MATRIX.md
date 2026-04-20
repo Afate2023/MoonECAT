@@ -56,6 +56,19 @@ moon run cmd/main run -- --backend native --if <interface> --json
   `state --station 4097 --path --state preop` => `current_state=Init`、`final_state=PreOp`、`status_code=0`；
   `od --station 4097` => 成功返回 `OD List` 索引数组；
   `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
+- 2026-04-20 Linux Raw Socket（`eno1`，单从站 `VT_EX_CA20_20250225.esi.json`）实测：
+  `list-if --backend native-linux-raw --json` => 成功枚举 `lo / enp1s0 / eno1 / wlp3s0`；
+  错误路径：坏接口名 / 空接口名 / 超长接口名稳定返回 `ConfigMismatch`，无 raw-socket 权限稳定返回 `NotSupported("Operation not permitted")`；
+  `scan --backend native-linux-raw --if eno1 --json` => 初始探测到单从站 `position=0 / station=1001 / alias=59365 / vendor=5596774 / product=40200 / revision=2025070500`；
+  `validate --backend native-linux-raw --if eno1 --json` => `grade=Pass`、`difference_count=0`；
+  `diagnosis --backend native-linux-raw --if eno1 --station 1001 --json` => `AL State=Init`、`AL Error Flag=false`、`AL Status Code=0`；
+  `state --backend native-linux-raw --if eno1 --station 1001 --path --state preop --json` => `current_state=Init`、`final_state=PreOp`、`control_wkc=1`；
+  `state --backend native-linux-raw --if eno1 --station 1001 --path --state safeop --json` => 成功进入 `SafeOp`，并输出 live PDO audit；
+  `read-sii --backend native-linux-raw --if eno1 --position 0 --words 128 --json` => EEPROM `checksum_ok=true`，设备名 `EX_CA20`，CoE mailbox 能力与 ESI 一致；
+  `od --backend native-linux-raw --if eno1 --station 1001 --json` => 成功返回对象索引列表；
+  `run --backend native-linux-raw --if eno1 --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --startup-state op --shutdown-state none --cycles 10 --json` => `cycles_ok=10`、`final_phase=Done`、`fault=null`；
+  `run --backend native-linux-raw --if eno1 --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --until-fault --json` => 成功进入 `Operational`，在 `cycles_ok=72933` 后以 `timeout-recovery-required` 退出；
+  run 后再次 `scan` 可见从站已切到配置站地址 `4097`，`diagnosis --station 4097` 暴露 `AL Status Code=27 (Sync manager watchdog)`，且 `state --station 4097 --path --state preop` 可稳定回退，符合从站 watchdog / 站地址切换行为，不是 Linux HAL 故障
 
 ## 2. Native Library
 

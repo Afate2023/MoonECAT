@@ -134,7 +134,9 @@ int32_t moonecat_linux_recv_into(int32_t handle_id,
     rc = recv(fd, buf, (size_t)max_len, 0);
     if (rc > 0)
         return (int32_t)rc;
-    if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+    if (rc == 0)
+        return 0; /* zero-length packet on AF_PACKET; treat as timeout */
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
         return 0;
     return -1;
 }

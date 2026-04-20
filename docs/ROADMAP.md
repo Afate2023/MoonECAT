@@ -37,13 +37,13 @@ MoonECAT 当前更适合被定义为：
 具体而言：
 - 协议核心（帧编解码、ESM、DC、PDO、SDO、FoE、EEPROM、SII 全类别解析）功能完整
 - 验证基础设施（虚拟总线/从站、故障注入、录制回放、场景执行器、monitor/verdict）**已全面实现**，超出原始路线预期
-- Native 后端（Windows Npcap）已有实机闭环证据；Linux Raw Socket FFI 已实现，实机验证待补
+- Native 后端（Windows Npcap + Linux Raw Socket）均已有实机闭环证据；Linux 侧已补单从站 + ESI + `run --until-fault` 回归
 - HIL/Co-Sim 框架（hook、adapter、timebase、task schedule）已就绪，PoC 演示待收口
 - CLI 功能完整（8 个子命令），Extism 插件边界已设计
 
 后续重点不再是"把验证能力做出来"（已完成），而应是：
 
-1. **补齐 Linux 实机证据** — 完成双平台对等验证
+1. **固化 Linux 实机证据** — 把已补齐的双平台对等验证沉淀为稳定回归入口
 2. **规范化输出 schema 与合同文档** — 把实现转化为稳定交付
 3. **收口 HIL PoC** — 验证端到端闭环
 
@@ -53,7 +53,7 @@ MoonECAT 当前更适合被定义为：
 
 ### 3.1 目标
 - 对齐 Windows Npcap 与 Linux Raw Socket 的 HAL 语义
-- 形成 Linux Raw Socket 实机���环基线
+- 固化 Linux Raw Socket 实机闭环基线
 - 冻结 Native trace / progress NDJSON 输出
 - 把 `run --until-fault` 收口为正式回归入口
 - 把 Native 交付从“人工跑过”升级为“可复核证据矩阵”
@@ -146,11 +146,11 @@ MoonECAT 在未来 HIL 系统中的定位应是：
 | 条目 | 状态 | 说明 |
 |------|------|------|
 | Native HAL 语义统一 | 🔶 | Windows Npcap + Linux Raw Socket 双后端共享 `Nic`/`ZeroCopyNic` trait; `EcError` 17 变体覆盖; 零拷贝后端已实现; 尚需对齐部分边界行为文档 |
-| Linux Raw Socket 实机闭环 | 🔶 | FFI 桩 + fallback 体系完成; AF_PACKET send/recv/list 路径已实现; 实机证据待补(Windows 已有 BACKEND_RELEASE_MATRIX 实机记录) |
+| Linux Raw Socket 实机闭环 | ✅ | 已补 Linux Raw Socket 单从站实机闭环：`list-if -> scan -> validate -> diagnosis -> state -> read-sii -> od -> run`；`run --esi-json ... --startup-state op --shutdown-state none --cycles 10` 返回 `cycles_ok=10 / final_phase=Done`，`run --until-fault` 可进入 `Operational` |
 | Native trace / NDJSON schema 冻结 | 🔶 | `run --progress-ndjson` 已实现; schema 尚未作为正式规范文档化 |
 | `run --until-fault` 正式化 | ✅ | `run --until-fault` 已实现并集成于 CLI; 输出 stop reason / first fault / fault count |
 | Native FFI 生命周期与失败路径测试 | 🔶 | Native FFI 安全模型有文档(NATIVE_FFI_SAFETY.md); handle 生命周期由保守所有权管理; 需更多失败路径测试 |
-| Native CLI 证据矩阵 | 🔶 | BACKEND_RELEASE_MATRIX.md 记录了 Windows Npcap 实机证据(2026-03-11, 2026-03-14); Linux 实机证据待补 |
+| Native CLI 证据矩阵 | ✅ | BACKEND_RELEASE_MATRIX.md 已记录 Windows Npcap 与 Linux Raw Socket 实机证据；Linux 侧补齐了权限错误、坏接口名、单从站 ESI 链路与 `run --until-fault` 结果 |
 
 ### P1：形成验证平台差异化 — Verification Runtime
 | 条目 | 状态 | 说明 |

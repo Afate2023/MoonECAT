@@ -1,6 +1,6 @@
 # Native Backend Plan
 
-> **实现状态（2026-04-14）**：本设计已大部分落地。`hal/native/` 包含 20 个文件，Windows Npcap FFI + Linux Raw Socket FFI + 零拷贝后端 + platform_stub.c 均已实现。Windows Npcap 已有1机闭环证据（见 BACKEND_RELEASE_MATRIX.md），Linux Raw Socket FFI 已实现但实机验证待补。
+> **实现状态（2026-04-20）**：本设计已大部分落地。`hal/native/` 包含 20 个文件，Windows Npcap FFI + Linux Raw Socket FFI + 零拷贝后端 + platform_stub.c 均已实现。Windows Npcap 与 Linux Raw Socket 均已有单从站实机闭环证据（见 BACKEND_RELEASE_MATRIX.md）；Linux 侧已补 `list-if / scan / validate / diagnosis / state / read-sii / od / run / run --until-fault` 实测。
 
 本文件细化 MoonECAT Native 后端的目录、文件、FFI 约束与验证步骤。
 Windows 路径参考附带的 Npcap SDK，Linux 路径以 Raw Socket 为首个落点。

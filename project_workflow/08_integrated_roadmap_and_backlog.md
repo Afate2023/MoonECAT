@@ -107,14 +107,14 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L4-05 | Native FFI 句柄安全策略文档（整数句柄 ID + C stub 内部句柄表） | ✅ | `docs/NATIVE_FFI_SAFETY.md` |
 | L4-06 | 回放集成测试 scan→validate→run→stop | ✅ | `898616e` |
 | L4-07 | 压力回归（1000 周期稳定性 + telemetry 单调性） | ✅ | `e4bff92` |
-| L4-08 | Linux Raw Socket 实机闭环 | ❌ | 待验证 |
+| L4-08 | Linux Raw Socket 实机闭环 | ✅ | 2026-04-20 `eno1` + `VT_EX_CA20_20250225.esi.json`：`list-if -> scan -> validate -> diagnosis -> state -> read-sii -> od -> run -> run --until-fault` |
 | L4-09 | AddressSanitizer / 等价内存安全检查 | ❌ | 未执行 |
 | L4-10 | Extism 宿主 host capability 打通 | ❌ | 仅 Mock 回放 |
 | L4-11 | 事件溯源 deterministic replay 最小闭环 | ✅ | `e4b03a2` / `fa33f01`：RecordingNic + ReplayNic + NicEventLog；多从站 FMMU PDO 确定性回放 + 多周期输入变化回放，hal/mock 53/53 |
 | L4-12 | Fault injection 一等模型 | ✅ | `ba7356e` / `fa33f01`：FaultInjector + FaultNic（7 fault × 5 schedule）；多从站 FMMU RecvTimeout/WkcCorrupt/CountDown 恢复，hal/mock 53/53 |
 | L4-13 | Monitor / Verdict 框架 | ✅ | `7af544f`：Verdict(Pass/Warn/Fail/Block) + 6 内置 monitor + run_monitors + DiagnosticSurface 集成；runtime 测试全量覆盖 |
 
-**综合进度**：L1/L2 全部完成，L3 已形成最小产品面，L4 验证加固层约 77% 完成（10/13）。
+**综合进度**：L1/L2 全部完成，L3 已形成最小产品面，L4 验证加固层约 85% 完成（11/13）。
 
 ---
 
@@ -140,11 +140,11 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | 编号 | 任务 | 对应 BACKLOG | 状态 | 涉及目录 |
 |---|---|---|---|---|
 | A-1 | 统一 Windows/Linux Native HAL 语义（open/send/recv/close/error/filter） | P0-1 | ⚠️ 部分 | hal/native/, cmd/main/ |
-| A-2 | Linux Raw Socket 实机闭环 `list-if → scan → validate → run` | P0-2 | ❌ | hal/native/, scripts/ |
+| A-2 | Linux Raw Socket 实机闭环 `list-if → scan → validate → run` | P0-2 | ✅ | hal/native/, scripts/, docs/ |
 | A-3 | 冻结 NDJSON progress schema（版本/字段/兼容性） | P0-3 | ⚠️ 已实现待冻结 | runtime/, cmd/main/ |
 | A-4 | `run --until-fault` 正式化为回归入口（stop reason / fault summary） | P0-4 | ✅ Windows Npcap 已复核 | runtime/, cmd/main/ |
 | A-5 | Native FFI 生命周期与失败路径测试（ASan / double close / leak） | P0-5 | ❌ | hal/native/ |
-| A-6 | Native CLI 实机证据矩阵（平台 × 网卡 × 从站 × 命令 × 结果） | P0-6 | ⚠️ Windows 部分 | docs/, scripts/ |
+| A-6 | Native CLI 实机证据矩阵（平台 × 网卡 × 从站 × 命令 × 结果） | P0-6 | ✅ | docs/, scripts/ |
 
 **收口条件**：
 - Windows 与 Linux Native 后端共享同一稳定 HAL 语义
