@@ -1,6 +1,6 @@
 # MoonECAT SII Full Read Design
 
-> **实现状态（2026-04-14）**：本设计已全面落地。`mailbox/sii_parser.mbt` + `mailbox/sii.mbt` + `mailbox/sii_flags.mbt` 实现了完整的 SII 三层解析（A: preamble/B: fixed header+area/C: full category）。已支持 Strings(10)/General(30)/FMMU(40)/SyncM(41)/FMMU_EX(42)/SyncUnit(43)/TxPDO(50)/RxPDO(51)/DC(60)/Timeouts(70) 深解析，未识别类别保留为 `Raw`。`SiiFullInfo` 聚合模型、`SiiCategoryClass`/`SiiOverlayCandidate` 框架均已实现。CLI `read-sii` 命令可输出结构化 JSON。
+> **实现状态（2026-04-21）**：本设计已全面落地，并已从“框架完成”进一步收口到“产品面与实机证据闭环”。`mailbox/sii_parser.mbt` + `mailbox/sii.mbt` + `mailbox/sii_flags.mbt` 实现了完整的 SII 三层解析（A: preamble/B: fixed header+area/C: full category）。运行时强语义类别 Strings(10)/General(30)/FMMU(40)/SyncM(41)/FMMU_EX(42)/SyncUnit(43)/TxPDO(50)/RxPDO(51)/DC(60)/Timeouts(70) 已深解析；标准保留类别 20/80/90/100/110 已显式识别并稳定导出；扩展类别已具备 `SiiCategoryClass` / `SiiOverlayCandidate` / decoder 状态合同。CLI `read-sii` / `esi-sii` 均可输出稳定结构化 JSON，当前回归为 `moon test protocol` 329/329、`moon test mailbox` 312/312、`moon test runtime` 811/811、`moon test cmd/main` 122/122、全量 `moon test` 1878/1878。
 
 本文档定义 MoonECAT 的 SII 完整类别深读计划。目标不是再做一套 ESI 解析器，而是把实时链路上的 EEPROM 读取、现有 mailbox SII parser、CLI 输出和后续配置工具消费统一到一条稳定路径，并把 ETG.2010 规定的类别覆盖范围拆成可执行阶段。
 
@@ -50,9 +50,9 @@
   - category 记录 `type_code`
   - CLI 输出原始 category 预览
 
-### 3.2 尚未完成的“完整类别深读”范围
+### 3.2 已完成导出、尚未做 typed view 的范围
 
-按 ETG.2010 Table 5，当前仍未形成独立深读策略的范围有：
+按 ETG.2010 Table 5，以下类别已经纳入稳定识别 / 分类 / 导出面，但尚未继续上探为更强的 typed view：
 
 - DataTypes (20)
 - Dictionary (80)
@@ -63,7 +63,7 @@
 - Vendor specific (0x0800-0x1FFF, 0x3000-0xFFFE)
 - Application specific (0x2000-0x2FFF)
 
-这些类别里，20/80/90/100/110 属于“标准编号但当前规范内容保留或弱定义”的类别；其实现重点不是立即做强语义反序列化，而是先建立稳定的保留、索引、导出和后续增量解析能力。
+这些类别里，20/80/90/100/110 已不再混入普通 `Raw`，而是作为显式标准保留类别稳定输出标题、`known`、`category_class`、长度与原始字节；01-09、vendor-specific、application-specific 也已具备稳定分类与 overlay 挂载点。当前未完成的仅是“是否值得继续做更强 typed view”，不再是产品面缺口。
 
 ### 3.3 当前文档/实现中的过时点
 
@@ -261,6 +261,15 @@ raw_categories
 
 ## 8. 当前状态与下一批执行项
 
+### 2026-04-21 状态确认
+
+截至当前仓库状态，SII 完成情况可归纳为：
+
+- 设计目标已全部落地到产品面：在线 EEPROM 读取、聚合模型、CLI `read-sii` / `esi-sii`、runtime startup / mapping 共享同一条 SII 语义链路。
+- 运行时强语义类别与标准保留类别都已进入稳定输出面；剩余工作仅限于可选的 typed overlay / typed view 增量，不阻塞当前交付。
+- Native 实机证据已补齐：Windows 与 Linux 均已完成 `scan -> read-sii -> run` 真实链路回归；其中 Linux `native-linux-raw` 已在 `eno1` + `VT_EX_CA20_20250225.esi.json` 单从站链路上确认 `read-sii` 输出 EEPROM checksum、设备名与 CoE mailbox 能力正确，并能衔接到后续 `run`。
+- 当前测试基线为：`moon test protocol` 329/329、`moon test mailbox` 312/312、`moon test runtime` 811/811、`moon test cmd/main` 122/122、全量 `moon test` 1878/1878。
+
 ### 2026-03-23 交付摘要
 
 本轮 SII 深读框架已经形成一条完整提交链，代码提交与对应回填如下：
@@ -300,13 +309,13 @@ raw_categories
 - 标准保留类别：20/80/90/100/110 已脱离普通 Raw，进入稳定导出面
 - 扩展类别：vendor/application/device-specific 现已有 `category_class`、`overlay_candidate()` 与 `overlay_key`，后续可继续叠加 typed overlay
 
-验证证据：
+验证证据（当时交付批次）：
 
 - `moon test protocol` `111/111`
 - `moon test cmd/main` `70/70`
 - `moon test runtime` `105/105`
 - 后续聚合回归 `moon test` `187/187`（mailbox + cmd/main + runtime）
-- 最新全量回归 `moon test` `414/414`
+- 当时全量回归 `moon test` `414/414`
 
 ### 当前已落实
 
@@ -316,9 +325,12 @@ raw_categories
 - 已保留未知 category 的 `type_code + raw bytes`
 - `read-sii` / `esi-sii` 已输出稳定 JSON / 文本结构
 - 标准保留类别 20/80/90/100/110 已有显式类别名与稳定导出面
-- 扩展 raw category 已有 `category_class` 与 `overlay_key`，可作为 typed overlay 的统一挂载点
+- 扩展 raw category 已有 `category_class`、`overlay_key`、`overlay_status` 与 `overlay_decoder`，可作为 typed overlay 的统一挂载点
+- Windows 与 Linux Native 后端都已有 `scan -> read-sii -> run` 实机证据，SII 已不再停留在“仅 fixture / 仅设计”阶段
 
 ### 后续建议方向
+
+以下均为增强项，不构成当前 SII 完成度阻塞：
 
 1. 基于 `overlay_key` 为真实样本落第一个 vendor-specific typed overlay
 2. 为 `DataTypes` / `Dictionary` / `Hardware` / `Vendor Information` / `Images` 选择是否继续增加只读 typed view
