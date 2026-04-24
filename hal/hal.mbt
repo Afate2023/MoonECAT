@@ -1,10 +1,14 @@
 ///|
 /// Timestamp represents a monotonic point in time, in nanoseconds.
-pub(all) struct Timestamp(Int64) derive(Eq, Debug, Compare)
+pub(all) enum Timestamp {
+  Timestamp(Int64)
+} derive(Eq, Debug, Compare)
 
 ///|
 /// Duration represents a span of time, in nanoseconds.
-pub(all) struct Duration(Int64) derive(Eq, Debug, Compare)
+pub(all) enum Duration {
+  Duration(Int64)
+} derive(Eq, Debug, Compare)
 
 ///|
 /// NicHandle is an opaque network interface handle provided by the HAL backend.

@@ -1,0 +1,5 @@
+///|
+#proof_import("array.Array")
+predicate _mailbox_array_proof_model(_xs : FixedArray[Int]) {
+  true
+}

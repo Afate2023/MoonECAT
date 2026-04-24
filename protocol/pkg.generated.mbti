@@ -599,11 +599,11 @@ pub impl Show for ScanResult
 
 pub(all) struct SlaveInfo {
   position : Int
-  mut configured_address : UInt
+  configured_address : UInt
   identity : @hal.SlaveIdentity
-  mut al_status : EsmState
+  al_status : EsmState
   dl_status : UInt
-  mut sii : @mailbox.SiiData?
+  sii : @mailbox.SiiData?
 } derive(@debug.Debug)
 pub fn SlaveInfo::to_string(Self) -> String
 pub impl Show for SlaveInfo

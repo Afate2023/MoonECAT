@@ -11,3 +11,7 @@ import {
   "afate/MoonECAT/hal/mock",
   "moonbitlang/core/bench",
 } for "test"
+
+options(
+  "proof-enabled": true,
+)

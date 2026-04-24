@@ -46,9 +46,9 @@ pub fn DiagnosticEvent::new(Timestamp, Severity, String, String) -> Self
 pub fn DiagnosticEvent::to_string(Self) -> String
 pub impl Show for DiagnosticEvent
 
-pub(all) struct Duration(Int64) derive(Compare, Eq, @debug.Debug)
-#deprecated
-pub fn Duration::inner(Self) -> Int64
+pub(all) enum Duration {
+  Duration(Int64)
+} derive(Compare, Eq, @debug.Debug)
 pub fn Duration::to_string(Self) -> String
 pub impl Show for Duration
 
@@ -168,9 +168,9 @@ pub(all) enum SlavePresence {
 pub fn SlavePresence::to_string(Self) -> String
 pub impl Show for SlavePresence
 
-pub(all) struct Timestamp(Int64) derive(Compare, Eq, @debug.Debug)
-#deprecated
-pub fn Timestamp::inner(Self) -> Int64
+pub(all) enum Timestamp {
+  Timestamp(Int64)
+} derive(Compare, Eq, @debug.Debug)
 pub fn Timestamp::to_string(Self) -> String
 pub impl Show for Timestamp
 

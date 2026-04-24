@@ -1327,8 +1327,6 @@ pub impl Show for SimStepResult
 pub(all) struct SimTime(Int64) derive(Compare, Eq, @debug.Debug)
 pub fn SimTime::advance(Self, Int64) -> Self
 pub fn SimTime::from_ns(Int64) -> Self
-#deprecated
-pub fn SimTime::inner(Self) -> Int64
 pub fn SimTime::to_ns(Self) -> Int64
 pub fn SimTime::to_string(Self) -> String
 pub fn SimTime::zero() -> Self
