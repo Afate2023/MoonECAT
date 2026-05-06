@@ -56,6 +56,9 @@ moon run cmd/main run -- --backend native --if <interface> --json
   `state --station 4097 --path --state preop` => `current_state=Init`、`final_state=PreOp`、`status_code=0`；
   `od --station 4097` => 成功返回 `OD List` 索引数组；
   `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
+- 2026-04-23 Windows Npcap 同链路 + EX_CA20 ESI（接口 `\\Device\\NPF_{82A62AE6-53AD-431E-8283-4E7F3F2CE4B3}`，ESI=`References/VT_EX_CA20_20250225.esi.json`）实测：
+  `run --backend native-windows-npcap --if '\\Device\\NPF_{82A62AE6-53AD-431E-8283-4E7F3F2CE4B3}' --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --startup-state op --shutdown-state none --cycles 20 --timeout-ms 50 --record artifacts/real-device-20260423-esi.ndjson` => `Slaves found: 1`、`Validation: PASS`、`Cycles: 20/20 OK`、`Phase: Done`、`Fault: none`；
+  `replay --trace artifacts/real-device-20260423-esi.ndjson --cycles 20` => `Verdict: Pass`、`Cycles: 20/20 OK`，但在未附带 `--scan-json` 时 replay 侧探测结果退化为 `Slaves found: 0`，因此证据级回放应同时归档 live `scan --json`
 - 2026-04-20 Linux Raw Socket（`eno1`，单从站 `VT_EX_CA20_20250225.esi.json`）实测：
   `list-if --backend native-linux-raw --json` => 成功枚举 `lo / enp1s0 / eno1 / wlp3s0`；
   错误路径：坏接口名 / 空接口名 / 超长接口名稳定返回 `ConfigMismatch`，无 raw-socket 权限稳定返回 `NotSupported("Operation not permitted")`；
@@ -99,6 +102,7 @@ moon test hal/native/native_test.mbt --target native
 - Windows Npcap：接口枚举、open/send/recv/close、运行时动态加载已实现
 - Linux Raw Socket：接口枚举、open/send/recv/close 已实现
 - 真实 `scan/validate/run` 回归通过 `scripts/regression-real-device.ps1` 驱动；`--record <ndjson>` 把帧级事件流落盘，`scripts/replay-diff.ps1` 把同一份 NDJSON 通过 `cmd/main replay --trace ... --json` 重放并与 live `run-summary` 做稳定字段（slave_count / topology_fingerprint / verdict）比对
+- 对真实 `--record <ndjson>` 产物做 replay 时，若希望保留 live `slave_count` / topology 证据，应同时保留 `scan --json` 并在 replay 时传入 `--scan-json <path>`；仅依赖 NDJSON 时，replay 的 probe 可能回退成 `0 slaves`
 - CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
 - `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现（包括 `NativeNic`）包成可记录链路，不再局限于 `VirtualNic`
 
