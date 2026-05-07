@@ -2,6 +2,7 @@ import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/mailbox",
+  "afate/MoonECAT/runtime/hil" @hil,
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
@@ -10,4 +11,6 @@ import {
 
 import {
   "afate/MoonECAT/hal/mock",
+  "afate/MoonECAT/runtime/analysis" @analysis,
+  "afate/MoonECAT/runtime/simulation" @simulation,
 } for "test"

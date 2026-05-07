@@ -230,6 +230,14 @@ pub fn RecordingNic::get_log(Self) -> NicEventLog
 pub fn RecordingNic::wrap(VirtualNic) -> Self
 pub impl @hal.Nic for RecordingNic
 
+pub(all) struct RecordingNicAdapter[N] {
+  inner : N
+  log : NicEventLog
+}
+pub fn[N] RecordingNicAdapter::get_log(Self[N]) -> NicEventLog
+pub fn[N] RecordingNicAdapter::wrap(N) -> Self[N]
+pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N]
+
 pub struct ReplayNic {
   log : NicEventLog
   mut cursor : Int

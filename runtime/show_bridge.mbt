@@ -1,24 +1,4 @@
 ///|
-pub impl Show for QualityTrend with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn QualityTrend::to_string(self : QualityTrend) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for QualityGrade with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn QualityGrade::to_string(self : QualityGrade) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
 pub impl Show for ConfigurationSource with output(self, logger) {
   logger.write_string(@debug.render(Debug::to_repr(self)))
 }
@@ -93,66 +73,6 @@ pub impl Show for ConfigurationComparisonReport with output(self, logger) {
 pub fn ConfigurationComparisonReport::to_string(
   self : ConfigurationComparisonReport,
 ) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for SimTime with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn SimTime::to_string(self : SimTime) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for SimStepResult with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn SimStepResult::to_string(self : SimStepResult) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for CoSimConfig with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn CoSimConfig::to_string(self : CoSimConfig) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for CycleSnapshot with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn CycleSnapshot::to_string(self : CycleSnapshot) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for CycleDirective with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn CycleDirective::to_string(self : CycleDirective) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for PerfTrend with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn PerfTrend::to_string(self : PerfTrend) -> String {
   @debug.render(Debug::to_repr(self))
 }
 
@@ -245,40 +165,6 @@ pub impl Show for DiagnosticSurface with output(self, logger) {
 
 ///|
 pub fn DiagnosticSurface::to_string(self : DiagnosticSurface) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for DriftCompensationGains with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn DriftCompensationGains::to_string(
-  self : DriftCompensationGains,
-) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for DriftCompensator with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn DriftCompensator::to_string(self : DriftCompensator) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for DriftCompensationReport with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn DriftCompensationReport::to_string(
-  self : DriftCompensationReport,
-) -> String {
   @debug.render(Debug::to_repr(self))
 }
 
@@ -483,56 +369,6 @@ pub fn EsiJsonDocument::to_string(self : EsiJsonDocument) -> String {
 }
 
 ///|
-pub impl Show for BridgeTransport with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn BridgeTransport::to_string(self : BridgeTransport) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for ExternalBridgeConfig with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn ExternalBridgeConfig::to_string(self : ExternalBridgeConfig) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for BridgeState with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn BridgeState::to_string(self : BridgeState) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for ExternalProcessBridge with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn ExternalProcessBridge::to_string(self : ExternalProcessBridge) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for HilSessionSummary with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn HilSessionSummary::to_string(self : HilSessionSummary) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
 pub impl Show for MasterOdDataType with output(self, logger) {
   logger.write_string(@debug.render(Debug::to_repr(self)))
 }
@@ -591,16 +427,6 @@ pub impl Show for MasterIdentity with output(self, logger) {
 
 ///|
 pub fn MasterIdentity::to_string(self : MasterIdentity) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for MultiRateAnalysis with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn MultiRateAnalysis::to_string(self : MultiRateAnalysis) -> String {
   @debug.render(Debug::to_repr(self))
 }
 
@@ -713,26 +539,6 @@ pub fn SmWatchdogValidation::to_string(self : SmWatchdogValidation) -> String {
 }
 
 ///|
-pub impl Show for CycleResult with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn CycleResult::to_string(self : CycleResult) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for DcState with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn DcState::to_string(self : DcState) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
 pub impl Show for Runtime with output(self, logger) {
   logger.write_string(@debug.render(Debug::to_repr(self)))
 }
@@ -825,76 +631,6 @@ pub fn Telemetry::to_string(self : Telemetry) -> String {
 }
 
 ///|
-pub impl Show for ProcessImageSlice with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn ProcessImageSlice::to_string(self : ProcessImageSlice) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for TaskDescriptor with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn TaskDescriptor::to_string(self : TaskDescriptor) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for TaskSchedule with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn TaskSchedule::to_string(self : TaskSchedule) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for ClockDomain with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn ClockDomain::to_string(self : ClockDomain) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for DomainTimestamp with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn DomainTimestamp::to_string(self : DomainTimestamp) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for TimebaseSync with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn TimebaseSync::to_string(self : TimebaseSync) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for CycleTimingReport with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn CycleTimingReport::to_string(self : CycleTimingReport) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
 pub impl Show for TopologyFingerprint with output(self, logger) {
   logger.write_string(@debug.render(Debug::to_repr(self)))
 }
@@ -913,16 +649,6 @@ pub impl Show for TopologyFingerprintMatch with output(self, logger) {
 pub fn TopologyFingerprintMatch::to_string(
   self : TopologyFingerprintMatch,
 ) -> String {
-  @debug.render(Debug::to_repr(self))
-}
-
-///|
-pub impl Show for LinkGrade with output(self, logger) {
-  logger.write_string(@debug.render(Debug::to_repr(self)))
-}
-
-///|
-pub fn LinkGrade::to_string(self : LinkGrade) -> String {
   @debug.render(Debug::to_repr(self))
 }
 

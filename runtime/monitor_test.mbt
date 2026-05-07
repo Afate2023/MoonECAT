@@ -111,7 +111,7 @@ test "monitor_dc_drift: pass when disabled" {
 test "monitor_dc_drift: fail when drifting" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  rt.dc_state = @runtime.DcState::Drifting(42L)
+  rt.dc_state = @hil.DcState::Drifting(42L)
   let r = @runtime.monitor_dc_drift(rt)
   assert_true(r.verdict is Fail(_))
 }

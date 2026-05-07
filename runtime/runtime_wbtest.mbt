@@ -2919,22 +2919,6 @@ test "validate_grade_label Warn" {
   assert_eq(validate_grade_label(Warn), "WARN")
 }
 
-// ===== isqrt64 edge case =====
-
-///|
-test "isqrt64 zero and negative" {
-  assert_eq(isqrt64(0L), 0L)
-  assert_eq(isqrt64(-5L), 0L)
-}
-
-// ===== lcm edge case =====
-
-///|
-test "lcm with zero" {
-  assert_eq(lcm(0, 5), 0)
-  assert_eq(lcm(5, 0), 0)
-}
-
 // ===== validation_difference_issue Informational branch =====
 
 ///|
@@ -2984,35 +2968,6 @@ test "read_u32_le offset near end" {
   let data = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04', b'\x05'])
   // offset=2, needs 4 more bytes from offset=2 but only 3 available
   assert_eq(read_u32_le(data, 2), 0U)
-}
-
-// ===== compute_sync_offsets sync1_enabled =====
-
-///|
-test "compute_sync_offsets with sync1 enabled" {
-  let config : AutoTuneConfig = {
-    probe_iterations: 10,
-    probe_timeout_ns: 5_000_000L,
-    strategy: Balanced,
-    cycle_time_ns: 1_000_000L,
-    sync0_base_offset_ns: 1_000_000L,
-    sync1_enabled: true,
-    sync1_delta_ns: 500_000L,
-    safety_margin_permille: 100,
-  }
-  let probe : ProbeResult = {
-    station: 0x1001U,
-    forward_delay_ns: 100_000L,
-    reverse_delay_ns: 100_000L,
-    round_trip_ns: 200_000L,
-    recv_time_port0: 0L,
-    recv_time_port1: 0L,
-  }
-  let rec = compute_sync_offsets(config, probe)
-  // sync1 should be non-zero when enabled
-  assert_true(rec.sync1_offset_ns > 0L)
-  // sync1 = sync0 + sync1_delta_ns
-  assert_eq(rec.sync1_offset_ns, rec.sync0_offset_ns + 500_000L)
 }
 
 // ===== uint_to_hex zero =====
@@ -3090,7 +3045,6 @@ test "highest_diagnostic_level picks Block over Degrade" {
 
 // ============================================================
 // Batch 3 whitebox: diagnosis_timeout_step, escape_json,
-//   compute_sync_offsets sync1, validate negative propagation,
 //   eoe reassembly
 // ============================================================
 
@@ -3179,115 +3133,6 @@ test "escape_json with quotes and newlines" {
 ///|
 test "escape_json plain string unchanged" {
   assert_eq(escape_json("abc"), "abc")
-}
-
-// ===== compute_sync_offsets with sync1_enabled =====
-
-///|
-test "compute_sync_offsets sync1_enabled true produces nonzero sync1" {
-  let config : AutoTuneConfig = {
-    probe_iterations: 10,
-    probe_timeout_ns: 5_000_000L,
-    strategy: Balanced,
-    cycle_time_ns: 1_000_000L,
-    sync0_base_offset_ns: 1_000_000L,
-    sync1_enabled: true,
-    sync1_delta_ns: 500_000L,
-    safety_margin_permille: 100,
-  }
-  let avg : ProbeResult = {
-    station: 0x1001U,
-    forward_delay_ns: 100_000L,
-    reverse_delay_ns: 100_000L,
-    round_trip_ns: 200_000L,
-    recv_time_port0: 0L,
-    recv_time_port1: 0L,
-  }
-  let rec = compute_sync_offsets(config, avg)
-  assert_true(rec.sync1_offset_ns > 0L)
-  assert_true(rec.sync1_offset_ns > rec.sync0_offset_ns)
-}
-
-// ===== validate_recommendations sync1 over limit =====
-
-///|
-test "validate_recommendations sync1 over limit from whitebox" {
-  let config : AutoTuneConfig = {
-    probe_iterations: 5,
-    probe_timeout_ns: 5_000_000L,
-    strategy: Balanced,
-    cycle_time_ns: 1_000_000L,
-    sync0_base_offset_ns: 1_000_000L,
-    sync1_enabled: true,
-    sync1_delta_ns: 9_000_000L,
-    safety_margin_permille: 100,
-  }
-  let avg : ProbeResult = {
-    station: 0x1001U,
-    forward_delay_ns: 100_000L,
-    reverse_delay_ns: 100_000L,
-    round_trip_ns: 200_000L,
-    recv_time_port0: 0L,
-    recv_time_port1: 0L,
-  }
-  let rec = compute_sync_offsets(config, avg)
-  let tuner = PdoAutoTuner::new(config~)
-  let result = tuner.analyze([0x1001U], [
-    [
-      {
-        station: 0x1001U,
-        forward_delay_ns: 100_000L,
-        reverse_delay_ns: 100_000L,
-        round_trip_ns: 200_000L,
-        recv_time_port0: 100_000L,
-        recv_time_port1: 200_000L,
-      },
-    ],
-  ])
-  let errors = validate_recommendations(result, 2_000_000L)
-  // sync1 = sync0 + 9_000_000 which is >> 2_000_000
-  assert_true(
-    errors.iter().any(fn(s) { s.contains("Sync1") && s.contains("exceeds") }),
-  )
-  ignore(rec)
-}
-
-// ===== validate_recommendations negative propagation =====
-
-///|
-test "validate_recommendations negative propagation from whitebox" {
-  // Construct recommendation with negative propagation by using compute_sync_offsets
-  // with a probe that has negative forward_delay
-  let config : AutoTuneConfig = {
-    probe_iterations: 5,
-    probe_timeout_ns: 5_000_000L,
-    strategy: Balanced,
-    cycle_time_ns: 1_000_000L,
-    sync0_base_offset_ns: 0L,
-    sync1_enabled: false,
-    sync1_delta_ns: 0L,
-    safety_margin_permille: 0,
-  }
-  let avg : ProbeResult = {
-    station: 0x1001U,
-    forward_delay_ns: -500L,
-    reverse_delay_ns: 500L,
-    round_trip_ns: 0L,
-    recv_time_port0: 0L,
-    recv_time_port1: 0L,
-  }
-  let rec = compute_sync_offsets(config, avg)
-  // rec.propagation_delay_ns = avg.forward_delay_ns = -500
-  let result : AutoTuneResult = {
-    recommendations: [rec],
-    probe_data: [avg],
-    reference_station: 0x1001U,
-    measurement_duration_ns: 0L,
-    success: true,
-    messages: [],
-  }
-  let errors = validate_recommendations(result, 10_000_000L)
-  assert_true(errors.iter().any(fn(s) { s.contains("negative propagation") }))
 }
 
 // ===== EoeReassemblyBuffer is_complete with gap =====
@@ -3401,32 +3246,6 @@ test "diagnosis_restore_path covers all states" {
   assert_eq(path_init.length(), 2)
   let path_boot = diagnosis_restore_path(@protocol.Boot)
   assert_eq(path_boot.length(), 3)
-}
-
-// ===== step_result_to_parts =====
-
-///|
-test "step_result_to_parts Ok" {
-  let (status, msg, ns) = step_result_to_parts(Ok(SimTime::from_ns(12345L)))
-  assert_eq(status, "ok")
-  assert_eq(msg, "")
-  assert_eq(ns, 12345L)
-}
-
-///|
-test "step_result_to_parts Terminated" {
-  let (status, msg, ns) = step_result_to_parts(Terminated("done"))
-  assert_eq(status, "terminated")
-  assert_eq(msg, "done")
-  assert_eq(ns, 0L)
-}
-
-///|
-test "step_result_to_parts Error" {
-  let (status, msg, ns) = step_result_to_parts(Error("boom"))
-  assert_eq(status, "error")
-  assert_eq(msg, "boom")
-  assert_eq(ns, 0L)
 }
 
 // ── Batch 4: esi_json private helpers error paths ──
@@ -4464,34 +4283,6 @@ test "next_scan_station_address skips used" {
   assert_eq(addr, 0x1003U)
 }
 
-// ── Batch 4: topology_health compute_link_health_score ──
-
-///|
-test "compute_link_health_score with zero tx" {
-  let score = compute_link_health_score(0L, 0L, 0L, 0L, 300, 300, 300)
-  assert_eq(score, 1000)
-}
-
-///|
-test "compute_link_health_score perfect" {
-  let score = compute_link_health_score(1000L, 1000L, 0L, 0L, 300, 300, 300)
-  assert_eq(score, 1000)
-}
-
-///|
-test "compute_link_health_score with losses" {
-  let score = compute_link_health_score(1000L, 500L, 0L, 0L, 300, 300, 300)
-  // 500 lost / 1000 = 500‰, deduction = 500*300/1000=150
-  assert_eq(score, 850)
-}
-
-///|
-test "compute_link_health_score clamps to zero" {
-  // All frames lost + all timeouts + all WKC errors → max deduction
-  let score = compute_link_health_score(1L, 0L, 1L, 1L, 1000, 1000, 1000)
-  assert_eq(score, 0)
-}
-
 ///|
 // =====================================================
 // BATCH 5: coverage edge-case tests (whitebox)
@@ -4598,40 +4389,6 @@ test "merge_startup_mailbox_commands keeps derived presafeop commands and overri
 }
 
 ///|
-test "slices_overlap_output zero length" {
-  let a : ProcessImageSlice = {
-    output_offset: 0,
-    output_length: 0,
-    input_offset: 0,
-    input_length: 10,
-  }
-  let b : ProcessImageSlice = {
-    output_offset: 0,
-    output_length: 10,
-    input_offset: 0,
-    input_length: 10,
-  }
-  assert_true(slices_overlap_output(a, b) == false)
-}
-
-///|
-test "slices_overlap_input zero length" {
-  let a : ProcessImageSlice = {
-    output_offset: 0,
-    output_length: 10,
-    input_offset: 0,
-    input_length: 0,
-  }
-  let b : ProcessImageSlice = {
-    output_offset: 0,
-    output_length: 10,
-    input_offset: 0,
-    input_length: 10,
-  }
-  assert_true(slices_overlap_input(a, b) == false)
-}
-
-///|
 test "eni_json_document_from_configuration round trip" {
   let config : ConfigurationModel = {
     source: OnlineScan,
@@ -4674,36 +4431,6 @@ test "eni_json_document_from_configuration round trip" {
 }
 
 ///|
-test "AutoTuneResult to_json with multiple recommendations" {
-  let result : AutoTuneResult = {
-    success: true,
-    reference_station: 0x1001U,
-    recommendations: [
-      {
-        station: 0x1001U,
-        sync0_offset_ns: 100L,
-        sync1_offset_ns: 200L,
-        sync0_cycle_ns: 1_000_000L,
-        propagation_delay_ns: 50L,
-      },
-      {
-        station: 0x1002U,
-        sync0_offset_ns: 300L,
-        sync1_offset_ns: 400L,
-        sync0_cycle_ns: 1_000_000L,
-        propagation_delay_ns: 150L,
-      },
-    ],
-    probe_data: [],
-    measurement_duration_ns: 50_000_000L,
-    messages: ["msg1", "msg2"],
-  }
-  let j = result.to_json()
-  assert_true(j.contains("msg1"))
-  assert_true(j.contains("msg2"))
-}
-
-///|
 test "NullRunProgressSink emit no-op" {
   let sink = NullRunProgressSink::new()
   let progress : RunProgress = {
@@ -4717,62 +4444,6 @@ test "NullRunProgressSink emit no-op" {
     consecutive_timeouts: 0,
   }
   sink.emit(progress)
-}
-
-///|
-test "TopologyHealthReport to_json with bottleneck and warnings" {
-  let report : TopologyHealthReport = {
-    system_health_score: 900,
-    system_grade: Excellent,
-    max_propagation_delay_ns: 1000L,
-    total_cable_length_m: 10.0,
-    bottleneck_index: None,
-    slaves: [],
-    warnings: [],
-  }
-  let j = report.to_json()
-  assert_true(j.contains("null"))
-  // Now test with slaves and warnings for separator coverage
-  let report2 : TopologyHealthReport = {
-    system_health_score: 800,
-    system_grade: Good,
-    max_propagation_delay_ns: 2000L,
-    total_cable_length_m: 20.0,
-    bottleneck_index: Some(0),
-    slaves: [
-      {
-        station: 0x1001U,
-        position: 0,
-        propagation_delay_ns: 100L,
-        estimated_cable_length_m: 1.0,
-        tx_frames: 100L,
-        rx_frames: 99L,
-        timeouts: 0L,
-        wkc_errors: 0L,
-        loss_rate_permille: 10,
-        health_score: 950,
-        grade: Excellent,
-      },
-      {
-        station: 0x1002U,
-        position: 1,
-        propagation_delay_ns: 200L,
-        estimated_cable_length_m: 2.0,
-        tx_frames: 100L,
-        rx_frames: 98L,
-        timeouts: 1L,
-        wkc_errors: 0L,
-        loss_rate_permille: 20,
-        health_score: 900,
-        grade: Good,
-      },
-    ],
-    warnings: ["warning1", "warning2"],
-  }
-  let j2 = report2.to_json()
-  assert_true(j2.contains("warning1"))
-  assert_true(j2.contains("warning2"))
-  assert_true(j2.contains("4098")) // 0x1002 in decimal
 }
 
 ///|
@@ -5868,108 +5539,6 @@ test "parse_esi_json_selected_module with malformed json raises" {
   assert_true(result is Err(_))
 }
 
-// ===== Batch 21: multi_rate — non-harmonic and peak cycle analysis =====
-
-///|
-test "analyze_multi_rate non-harmonic schedule" {
-  let schedule : TaskSchedule = {
-    base_period_ns: 1_000_000L,
-    tasks: [
-      {
-        name: "t1",
-        priority: 0,
-        cycle_divisor: 3,
-        slice: {
-          output_offset: 0,
-          output_length: 4,
-          input_offset: 0,
-          input_length: 4,
-        },
-      },
-      {
-        name: "t2",
-        priority: 1,
-        cycle_divisor: 2,
-        slice: {
-          output_offset: 4,
-          output_length: 8,
-          input_offset: 4,
-          input_length: 8,
-        },
-      },
-    ],
-  }
-  let analysis = analyze_multi_rate(schedule)
-  // LCM(3,2) = 6
-  assert_eq(analysis.hyperperiod, 6)
-  // 3 is not a power of 2
-  assert_eq(analysis.is_harmonic, false)
-  // Cycle 0: both (count=2), Cycle 1: none, Cycle 2: t2 only, Cycle 3: t1 only, Cycle 4: t2 only, Cycle 5: none
-  assert_eq(analysis.worst_case_tasks_per_cycle, 2)
-  assert_eq(analysis.peak_cycles, [0])
-}
-
-///|
-test "analyze_multi_rate with multiple peak cycles" {
-  let schedule : TaskSchedule = {
-    base_period_ns: 1_000_000L,
-    tasks: [
-      {
-        name: "t1",
-        priority: 0,
-        cycle_divisor: 2,
-        slice: {
-          output_offset: 0,
-          output_length: 4,
-          input_offset: 0,
-          input_length: 4,
-        },
-      },
-    ],
-  }
-  let analysis = analyze_multi_rate(schedule)
-  // LCM(2) = 2, all powers of 2 → harmonic
-  assert_eq(analysis.hyperperiod, 2)
-  assert_eq(analysis.is_harmonic, true)
-  // Cycle 0: t1, Cycle 1: none → worst = 1, peaks = [0]
-  assert_eq(analysis.worst_case_tasks_per_cycle, 1)
-  assert_eq(analysis.peak_cycles, [0])
-}
-
-///|
-test "validate_multi_rate detects excessive hyperperiod" {
-  let schedule : TaskSchedule = {
-    base_period_ns: 1_000_000L,
-    tasks: [
-      {
-        name: "t1",
-        priority: 0,
-        cycle_divisor: 7,
-        slice: {
-          output_offset: 0,
-          output_length: 4,
-          input_offset: 0,
-          input_length: 4,
-        },
-      },
-      {
-        name: "t2",
-        priority: 1,
-        cycle_divisor: 13,
-        slice: {
-          output_offset: 4,
-          output_length: 8,
-          input_offset: 4,
-          input_length: 8,
-        },
-      },
-    ],
-  }
-  // LCM(7,13) = 91, exceeds max_hyperperiod = 8
-  let errors = validate_multi_rate(schedule, max_hyperperiod=8)
-  assert_true(errors.length() > 0)
-}
-
 // ===== Batch 23: resolve_selected_module_pdos missing module =====
 
 ///|
@@ -6013,134 +5582,4 @@ test "resolve_selected_module_pdos skips missing module_ident" {
   let (tx, rx) = resolve_selected_module_pdos(device, modules)
   assert_eq(tx.length(), 0)
   assert_eq(rx.length(), 0)
-}
-
-// ===== Batch 26: HilCycleHook Terminated/Error paths =====
-
-///|
-struct TerminatingAdapter {
-  mut call_count : Int
-  terminate_at : Int
-}
-
-///|
-impl CoSimAdapter for TerminatingAdapter with init_(self, _config) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for TerminatingAdapter with write_outputs(
-  self,
-  _image,
-  _slice,
-) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for TerminatingAdapter with step(self, current, dt) {
-  self.call_count += 1
-  if self.call_count >= self.terminate_at {
-    Terminated("limit reached")
-  } else {
-    Ok(current.advance(dt))
-  }
-}
-
-///|
-impl CoSimAdapter for TerminatingAdapter with read_inputs(self, _image, _slice) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for TerminatingAdapter with shutdown(self) {
-  ignore(self)
-}
-
-///|
-test "HilCycleHook on_post_cycle Terminated path" {
-  let adapter : TerminatingAdapter = { call_count: 0, terminate_at: 1 }
-  let schedule : TaskSchedule = { base_period_ns: 1_000_000L, tasks: [] }
-  let session = HilSession::new(1_000_000L, schedule)
-  let hook = HilCycleHook::new(adapter, session)
-  let image = @protocol.ProcessImage::new(0, 0)
-  let ctx : @protocol.PdoContext = {
-    image,
-    mappings: [],
-    logical_base: 0U,
-    logical_size: 0,
-    block_lrw: false,
-  }
-  let snap : CycleSnapshot = {
-    cycle: 0L,
-    result: None,
-    dc_state: Disabled,
-    recovery_pending: false,
-  }
-  let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, StopGraceful)
-  assert_true(hook.session.terminated)
-  assert_eq(hook.session.termination_reason, "limit reached")
-}
-
-///|
-struct ErrorAdapter {
-  mut call_count : Int
-  error_at : Int
-}
-
-///|
-impl CoSimAdapter for ErrorAdapter with init_(self, _config) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for ErrorAdapter with write_outputs(self, _image, _slice) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for ErrorAdapter with step(self, current, dt) {
-  self.call_count += 1
-  if self.call_count >= self.error_at {
-    Error("solver diverged")
-  } else {
-    Ok(current.advance(dt))
-  }
-}
-
-///|
-impl CoSimAdapter for ErrorAdapter with read_inputs(self, _image, _slice) {
-  ignore(self)
-}
-
-///|
-impl CoSimAdapter for ErrorAdapter with shutdown(self) {
-  ignore(self)
-}
-
-///|
-test "HilCycleHook on_post_cycle Error path" {
-  let adapter : ErrorAdapter = { call_count: 0, error_at: 1 }
-  let schedule : TaskSchedule = { base_period_ns: 1_000_000L, tasks: [] }
-  let session = HilSession::new(1_000_000L, schedule)
-  let hook = HilCycleHook::new(adapter, session)
-  let image = @protocol.ProcessImage::new(0, 0)
-  let ctx : @protocol.PdoContext = {
-    image,
-    mappings: [],
-    logical_base: 0U,
-    logical_size: 0,
-    block_lrw: false,
-  }
-  let snap : CycleSnapshot = {
-    cycle: 0L,
-    result: None,
-    dc_state: Disabled,
-    recovery_pending: false,
-  }
-  let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, StopGraceful)
-  assert_true(hook.session.terminated)
-  assert_eq(hook.session.termination_reason, "solver diverged")
 }

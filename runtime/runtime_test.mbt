@@ -685,18 +685,18 @@ test "Runtime run_cycle without pdo_ctx raises Internal error" {
 
 ///|
 test "DcState display" {
-  inspect(@runtime.DcState::Disabled, content="Disabled")
-  inspect(@runtime.DcState::Measuring, content="Measuring")
-  inspect(@runtime.DcState::Locked, content="Locked")
-  inspect(@runtime.DcState::Drifting(100L), content="Drifting(100)")
+  inspect(@hil.DcState::Disabled, content="Disabled")
+  inspect(@hil.DcState::Measuring, content="Measuring")
+  inspect(@hil.DcState::Locked, content="Locked")
+  inspect(@hil.DcState::Drifting(100L), content="Drifting(100)")
 }
 
 ///|
 test "CycleResult equality" {
-  let r1 : @runtime.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
-  let r2 : @runtime.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
+  let r1 : @hil.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
+  let r2 : @hil.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
   assert_eq(r1, r2)
-  let r3 : @runtime.CycleResult = { wkc: 1U, expected_wkc: 3U, ok: false }
+  let r3 : @hil.CycleResult = { wkc: 1U, expected_wkc: 3U, ok: false }
   assert_true(r1 != r3)
 }
 
@@ -3772,7 +3772,7 @@ test "validation_difference_grade Block for IdentityMismatch" {
 
 ///|
 test "TopologyHealthAnalyzer perfect slave scores 1000" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   for i = 0; i < 100; i = i + 1 {
     analyzer.record_cycle(0, 1L, 1L, false, true)
@@ -3784,13 +3784,13 @@ test "TopologyHealthAnalyzer perfect slave scores 1000" {
   assert_eq(report.slaves[0].timeouts, 0L)
   assert_eq(report.slaves[0].wkc_errors, 0L)
   assert_eq(report.slaves[0].health_score, 1000)
-  assert_true(report.slaves[0].grade is @runtime.LinkGrade::Excellent)
+  assert_true(report.slaves[0].grade is @analysis.LinkGrade::Excellent)
   assert_eq(report.system_health_score, 1000)
 }
 
 ///|
 test "TopologyHealthAnalyzer degraded slave" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 1000L)
   for i = 0; i < 100; i = i + 1 {
     let timeout = i < 50
@@ -3805,7 +3805,7 @@ test "TopologyHealthAnalyzer degraded slave" {
 
 ///|
 test "TopologyHealthAnalyzer empty returns default score" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   let report = analyzer.analyze()
   assert_eq(report.slaves.length(), 0)
   // Empty analyzer defaults to perfect score (no errors observed)
@@ -3814,7 +3814,7 @@ test "TopologyHealthAnalyzer empty returns default score" {
 
 ///|
 test "TopologyHealthAnalyzer cable length estimation" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   for _i = 0; _i < 10; _i = _i + 1 {
     analyzer.record_cycle(0, 1L, 1L, false, true)
@@ -3827,7 +3827,7 @@ test "TopologyHealthAnalyzer cable length estimation" {
 
 ///|
 test "TopologyHealthAnalyzer bottleneck detection" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   analyzer.add_slave(0x1002U, 1, 1000L)
   for _i = 0; _i < 100; _i = _i + 1 {
@@ -3840,7 +3840,7 @@ test "TopologyHealthAnalyzer bottleneck detection" {
 
 ///|
 test "TopologyHealthAnalyzer record_cycle out of bounds ignored" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   analyzer.record_cycle(99, 1L, 1L, false, true)
   analyzer.record_cycle(-1, 1L, 1L, false, true)
@@ -3850,7 +3850,7 @@ test "TopologyHealthAnalyzer record_cycle out of bounds ignored" {
 
 ///|
 test "TopologyHealthAnalyzer ingest_telemetry" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   analyzer.ingest_telemetry(0, 1000L, 990L, 5L, 3L)
   let report = analyzer.analyze()
@@ -3862,7 +3862,7 @@ test "TopologyHealthAnalyzer ingest_telemetry" {
 
 ///|
 test "TopologyHealthReport to_json contains slave data" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 500L)
   analyzer.record_cycle(0, 1L, 1L, false, true)
   let report = analyzer.analyze()
@@ -3873,15 +3873,17 @@ test "TopologyHealthReport to_json contains slave data" {
 
 ///|
 test "estimate_cable_length basic" {
-  let len = @runtime.estimate_cable_length(500L)
+  let len = @analysis.estimate_cable_length(500L)
   assert_true(len > 99.0)
   assert_true(len < 101.0)
 }
 
 ///|
 test "grade_from_score boundaries" {
-  assert_true(@runtime.grade_from_score(1000) is @runtime.LinkGrade::Excellent)
-  assert_true(@runtime.grade_from_score(0) is @runtime.LinkGrade::Critical)
+  assert_true(
+    @analysis.grade_from_score(1000) is @analysis.LinkGrade::Excellent,
+  )
+  assert_true(@analysis.grade_from_score(0) is @analysis.LinkGrade::Critical)
 }
 
 // ===== Coverage: verification_report.mbt =====
@@ -4453,58 +4455,60 @@ test "diagnostic_surface_from_validate with differences" {
 ///|
 test "quality_grade_from_score boundaries" {
   assert_true(
-    @runtime.quality_grade_from_score(1000) is @runtime.QualityGrade::Excellent,
+    @analysis.quality_grade_from_score(1000)
+    is @analysis.QualityGrade::Excellent,
   )
   assert_true(
-    @runtime.quality_grade_from_score(900) is @runtime.QualityGrade::Excellent,
+    @analysis.quality_grade_from_score(900) is @analysis.QualityGrade::Excellent,
   )
   assert_true(
-    @runtime.quality_grade_from_score(899) is @runtime.QualityGrade::Good,
+    @analysis.quality_grade_from_score(899) is @analysis.QualityGrade::Good,
   )
   assert_true(
-    @runtime.quality_grade_from_score(750) is @runtime.QualityGrade::Good,
+    @analysis.quality_grade_from_score(750) is @analysis.QualityGrade::Good,
   )
   assert_true(
-    @runtime.quality_grade_from_score(500) is @runtime.QualityGrade::Acceptable,
+    @analysis.quality_grade_from_score(500)
+    is @analysis.QualityGrade::Acceptable,
   )
   assert_true(
-    @runtime.quality_grade_from_score(250) is @runtime.QualityGrade::Poor,
+    @analysis.quality_grade_from_score(250) is @analysis.QualityGrade::Poor,
   )
   assert_true(
-    @runtime.quality_grade_from_score(249) is @runtime.QualityGrade::Critical,
+    @analysis.quality_grade_from_score(249) is @analysis.QualityGrade::Critical,
   )
   assert_true(
-    @runtime.quality_grade_from_score(0) is @runtime.QualityGrade::Critical,
+    @analysis.quality_grade_from_score(0) is @analysis.QualityGrade::Critical,
   )
 }
 
 ///|
 test "score_dimension perfect value" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "loss",
     value: 0L,
     good_threshold: 0L,
     bad_threshold: 100L,
     weight: 100,
   }
-  assert_eq(@runtime.score_dimension(dim), 1000)
+  assert_eq(@analysis.score_dimension(dim), 1000)
 }
 
 ///|
 test "score_dimension worst value" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "loss",
     value: 200L,
     good_threshold: 0L,
     bad_threshold: 100L,
     weight: 100,
   }
-  assert_eq(@runtime.score_dimension(dim), 0)
+  assert_eq(@analysis.score_dimension(dim), 0)
 }
 
 ///|
 test "compute_quality_score single dimension" {
-  let dims : Array[@runtime.QualityDimension] = [
+  let dims : Array[@analysis.QualityDimension] = [
     {
       name: "loss",
       value: 0L,
@@ -4513,7 +4517,7 @@ test "compute_quality_score single dimension" {
       weight: 100,
     },
   ]
-  let (score, breakdown) = @runtime.compute_quality_score(dims)
+  let (score, breakdown) = @analysis.compute_quality_score(dims)
   assert_eq(score, 1000)
   assert_eq(breakdown.length(), 1)
   assert_eq(breakdown[0].0, "loss")
@@ -4521,7 +4525,7 @@ test "compute_quality_score single dimension" {
 
 ///|
 test "compute_quality_score mixed dimensions" {
-  let dims : Array[@runtime.QualityDimension] = [
+  let dims : Array[@analysis.QualityDimension] = [
     {
       name: "loss",
       value: 0L,
@@ -4537,32 +4541,32 @@ test "compute_quality_score mixed dimensions" {
       weight: 50,
     },
   ]
-  let (score, _) = @runtime.compute_quality_score(dims)
+  let (score, _) = @analysis.compute_quality_score(dims)
   // 50% perfect + 50% worst → ~500
   assert_eq(score, 500)
 }
 
 ///|
 test "CommQualityScorer lifecycle" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   // Perfect telemetry: 1000 cycles, 0 timeouts, 0 wkc errors, 0 retries
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   assert_eq(qs.overall, 1000)
-  assert_true(qs.grade is @runtime.QualityGrade::Excellent)
+  assert_true(qs.grade is @analysis.QualityGrade::Excellent)
   scorer.record_score(qs.overall)
-  assert_true(scorer.trend() is @runtime.QualityTrend::Stable)
+  assert_true(scorer.trend() is @analysis.QualityTrend::Stable)
 }
 
 ///|
 test "CommQualityScorer degraded telemetry" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(1000L, 200L, 100L, 50L)
   assert_true(qs.overall < 1000)
 }
 
 ///|
 test "CommQualityScorer trend degrading" {
-  let scorer = @runtime.CommQualityScorer::new(history_size=5)
+  let scorer = @analysis.CommQualityScorer::new(history_size=5)
   // Window 1: 5 high scores → prev_window_avg = 800
   for i = 0; i < 5; i = i + 1 {
     scorer.record_score(800)
@@ -4578,22 +4582,22 @@ test "CommQualityScorer trend degrading" {
   }
   // sample_count=14 ≥ 10. History buffer: [100,100,100,100,700]. avg=200
   // 200 + 50 < 700 → Degrading
-  assert_true(scorer.trend() is @runtime.QualityTrend::Degrading)
+  assert_true(scorer.trend() is @analysis.QualityTrend::Degrading)
 }
 
 ///|
 test "CommQualityScorer trend stable" {
-  let scorer = @runtime.CommQualityScorer::new(history_size=5)
+  let scorer = @analysis.CommQualityScorer::new(history_size=5)
   // Not enough samples for non-Stable trend
   for i = 0; i < 5; i = i + 1 {
     scorer.record_score(800)
   }
-  assert_true(scorer.trend() is @runtime.QualityTrend::Stable)
+  assert_true(scorer.trend() is @analysis.QualityTrend::Stable)
 }
 
 ///|
 test "QualityScore to_json contains fields" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(100L, 100L, 0L, 0L)
   let json = qs.to_json()
   assert_true(json.contains("overall"))
@@ -4748,7 +4752,7 @@ test "VerificationReport to_json with multiple monitors and timeline" {
 
 ///|
 test "TopologyHealthReport to_json multi-slave and warnings" {
-  let analyzer = @runtime.TopologyHealthAnalyzer::new()
+  let analyzer = @analysis.TopologyHealthAnalyzer::new()
   analyzer.add_slave(0x1001U, 0, 0L)
   analyzer.add_slave(0x1002U, 1, 100L)
   // Record enough cycles to have data
@@ -4767,7 +4771,7 @@ test "TopologyHealthReport to_json multi-slave and warnings" {
 
 ///|
 test "CyclePerfAnalyzer record with window update" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
+  let analyzer = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
   // Record enough timestamps to fill the window
   for i = 0; i < 7; i = i + 1 {
     analyzer.record(i.to_int64() * 1_000_000L)
@@ -4780,7 +4784,7 @@ test "CyclePerfAnalyzer record with window update" {
 
 ///|
 test "CyclePerfAnalyzer record_duration with deadline miss" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(
+  let analyzer = @analysis.CyclePerfAnalyzer::new(
     1_000_000L,
     deadline_tolerance_ns=100_000L,
   )
@@ -4795,7 +4799,7 @@ test "CyclePerfAnalyzer record_duration with deadline miss" {
 
 ///|
 test "CyclePerfAnalyzer trend degrading" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
+  let analyzer = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=5)
   // Window 1: 5 normal cycles → prev_window_mean set
   for i = 0; i < 5; i = i + 1 {
     analyzer.record_duration(1_000_000L)
@@ -4809,12 +4813,12 @@ test "CyclePerfAnalyzer trend degrading" {
     analyzer.record_duration(5_000_000L)
   }
   // total_cycles=14 >= 10. current_mean > prev_window_mean + threshold → Degrading
-  assert_true(analyzer.trend() is @runtime.PerfTrend::Degrading)
+  assert_true(analyzer.trend() is @analysis.PerfTrend::Degrading)
 }
 
 ///|
 test "CyclePerfAnalyzer stats with zero cycles" {
-  let analyzer = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let analyzer = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   let stats = analyzer.stats()
   assert_eq(stats.total_cycles, 0L)
   assert_eq(stats.min_ns, 0L)
@@ -4825,11 +4829,11 @@ test "CyclePerfAnalyzer stats with zero cycles" {
 
 ///|
 test "analyze_multi_rate empty tasks" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   assert_eq(analysis.hyperperiod, 1)
   assert_eq(analysis.worst_case_tasks_per_cycle, 0)
   assert_true(analysis.is_harmonic)
@@ -4838,7 +4842,7 @@ test "analyze_multi_rate empty tasks" {
 ///|
 test "analyze_multi_rate non-harmonic with peak tie" {
   // Use divisors 3 and 5 → non-harmonic, hyperperiod = 15
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -4865,7 +4869,7 @@ test "analyze_multi_rate non-harmonic with peak tie" {
       },
     ],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   assert_eq(analysis.hyperperiod, 15)
   assert_true(!analysis.is_harmonic)
   // Cycle 0: both t1 and t2 fire → 2 tasks. Other cycles have ≤1.
@@ -4874,7 +4878,7 @@ test "analyze_multi_rate non-harmonic with peak tie" {
 
 ///|
 test "validate_multi_rate detects hyperperiod exceeds" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -4902,14 +4906,14 @@ test "validate_multi_rate detects hyperperiod exceeds" {
     ],
   }
   // hyperperiod = 77, set max to 50
-  let errors = @runtime.validate_multi_rate(schedule, max_hyperperiod=50)
+  let errors = @simulation.validate_multi_rate(schedule, max_hyperperiod=50)
   assert_true(errors.length() > 0)
   assert_true(errors[0].contains("Hyperperiod"))
 }
 
 ///|
 test "validate_multi_rate detects IO exceeds" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -4925,7 +4929,7 @@ test "validate_multi_rate detects IO exceeds" {
       },
     ],
   }
-  let errors = @runtime.validate_multi_rate(
+  let errors = @simulation.validate_multi_rate(
     schedule,
     max_io_bytes_per_cycle=100,
   )
@@ -4935,9 +4939,9 @@ test "validate_multi_rate detects IO exceeds" {
 ///|
 test "validate_multi_rate detects tasks exceeds" {
   // 3 tasks all with divisor 1 → all fire every cycle
-  let tasks : Array[@runtime.TaskDescriptor] = []
+  let tasks : Array[@simulation.TaskDescriptor] = []
   for i = 0; i < 3; i = i + 1 {
-    let slice : @runtime.ProcessImageSlice = {
+    let slice : @simulation.ProcessImageSlice = {
       output_offset: i * 10,
       output_length: 5,
       input_offset: i * 10,
@@ -4950,14 +4954,17 @@ test "validate_multi_rate detects tasks exceeds" {
       slice,
     })
   }
-  let schedule : @runtime.TaskSchedule = { base_period_ns: 1_000_000L, tasks }
-  let errors = @runtime.validate_multi_rate(schedule, max_tasks_per_cycle=2)
+  let schedule : @simulation.TaskSchedule = {
+    base_period_ns: 1_000_000L,
+    tasks,
+  }
+  let errors = @simulation.validate_multi_rate(schedule, max_tasks_per_cycle=2)
   assert_true(errors.iter().any(fn(s) { s.contains("tasks per cycle") }))
 }
 
 ///|
 test "validate_multi_rate non-harmonic warning" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -4973,7 +4980,7 @@ test "validate_multi_rate non-harmonic warning" {
       },
     ],
   }
-  let errors = @runtime.validate_multi_rate(schedule)
+  let errors = @simulation.validate_multi_rate(schedule)
   assert_true(errors.iter().any(fn(s) { s.contains("non-harmonic") }))
 }
 
@@ -4981,9 +4988,9 @@ test "validate_multi_rate non-harmonic warning" {
 
 ///|
 test "AutoTuneConfig conservative and aggressive" {
-  let c = @runtime.AutoTuneConfig::conservative()
+  let c = @analysis.AutoTuneConfig::conservative()
   assert_eq(c.probe_iterations, 20)
-  let a = @runtime.AutoTuneConfig::aggressive()
+  let a = @analysis.AutoTuneConfig::aggressive()
   assert_eq(a.probe_iterations, 5)
 }
 
@@ -4991,7 +4998,7 @@ test "AutoTuneConfig conservative and aggressive" {
 
 ///|
 test "hil_session_to_json with multiple tasks and steps" {
-  let t1 : @runtime.TaskDescriptor = {
+  let t1 : @simulation.TaskDescriptor = {
     name: "task_a",
     priority: 0,
     cycle_divisor: 1,
@@ -5002,7 +5009,7 @@ test "hil_session_to_json with multiple tasks and steps" {
       input_length: 4,
     },
   }
-  let t2 : @runtime.TaskDescriptor = {
+  let t2 : @simulation.TaskDescriptor = {
     name: "task_b",
     priority: 1,
     cycle_divisor: 2,
@@ -5013,17 +5020,17 @@ test "hil_session_to_json with multiple tasks and steps" {
       input_length: 4,
     },
   }
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [t1, t2],
   }
-  let session = @runtime.HilSession::new(1_000_000L, schedule)
+  let session = @hil.HilSession::new(1_000_000L, schedule)
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(1_000_000L)),
   )
-  session.step_log.push(@runtime.SimStepResult::Terminated("done"))
-  session.step_log.push(@runtime.SimStepResult::Error("oops"))
-  let json = @runtime.hil_session_to_json(session)
+  session.step_log.push(@simulation.SimStepResult::Terminated("done"))
+  session.step_log.push(@simulation.SimStepResult::Error("oops"))
+  let json = @hil.hil_session_to_json(session)
   assert_true(json.contains("task_a"))
   assert_true(json.contains("task_b"))
   assert_true(json.contains("terminated"))
@@ -5032,19 +5039,19 @@ test "hil_session_to_json with multiple tasks and steps" {
 
 ///|
 test "hil_session_summary with terminated step" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [],
   }
-  let session = @runtime.HilSession::new(1_000_000L, schedule)
+  let session = @hil.HilSession::new(1_000_000L, schedule)
   session.step_log.push(
-    @runtime.SimStepResult::Ok(@runtime.SimTime::from_ns(1_000_000L)),
+    @simulation.SimStepResult::Ok(@simulation.SimTime::from_ns(1_000_000L)),
   )
-  session.step_log.push(@runtime.SimStepResult::Terminated("timeout"))
-  session.step_log.push(@runtime.SimStepResult::Error("fail"))
+  session.step_log.push(@simulation.SimStepResult::Terminated("timeout"))
+  session.step_log.push(@simulation.SimStepResult::Error("fail"))
   session.terminated = true
   session.termination_reason = "timeout"
-  let summary = @runtime.hil_session_summary(session)
+  let summary = @hil.hil_session_summary(session)
   assert_eq(summary.total_steps, 3)
   assert_eq(summary.ok_steps, 2) // Ok + Terminated count as ok
   assert_eq(summary.error_steps, 1)
@@ -5090,91 +5097,91 @@ test "ScanReport format with alias and multiple slaves" {
 
 ///|
 test "build_task_schedule returns None for overlapping inputs" {
-  let s1 : @runtime.ProcessImageSlice = {
+  let s1 : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 10,
     input_offset: 0,
     input_length: 20,
   }
-  let s2 : @runtime.ProcessImageSlice = {
+  let s2 : @simulation.ProcessImageSlice = {
     output_offset: 20,
     output_length: 10,
     input_offset: 10,
     input_length: 20,
   }
-  let t1 : @runtime.TaskDescriptor = {
+  let t1 : @simulation.TaskDescriptor = {
     name: "t1",
     priority: 0,
     cycle_divisor: 1,
     slice: s1,
   }
-  let t2 : @runtime.TaskDescriptor = {
+  let t2 : @simulation.TaskDescriptor = {
     name: "t2",
     priority: 1,
     cycle_divisor: 1,
     slice: s2,
   }
-  let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
+  let result = @simulation.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is None)
 }
 
 ///|
 test "build_task_schedule returns None for overlapping outputs" {
-  let s1 : @runtime.ProcessImageSlice = {
+  let s1 : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 20,
     input_offset: 100,
     input_length: 10,
   }
-  let s2 : @runtime.ProcessImageSlice = {
+  let s2 : @simulation.ProcessImageSlice = {
     output_offset: 10,
     output_length: 20,
     input_offset: 200,
     input_length: 10,
   }
-  let t1 : @runtime.TaskDescriptor = {
+  let t1 : @simulation.TaskDescriptor = {
     name: "t1",
     priority: 0,
     cycle_divisor: 1,
     slice: s1,
   }
-  let t2 : @runtime.TaskDescriptor = {
+  let t2 : @simulation.TaskDescriptor = {
     name: "t2",
     priority: 1,
     cycle_divisor: 1,
     slice: s2,
   }
-  let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
+  let result = @simulation.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is None)
 }
 
 ///|
 test "build_task_schedule success with non-overlapping slices" {
-  let s1 : @runtime.ProcessImageSlice = {
+  let s1 : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 10,
     input_offset: 0,
     input_length: 10,
   }
-  let s2 : @runtime.ProcessImageSlice = {
+  let s2 : @simulation.ProcessImageSlice = {
     output_offset: 10,
     output_length: 10,
     input_offset: 10,
     input_length: 10,
   }
-  let t1 : @runtime.TaskDescriptor = {
+  let t1 : @simulation.TaskDescriptor = {
     name: "t1",
     priority: 0,
     cycle_divisor: 1,
     slice: s1,
   }
-  let t2 : @runtime.TaskDescriptor = {
+  let t2 : @simulation.TaskDescriptor = {
     name: "t2",
     priority: 1,
     cycle_divisor: 2,
     slice: s2,
   }
-  let result = @runtime.build_task_schedule(1_000_000L, [t1, t2])
+  let result = @simulation.build_task_schedule(1_000_000L, [t1, t2])
   assert_true(result is Some(_))
 }
 
@@ -5183,14 +5190,14 @@ test "build_task_schedule success with non-overlapping slices" {
 ///|
 test "write_slice_outputs_inplace partial" {
   let image = @hal.MutableProcessImage::new(16, 16)
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 4,
     output_length: 4,
     input_offset: 0,
     input_length: 4,
   }
   let src = FixedArray::make(8, b'\xFF')
-  @runtime.write_slice_outputs_inplace(image, slice, src, 2)
+  @simulation.write_slice_outputs_inplace(image, slice, src, 2)
   assert_eq(image.outputs[4], b'\xFF')
   assert_eq(image.outputs[0], b'\x00')
 }
@@ -5201,13 +5208,13 @@ test "slice_inputs_view returns correct range" {
   for i = 0; i < 16; i = i + 1 {
     image.inputs[i] = i.to_byte()
   }
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 4,
     input_offset: 4,
     input_length: 4,
   }
-  let (buf, offset, len) = @runtime.slice_inputs_view(image, slice)
+  let (buf, offset, len) = @simulation.slice_inputs_view(image, slice)
   assert_eq(offset, 4)
   assert_eq(len, 4)
   assert_eq(buf[offset], b'\x04')
@@ -5217,7 +5224,7 @@ test "slice_inputs_view returns correct range" {
 
 ///|
 test "CommQualityScorer trend improving" {
-  let scorer = @runtime.CommQualityScorer::new(history_size=5)
+  let scorer = @analysis.CommQualityScorer::new(history_size=5)
   // Window 1: 5 low scores → prev_window_avg = 200
   for i = 0; i < 5; i = i + 1 {
     scorer.record_score(200)
@@ -5231,12 +5238,12 @@ test "CommQualityScorer trend improving" {
     scorer.record_score(900)
   }
   // current_avg = (900*4 + 500)/5 = 820. 820 > 500 + 50 → Improving
-  assert_true(scorer.trend() is @runtime.QualityTrend::Improving)
+  assert_true(scorer.trend() is @analysis.QualityTrend::Improving)
 }
 
 ///|
 test "CommQualityScorer score_from_telemetry zero cycles" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(0L, 0L, 0L, 0L)
   // With zero cycles, all rates are 0 → perfect score
   assert_eq(qs.overall, 1000)
@@ -5814,7 +5821,7 @@ test "diagnostic_surface_from_run with retries telemetry" {
 
 ///|
 test "DriftCompensationGains aggressive" {
-  let gains = @runtime.DriftCompensationGains::aggressive()
+  let gains = @simulation.DriftCompensationGains::aggressive()
   assert_eq(gains.kp_num, 1L)
   assert_eq(gains.kp_den, 2L)
   assert_eq(gains.ki_num, 1L)
@@ -5823,7 +5830,7 @@ test "DriftCompensationGains aggressive" {
 
 ///|
 test "DriftCompensationGains conservative" {
-  let gains = @runtime.DriftCompensationGains::conservative()
+  let gains = @simulation.DriftCompensationGains::conservative()
   assert_eq(gains.kp_num, 1L)
   assert_eq(gains.kp_den, 10L)
   assert_eq(gains.ki_num, 1L)
@@ -5832,10 +5839,10 @@ test "DriftCompensationGains conservative" {
 
 ///|
 test "DriftCompensator compensate applies correction" {
-  let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let comp = @simulation.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   // First update: reference=1000, local=1100 => error = 100 - 0 = 100
   let correction = comp.compensate(sync, 1000L, 1100L)
@@ -5845,10 +5852,10 @@ test "DriftCompensator compensate applies correction" {
 
 ///|
 test "DriftCompensator report generates report" {
-  let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let comp = @simulation.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   // Do a few compensations
   for i = 0; i < 5; i = i + 1 {
@@ -5864,7 +5871,7 @@ test "DriftCompensator report generates report" {
 
 ///|
 test "CommQualityScorer trend with history" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   // Record strictly decreasing scores to get Degrading trend
   scorer.record_score(100)
   scorer.record_score(90)
@@ -5873,28 +5880,28 @@ test "CommQualityScorer trend with history" {
   let trend = scorer.trend()
   // Should detect degrading since scores are declining  
   assert_true(
-    trend is @runtime.QualityTrend::Degrading ||
-    trend is @runtime.QualityTrend::Stable ||
-    trend is @runtime.QualityTrend::Improving,
+    trend is @analysis.QualityTrend::Degrading ||
+    trend is @analysis.QualityTrend::Stable ||
+    trend is @analysis.QualityTrend::Improving,
   )
 }
 
 ///|
 test "score_dimension with value at bad threshold" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "timeouts",
     value: 100L,
     good_threshold: 0L,
     bad_threshold: 100L,
     weight: 1,
   }
-  let score = @runtime.score_dimension(dim)
+  let score = @analysis.score_dimension(dim)
   assert_true(score >= 0 && score <= 100)
 }
 
 ///|
 test "compute_quality_score with multiple dimensions" {
-  let dims : Array[@runtime.QualityDimension] = [
+  let dims : Array[@analysis.QualityDimension] = [
     {
       name: "timeouts",
       value: 0L,
@@ -5910,14 +5917,14 @@ test "compute_quality_score with multiple dimensions" {
       weight: 1,
     },
   ]
-  let (overall, per_dim) = @runtime.compute_quality_score(dims)
+  let (overall, per_dim) = @analysis.compute_quality_score(dims)
   assert_true(overall >= 0 && overall <= 1000)
   assert_eq(per_dim.length(), 2)
 }
 
 ///|
 test "CommQualityScorer score_from_telemetry with jitter" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let score = scorer.score_from_telemetry(
     1000L,
     5L,
@@ -6232,11 +6239,11 @@ test "monitor_pdo_configured expected_wkc zero warns" {
 
 ///|
 test "DriftCompensator compensate inactive returns zero" {
-  let comp = @runtime.DriftCompensator::new()
+  let comp = @simulation.DriftCompensator::new()
   comp.active = false
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   let correction = comp.compensate(sync, 1000L, 2000L)
   assert_eq(correction, 0L)
@@ -6246,10 +6253,10 @@ test "DriftCompensator compensate inactive returns zero" {
 
 ///|
 test "DriftCompensator integral windup positive clamp" {
-  let comp = @runtime.DriftCompensator::new(max_integral_ns=100L)
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let comp = @simulation.DriftCompensator::new(max_integral_ns=100L)
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   // Large error to exceed max_integral: measured_offset = local - ref = huge
   for i = 0; i < 50; i = i + 1 {
@@ -6261,10 +6268,10 @@ test "DriftCompensator integral windup positive clamp" {
 
 ///|
 test "DriftCompensator integral windup negative clamp" {
-  let comp = @runtime.DriftCompensator::new(max_integral_ns=100L)
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let comp = @simulation.DriftCompensator::new(max_integral_ns=100L)
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   // Negative error: local < ref
   for i = 0; i < 50; i = i + 1 {
@@ -6278,22 +6285,22 @@ test "DriftCompensator integral windup negative clamp" {
 
 ///|
 test "ExternalBridgeConfig named_pipe creates config" {
-  let config = @runtime.ExternalBridgeConfig::named_pipe("test_pipe")
-  assert_true(config.transport is @runtime.BridgeTransport::NamedPipe(_))
+  let config = @simulation.ExternalBridgeConfig::named_pipe("test_pipe")
+  assert_true(config.transport is @simulation.BridgeTransport::NamedPipe(_))
 }
 
 ///|
 test "ExternalBridgeConfig shared_memory creates config" {
-  let config = @runtime.ExternalBridgeConfig::shared_memory("shm_test", 4096)
-  assert_true(config.transport is @runtime.BridgeTransport::SharedMemory(..))
+  let config = @simulation.ExternalBridgeConfig::shared_memory("shm_test", 4096)
+  assert_true(config.transport is @simulation.BridgeTransport::SharedMemory(..))
 }
 
 // ===== ExternalProcessBridge avg_latency_ns =====
 
 ///|
 test "ExternalProcessBridge avg_latency_ns with steps" {
-  let config = @runtime.ExternalBridgeConfig::unix_socket("/tmp/test")
-  let bridge = @runtime.ExternalProcessBridge::new(config)
+  let config = @simulation.ExternalBridgeConfig::unix_socket("/tmp/test")
+  let bridge = @simulation.ExternalProcessBridge::new(config)
   bridge.step_count = 10L
   bridge.total_latency_ns = 50_000L
   assert_eq(bridge.avg_latency_ns(), 5_000L)
@@ -6301,8 +6308,8 @@ test "ExternalProcessBridge avg_latency_ns with steps" {
 
 ///|
 test "ExternalProcessBridge avg_latency_ns zero steps" {
-  let config = @runtime.ExternalBridgeConfig::unix_socket("/tmp/test")
-  let bridge = @runtime.ExternalProcessBridge::new(config)
+  let config = @simulation.ExternalBridgeConfig::unix_socket("/tmp/test")
+  let bridge = @simulation.ExternalProcessBridge::new(config)
   assert_eq(bridge.avg_latency_ns(), 0L)
 }
 
@@ -6311,7 +6318,7 @@ test "ExternalProcessBridge avg_latency_ns zero steps" {
 ///|
 test "encode_step_request with short outputs pads zeros" {
   let outputs = Bytes::from_array([b'\x01', b'\x02'])
-  let encoded = @runtime.encode_step_request(100L, 200L, outputs, 4)
+  let encoded = @simulation.encode_step_request(100L, 200L, outputs, 4)
   // Total = 16 + 4 = 20
   assert_eq(encoded.length(), 20)
   // Last 2 bytes should be zero padding
@@ -6322,7 +6329,7 @@ test "encode_step_request with short outputs pads zeros" {
 ///|
 test "decode_step_response with short data pads zeros" {
   let data = Bytes::from_array([b'\x01']) // only status byte, no input data
-  let (status, inputs) = @runtime.decode_step_response(data, 4)
+  let (status, inputs) = @simulation.decode_step_response(data, 4)
   assert_eq(status, b'\x01')
   assert_eq(inputs.length(), 4)
   // All inputs should be zero since there's not enough data
@@ -6333,7 +6340,7 @@ test "decode_step_response with short data pads zeros" {
 
 ///|
 test "decode_step_response empty data" {
-  let (status, inputs) = @runtime.decode_step_response(Bytes::new(0), 2)
+  let (status, inputs) = @simulation.decode_step_response(Bytes::new(0), 2)
   assert_eq(status, b'\xFF')
   assert_eq(inputs.length(), 2)
 }
@@ -6342,11 +6349,11 @@ test "decode_step_response empty data" {
 
 ///|
 test "HilSession getters" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     tasks: [],
     base_period_ns: 1_000_000L,
   }
-  let session = @runtime.HilSession::new(1_000_000L, schedule)
+  let session = @hil.HilSession::new(1_000_000L, schedule)
   let sim_time = session.get_sim_time()
   assert_eq(sim_time.to_ns(), 0L)
   assert_eq(session.is_terminated(), false)
@@ -6358,7 +6365,8 @@ test "HilSession getters" {
 
 ///|
 test "average_probe empty array returns zero" {
-  let result = @runtime.average_probe([])
+  let probes : Array[@analysis.ProbeResult] = []
+  let result = @analysis.average_probe(probes)
   assert_eq(result.station, 0U)
   assert_eq(result.forward_delay_ns, 0L)
   assert_eq(result.reverse_delay_ns, 0L)
@@ -6369,10 +6377,10 @@ test "average_probe empty array returns zero" {
 
 ///|
 test "PdoAutoTuner analyze generates WARNING for slow round-trip" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
   // round_trip_ns > cycle_time_ns (default=1_000_000)
-  let probe : @runtime.ProbeResult = @runtime.compute_probe_result(
+  let probe : @analysis.ProbeResult = @analysis.compute_probe_result(
     0x1001U, 1_500_000L, 3_000_000L, 500_000L,
   )
   let result = tuner.analyze(stations, [[probe]])
@@ -6383,7 +6391,7 @@ test "PdoAutoTuner analyze generates WARNING for slow round-trip" {
 
 ///|
 test "PdoAutoTuner analyze with no probe data" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
   let result = tuner.analyze(stations, [])
   assert_eq(result.success, false)
@@ -6396,25 +6404,25 @@ test "PdoAutoTuner analyze with no probe data" {
 test "validate_recommendations sync0 over limit" {
   // Use analyze to produce an AutoTuneResult with large sync0 offset
   // forward_delay_ns = 10_000_000 => sync0 = 1_000_000 + 10_000_000 + margin > limit
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
-  let probe = @runtime.compute_probe_result(
+  let probe = @analysis.compute_probe_result(
     0x1001U, 15_000_000L, 25_000_000L, 5_000_000L,
   )
   let result = tuner.analyze(stations, [[probe]])
   // validate with a small limit
-  let errors = @runtime.validate_recommendations(result, 1_000_000L)
+  let errors = @analysis.validate_recommendations(result, 1_000_000L)
   assert_true(errors.length() >= 1)
   assert_true(errors[0].contains("Sync0"))
 }
 
 ///|
 test "validate_recommendations no errors when within limit" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
-  let probe = @runtime.compute_probe_result(0x1001U, 300L, 400L, 200L)
+  let probe = @analysis.compute_probe_result(0x1001U, 300L, 400L, 200L)
   let result = tuner.analyze(stations, [[probe]])
-  let errors = @runtime.validate_recommendations(result, 100_000_000L)
+  let errors = @analysis.validate_recommendations(result, 100_000_000L)
   assert_eq(errors.length(), 0)
 }
 
@@ -6422,9 +6430,9 @@ test "validate_recommendations no errors when within limit" {
 
 ///|
 test "AutoTuneResult to_json with multiple recs and messages" {
-  let tuner = @runtime.PdoAutoTuner::new()
+  let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U, 0x1002U]
-  let probe1 = @runtime.compute_probe_result(0x1001U, 100L, 100L, 200L)
+  let probe1 = @analysis.compute_probe_result(0x1001U, 100L, 100L, 200L)
   // second station has no probe data → triggers WARNING message
   let result = tuner.analyze(stations, [[probe1]])
   let json = result.to_json()
@@ -6497,10 +6505,10 @@ test "MasterOdValue format I32" {
 
 ///|
 test "DriftCompensator reset clears state" {
-  let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(
-    @runtime.ClockDomain::Mcu,
-    @runtime.ClockDomain::Linux,
+  let comp = @simulation.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(
+    @simulation.ClockDomain::Mcu,
+    @simulation.ClockDomain::Linux,
   )
   ignore(comp.compensate(sync, 1000L, 2000L))
   assert_true(comp.update_count > 0L)
@@ -6731,7 +6739,7 @@ test "eoe_max_fragment_size normal mailbox" {
 ///|
 test "analyze_multi_rate tied peak cycles" {
   // Two tasks with same divisor → every cycle has same count → all cycles tied
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1000000L,
     tasks: [
       {
@@ -6758,7 +6766,7 @@ test "analyze_multi_rate tied peak cycles" {
       },
     ],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   // Both tasks fire on cycle 0, neither on cycle 1
   // Hyperperiod = lcm(2,2) = 2; cycle 0: 2 tasks, cycle 1: 0 tasks
   // Peak is cycle 0 only with 2 tasks
@@ -6768,7 +6776,7 @@ test "analyze_multi_rate tied peak cycles" {
 
 ///|
 test "analyze_multi_rate with harmonic divisors" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 500000L,
     tasks: [
       {
@@ -6795,7 +6803,7 @@ test "analyze_multi_rate with harmonic divisors" {
       },
     ],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   assert_true(analysis.is_harmonic)
   assert_eq(analysis.hyperperiod, 4)
   // Worst case: cycle 0 (both tasks) → 2 tasks, out=12, in=12
@@ -6829,7 +6837,7 @@ test "analyze_multi_rate tied peaks with equal count different IO" {
   // Let's try: three tasks all divisor=2,3,6 to hit tie in peak
   // Actually to hit the tied-peak AND different-IO branch, we need
   // two cycles with the SAME worst task count but different IO
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1000000L,
     tasks: [
       {
@@ -6867,7 +6875,7 @@ test "analyze_multi_rate tied peaks with equal count different IO" {
       },
     ],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   // hp = lcm(6,10,15) = 30
   assert_eq(analysis.hyperperiod, 30)
   // cycle 0: t1+t2+t3 = 3 tasks → worst
@@ -6878,7 +6886,7 @@ test "analyze_multi_rate tied peaks with equal count different IO" {
 
 ///|
 test "validate_multi_rate with too large hyperperiod" {
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1000000L,
     tasks: [
       {
@@ -6906,13 +6914,13 @@ test "validate_multi_rate with too large hyperperiod" {
     ],
   }
   // hp = lcm(7,11) = 77, with max_hyperperiod=10 → should warn
-  let msgs = @runtime.validate_multi_rate(schedule, max_hyperperiod=10)
+  let msgs = @simulation.validate_multi_rate(schedule, max_hyperperiod=10)
   assert_true(msgs.iter().any(fn(s) { s.contains("Hyperperiod") }))
 }
 
 ///|
 test "validate_multi_rate with excessive tasks per cycle" {
-  let tasks : Array[@runtime.TaskDescriptor] = []
+  let tasks : Array[@simulation.TaskDescriptor] = []
   for i = 0; i < 20; i = i + 1 {
     tasks.push({
       name: "t" + i.to_string(),
@@ -6926,8 +6934,8 @@ test "validate_multi_rate with excessive tasks per cycle" {
       },
     })
   }
-  let schedule : @runtime.TaskSchedule = { base_period_ns: 1000000L, tasks }
-  let msgs = @runtime.validate_multi_rate(schedule, max_tasks_per_cycle=5)
+  let schedule : @simulation.TaskSchedule = { base_period_ns: 1000000L, tasks }
+  let msgs = @simulation.validate_multi_rate(schedule, max_tasks_per_cycle=5)
   assert_true(msgs.iter().any(fn(s) { s.contains("Peak tasks per cycle") }))
 }
 
@@ -6954,7 +6962,7 @@ test "EoeSwitch to_json smoke" {
 
 ///|
 test "CyclePerfAnalyzer trend Improving" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   // Use record() for first window so prev_window_mean is set
   a.record(0L) // starts analyzer, no cycle
   a.record(2_000_000L) // cycle 1, duration=2M
@@ -6967,12 +6975,12 @@ test "CyclePerfAnalyzer trend Improving" {
   a.record_duration(500_000L)
   a.record_duration(500_000L) // total=8, window=[500K,500K,500K,500K], prev=2M
   // current_mean(500K) + threshold(50K) < prev(2M) → Improving
-  assert_true(a.trend() is Improving)
+  assert_true(a.trend() is @analysis.PerfTrend::Improving)
 }
 
 ///|
 test "CyclePerfAnalyzer stats fresh returns zeros" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   let s = a.stats()
   assert_eq(s.total_cycles, 0L)
   assert_eq(s.deadline_miss_rate_permille, 0)
@@ -6980,29 +6988,29 @@ test "CyclePerfAnalyzer stats fresh returns zeros" {
 
 ///|
 test "score_dimension bad value returns 0" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "x",
     value: 100L,
     good_threshold: 10L,
     bad_threshold: 50L,
     weight: 1,
   }
-  assert_eq(@runtime.score_dimension(dim), 0)
+  assert_eq(@analysis.score_dimension(dim), 0)
 }
 
 ///|
 test "CommQualityScorer trend Stable" {
-  let s = @runtime.CommQualityScorer::new(history_size=4)
+  let s = @analysis.CommQualityScorer::new(history_size=4)
   // Fill 2 windows with identical scores → Stable
   for _ in 0..<8 {
     s.record_score(500)
   }
-  assert_true(s.trend() is Stable)
+  assert_true(s.trend() is @analysis.QualityTrend::Stable)
 }
 
 ///|
 test "CommQualityScorer score_from_telemetry zero cycles rates" {
-  let s = @runtime.CommQualityScorer::new(history_size=4)
+  let s = @analysis.CommQualityScorer::new(history_size=4)
   let score = s.score_from_telemetry(0L, 0L, 0L, 0L)
   // With 0 cycles, all rates should be 0 → perfect score
   assert_eq(score.overall, 1000)
@@ -7013,7 +7021,7 @@ test "CommQualityScorer score_from_telemetry zero cycles rates" {
 
 ///|
 test "CommQualityScorer score_from_telemetry zero nominal_period_ns" {
-  let s = @runtime.CommQualityScorer::new(history_size=4)
+  let s = @analysis.CommQualityScorer::new(history_size=4)
   let score = s.score_from_telemetry(
     100L,
     0L,
@@ -7086,7 +7094,7 @@ test "configuration_to_eni_json with Optional presence" {
 ///|
 test "write_slice_outputs_inplace short src" {
   let image = @hal.MutableProcessImage::new(4, 4)
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 4,
     input_offset: 0,
@@ -7094,7 +7102,7 @@ test "write_slice_outputs_inplace short src" {
   }
   // src has only 2 bytes available from offset 1 → available=1 < output_length=4
   let src : FixedArray[Byte] = [b'\xAA', b'\xBB']
-  @runtime.write_slice_outputs_inplace(image, slice, src, 1)
+  @simulation.write_slice_outputs_inplace(image, slice, src, 1)
   // Only 1 byte should be written (available = 2-1 = 1)
   assert_eq(image.outputs[0], b'\xBB')
 }
@@ -7102,14 +7110,14 @@ test "write_slice_outputs_inplace short src" {
 ///|
 test "write_slice_outputs short data" {
   let image = @protocol.ProcessImage::new(4, 4)
-  let slice : @runtime.ProcessImageSlice = {
+  let slice : @simulation.ProcessImageSlice = {
     output_offset: 0,
     output_length: 4,
     input_offset: 0,
     input_length: 4,
   }
   let data = b"\xAA\xBB"
-  @runtime.write_slice_outputs(image, slice, data)
+  @simulation.write_slice_outputs(image, slice, data)
   // Only 2 bytes from data, rest should remain zero
   let out = image.outputs
   assert_eq(out[0], b'\xAA')
@@ -7119,7 +7127,7 @@ test "write_slice_outputs short data" {
 ///|
 test "score_dimension interpolation midpoint" {
   // value between good_threshold and bad_threshold → interpolated score
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "latency",
     value: 55L,
     good_threshold: 10L,
@@ -7128,19 +7136,20 @@ test "score_dimension interpolation midpoint" {
   }
   // excess = 55 - 10 = 45, range = 110 - 10 = 100
   // score = 1000 - 45*1000/100 = 1000 - 450 = 550
-  assert_eq(@runtime.score_dimension(dim), 550)
+  assert_eq(@analysis.score_dimension(dim), 550)
 }
 
 ///|
 test "compute_quality_score empty dimensions" {
-  let (overall, details) = @runtime.compute_quality_score([])
+  let dims : Array[@analysis.QualityDimension] = []
+  let (overall, details) = @analysis.compute_quality_score(dims)
   assert_eq(overall, 1000)
   assert_eq(details.length(), 0)
 }
 
 ///|
 test "CyclePerfAnalyzer trend improving" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   // Fill first window with high values
   a.record(2_000_000L)
   a.record(2_000_000L)
@@ -7160,12 +7169,12 @@ test "CyclePerfAnalyzer trend improving" {
   let t = a.trend()
   // After many low-value cycles the trend could be Improving or Stable
   // The point is to exercise the Improving/Stable branch
-  assert_true(t is @runtime.Improving || t is @runtime.Stable)
+  assert_true(t is @analysis.Improving || t is @analysis.Stable)
 }
 
 ///|
 test "CyclePerfAnalyzer stats zero cycles" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   let s = a.stats()
   assert_eq(s.total_cycles, 0L)
   assert_eq(s.min_ns, 0L)
@@ -7173,7 +7182,7 @@ test "CyclePerfAnalyzer stats zero cycles" {
 
 ///|
 test "JitterHistogram record idx negative clamp" {
-  let h = @runtime.JitterHistogram::new(bin_width=100L, num_bins=3)
+  let h = @analysis.JitterHistogram::new(bin_width=100L, num_bins=3)
   // center_index=1, deviation -9999999 → idx = -9999999/100 + 1 → very negative → clamp to 0
   h.record(-9_999_999L)
   assert_true(h.total == 1L)
@@ -7181,14 +7190,14 @@ test "JitterHistogram record idx negative clamp" {
 
 ///|
 test "DcJitterProfiler is_within_tolerance zero count" {
-  let p = @runtime.DcJitterProfiler::new(1_000_000L)
+  let p = @analysis.DcJitterProfiler::new(1_000_000L)
   assert_true(p.is_within_tolerance(100L, 50L))
 }
 
 ///|
 test "DriftCompensator report negative error" {
-  let comp = @runtime.DriftCompensator::new()
-  let sync = @runtime.TimebaseSync::new(@runtime.Mcu, @runtime.Linux)
+  let comp = @simulation.DriftCompensator::new()
+  let sync = @simulation.TimebaseSync::new(@simulation.Mcu, @simulation.Linux)
   // compensate with local < reference → negative error
   let _ = comp.compensate(sync, 10_000L, 5000L)
   let report = comp.report(sync)
@@ -7326,7 +7335,7 @@ test "analyze_multi_rate equal peak and bytes update" {
   // Two tasks with divisor 2 and divisor 3 → LCM=6
   // At cycle 0: both fire → count=2
   // At cycle 6: both fire again → count=2, equal peak, update worst bytes
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -7353,7 +7362,7 @@ test "analyze_multi_rate equal peak and bytes update" {
       },
     ],
   }
-  let analysis = @runtime.analyze_multi_rate(schedule)
+  let analysis = @simulation.analyze_multi_rate(schedule)
   assert_true(analysis.hyperperiod > 1)
   assert_true(analysis.worst_case_tasks_per_cycle >= 1)
 }
@@ -7748,7 +7757,7 @@ test "EoeSwitch send_frame mailbox too small raises" {
 test "analyze_multi_rate equal peak cycles with different IO" {
   // Two tasks each running every cycle → count always 2
   // But with different output sizes, the larger should be recorded
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -7775,7 +7784,7 @@ test "analyze_multi_rate equal peak cycles with different IO" {
       },
     ],
   }
-  let result = @runtime.analyze_multi_rate(schedule)
+  let result = @simulation.analyze_multi_rate(schedule)
   // hyperperiod = LCM(1,2) = 2
   assert_eq(result.hyperperiod, 2)
   // Cycle 0: both run → count=2, out=12, in=8
@@ -7807,7 +7816,7 @@ test "analyze_multi_rate multiple peaks at same count" {
   // Not multiple equal peaks either.
   // Use 2 tasks, both divisor 1:
   // Every cycle has count=2 → peaks = [0, 1, 2, ...]
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -7834,7 +7843,7 @@ test "analyze_multi_rate multiple peaks at same count" {
       },
     ],
   }
-  let result = @runtime.analyze_multi_rate(schedule)
+  let result = @simulation.analyze_multi_rate(schedule)
   // HP=1, cycle 0: both run → worst=2, peak=[0]
   assert_eq(result.hyperperiod, 1)
   assert_eq(result.worst_case_tasks_per_cycle, 2)
@@ -7926,7 +7935,7 @@ test "analyze_multi_rate multiple equal peaks detected" {
   // So `count == worst` at cycle > 0 is impossible → DEAD CODE.
 
   // Just verify basic behavior with non-harmonic setup
-  let schedule : @runtime.TaskSchedule = {
+  let schedule : @simulation.TaskSchedule = {
     base_period_ns: 1_000_000L,
     tasks: [
       {
@@ -7953,7 +7962,7 @@ test "analyze_multi_rate multiple equal peaks detected" {
       },
     ],
   }
-  let result = @runtime.analyze_multi_rate(schedule)
+  let result = @simulation.analyze_multi_rate(schedule)
   assert_eq(result.hyperperiod, 15)
   assert_eq(result.is_harmonic, false) // 3 and 5 are not powers of 2
   assert_eq(result.worst_case_tasks_per_cycle, 2) // cycle 0

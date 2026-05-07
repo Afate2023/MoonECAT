@@ -92,6 +92,9 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L3-16 | 零拷贝 PDO CLI 命令 `run-zc`（Mock + Native 后端） | M8 | `6814e4e` |
 | L3-17 | 主站对象字典浏览 `master-od` CLI 命令 | M8 | `6814e4e` |
 | L3-18 | 虚拟从站模板路线 B-15（ESI JSON → VirtualSlaveTemplate → run-virtual） | M8 | `7740e82` |
+| L3-19 | EoE 库层交付（帧编解码 + Virtual Switch 引擎 + 异步桥；Native Library L3 验收范围内） | M8 | `mailbox/eoe.mbt` / `mailbox/eoe_switch.mbt` / `mailbox/eoe_endpoint.mbt` / `mailbox/eoe_relay.mbt` / `mailbox/eoe_async/` |
+| L3-20 | FoE 库层交付（帧编解码 + download/upload FP+AP 多包事务 + RMSM 计数 + Busy 重试；Native Library L3 验收范围内） | M8 | `mailbox/foe.mbt` / `protocol/foe_transaction.mbt` / `protocol/integration_test.mbt` |
+| L3-21 | 真机回归 + NDJSON→Replay 闭环验证脚本（`scripts/regression-real-device.ps1` + `scripts/replay-diff.ps1` + `RecordingNicAdapter[N]` + `run --record`） | M8 | `hal/mock/recording_nic_adapter.mbt` / `cmd/main/run_commands.mbt` / `cmd/main/analysis_commands.mbt` |
 
 ### L4 — Verification & Hardening ⚠️ 部分完成
 
@@ -104,18 +107,31 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | L4-05 | Native FFI 句柄安全策略文档（整数句柄 ID + C stub 内部句柄表） | ✅ | `docs/NATIVE_FFI_SAFETY.md` |
 | L4-06 | 回放集成测试 scan→validate→run→stop | ✅ | `898616e` |
 | L4-07 | 压力回归（1000 周期稳定性 + telemetry 单调性） | ✅ | `e4bff92` |
-| L4-08 | Linux Raw Socket 实机闭环 | ❌ | 待验证 |
+| L4-08 | Linux Raw Socket 实机闭环 | ✅ | 2026-04-20 `eno1` + `VT_EX_CA20_20250225.esi.json`：`list-if -> scan -> validate -> diagnosis -> state -> read-sii -> od -> run -> run --until-fault` |
 | L4-09 | AddressSanitizer / 等价内存安全检查 | ❌ | 未执行 |
 | L4-10 | Extism 宿主 host capability 打通 | ❌ | 仅 Mock 回放 |
 | L4-11 | 事件溯源 deterministic replay 最小闭环 | ✅ | `e4b03a2` / `fa33f01`：RecordingNic + ReplayNic + NicEventLog；多从站 FMMU PDO 确定性回放 + 多周期输入变化回放，hal/mock 53/53 |
 | L4-12 | Fault injection 一等模型 | ✅ | `ba7356e` / `fa33f01`：FaultInjector + FaultNic（7 fault × 5 schedule）；多从站 FMMU RecvTimeout/WkcCorrupt/CountDown 恢复，hal/mock 53/53 |
 | L4-13 | Monitor / Verdict 框架 | ✅ | `7af544f`：Verdict(Pass/Warn/Fail/Block) + 6 内置 monitor + run_monitors + DiagnosticSurface 集成；runtime 测试全量覆盖 |
 
-**综合进度**：L1/L2 全部完成，L3 已形成最小产品面，L4 验证加固层约 77% 完成（10/13）。
+**综合进度**：L1/L2 全部完成，L3 已形成最小产品面，L4 验证加固层约 85% 完成（11/13）。
 
 ---
 
 ## 3. 三条主线路线图
+
+### 当前物理包映射
+
+为避免 `runtime/` 根包继续承载 analysis / simulation / HIL 的实现细节，当前代码布局按主线职责收口为以下物理边界：
+
+| 包路径 | 对齐主线 | 当前职责 |
+|---|---|---|
+| `runtime/` | 主线 A + 主线 B | 运行时编排、Native/Verification 产品面、diagnostic/replay/monitor/fault/report/CLI 直接消费的根运行时能力 |
+| `runtime/analysis/` | ME Analysis Engine | 抖动剖析、PDO auto-tune、拓扑健康、周期性能、通信质量评分 |
+| `runtime/simulation/` | 主线 C | ProcessImage 分区、多速率调度、时基同步、漂移补偿、co-sim 适配与零拷贝切片辅助 |
+| `runtime/hil/` | 主线 C | CycleHook / HilSession / HilCycleHook / HIL JSON 导出等通信闭环边界 |
+
+约束：新实现优先落到对应子包；`runtime/` 根包仅保留 orchestration 与被主线 A/B 直接消费的共享表面，不再回填 analysis/simulation/hil 的 facade 型重复实现。
 
 ### 主线 A：Native Runtime Baseline（P0 优先级）
 
@@ -124,11 +140,11 @@ MoonECAT 把全部已交付与规划工作按四个成熟度等级归类：
 | 编号 | 任务 | 对应 BACKLOG | 状态 | 涉及目录 |
 |---|---|---|---|---|
 | A-1 | 统一 Windows/Linux Native HAL 语义（open/send/recv/close/error/filter） | P0-1 | ⚠️ 部分 | hal/native/, cmd/main/ |
-| A-2 | Linux Raw Socket 实机闭环 `list-if → scan → validate → run` | P0-2 | ❌ | hal/native/, scripts/ |
+| A-2 | Linux Raw Socket 实机闭环 `list-if → scan → validate → run` | P0-2 | ✅ | hal/native/, scripts/, docs/ |
 | A-3 | 冻结 NDJSON progress schema（版本/字段/兼容性） | P0-3 | ⚠️ 已实现待冻结 | runtime/, cmd/main/ |
 | A-4 | `run --until-fault` 正式化为回归入口（stop reason / fault summary） | P0-4 | ✅ Windows Npcap 已复核 | runtime/, cmd/main/ |
 | A-5 | Native FFI 生命周期与失败路径测试（ASan / double close / leak） | P0-5 | ❌ | hal/native/ |
-| A-6 | Native CLI 实机证据矩阵（平台 × 网卡 × 从站 × 命令 × 结果） | P0-6 | ⚠️ Windows 部分 | docs/, scripts/ |
+| A-6 | Native CLI 实机证据矩阵（平台 × 网卡 × 从站 × 命令 × 结果） | P0-6 | ✅ | docs/, scripts/ |
 
 **收口条件**：
 - Windows 与 Linux Native 后端共享同一稳定 HAL 语义

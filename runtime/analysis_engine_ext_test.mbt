@@ -5,27 +5,27 @@
 
 test "estimate_cable_length" {
   // 500ns delay ≈ 100m cable
-  let len = @runtime.estimate_cable_length(500L)
+  let len = @analysis.estimate_cable_length(500L)
   inspect(len, content="100")
 }
 
 ///|
 test "grade_from_score boundaries" {
-  inspect(@runtime.grade_from_score(1000), content="Excellent")
-  inspect(@runtime.grade_from_score(950), content="Excellent")
-  inspect(@runtime.grade_from_score(949), content="Good")
-  inspect(@runtime.grade_from_score(800), content="Good")
-  inspect(@runtime.grade_from_score(799), content="Fair")
-  inspect(@runtime.grade_from_score(600), content="Fair")
-  inspect(@runtime.grade_from_score(599), content="Poor")
-  inspect(@runtime.grade_from_score(300), content="Poor")
-  inspect(@runtime.grade_from_score(299), content="Critical")
-  inspect(@runtime.grade_from_score(0), content="Critical")
+  inspect(@analysis.grade_from_score(1000), content="Excellent")
+  inspect(@analysis.grade_from_score(950), content="Excellent")
+  inspect(@analysis.grade_from_score(949), content="Good")
+  inspect(@analysis.grade_from_score(800), content="Good")
+  inspect(@analysis.grade_from_score(799), content="Fair")
+  inspect(@analysis.grade_from_score(600), content="Fair")
+  inspect(@analysis.grade_from_score(599), content="Poor")
+  inspect(@analysis.grade_from_score(300), content="Poor")
+  inspect(@analysis.grade_from_score(299), content="Critical")
+  inspect(@analysis.grade_from_score(0), content="Critical")
 }
 
 ///|
 test "TopologyHealthAnalyzer perfect link" {
-  let a = @runtime.TopologyHealthAnalyzer::new()
+  let a = @analysis.TopologyHealthAnalyzer::new()
   a.add_slave(1U, 0, 100L)
   a.ingest_telemetry(0, 1000L, 1000L, 0L, 0L)
   let r = a.analyze()
@@ -37,7 +37,7 @@ test "TopologyHealthAnalyzer perfect link" {
 
 ///|
 test "TopologyHealthAnalyzer degraded link" {
-  let a = @runtime.TopologyHealthAnalyzer::new()
+  let a = @analysis.TopologyHealthAnalyzer::new()
   a.add_slave(1U, 0, 100L)
   a.add_slave(2U, 1, 200L)
   // Slave 0: perfect
@@ -52,14 +52,14 @@ test "TopologyHealthAnalyzer degraded link" {
   inspect(r.slaves[0].health_score > r.slaves[1].health_score, content="true")
   // System grade should be degraded
   inspect(
-    r.system_grade is (@runtime.Excellent | @runtime.Good),
+    r.system_grade is (@analysis.Excellent | @analysis.Good),
     content="true",
   )
 }
 
 ///|
 test "TopologyHealthAnalyzer cable warning" {
-  let a = @runtime.TopologyHealthAnalyzer::new()
+  let a = @analysis.TopologyHealthAnalyzer::new()
   // 600ns = 120m > 100m limit
   a.add_slave(1U, 0, 600L)
   a.ingest_telemetry(0, 100L, 100L, 0L, 0L)
@@ -70,7 +70,7 @@ test "TopologyHealthAnalyzer cable warning" {
 
 ///|
 test "TopologyHealthAnalyzer to_json" {
-  let a = @runtime.TopologyHealthAnalyzer::new()
+  let a = @analysis.TopologyHealthAnalyzer::new()
   a.add_slave(1U, 0, 100L)
   a.ingest_telemetry(0, 100L, 100L, 0L, 0L)
   let r = a.analyze()
@@ -81,7 +81,7 @@ test "TopologyHealthAnalyzer to_json" {
 
 ///|
 test "TopologyHealthAnalyzer record_cycle" {
-  let a = @runtime.TopologyHealthAnalyzer::new()
+  let a = @analysis.TopologyHealthAnalyzer::new()
   a.add_slave(1U, 0, 50L)
   for _i = 0; _i < 100; _i = _i + 1 {
     a.record_cycle(0, 1L, 1L, false, true)
@@ -99,7 +99,7 @@ test "TopologyHealthAnalyzer record_cycle" {
 
 ///|
 test "CyclePerfAnalyzer perfect timing" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   // 11 timestamps at perfect 1ms intervals
   for i = 0; i < 11; i = i + 1 {
     a.record((i * 1_000_000).to_int64())
@@ -113,7 +113,7 @@ test "CyclePerfAnalyzer perfect timing" {
 
 ///|
 test "CyclePerfAnalyzer deadline miss detection" {
-  let a = @runtime.CyclePerfAnalyzer::new(
+  let a = @analysis.CyclePerfAnalyzer::new(
     1_000_000L,
     deadline_tolerance_ns=50_000L,
   )
@@ -128,7 +128,7 @@ test "CyclePerfAnalyzer deadline miss detection" {
 
 ///|
 test "CyclePerfAnalyzer record_duration" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   a.record_duration(1_000_000L)
   a.record_duration(1_000_100L)
   a.record_duration(999_900L)
@@ -140,7 +140,7 @@ test "CyclePerfAnalyzer record_duration" {
 
 ///|
 test "CyclePerfAnalyzer stats empty" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   let s = a.stats()
   inspect(s.total_cycles, content="0")
   inspect(s.mean_ns, content="0")
@@ -148,7 +148,7 @@ test "CyclePerfAnalyzer stats empty" {
 
 ///|
 test "CyclePerfAnalyzer reset" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   a.record_duration(1_000_000L)
   a.record_duration(1_000_000L)
   a.reset()
@@ -158,7 +158,7 @@ test "CyclePerfAnalyzer reset" {
 
 ///|
 test "CyclePerfAnalyzer trend initial stable" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L, window_size=10)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=10)
   for i = 0; i < 15; i = i + 1 {
     a.record_duration(1_000_000L)
   }
@@ -167,7 +167,7 @@ test "CyclePerfAnalyzer trend initial stable" {
 
 ///|
 test "CyclePerfStats to_json" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   a.record_duration(1_000_000L)
   a.record_duration(1_000_000L)
   let s = a.stats()
@@ -178,7 +178,7 @@ test "CyclePerfStats to_json" {
 
 ///|
 test "isqrt64 via CyclePerfAnalyzer stddev" {
-  let a = @runtime.CyclePerfAnalyzer::new(1_000_000L)
+  let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   // Same values → stddev = 0
   for _i = 0; _i < 10; _i = _i + 1 {
     a.record_duration(1_000_000L)
@@ -191,20 +191,20 @@ test "isqrt64 via CyclePerfAnalyzer stddev" {
 
 ///|
 test "quality_grade_from_score boundaries" {
-  inspect(@runtime.quality_grade_from_score(1000), content="Excellent")
-  inspect(@runtime.quality_grade_from_score(900), content="Excellent")
-  inspect(@runtime.quality_grade_from_score(899), content="Good")
-  inspect(@runtime.quality_grade_from_score(750), content="Good")
-  inspect(@runtime.quality_grade_from_score(749), content="Acceptable")
-  inspect(@runtime.quality_grade_from_score(500), content="Acceptable")
-  inspect(@runtime.quality_grade_from_score(499), content="Poor")
-  inspect(@runtime.quality_grade_from_score(250), content="Poor")
-  inspect(@runtime.quality_grade_from_score(249), content="Critical")
+  inspect(@analysis.quality_grade_from_score(1000), content="Excellent")
+  inspect(@analysis.quality_grade_from_score(900), content="Excellent")
+  inspect(@analysis.quality_grade_from_score(899), content="Good")
+  inspect(@analysis.quality_grade_from_score(750), content="Good")
+  inspect(@analysis.quality_grade_from_score(749), content="Acceptable")
+  inspect(@analysis.quality_grade_from_score(500), content="Acceptable")
+  inspect(@analysis.quality_grade_from_score(499), content="Poor")
+  inspect(@analysis.quality_grade_from_score(250), content="Poor")
+  inspect(@analysis.quality_grade_from_score(249), content="Critical")
 }
 
 ///|
 test "score_dimension linear interpolation" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "test",
     value: 50L,
     good_threshold: 0L,
@@ -212,36 +212,36 @@ test "score_dimension linear interpolation" {
     weight: 1000,
   }
   // 50 is midpoint → 500
-  inspect(@runtime.score_dimension(dim), content="500")
+  inspect(@analysis.score_dimension(dim), content="500")
 }
 
 ///|
 test "score_dimension at good threshold" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "test",
     value: 0L,
     good_threshold: 0L,
     bad_threshold: 100L,
     weight: 1000,
   }
-  inspect(@runtime.score_dimension(dim), content="1000")
+  inspect(@analysis.score_dimension(dim), content="1000")
 }
 
 ///|
 test "score_dimension at bad threshold" {
-  let dim : @runtime.QualityDimension = {
+  let dim : @analysis.QualityDimension = {
     name: "test",
     value: 100L,
     good_threshold: 0L,
     bad_threshold: 100L,
     weight: 1000,
   }
-  inspect(@runtime.score_dimension(dim), content="0")
+  inspect(@analysis.score_dimension(dim), content="0")
 }
 
 ///|
 test "CommQualityScorer perfect telemetry" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   inspect(qs.overall, content="1000")
   inspect(qs.grade, content="Excellent")
@@ -249,7 +249,7 @@ test "CommQualityScorer perfect telemetry" {
 
 ///|
 test "CommQualityScorer degraded telemetry" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   // 5% timeouts, 2% WKC errors
   let qs = scorer.score_from_telemetry(1000L, 50L, 20L, 10L)
   // Should not be Excellent anymore
@@ -259,7 +259,7 @@ test "CommQualityScorer degraded telemetry" {
 
 ///|
 test "CommQualityScorer trend initial stable" {
-  let scorer = @runtime.CommQualityScorer::new(history_size=10)
+  let scorer = @analysis.CommQualityScorer::new(history_size=10)
   for _i = 0; _i < 15; _i = _i + 1 {
     let _ = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   }
@@ -268,7 +268,7 @@ test "CommQualityScorer trend initial stable" {
 
 ///|
 test "QualityScore to_json" {
-  let scorer = @runtime.CommQualityScorer::new()
+  let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   let json = qs.to_json()
   inspect(json.contains("\"overall\""), content="true")
@@ -279,7 +279,7 @@ test "QualityScore to_json" {
 
 ///|
 test "compute_quality_score weighted" {
-  let dims : Array[@runtime.QualityDimension] = [
+  let dims : Array[@analysis.QualityDimension] = [
     {
       name: "a",
       value: 0L,
@@ -295,7 +295,7 @@ test "compute_quality_score weighted" {
       weight: 500,
     },
   ]
-  let (overall, _) = @runtime.compute_quality_score(dims)
+  let (overall, _) = @analysis.compute_quality_score(dims)
   // 1000*500 + 0*500 / 1000 = 500
   inspect(overall, content="500")
 }

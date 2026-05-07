@@ -48,9 +48,9 @@
 | 505 | Emergency Message | shall | ✅ | [mailbox/emergency.mbt](../mailbox/emergency.mbt) | decode_emergency/decode_emergency_frame |
 | 506 | PDO in CoE | may | ➖ | — | |
 | **EoE (5.8)** | | | | | |
-| 601–603 | EoE Protocol / Virtual Switch / OS Endpoint | shall if EoE | ➖ | — | 项目范围排除 |
+| 601–603 | EoE Protocol / Virtual Switch / OS Endpoint | shall if EoE | ✅ | [mailbox/eoe.mbt](../mailbox/eoe.mbt), [mailbox/eoe_switch.mbt](../mailbox/eoe_switch.mbt), [mailbox/eoe_endpoint.mbt](../mailbox/eoe_endpoint.mbt), [mailbox/eoe_relay.mbt](../mailbox/eoe_relay.mbt), [mailbox/eoe_async/](../mailbox/eoe_async/) | 帧编解码 + Virtual Switch 引擎 + 异步桥；正式纳入 L3 交付面 |
 | **FoE (5.9)** | | | | | |
-| 701–703 | FoE Protocol / FW Up/Download / Boot State | shall if FoE | ➖ | — | 项目范围排除 |
+| 701–703 | FoE Protocol / FW Up/Download / Boot State | shall if FoE | ✅ | [mailbox/foe.mbt](../mailbox/foe.mbt), [protocol/foe_transaction.mbt](../protocol/foe_transaction.mbt) | FoE 帧编解码 + download/upload (FP+AP) 多包事务 + RMSM 计数 + Busy 重试；正式纳入 L3 交付面 |
 | **SoE (5.10)** | | | | | |
 | 801 | SoE Services | should if SoE | ➖ | — | 项目范围排除 |
 | **AoE (5.11)** | | | | | |
@@ -81,7 +81,8 @@
 | Master Object Dictionary | ETG.1500 5.15.1 | ❌ 未实现 | L3 | B | 设计主站 OD、配置摘要与诊断汇聚模型 |
 | 拓扑变化 / Hot Connect | Compendium topology/Hot Connect；GatorCAT/ethercrab/SOEM | ⚠️ 显式标识+别名+4-tuple 已有，拓扑指纹待冻结 | L3-L4 | B | 补拓扑指纹与实机双分支证据 |
 | Multiple Tasks / Process Image | ETG.1500 5.4.2；EtherCrab/Gatorcat | ➖ 单任务 Free Run 优先 | L4 | C | DC 基线稳定后再设计 |
-| EoE/FoE/SoE 等 feature pack | ETG.1500 5.8~5.10 | ➖ 不阻塞主线 | — | — | Class A 基线完成后按 feature pack 评估 |
+| EoE/FoE 库层交付 | ETG.1500 5.8~5.9；ETG.1000.6 §5.7~5.8 | ✅ 库层已落地（帧编解码 + Virtual Switch + FoE 事务），正式纳入 L3 | L3 | A | 库层契约保持稳定；CLI 暴露面（`eoe-bridge` / `foe-download` / `foe-upload`）按 feature pack 增量 |
+| SoE/AoE/VoE 等 feature pack | ETG.1500 5.10~5.12 | ➖ 不阻塞主线 | — | — | Class A 基线完成后按 feature pack 评估 |
 
 ## 0.2 当前交付验收基线
 

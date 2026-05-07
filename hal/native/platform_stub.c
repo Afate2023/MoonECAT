@@ -737,8 +737,20 @@ int32_t moonecat_linux_raw_socket_open(const char *name, int32_t snaplen,
   unsigned int ifindex;
   struct sockaddr_ll addr;
   struct timeval tv;
+  char ifname[IFNAMSIZ];
+  uint32_t name_len;
   (void)snaplen;
-  ifindex = if_nametoindex(name);
+  /* `name` originates from MoonBit `Bytes` and is NOT guaranteed to be
+     NUL-terminated. Copy into a local buffer with explicit NUL termination
+     before handing to libc string-based APIs (if_nametoindex / SIOCGIFFLAGS). */
+  name_len = Moonbit_array_length((uint8_t *)name);
+  if (name_len == 0 || name_len >= IFNAMSIZ) {
+    moonecat_set_error(-4, "Linux interface name length out of range");
+    return -1;
+  }
+  memcpy(ifname, name, name_len);
+  ifname[name_len] = '\0';
+  ifindex = if_nametoindex(ifname);
   if (ifindex == 0) {
     moonecat_set_error(-4, "Linux interface not found");
     return -1;
@@ -828,6 +840,12 @@ moonbit_bytes_t moonecat_linux_raw_socket_recv(int32_t handle_id) {
   if (rc > 0) {
     moonecat_set_error(1, "ok");
     return moonecat_bytes_from_buffer((const char *)buffer, (size_t)rc);
+  }
+  if (rc == 0) {
+    /* Zero-length packet on AF_PACKET is unexpected; treat as benign timeout
+       so callers can retry without surfacing a stale errno. */
+    moonecat_set_error(0, "recv timeout");
+    return moonbit_make_bytes(0, 0);
   }
   if (rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
     moonecat_set_error(0, "recv timeout");

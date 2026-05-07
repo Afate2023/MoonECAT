@@ -105,6 +105,17 @@ test "replay remaining tracks cursor position" {
 }
 
 ///|
+test "replay send mismatch raises SendFailed" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Sent(b"\x01\x02", 2))
+  let replay = @mock.ReplayNic::from_log(log)
+  let result : Result[Int, @hal.EcError] = Ok(replay.send(b"\x01\x03")) catch {
+    e => Err(e)
+  }
+  assert_true(result is Err(@hal.EcError::SendFailed(_)))
+}
+
+///|
 test "replay RecvTimeout event raises RecvTimeout" {
   let log = @mock.NicEventLog::new()
   log.append(@mock.Sent(b"\x01", 1))
@@ -142,21 +153,16 @@ test "record fault then replay reproduces fault" {
   }
   let slave = @mock.VirtualSlave::new(0, identity, b"")
   let nic = @mock.VirtualNic::with_slaves([slave])
-  // Record through a FaultNic that will timeout on recv
   let fault_nic = @mock.FaultNic::wrap(nic)
   fault_nic.injector.add(@mock.RecvTimeout, @mock.Always)
-  // Wrap the FaultNic in a recording layer
-  // We can't directly wrap FaultNic, so record manually
-  let log = @mock.NicEventLog::new()
-  // Simulate what would happen: send succeeds, recv times out
-  let send_data = @protocol.EcFrame::{
-    dst_mac: [b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF', b'\xFF'],
-    src_mac: [b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00'],
-    pdus: [],
-  }.encode()
-  log.append(@mock.Sent(send_data, send_data.length()))
-  log.append(@mock.RecvTimeout)
-  // Replay the fault session
+  let recording = @mock.RecordingNicAdapter::wrap(fault_nic)
+  let result1 : Result[Int, @hal.EcError] = Ok(
+    @protocol.count_slaves(recording, @hal.Duration(1_000_000L)),
+  ) catch {
+    e => Err(e)
+  }
+  assert_true(result1 is Err(@hal.EcError::RecvTimeout))
+  let log = recording.get_log()
   let replay = @mock.ReplayNic::from_log(log)
   let result : Result[Int, @hal.EcError] = Ok(
     @protocol.count_slaves(replay, @hal.Duration(1_000_000L)),

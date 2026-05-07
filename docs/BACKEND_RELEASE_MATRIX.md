@@ -56,6 +56,22 @@ moon run cmd/main run -- --backend native --if <interface> --json
   `state --station 4097 --path --state preop` => `current_state=Init`、`final_state=PreOp`、`status_code=0`；
   `od --station 4097` => 成功返回 `OD List` 索引数组；
   `run` => `cycles_requested=10`、`cycles_ok=10`、`final_phase=Done`
+- 2026-04-23 Windows Npcap 同链路 + EX_CA20 ESI（接口 `\\Device\\NPF_{82A62AE6-53AD-431E-8283-4E7F3F2CE4B3}`，ESI=`References/VT_EX_CA20_20250225.esi.json`）实测：
+  `run --backend native-windows-npcap --if '\\Device\\NPF_{82A62AE6-53AD-431E-8283-4E7F3F2CE4B3}' --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --startup-state op --shutdown-state none --cycles 20 --timeout-ms 50 --record artifacts/real-device-20260423-esi.ndjson` => `Slaves found: 1`、`Validation: PASS`、`Cycles: 20/20 OK`、`Phase: Done`、`Fault: none`；
+  `replay --trace artifacts/real-device-20260423-esi.ndjson --cycles 20` => `Verdict: Pass`、`Cycles: 20/20 OK`，但在未附带 `--scan-json` 时 replay 侧探测结果退化为 `Slaves found: 0`，因此证据级回放应同时归档 live `scan --json`
+- 2026-04-20 Linux Raw Socket（`eno1`，单从站 `VT_EX_CA20_20250225.esi.json`）实测：
+  `list-if --backend native-linux-raw --json` => 成功枚举 `lo / enp1s0 / eno1 / wlp3s0`；
+  错误路径：坏接口名 / 空接口名 / 超长接口名稳定返回 `ConfigMismatch`，无 raw-socket 权限稳定返回 `NotSupported("Operation not permitted")`；
+  `scan --backend native-linux-raw --if eno1 --json` => 初始探测到单从站 `position=0 / station=1001 / alias=59365 / vendor=5596774 / product=40200 / revision=2025070500`；
+  `validate --backend native-linux-raw --if eno1 --json` => `grade=Pass`、`difference_count=0`；
+  `diagnosis --backend native-linux-raw --if eno1 --station 1001 --json` => `AL State=Init`、`AL Error Flag=false`、`AL Status Code=0`；
+  `state --backend native-linux-raw --if eno1 --station 1001 --path --state preop --json` => `current_state=Init`、`final_state=PreOp`、`control_wkc=1`；
+  `state --backend native-linux-raw --if eno1 --station 1001 --path --state safeop --json` => 成功进入 `SafeOp`，并输出 live PDO audit；
+  `read-sii --backend native-linux-raw --if eno1 --position 0 --words 128 --json` => EEPROM `checksum_ok=true`，设备名 `EX_CA20`，CoE mailbox 能力与 ESI 一致；
+  `od --backend native-linux-raw --if eno1 --station 1001 --json` => 成功返回对象索引列表；
+  `run --backend native-linux-raw --if eno1 --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --startup-state op --shutdown-state none --cycles 10 --json` => `cycles_ok=10`、`final_phase=Done`、`fault=null`；
+  `run --backend native-linux-raw --if eno1 --esi-json References/VT_EX_CA20_20250225.esi.json --device-index 0 --until-fault --json` => 成功进入 `Operational`，在 `cycles_ok=72933` 后以 `timeout-recovery-required` 退出；
+  run 后再次 `scan` 可见从站已切到配置站地址 `4097`，`diagnosis --station 4097` 暴露 `AL Status Code=27 (Sync manager watchdog)`，且 `state --station 4097 --path --state preop` 可稳定回退，符合从站 watchdog / 站地址切换行为，不是 Linux HAL 故障
 
 ## 2. Native Library
 
@@ -85,8 +101,21 @@ moon test hal/native/native_test.mbt --target native
 
 - Windows Npcap：接口枚举、open/send/recv/close、运行时动态加载已实现
 - Linux Raw Socket：接口枚举、open/send/recv/close 已实现
-- 真实 `scan/validate/run` 回归尚未补成自动化硬件测试
+- 真实 `scan/validate/run` 回归通过 `scripts/regression-real-device.ps1` 驱动；`--record <ndjson>` 把帧级事件流落盘，`scripts/replay-diff.ps1` 把同一份 NDJSON 通过 `cmd/main replay --trace ... --json` 重放并与 live `run-summary` 做稳定字段（slave_count / topology_fingerprint / verdict）比对
+- 对真实 `--record <ndjson>` 产物做 replay 时，若希望保留 live `slave_count` / topology 证据，应同时保留 `scan --json` 并在 replay 时传入 `--scan-json <path>`；仅依赖 NDJSON 时，replay 的 probe 可能回退成 `0 slaves`
 - CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
+- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现（包括 `NativeNic`）包成可记录链路，不再局限于 `VirtualNic`
+
+### EoE / FoE（L3 交付面）
+
+| 协议 | 库层实现 | 测试覆盖 | 现状 |
+| --- | --- | --- | --- |
+| **EoE** | `mailbox/eoe.mbt`（帧编解码 + EoeResult） + `mailbox/eoe_switch.mbt` / `eoe_endpoint.mbt` / `eoe_relay.mbt`（Virtual Switch 引擎） + `mailbox/eoe_async/`（异步桥） | `runtime/runtime_test.mbt`、`runtime/runtime_wbtest.mbt`、`mailbox/mailbox_test.mbt` 中含 fragment/IP request/response、Virtual Switch 端点路由、relay 调度等多组用例 | ✅ 帧层 + Virtual Switch 已闭环；CLI 暴露面后续按 feature pack 增量交付，**不阻塞 Native Library L3 验收** |
+| **FoE** | `mailbox/foe.mbt`（FoeOpCode/ErrorCode/Response） + `protocol/foe_transaction.mbt`（download/upload + RMSM 计数器 + Busy 重试） | `protocol/integration_test.mbt`（含 download/upload 多包 + Busy 重试 + 错误码端到端用例）、`mailbox/mailbox_test.mbt` | ✅ FoE FP+AP 多包传输事务已闭环；CLI 暴露面后续按 feature pack 增量交付，**不阻塞 Native Library L3 验收** |
+
+> EoE/FoE 已正式纳入 Native Library L3 交付面（库层 API + 库内事务 +
+> 库层测试）。CLI 子命令（如 `eoe-bridge`、`foe-download`/`foe-upload`）
+> 列入后续 feature pack，不在 L3 验收闸门内，但库层契约必须保持稳定。
 
 ## 3. Extism Plugin
 
