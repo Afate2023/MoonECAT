@@ -194,15 +194,15 @@ pub(all) struct SlaveInfo {
   /// Position on the bus (0 = first slave)
   position : Int
   /// Configured station address (assigned during configuration)
-  mut configured_address : UInt
+  configured_address : UInt
   /// Identity from SII EEPROM
   identity : @hal.SlaveIdentity
   /// Current ESM state
-  mut al_status : EsmState
+  al_status : EsmState
   /// DL status (link/signal)
   dl_status : UInt
   /// SII data read from EEPROM
-  mut sii : @mailbox.SiiData?
+  sii : @mailbox.SiiData?
 } derive(Debug)
 
 ///|

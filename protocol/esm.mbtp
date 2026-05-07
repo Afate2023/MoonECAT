@@ -1,0 +1,28 @@
+///|
+predicate esm_state_byte(state : EsmState, byte : Byte) {
+  match state {
+    Init => byte == b'\x01'
+    PreOp => byte == b'\x02'
+    SafeOp => byte == b'\x04'
+    Op => byte == b'\x08'
+    Boot => byte == b'\x03'
+  }
+}
+
+///|
+predicate valid_esm_transition(current : EsmState, target : EsmState) {
+  match (current, target) {
+    (Init, PreOp) => true
+    (Init, Boot) => true
+    (PreOp, SafeOp) => true
+    (PreOp, Init) => true
+    (SafeOp, Op) => true
+    (SafeOp, PreOp) => true
+    (SafeOp, Init) => true
+    (Op, SafeOp) => true
+    (Op, PreOp) => true
+    (Op, Init) => true
+    (Boot, Init) => true
+    _ => false
+  }
+}

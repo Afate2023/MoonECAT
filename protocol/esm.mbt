@@ -11,7 +11,11 @@ pub(all) enum EsmState {
 
 ///|
 /// ESM state register values.
-pub fn EsmState::to_byte(self : EsmState) -> Byte {
+pub fn EsmState::to_byte(
+  self : EsmState,
+) -> Byte where {
+  proof_ensure: result => esm_state_byte(self, result),
+} {
   match self {
     Init => b'\x01'
     PreOp => b'\x02'
@@ -38,7 +42,12 @@ pub fn EsmState::from_byte(b : Byte) -> EsmState raise @hal.EcError {
 
 ///|
 /// Check whether the transition from one ESM state to another is valid.
-pub fn EsmState::can_transition(self : EsmState, target : EsmState) -> Bool {
+pub fn EsmState::can_transition(
+  self : EsmState,
+  target : EsmState,
+) -> Bool where {
+  proof_ensure: result => result == valid_esm_transition(self, target),
+} {
   match (self, target) {
     (Init, PreOp) => true
     (Init, Boot) => true
