@@ -77,6 +77,7 @@ test "native scaffold keeps unavailable linux backend explicit" {
   }
   assert_true(
     message.contains("Linux Raw Socket backend") ||
-    message.contains("native backend is not available"),
+    message.contains("native backend is not available") ||
+    message.contains("native ffi is unavailable"),
   )
 }

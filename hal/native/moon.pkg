@@ -13,13 +13,14 @@ options(
   "native-stub": [ "platform_stub.c", "zero_copy_stub.c" ],
   targets: {
     "ffi_native.mbt": [ "native" ],
-    "ffi_native_fallback.mbt": [ "wasm-gc" ],
+    "ffi_native_fallback.mbt": [ "not", "native" ],
     "linux_raw_socket_ffi.mbt": [ "native" ],
-    "linux_raw_socket_ffi_fallback.mbt": [ "wasm-gc" ],
+    "linux_raw_socket_ffi_fallback.mbt": [ "not", "native" ],
+    "native_wbtest.mbt": [ "native" ],
     "native_zero_copy_nic.mbt": [ "native" ],
     "windows_npcap_ffi.mbt": [ "native" ],
-    "windows_npcap_ffi_fallback.mbt": [ "wasm-gc" ],
+    "windows_npcap_ffi_fallback.mbt": [ "not", "native" ],
     "zero_copy_ffi.mbt": [ "native" ],
-    "zero_copy_ffi_fallback.mbt": [ "wasm-gc" ],
+    "zero_copy_ffi_fallback.mbt": [ "not", "native" ],
   },
 )
