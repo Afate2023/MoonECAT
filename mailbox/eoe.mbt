@@ -288,7 +288,7 @@ pub fn decode_eoe_response(frame : Bytes) -> EoeResponse raise @hal.EcError {
   let mbh = MailboxHeader::from_bytes(frame)
   if mbh.mb_type != EoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected EoE mailbox type, got " + mbh.mb_type.to_string(),
+      "expected EoE mailbox type, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let off = mailbox_header_len

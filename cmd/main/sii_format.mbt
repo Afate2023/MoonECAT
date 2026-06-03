@@ -113,7 +113,7 @@ fn read_sii_json(
       None => (Json::null(), Json::null(), Json::null())
     }
     Json::object({
-      "category": Json::string(entry.category.to_string()),
+      "category": Json::string(@debug.to_string(entry.category)),
       "title": Json::string(sii_category_title(entry.category, entry.type_code)),
       "category_code": Json::number(entry.type_code.to_double()),
       "category_class": Json::string(category_class),
@@ -132,7 +132,7 @@ fn read_sii_json(
   }
   let fmmu_json = fmmu.map(fn(direction) {
     Json::object({
-      "usage": Json::string(direction.to_string()),
+      "usage": Json::string(@debug.to_string(direction)),
       "description": Json::string(fmmu_usage_name(direction)),
     })
   })
@@ -152,7 +152,7 @@ fn read_sii_json(
       "control": Json::number(sm.control.to_uint().to_double()),
       "status": Json::number(sm.status.to_uint().to_double()),
       "activate": Json::number(sm.activate.to_uint().to_double()),
-      "sm_type": Json::string(sm.sm_type.to_string()),
+      "sm_type": Json::string(@debug.to_string(sm.sm_type)),
     })
   })
   let sync_units_json = sii.sync_units.map(fn(entry) {

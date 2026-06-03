@@ -25,7 +25,7 @@ pub fn[N : @hal.Nic] transact(
             "timeout at transact.recv: ignored " +
             max_ignored_rx_frames.to_string() +
             " invalid frames; last error=" +
-            err.to_string(),
+            @debug.to_string(err),
           )
         }
       }

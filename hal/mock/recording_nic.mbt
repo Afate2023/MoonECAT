@@ -34,7 +34,7 @@ pub impl @hal.Nic for RecordingNic with send(self, data) {
       n
     }
     Err(e) => {
-      self.log.append(NicEvent::SendFailed(e.to_string()))
+      self.log.append(NicEvent::SendFailed(@debug.to_string(e)))
       raise e
     }
   }
@@ -63,7 +63,7 @@ pub impl @hal.Nic for RecordingNic with recv(self, timeout~) {
       raise @hal.EcError::RecvFailed(msg)
     }
     Err(e) => {
-      self.log.append(NicEvent::RecvFailed(e.to_string()))
+      self.log.append(NicEvent::RecvFailed(@debug.to_string(e)))
       raise e
     }
   }

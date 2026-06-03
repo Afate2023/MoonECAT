@@ -473,7 +473,7 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
       control_wkc~
     ) => {
       let current_text = match current {
-        Some(state) => state.to_string()
+        Some(state) => @debug.to_string(state)
         None => "unknown"
       }
       let error_text = match error_indication {
@@ -501,7 +501,7 @@ fn run_fault_issues(fault : RunFault) -> Array[DiagnosticIssue] {
           detail: "Startup transition failed for station " +
           station.to_string() +
           ": target=" +
-          target.to_string() +
+          @debug.to_string(target) +
           " current=" +
           current_text +
           " error_flag=" +
@@ -569,9 +569,9 @@ pub fn diagnostic_surface_from_state_transition(
         category: StateTransition,
         level: Block,
         detail: "Final state " +
-        state.to_string() +
+        @debug.to_string(state) +
         " does not match target " +
-        target.to_string(),
+        @debug.to_string(target),
       })
     _ => ()
   }
@@ -694,7 +694,7 @@ fn validation_difference_issue(
     level: diagnostic_level_from_validate_grade(
       validation_difference_grade(diff),
     ),
-    detail: diff.to_string(),
+    detail: @debug.to_string(diff),
   }
 }
 
@@ -1100,11 +1100,11 @@ fn[N : @hal.Nic] enter_diagnosis_preop(
     let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
     let status_code_text = match status_code {
       Ok(code) => code.to_string()
-      Err(err) => err.to_string()
+      Err(err) => @debug.to_string(err)
     }
     raise @hal.EcError::Internal(
       "diagnosis failed to enter PreOp: actual=" +
-      confirmed_preop.to_string() +
+      @debug.to_string(confirmed_preop) +
       ", AL status code=" +
       status_code_text,
     )
@@ -1195,7 +1195,7 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
     }
     if resp.command != @mailbox.SdoCommand::UploadResponse {
       raise @hal.EcError::MailboxProtocol(
-        stage + ": expected UploadResponse, got " + resp.command.to_string(),
+        stage + ": expected UploadResponse, got " + @debug.to_string(resp.command),
       )
     }
     if resp.index != index || resp.subindex != subindex {

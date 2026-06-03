@@ -11,7 +11,7 @@ test "NullCycleHook on_pre_cycle returns Continue" {
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
+  @debug.assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
@@ -24,7 +24,7 @@ test "NullCycleHook on_post_cycle returns Continue" {
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_post_cycle(snap, ctx), @hil.Continue)
+  @debug.assert_eq(hook.on_post_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
@@ -36,14 +36,14 @@ test "NullCycleHook on_fault returns Continue" {
     dc_state: @hil.Disabled,
     recovery_pending: true,
   }
-  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
+  @debug.assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
 }
 
 ///|
 test "CycleDirective equality" {
-  assert_eq(@hil.Continue, @hil.Continue)
-  assert_eq(@hil.SkipCycle, @hil.SkipCycle)
-  assert_eq(@hil.StopGraceful, @hil.StopGraceful)
+  @debug.assert_eq(@hil.Continue, @hil.Continue)
+  @debug.assert_eq(@hil.SkipCycle, @hil.SkipCycle)
+  @debug.assert_eq(@hil.StopGraceful, @hil.StopGraceful)
   assert_true(@hil.Continue != @hil.SkipCycle)
   assert_true(@hil.Continue != @hil.StopGraceful)
 }
@@ -467,7 +467,7 @@ test "HilCycleHook on_pre_cycle returns Continue" {
     ],
     0x1000U,
   )
-  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
+  @debug.assert_eq(hook.on_pre_cycle(snap, ctx), @hil.Continue)
 }
 
 ///|
@@ -507,7 +507,7 @@ test "HilCycleHook on_post_cycle advances sim time via adapter" {
     0x1000U,
   )
   let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, @hil.Continue)
+  @debug.assert_eq(directive, @hil.Continue)
   assert_eq(hook.session.sim_time.to_ns(), 1_000_000L)
   assert_eq(hook.session.step_log.length(), 1)
 }
@@ -527,7 +527,7 @@ test "HilCycleHook on_fault returns Continue" {
     dc_state: @hil.Disabled,
     recovery_pending: false,
   }
-  assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
+  @debug.assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
 }
 
 ///|
@@ -547,8 +547,8 @@ test "HilCycleHook returns StopGraceful when terminated" {
     recovery_pending: false,
   }
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(hook.on_pre_cycle(snap, ctx), @hil.StopGraceful)
-  assert_eq(hook.on_post_cycle(snap, ctx), @hil.StopGraceful)
+  @debug.assert_eq(hook.on_pre_cycle(snap, ctx), @hil.StopGraceful)
+  @debug.assert_eq(hook.on_post_cycle(snap, ctx), @hil.StopGraceful)
 }
 
 // ── C-5: Timebase tests ──────────────────────────────────────────────
@@ -557,7 +557,7 @@ test "HilCycleHook returns StopGraceful when terminated" {
 test "VirtualTimebase starts at zero and advances" {
   let tb = @simulation.VirtualTimebase::new()
   assert_eq(tb.now_ns(), 0L)
-  assert_eq(tb.domain(), @simulation.Virtual)
+  @debug.assert_eq(tb.domain(), @simulation.Virtual)
   assert_true(tb.is_monotonic())
   assert_eq(tb.resolution_ns(), 1L)
   tb.advance(1_000_000L)
@@ -614,10 +614,10 @@ test "TimebaseSync to_local and to_reference are inverse" {
 
 ///|
 test "ClockDomain equality" {
-  assert_eq(@simulation.Mcu, @simulation.Mcu)
-  assert_eq(@simulation.Linux, @simulation.Linux)
-  assert_eq(@simulation.Fpga, @simulation.Fpga)
-  assert_eq(@simulation.Virtual, @simulation.Virtual)
+  @debug.assert_eq(@simulation.Mcu, @simulation.Mcu)
+  @debug.assert_eq(@simulation.Linux, @simulation.Linux)
+  @debug.assert_eq(@simulation.Fpga, @simulation.Fpga)
+  @debug.assert_eq(@simulation.Virtual, @simulation.Virtual)
   assert_true(@simulation.Mcu != @simulation.Linux)
 }
 
@@ -632,7 +632,7 @@ test "CycleTimingReport jitter calculation" {
   assert_eq(report.nominal_period_ns, 1_000_000L)
   assert_eq(report.actual_period_ns, 1_000_500L)
   assert_eq(report.jitter_ns, 500L)
-  assert_eq(report.domain, @simulation.Mcu)
+  @debug.assert_eq(report.domain, @simulation.Mcu)
 }
 
 ///|

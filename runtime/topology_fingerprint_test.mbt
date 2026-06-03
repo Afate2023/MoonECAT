@@ -27,7 +27,7 @@ test "topology_fingerprint: deterministic for identical scan" {
   }
   let fp1 = @runtime.topology_fingerprint(scan)
   let fp2 = @runtime.topology_fingerprint(scan)
-  assert_eq(fp1, fp2)
+  @debug.assert_eq(fp1, fp2)
   assert_eq(fp1.slave_count, 2)
 }
 
@@ -74,7 +74,7 @@ test "fingerprint_match: identical" {
     slave_count: 2,
     identity_hash: 12345L,
   }
-  assert_eq(
+  @debug.assert_eq(
     @runtime.fingerprint_match(fp, fp),
     @runtime.TopologyFingerprintMatch::Identical,
   )
@@ -106,7 +106,7 @@ test "fingerprint_match: identity changed" {
     slave_count: 2,
     identity_hash: 99999L,
   }
-  assert_eq(
+  @debug.assert_eq(
     @runtime.fingerprint_match(fp_a, fp_b),
     @runtime.TopologyFingerprintMatch::IdentityChanged,
   )
@@ -132,7 +132,7 @@ test "topology_fingerprint_from_config: matches scan fingerprint" {
   let config = @runtime.configuration_from_scan(scan)
   let fp_scan = @runtime.topology_fingerprint(scan)
   let fp_config = @runtime.topology_fingerprint_from_config(config)
-  assert_eq(fp_scan, fp_config)
+  @debug.assert_eq(fp_scan, fp_config)
 }
 
 ///|
@@ -140,7 +140,7 @@ test "topology_fingerprint: empty scan" {
   let scan : @runtime.ScanReport = { slave_count: 0, slaves: [] }
   let fp = @runtime.topology_fingerprint(scan)
   assert_eq(fp.slave_count, 0)
-  assert_eq(
+  @debug.assert_eq(
     @runtime.fingerprint_match(fp, fp),
     @runtime.TopologyFingerprintMatch::Identical,
   )
@@ -176,7 +176,7 @@ test "topology_fingerprint: position order independent of array order" {
     slave_count: 2,
     slaves: [slave_b, slave_a],
   }
-  assert_eq(
+  @debug.assert_eq(
     @runtime.topology_fingerprint(scan_ab),
     @runtime.topology_fingerprint(scan_ba),
   )

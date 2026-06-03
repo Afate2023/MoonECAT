@@ -2,9 +2,9 @@
 test "native scaffold exposes config defaults" {
   let linux = default_linux_config("eth0")
   let windows = default_windows_npcap_config("\\\\Device\\\\NPF_{GUID}")
-  assert_eq(linux.backend, LinuxRawSocket)
-  assert_eq(windows.backend, WindowsNpcap)
-  assert_eq(linux.snaplen, @hal.max_frame_size)
+  @debug.assert_eq(linux.backend, LinuxRawSocket)
+  @debug.assert_eq(windows.backend, WindowsNpcap)
+  @debug.assert_eq(linux.snaplen, @hal.max_frame_size)
 }
 
 ///|
@@ -56,11 +56,11 @@ test "native interface listing parses metadata and probe candidates" {
       ]),
     }),
   )
-  assert_eq(listing.backend, WindowsNpcap)
-  assert_eq(listing.interfaces.length(), 3)
+  @debug.assert_eq(listing.backend, WindowsNpcap)
+  @debug.assert_eq(listing.interfaces.length(), 3)
   let candidates = native_interface_probe_candidates(listing)
-  assert_eq(candidates.length(), 1)
-  assert_eq(candidates[0].name, "ethercat0")
+  @debug.assert_eq(candidates.length(), 1)
+  @debug.assert_eq(candidates[0].name, "ethercat0")
 }
 
 ///|

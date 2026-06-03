@@ -535,7 +535,7 @@ fn[N : @hal.Nic] build_pdo_audit_report(
         ),
         live_detected: None,
         live_differs_from_plan: None,
-        live_read_error: Some(err.to_string()),
+        live_read_error: Some(@debug.to_string(err)),
         configured_rx,
         configured_tx,
         live_rx: None,

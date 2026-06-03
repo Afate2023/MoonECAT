@@ -544,7 +544,7 @@ fn write_recording_log(
   let fingerprint = @runtime.topology_fingerprint(scan_report)
   let ndjson = log.to_ndjson_with_header(
     slave_count=scan_report.slave_count,
-    fingerprint=fingerprint.to_string(),
+    fingerprint=@debug.to_string(fingerprint),
   )
   let result : Result[Unit, Error] = try? @fs.write_string_to_file(path, ndjson)
   match result {

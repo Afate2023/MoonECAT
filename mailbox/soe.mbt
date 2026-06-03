@@ -190,7 +190,7 @@ pub fn decode_soe_response(frame : Bytes) -> SoeResponse raise @hal.EcError {
   let mbh = MailboxHeader::from_bytes(frame)
   if mbh.mb_type != SoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected SoE mailbox type, got " + mbh.mb_type.to_string(),
+      "expected SoE mailbox type, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let off = mailbox_header_len
@@ -236,7 +236,7 @@ pub fn decode_soe_response(frame : Bytes) -> SoeResponse raise @hal.EcError {
     }
     _ =>
       raise @hal.EcError::MailboxProtocol(
-        "unexpected SoE opCode in response: " + op_code.to_string(),
+        "unexpected SoE opCode in response: " + @debug.to_string(op_code),
       )
   }
 }

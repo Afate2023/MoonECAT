@@ -2649,7 +2649,7 @@ test "SmWatchdogConfig struct equality and derive Show" {
   }
   @debug.assert_eq(a, b)
   // Show derive produces non-empty string
-  assert_true(a.to_string().length() > 0)
+  assert_true(@debug.to_string(a).length() > 0)
 }
 
 ///|

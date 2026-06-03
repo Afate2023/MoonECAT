@@ -554,17 +554,17 @@ fn[N : @hal.Nic] refine_station_startup_preparation_in_preop_if_needed(
 fn state_transition_report_json(report : StateTransitionReport) -> Json {
   Json::object({
     "mode": Json::string(report.mode),
-    "target_state": Json::string(report.target.to_string()),
+    "target_state": Json::string(@debug.to_string(report.target)),
     "station": match report.station {
       Some(station) => Json::number(station.to_double())
       None => Json::null()
     },
     "current_state": match report.current {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "final_state": match report.final_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "al_error_flag": match report.al_error_flag {
@@ -614,18 +614,18 @@ fn state_transition_report_text(report : StateTransitionReport) -> String {
   buf.write_string("EtherCAT State Transition\n")
   buf.write_string("=========================\n")
   buf.write_string("Mode: " + report.mode + "\n")
-  buf.write_string("Target: " + report.target.to_string() + "\n")
+  buf.write_string("Target: " + @debug.to_string(report.target) + "\n")
   match report.station {
     Some(station) =>
       buf.write_string("Station: " + format_hex(station, 4) + "\n")
     None => ()
   }
   match report.current {
-    Some(state) => buf.write_string("Current: " + state.to_string() + "\n")
+    Some(state) => buf.write_string("Current: " + @debug.to_string(state) + "\n")
     None => ()
   }
   match report.final_state {
-    Some(state) => buf.write_string("Final: " + state.to_string() + "\n")
+    Some(state) => buf.write_string("Final: " + @debug.to_string(state) + "\n")
     None => ()
   }
   match report.al_error_flag {

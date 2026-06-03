@@ -56,7 +56,7 @@ fn option_bool_json(value : Bool?) -> Json {
 ///|
 fn option_esm_state_json(value : @protocol.EsmState?) -> Json {
   match value {
-    Some(state) => Json::string(state.to_string())
+    Some(state) => Json::string(@debug.to_string(state))
     None => Json::null()
   }
 }
@@ -129,10 +129,10 @@ fn configuration_difference_json(
     @runtime.Missing(position~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("missing"),
         "position": Json::number(position.to_double()),
@@ -140,10 +140,10 @@ fn configuration_difference_json(
     @runtime.OptionalMissing(position~, group_id~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("optional-missing"),
         "position": Json::number(position.to_double()),
@@ -152,10 +152,10 @@ fn configuration_difference_json(
     @runtime.Extra(position~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("extra"),
         "position": Json::number(position.to_double()),
@@ -163,10 +163,10 @@ fn configuration_difference_json(
     @runtime.StationAddressMismatch(position~, expected~, actual~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("station-address-mismatch"),
         "position": Json::number(position.to_double()),
@@ -176,10 +176,10 @@ fn configuration_difference_json(
     @runtime.AliasAddressMismatch(position~, expected~, actual~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("alias-address-mismatch"),
         "position": Json::number(position.to_double()),
@@ -189,10 +189,10 @@ fn configuration_difference_json(
     @runtime.IdentityMismatch(position~, expected~, actual~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("identity-mismatch"),
         "position": Json::number(position.to_double()),
@@ -202,10 +202,10 @@ fn configuration_difference_json(
     @runtime.IdentificationMismatch(position~, expected~, actual~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("identification-mismatch"),
         "position": Json::number(position.to_double()),
@@ -215,10 +215,10 @@ fn configuration_difference_json(
     @runtime.ProcessDataSummaryMismatch(position~, expected~, actual~) =>
       Json::object({
         "category": Json::string(
-          @runtime.validation_difference_category(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_category(diff)),
         ),
         "grade": Json::string(
-          @runtime.validation_difference_grade(diff).to_string(),
+          @debug.to_string(@runtime.validation_difference_grade(diff)),
         ),
         "type": Json::string("process-data-summary-mismatch"),
         "position": Json::number(position.to_double()),
@@ -231,12 +231,12 @@ fn configuration_difference_json(
 ///|
 fn validate_report_json(report : @runtime.ValidateReport) -> Json {
   Json::object({
-    "expected_source": Json::string(report.expected_source.to_string()),
-    "actual_source": Json::string(report.actual_source.to_string()),
+    "expected_source": Json::string(@debug.to_string(report.expected_source)),
+    "actual_source": Json::string(@debug.to_string(report.actual_source)),
     "total_expected": Json::number(report.total_expected.to_double()),
     "total_found": Json::number(report.total_found.to_double()),
     "all_ok": Json::boolean(report.all_ok),
-    "grade": Json::string(report.grade.to_string()),
+    "grade": Json::string(@debug.to_string(report.grade)),
     "result_count": Json::number(report.results.length().to_double()),
     "difference_count": Json::number(report.differences.length().to_double()),
     "differences": Json::array(
@@ -251,12 +251,12 @@ fn validate_output_json(
   report : @runtime.ValidateReport,
 ) -> Json {
   Json::object({
-    "expected_source": Json::string(report.expected_source.to_string()),
-    "actual_source": Json::string(report.actual_source.to_string()),
+    "expected_source": Json::string(@debug.to_string(report.expected_source)),
+    "actual_source": Json::string(@debug.to_string(report.actual_source)),
     "total_expected": Json::number(report.total_expected.to_double()),
     "total_found": Json::number(report.total_found.to_double()),
     "all_ok": Json::boolean(report.all_ok),
-    "grade": Json::string(report.grade.to_string()),
+    "grade": Json::string(@debug.to_string(report.grade)),
     "result_count": Json::number(report.results.length().to_double()),
     "difference_count": Json::number(report.differences.length().to_double()),
     "differences": Json::array(
@@ -282,7 +282,7 @@ fn run_report_json(report : @runtime.RunReport) -> Json {
       Some(output_period_ns) => Json::number(output_period_ns.to_double())
       None => Json::null()
     },
-    "final_phase": Json::string(report.final_phase.to_string()),
+    "final_phase": Json::string(@debug.to_string(report.final_phase)),
     "fault": match report.fault {
       Some(fault) => run_fault_json(fault)
       None => Json::null()
@@ -403,9 +403,9 @@ fn run_fault_json(fault : @runtime.RunFault) -> Json {
       Json::object({
         "kind": Json::string("startup-transition-failed"),
         "station": Json::number(station.to_double()),
-        "target": Json::string(target.to_string()),
+        "target": Json::string(@debug.to_string(target)),
         "current": match current {
-          Some(state) => Json::string(state.to_string())
+          Some(state) => Json::string(@debug.to_string(state))
           None => Json::null()
         },
         "al_error_flag": match error_indication {
@@ -449,19 +449,19 @@ fn run_fault_json(fault : @runtime.RunFault) -> Json {
 fn state_surface_summary_json(summary : @runtime.StateSurfaceSummary) -> Json {
   Json::object({
     "target_state": match summary.target_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "current_state": match summary.current_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "final_state": match summary.final_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "al_state": match summary.al_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "al_error_flag": match summary.al_error_flag {
@@ -495,15 +495,15 @@ fn configuration_surface_summary_json(
       }),
     ),
     "expected_source": match summary.expected_source {
-      Some(source) => Json::string(source.to_string())
+      Some(source) => Json::string(@debug.to_string(source))
       None => Json::null()
     },
     "actual_source": match summary.actual_source {
-      Some(source) => Json::string(source.to_string())
+      Some(source) => Json::string(@debug.to_string(source))
       None => Json::null()
     },
     "validation_grade": match summary.validation_grade {
-      Some(grade) => Json::string(grade.to_string())
+      Some(grade) => Json::string(@debug.to_string(grade))
       None => Json::null()
     },
     "difference_count": Json::number(summary.difference_count.to_double()),
@@ -530,9 +530,9 @@ fn runtime_metrics_summary_json(
 ///|
 fn diagnostic_issue_json(issue : @runtime.DiagnosticIssue) -> Json {
   Json::object({
-    "source": Json::string(issue.source.to_string()),
-    "category": Json::string(issue.category.to_string()),
-    "level": Json::string(issue.level.to_string()),
+    "source": Json::string(@debug.to_string(issue.source)),
+    "category": Json::string(@debug.to_string(issue.category)),
+    "level": Json::string(@debug.to_string(issue.level)),
     "detail": Json::string(issue.detail),
   })
 }
@@ -544,7 +544,7 @@ fn diagnostic_surface_json(surface : @runtime.DiagnosticSurface) -> Json {
       Some(station) => Json::number(station.to_double())
       None => Json::null()
     },
-    "overall_level": Json::string(surface.overall_level.to_string()),
+    "overall_level": Json::string(@debug.to_string(surface.overall_level)),
     "state": state_surface_summary_json(surface.state_summary),
     "configuration": match surface.configuration_summary {
       Some(summary) => configuration_surface_summary_json(summary)
@@ -571,14 +571,14 @@ fn diagnostic_surface_json(surface : @runtime.DiagnosticSurface) -> Json {
           results.map(fn(r) {
             Json::object({
               "name": Json::string(r.name),
-              "verdict": Json::string(r.verdict.to_string()),
+              "verdict": Json::string(@debug.to_string(r.verdict)),
             })
           }),
         )
       None => Json::null()
     },
     "overall_verdict": match surface.overall_verdict {
-      Some(v) => Json::string(v.to_string())
+      Some(v) => Json::string(@debug.to_string(v))
       None => Json::null()
     },
     "topology_fingerprint": match surface.topology_fingerprint {

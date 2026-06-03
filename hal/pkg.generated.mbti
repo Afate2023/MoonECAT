@@ -32,8 +32,6 @@ pub(all) suberror EcError {
   NotSupported(String)
   Internal(String)
 } derive(@debug.Debug)
-pub fn EcError::to_string(Self) -> String
-pub impl Show for EcError
 
 // Types and methods
 pub(all) struct DiagnosticEvent {
@@ -43,14 +41,10 @@ pub(all) struct DiagnosticEvent {
   message : String
 } derive(@debug.Debug)
 pub fn DiagnosticEvent::new(Timestamp, Severity, String, String) -> Self
-pub fn DiagnosticEvent::to_string(Self) -> String
-pub impl Show for DiagnosticEvent
 
 pub(all) enum Duration {
   Duration(Int64)
 } derive(Compare, Eq, @debug.Debug)
-pub fn Duration::to_string(Self) -> String
-pub impl Show for Duration
 
 pub(all) struct FramePool {
   id : Int
@@ -89,8 +83,6 @@ pub(all) struct FrameRef {
   offset : Int
   length : Int
 } derive(Eq, @debug.Debug)
-pub fn FrameRef::to_string(Self) -> String
-pub impl Show for FrameRef
 
 pub(all) enum FrameState {
   Free
@@ -101,8 +93,6 @@ pub(all) enum FrameState {
   Receiving
   Received
 } derive(Eq, @debug.Debug)
-pub fn FrameState::to_string(Self) -> String
-pub impl Show for FrameState
 
 pub(all) struct MasterConfig {
   interface_name : String
@@ -112,8 +102,6 @@ pub(all) struct MasterConfig {
   dc_enabled : Bool
 } derive(Eq, @debug.Debug)
 pub fn MasterConfig::default() -> Self
-pub fn MasterConfig::to_string(Self) -> String
-pub impl Show for MasterConfig
 
 pub(all) struct MutableProcessImage {
   outputs : FixedArray[Byte]
@@ -123,14 +111,10 @@ pub(all) struct MutableProcessImage {
 } derive(@debug.Debug)
 pub fn MutableProcessImage::clear_inputs(Self) -> Unit
 pub fn MutableProcessImage::new(Int, Int) -> Self
-pub fn MutableProcessImage::to_string(Self) -> String
-pub impl Show for MutableProcessImage
 
 pub(all) struct NicHandle {
   id : Int
 } derive(Eq, @debug.Debug)
-pub fn NicHandle::to_string(Self) -> String
-pub impl Show for NicHandle
 
 pub(all) enum Severity {
   Debug
@@ -138,8 +122,6 @@ pub(all) enum Severity {
   Warn
   Error
 } derive(Eq, @debug.Debug)
-pub fn Severity::to_string(Self) -> String
-pub impl Show for Severity
 
 pub(all) struct SlaveConfig {
   position : UInt
@@ -149,8 +131,6 @@ pub(all) struct SlaveConfig {
   configured_address : UInt
   presence : SlavePresence
 } derive(Eq, @debug.Debug)
-pub fn SlaveConfig::to_string(Self) -> String
-pub impl Show for SlaveConfig
 
 pub(all) struct SlaveIdentity {
   vendor_id : UInt
@@ -158,55 +138,49 @@ pub(all) struct SlaveIdentity {
   revision : UInt
   serial : UInt
 } derive(Eq, @debug.Debug)
-pub fn SlaveIdentity::to_string(Self) -> String
-pub impl Show for SlaveIdentity
 
 pub(all) enum SlavePresence {
   Mandatory
   Optional(group_id~ : UInt?)
 } derive(Eq, @debug.Debug)
-pub fn SlavePresence::to_string(Self) -> String
-pub impl Show for SlavePresence
 
 pub(all) enum Timestamp {
   Timestamp(Int64)
 } derive(Compare, Eq, @debug.Debug)
-pub fn Timestamp::to_string(Self) -> String
-pub impl Show for Timestamp
 
 // Type aliases
 
 // Traits
 pub(open) trait Clock {
-  now(Self) -> Timestamp
-  sleep(Self, Duration) -> Unit
+  fn now(Self) -> Timestamp
+  fn sleep(Self, Duration) -> Unit
 }
 
 pub(open) trait DiagnosticSink {
-  emit(Self, DiagnosticEvent) -> Unit
+  fn emit(Self, DiagnosticEvent) -> Unit
 }
 
 pub(open) trait FileAccess {
-  read_file(Self, String) -> Bytes raise EcError
-  write_file(Self, String, Bytes) -> Unit raise EcError
+  fn read_file(Self, String) -> Bytes raise EcError
+  fn write_file(Self, String, Bytes) -> Unit raise EcError
 }
 
 pub(open) trait Nic {
-  open_(String) -> Self raise EcError
-  send(Self, Bytes) -> Int raise EcError
-  recv(Self, timeout~ : Duration) -> Bytes raise EcError
-  close(Self) -> Unit
+  fn open_(String) -> Self raise EcError
+  fn send(Self, Bytes) -> Int raise EcError
+  fn recv(Self, timeout~ : Duration) -> Bytes raise EcError
+  fn close(Self) -> Unit
 }
 
 pub(open) trait ZeroCopyNic {
-  open_(String, FramePool) -> Self raise EcError
-  acquire_tx(Self) -> FrameRef raise EcError
-  tx_buffer(Self, FrameRef) -> FixedArray[Byte]
-  submit(Self, FrameRef, length~ : Int) -> Unit raise EcError
-  recv(Self, timeout~ : Duration) -> FrameRef raise EcError
-  rx_buffer(Self, FrameRef) -> FixedArray[Byte]
-  rx_length(Self, FrameRef) -> Int
-  release(Self, FrameRef) -> Unit
-  close(Self) -> Unit
+  fn open_(String, FramePool) -> Self raise EcError
+  fn acquire_tx(Self) -> FrameRef raise EcError
+  fn tx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  fn submit(Self, FrameRef, length~ : Int) -> Unit raise EcError
+  fn recv(Self, timeout~ : Duration) -> FrameRef raise EcError
+  fn rx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  fn rx_length(Self, FrameRef) -> Int
+  fn release(Self, FrameRef) -> Unit
+  fn close(Self) -> Unit
 }
 

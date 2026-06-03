@@ -92,7 +92,7 @@ fn startup_trace_od_entry_failure(
     subindex,
     value_hex: None,
     value_u32: None,
-    error_detail: Some(err.to_string()),
+    error_detail: Some(@debug.to_string(err)),
     abort_code: match err {
       @hal.EcError::SdoAbort(code) => Some(code)
       _ => None
@@ -128,11 +128,11 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
     Ok(snapshot) =>
       notes.push(
         "recover-al-error state=" +
-        snapshot.state.to_string() +
+        @debug.to_string(snapshot.state) +
         " error=" +
         snapshot.error_indication.to_string(),
       )
-    Err(err) => notes.push("recover-al-error failed: " + err.to_string())
+    Err(err) => notes.push("recover-al-error failed: " + @debug.to_string(err))
   }
   let request_init_result : Result[@protocol.EsmState, @hal.EcError] = try? @protocol.request_state(
     nic,
@@ -141,9 +141,9 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
     timeout,
   )
   match request_init_result {
-    Ok(state) => notes.push("request-init confirmed=" + state.to_string())
+    Ok(state) => notes.push("request-init confirmed=" + @debug.to_string(state))
     Err(err) => {
-      notes.push("request-init failed: " + err.to_string())
+      notes.push("request-init failed: " + @debug.to_string(err))
       let broadcast_result : Result[UInt, @hal.EcError] = try? @protocol.broadcast_state(
         nic,
         @protocol.Init,
@@ -152,7 +152,7 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
       match broadcast_result {
         Ok(wkc) => notes.push("broadcast-init wkc=" + wkc.to_string())
         Err(broadcast_err) =>
-          notes.push("broadcast-init failed: " + broadcast_err.to_string())
+          notes.push("broadcast-init failed: " + @debug.to_string(broadcast_err))
       }
     }
   }
@@ -172,7 +172,7 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
         "]",
       )
     }
-    Err(err) => notes.push("scan failed: " + err.to_string())
+    Err(err) => notes.push("scan failed: " + @debug.to_string(err))
   }
   notes
 }
@@ -284,11 +284,11 @@ fn startup_trace_report_json(report : StartupTraceReport) -> Json {
 fn startup_trace_report_text(report : StartupTraceReport) -> String {
   let buf = StringBuilder(size_hint=2048)
   let initial_state_text = match report.initial_state {
-    Some(value) => value.to_string()
+    Some(value) => @debug.to_string(value)
     None => "unknown"
   }
   let final_state_text = match report.final_state {
-    Some(value) => value.to_string()
+    Some(value) => @debug.to_string(value)
     None => "unknown"
   }
   buf.write_string("Startup Trace\n")
@@ -310,7 +310,7 @@ fn startup_trace_report_text(report : StartupTraceReport) -> String {
   }
   for phase in report.phases {
     let phase_state = match phase.al_state {
-      Some(value) => value.to_string()
+      Some(value) => @debug.to_string(value)
       None => "unknown"
     }
     let phase_error = match phase.al_error_flag {
@@ -420,21 +420,21 @@ fn[N : @hal.Nic] capture_startup_trace_phase(
         snapshot.status_code,
       )
     Err(err) => {
-      notes.push("al snapshot unavailable: " + err.to_string())
+      notes.push("al snapshot unavailable: " + @debug.to_string(err))
       (None, None, None)
     }
   }
   let sync_managers = match sm_result {
     Ok(value) => value
     Err(err) => {
-      notes.push("sync manager snapshot unavailable: " + err.to_string())
+      notes.push("sync manager snapshot unavailable: " + @debug.to_string(err))
       []
     }
   }
   let fmmus = match fmmu_result {
     Ok(value) => value
     Err(err) => {
-      notes.push("fmmu snapshot unavailable: " + err.to_string())
+      notes.push("fmmu snapshot unavailable: " + @debug.to_string(err))
       []
     }
   }
@@ -512,7 +512,7 @@ fn[N : @hal.Nic] startup_trace_sdo_upload_once(
     if resp.command != @mailbox.SdoCommand::UploadResponse {
       raise @hal.EcError::MailboxProtocol(
         "startup-trace od read: expected UploadResponse, got " +
-        resp.command.to_string(),
+        @debug.to_string(resp.command),
       )
     }
     if resp.index != index || resp.subindex != subindex {
@@ -581,7 +581,7 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
         index,
         subindex_count: None,
         entries: [startup_trace_od_entry_failure(b'\x00', err)],
-        error_detail: Some(err.to_string()),
+        error_detail: Some(@debug.to_string(err)),
         abort_code: match err {
           @hal.EcError::SdoAbort(code) => Some(code)
           _ => None
@@ -642,7 +642,7 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
         index,
         subindex_count: None,
         entries: [startup_trace_od_entry_failure(b'\x00', err)],
-        error_detail: Some(err.to_string()),
+        error_detail: Some(@debug.to_string(err)),
         abort_code: None,
       })
     }
@@ -661,7 +661,7 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
           index,
           subindex_count: None,
           entries: [startup_trace_od_entry_failure(b'\x00', err)],
-          error_detail: Some(err.to_string()),
+          error_detail: Some(@debug.to_string(err)),
           abort_code: None,
         })
       }
@@ -750,7 +750,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match mailbox_write_result {
       Ok(_) => ()
       Err(err) => {
-        transition_error = Some("mailbox write failed: " + err.to_string())
+        transition_error = Some("mailbox write failed: " + @debug.to_string(err))
         return {
           station,
           source,
@@ -779,7 +779,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match preop_result {
       Ok(value) => phase_state = Some(value)
       Err(err) => {
-        transition_error = Some("preop request failed: " + err.to_string())
+        transition_error = Some("preop request failed: " + @debug.to_string(err))
         return {
           station,
           source,
@@ -816,7 +816,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
       Ok(_) => ()
       Err(err) => {
         transition_error = Some(
-          "presafeop mailbox commands failed: " + err.to_string(),
+          "presafeop mailbox commands failed: " + @debug.to_string(err),
         )
         return {
           station,
@@ -844,7 +844,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
       Ok(_) => ()
       Err(err) => {
         transition_error = Some(
-          "process mapping write failed: " + err.to_string(),
+          "process mapping write failed: " + @debug.to_string(err),
         )
         return {
           station,
@@ -874,7 +874,7 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match safeop_result {
       Ok(value) => phase_state = Some(value)
       Err(err) =>
-        transition_error = Some("safeop request failed: " + err.to_string())
+        transition_error = Some("safeop request failed: " + @debug.to_string(err))
     }
   }
   {

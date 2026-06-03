@@ -256,9 +256,9 @@ pub fn QualityScore::to_json(self : QualityScore) -> String {
   buf.write_string("  \"overall\": ")
   buf.write_string(self.overall.to_string())
   buf.write_string(",\n  \"grade\": \"")
-  buf.write_string(self.grade.to_string())
+  buf.write_string(@debug.to_string(self.grade))
   buf.write_string("\",\n  \"trend\": \"")
-  buf.write_string(self.trend.to_string())
+  buf.write_string(@debug.to_string(self.trend))
   buf.write_string("\",\n  \"dimensions\": {\n")
   for i = 0; i < self.dimensions.length(); i = i + 1 {
     let (name, score) = self.dimensions[i]

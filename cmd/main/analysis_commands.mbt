@@ -386,14 +386,14 @@ fn scenario_result_json(result : @mock.ScenarioResult) -> Json {
     "command": Json::string("scenario"),
     "name": Json::string(result.name),
     "passed": Json::boolean(result.passed),
-    "final_verdict": Json::string(result.final_verdict.to_string()),
+    "final_verdict": Json::string(@debug.to_string(result.final_verdict)),
     "total_cycles": Json::number(result.total_cycles.to_double()),
     "stop_reason": Json::string(result.stop_reason),
     "expected": Json::array(
       result.expected.map(fn(e) {
         Json::object({
           "cycle": Json::number(e.cycle.to_double()),
-          "verdict": Json::string(e.verdict.to_string()),
+          "verdict": Json::string(@debug.to_string(e.verdict)),
         })
       }),
     ),
@@ -401,7 +401,7 @@ fn scenario_result_json(result : @mock.ScenarioResult) -> Json {
       result.observed.map(fn(o) {
         Json::object({
           "cycle": Json::number(o.cycle.to_double()),
-          "verdict": Json::string(o.verdict.to_string()),
+          "verdict": Json::string(@debug.to_string(o.verdict)),
         })
       }),
     ),
@@ -417,7 +417,7 @@ fn scenario_result_text(result : @mock.ScenarioResult) -> String {
   buf.write_string(
     "Result: " + (if result.passed { "PASS" } else { "FAIL" }) + "\n",
   )
-  buf.write_string("Final Verdict: " + result.final_verdict.to_string() + "\n")
+  buf.write_string("Final Verdict: " + @debug.to_string(result.final_verdict) + "\n")
   buf.write_string("Total Cycles: " + result.total_cycles.to_string() + "\n")
   buf.write_string("Stop Reason: " + result.stop_reason + "\n")
   buf.to_string()
@@ -627,7 +627,7 @@ fn topo_health_json(report : @analysis.TopologyHealthReport) -> Json {
   Json::object({
     "command": Json::string("topo-health"),
     "system_health_score": Json::number(report.system_health_score.to_double()),
-    "system_grade": Json::string(report.system_grade.to_string()),
+    "system_grade": Json::string(@debug.to_string(report.system_grade)),
     "max_propagation_delay_ns": Json::number(
       report.max_propagation_delay_ns.to_double(),
     ),
@@ -646,7 +646,7 @@ fn topo_health_json(report : @analysis.TopologyHealthReport) -> Json {
           ),
           "cable_length_m": Json::number(s.estimated_cable_length_m),
           "health_score": Json::number(s.health_score.to_double()),
-          "grade": Json::string(s.grade.to_string()),
+          "grade": Json::string(@debug.to_string(s.grade)),
           "loss_permille": Json::number(s.loss_rate_permille.to_double()),
         })
       }),
@@ -663,7 +663,7 @@ fn topo_health_text(report : @analysis.TopologyHealthReport) -> String {
   buf.write_string("System health: ")
   buf.write_string(report.system_health_score.to_string())
   buf.write_string("/1000 (")
-  buf.write_string(report.system_grade.to_string())
+  buf.write_string(@debug.to_string(report.system_grade))
   buf.write_string(")\n")
   buf.write_string("Total cable: ~")
   buf.write_string(report.total_cable_length_m.to_int().to_string())
@@ -674,7 +674,7 @@ fn topo_health_text(report : @analysis.TopologyHealthReport) -> String {
     buf.write_string(" (pos ")
     buf.write_string(s.position.to_string())
     buf.write_string("): ")
-    buf.write_string(s.grade.to_string())
+    buf.write_string(@debug.to_string(s.grade))
     buf.write_string(" score=")
     buf.write_string(s.health_score.to_string())
     buf.write_string(" cable=~")
@@ -733,7 +733,7 @@ fn cycle_perf_json(
     ),
     "total_tx": Json::number(stats.total_tx.to_double()),
     "total_rx": Json::number(stats.total_rx.to_double()),
-    "trend": Json::string(trend.to_string()),
+    "trend": Json::string(@debug.to_string(trend)),
   })
 }
 
@@ -766,7 +766,7 @@ fn cycle_perf_text(
   buf.write_string(" (")
   buf.write_string(stats.deadline_miss_rate_permille.to_string())
   buf.write_string("‰)\nTrend: ")
-  buf.write_string(trend.to_string())
+  buf.write_string(@debug.to_string(trend))
   buf.write_string("\n")
   buf.to_string()
 }
@@ -807,8 +807,8 @@ fn comm_quality_json(score : @analysis.QualityScore, slave_count : Int) -> Json 
   Json::object({
     "command": Json::string("comm-quality"),
     "overall": Json::number(score.overall.to_double()),
-    "grade": Json::string(score.grade.to_string()),
-    "trend": Json::string(score.trend.to_string()),
+    "grade": Json::string(@debug.to_string(score.grade)),
+    "trend": Json::string(@debug.to_string(score.trend)),
     "slave_count": Json::number(slave_count.to_double()),
     "dimensions": Json::object(dim_obj),
   })
@@ -825,10 +825,10 @@ fn comm_quality_text(
   buf.write_string("Overall: ")
   buf.write_string(score.overall.to_string())
   buf.write_string("/1000 (")
-  buf.write_string(score.grade.to_string())
+  buf.write_string(@debug.to_string(score.grade))
   buf.write_string(")\n")
   buf.write_string("Trend: ")
-  buf.write_string(score.trend.to_string())
+  buf.write_string(@debug.to_string(score.trend))
   buf.write_string("\nSlaves: ")
   buf.write_string(slave_count.to_string())
   buf.write_string("\nDimensions:\n")

@@ -183,8 +183,6 @@ pub(all) struct ConfigurationComparisonReport {
   differences : Array[ConfigurationDifference]
   all_ok : Bool
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationComparisonReport::to_string(Self) -> String
-pub impl Show for ConfigurationComparisonReport
 
 pub(all) enum ConfigurationDifference {
   Missing(position~ : Int)
@@ -196,8 +194,6 @@ pub(all) enum ConfigurationDifference {
   IdentificationMismatch(position~ : Int, expected~ : UInt?, actual~ : UInt?)
   ProcessDataSummaryMismatch(position~ : Int, expected~ : ConfigurationProcessDataSummary, actual~ : ConfigurationProcessDataSummary)
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationDifference::to_string(Self) -> String
-pub impl Show for ConfigurationDifference
 
 pub(all) struct ConfigurationMailboxProtocols {
   aoe : Bool
@@ -207,16 +203,12 @@ pub(all) struct ConfigurationMailboxProtocols {
   soe : Bool
   voe : Bool
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationMailboxProtocols::to_string(Self) -> String
-pub impl Show for ConfigurationMailboxProtocols
 
 pub(all) struct ConfigurationModel {
   source : ConfigurationSource
   total_slaves : Int
   slaves : Array[ConfigurationSlave]
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationModel::to_string(Self) -> String
-pub impl Show for ConfigurationModel
 
 pub(all) struct ConfigurationProcessDataSummary {
   sync_manager_count : Int
@@ -227,8 +219,6 @@ pub(all) struct ConfigurationProcessDataSummary {
   dc_op_mode_count : Int
   dc_assign_activate_count : Int
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationProcessDataSummary::to_string(Self) -> String
-pub impl Show for ConfigurationProcessDataSummary
 
 pub(all) struct ConfigurationSlave {
   position : Int
@@ -239,16 +229,12 @@ pub(all) struct ConfigurationSlave {
   process_data_summary : ConfigurationProcessDataSummary?
   presence : @hal.SlavePresence
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationSlave::to_string(Self) -> String
-pub impl Show for ConfigurationSlave
 
 pub(all) enum ConfigurationSource {
   OnlineScan
   OfflineConfig
   EniImport
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationSource::to_string(Self) -> String
-pub impl Show for ConfigurationSource
 
 pub(all) struct ConfigurationSurfaceSummary {
   slave_count : Int
@@ -258,8 +244,6 @@ pub(all) struct ConfigurationSurfaceSummary {
   validation_grade : ValidateGrade?
   difference_count : Int
 } derive(Eq, @debug.Debug)
-pub fn ConfigurationSurfaceSummary::to_string(Self) -> String
-pub impl Show for ConfigurationSurfaceSummary
 
 pub(all) struct DiagnosisSession {
   original_state : @protocol.EsmState
@@ -280,8 +264,6 @@ pub(all) enum DiagnosticCategory {
   StateTransition
   MonitorVerdict
 } derive(Eq, @debug.Debug)
-pub fn DiagnosticCategory::to_string(Self) -> String
-pub impl Show for DiagnosticCategory
 
 pub(all) struct DiagnosticIssue {
   source : DiagnosticSourceLayer
@@ -289,16 +271,12 @@ pub(all) struct DiagnosticIssue {
   level : DiagnosticLevel
   detail : String
 } derive(Eq, @debug.Debug)
-pub fn DiagnosticIssue::to_string(Self) -> String
-pub impl Show for DiagnosticIssue
 
 pub(all) enum DiagnosticLevel {
   Block
   Degrade
   Info
 } derive(Eq, @debug.Debug)
-pub fn DiagnosticLevel::to_string(Self) -> String
-pub impl Show for DiagnosticLevel
 
 pub(all) enum DiagnosticSourceLayer {
   Registers
@@ -309,8 +287,6 @@ pub(all) enum DiagnosticSourceLayer {
   StateTransition
   Monitor
 } derive(Eq, @debug.Debug)
-pub fn DiagnosticSourceLayer::to_string(Self) -> String
-pub impl Show for DiagnosticSourceLayer
 
 pub(all) struct DiagnosticSurface {
   station_address : UInt?
@@ -325,26 +301,18 @@ pub(all) struct DiagnosticSurface {
   overall_verdict : Verdict?
   topology_fingerprint : TopologyFingerprint?
 } derive(Eq, @debug.Debug)
-pub fn DiagnosticSurface::to_string(Self) -> String
-pub impl Show for DiagnosticSurface
 
 pub(all) struct EoeEndpointFrame {
   station : UInt
   data : Bytes
 } derive(Eq, @debug.Debug)
-pub fn EoeEndpointFrame::to_string(Self) -> String
-pub impl Show for EoeEndpointFrame
 
 type EoeReassemblyBuffer derive(@debug.Debug)
-pub fn EoeReassemblyBuffer::to_string(Self) -> String
-pub impl Show for EoeReassemblyBuffer
 
 pub(all) struct EoeReceivedFrame {
   station : UInt
   data : Bytes
 } derive(Eq, @debug.Debug)
-pub fn EoeReceivedFrame::to_string(Self) -> String
-pub impl Show for EoeReceivedFrame
 
 pub(all) struct EoeRelay {
   stats : EoeRelayStats
@@ -355,23 +323,17 @@ pub fn EoeRelay::new() -> Self
 pub fn[N : @hal.Nic] EoeRelay::relay_cycle(Self, EoeSwitch, N, @hal.Duration, (EoeRelayFrame) -> Bool, () -> EoeRelayFrame?) -> (Int, Int)
 pub fn EoeRelay::set_active(Self, Bool) -> Unit
 pub fn EoeRelay::to_json(Self) -> Json
-pub fn EoeRelay::to_string(Self) -> String
-pub impl Show for EoeRelay
 
 pub(all) enum EoeRelayDirection {
   HostToSlave
   SlaveToHost
 } derive(Eq, @debug.Debug)
-pub fn EoeRelayDirection::to_string(Self) -> String
-pub impl Show for EoeRelayDirection
 
 pub(all) struct EoeRelayFrame {
   direction : EoeRelayDirection
   station : UInt
   data : Bytes
 } derive(Eq, @debug.Debug)
-pub fn EoeRelayFrame::to_string(Self) -> String
-pub impl Show for EoeRelayFrame
 
 pub(all) struct EoeRelayStats {
   mut tx_relayed : Int64
@@ -380,8 +342,6 @@ pub(all) struct EoeRelayStats {
 } derive(Eq, @debug.Debug)
 pub fn EoeRelayStats::new() -> Self
 pub fn EoeRelayStats::to_json(Self) -> Json
-pub fn EoeRelayStats::to_string(Self) -> String
-pub impl Show for EoeRelayStats
 
 pub(all) struct EoeStationContext {
   station : UInt
@@ -390,8 +350,6 @@ pub(all) struct EoeStationContext {
   mut tx_frame_number : UInt
   mut mb_counter : Byte
 } derive(@debug.Debug)
-pub fn EoeStationContext::to_string(Self) -> String
-pub impl Show for EoeStationContext
 
 pub(all) struct EoeSwitch {
   mut stations : Array[EoeStationContext]
@@ -411,8 +369,6 @@ pub fn EoeSwitch::process_received(Self, UInt, Bytes) -> Bool
 pub fn[N : @hal.Nic] EoeSwitch::send_frame(Self, N, UInt, Bytes, @hal.Duration) -> Int raise @hal.EcError
 pub fn[N : @hal.Nic] EoeSwitch::set_ip(Self, N, UInt, Bytes, Bytes, Bytes, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
 pub fn EoeSwitch::to_json(Self) -> Json
-pub fn EoeSwitch::to_string(Self) -> String
-pub impl Show for EoeSwitch
 
 pub(all) struct EsiJsonDcMode {
   name : String
@@ -422,8 +378,6 @@ pub(all) struct EsiJsonDcMode {
   sync0_factor : Int
   sync1_factor : Int
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonDcMode::to_string(Self) -> String
-pub impl Show for EsiJsonDcMode
 
 pub(all) struct EsiJsonDevice {
   vendor_id : UInt
@@ -448,15 +402,11 @@ pub(all) struct EsiJsonDevice {
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonDevice::to_string(Self) -> String
-pub impl Show for EsiJsonDevice
 
 pub(all) struct EsiJsonDocument {
   devices : Array[EsiJsonDevice]
   modules : Array[EsiJsonModule]
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonDocument::to_string(Self) -> String
-pub impl Show for EsiJsonDocument
 
 pub(all) struct EsiJsonInitCommand {
   transition : String
@@ -464,8 +414,6 @@ pub(all) struct EsiJsonInitCommand {
   subindex : Byte
   data : Bytes
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonInitCommand::to_string(Self) -> String
-pub impl Show for EsiJsonInitCommand
 
 pub(all) struct EsiJsonMailbox {
   data_link_layer : Bool
@@ -480,8 +428,6 @@ pub(all) struct EsiJsonMailbox {
   soe : Bool
   voe : Bool
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonMailbox::to_string(Self) -> String
-pub impl Show for EsiJsonMailbox
 
 pub(all) struct EsiJsonModule {
   module_ident : UInt
@@ -489,8 +435,6 @@ pub(all) struct EsiJsonModule {
   rx_pdos : Array[EsiJsonPdo]
   tx_pdos : Array[EsiJsonPdo]
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonModule::to_string(Self) -> String
-pub impl Show for EsiJsonModule
 
 pub(all) struct EsiJsonPdo {
   direction : String
@@ -500,8 +444,6 @@ pub(all) struct EsiJsonPdo {
   name : String
   entries : Array[EsiJsonPdoEntry]
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonPdo::to_string(Self) -> String
-pub impl Show for EsiJsonPdo
 
 pub(all) struct EsiJsonPdoEntry {
   base_index : UInt
@@ -511,15 +453,11 @@ pub(all) struct EsiJsonPdoEntry {
   name : String
   data_type_name : String
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonPdoEntry::to_string(Self) -> String
-pub impl Show for EsiJsonPdoEntry
 
 pub(all) struct EsiJsonSelectedModule {
   module_ident : UInt
   slot_index : Int
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonSelectedModule::to_string(Self) -> String
-pub impl Show for EsiJsonSelectedModule
 
 pub(all) struct EsiJsonSmEntry {
   physical_start : UInt
@@ -529,8 +467,6 @@ pub(all) struct EsiJsonSmEntry {
   enable : Bool
   sm_type : String
 } derive(Eq, ToJson, @debug.Debug)
-pub fn EsiJsonSmEntry::to_string(Self) -> String
-pub impl Show for EsiJsonSmEntry
 
 pub(all) struct EsiOfflineSiiReport {
   position : UInt
@@ -563,8 +499,6 @@ pub(all) struct MasterIdentity {
   revision : UInt
   serial : UInt
 } derive(Eq, @debug.Debug)
-pub fn MasterIdentity::to_string(Self) -> String
-pub impl Show for MasterIdentity
 
 pub(all) struct MasterObjectDictionary {
   entries : Array[MasterOdEntry]
@@ -574,15 +508,11 @@ pub fn MasterObjectDictionary::format_text(Self) -> String
 pub fn MasterObjectDictionary::indices(Self) -> Array[UInt]
 pub fn MasterObjectDictionary::lookup(Self, UInt, Byte) -> MasterOdEntry?
 pub fn MasterObjectDictionary::to_json(Self) -> Json
-pub fn MasterObjectDictionary::to_string(Self) -> String
-pub impl Show for MasterObjectDictionary
 
 pub(all) enum MasterOdAccess {
   ReadOnly
   ReadWrite
 } derive(Eq, @debug.Debug)
-pub fn MasterOdAccess::to_string(Self) -> String
-pub impl Show for MasterOdAccess
 
 pub(all) enum MasterOdDataType {
   Unsigned8
@@ -592,8 +522,6 @@ pub(all) enum MasterOdDataType {
   VisibleString
   OctetString
 } derive(Eq, @debug.Debug)
-pub fn MasterOdDataType::to_string(Self) -> String
-pub impl Show for MasterOdDataType
 
 pub(all) struct MasterOdEntry {
   index : UInt
@@ -603,8 +531,6 @@ pub(all) struct MasterOdEntry {
   access : MasterOdAccess
   value : MasterOdValue
 } derive(Eq, @debug.Debug)
-pub fn MasterOdEntry::to_string(Self) -> String
-pub impl Show for MasterOdEntry
 
 pub(all) enum MasterOdValue {
   U8(Byte)
@@ -615,8 +541,6 @@ pub(all) enum MasterOdValue {
   Raw(Bytes)
 } derive(Eq, @debug.Debug)
 pub fn MasterOdValue::format(Self) -> String
-pub fn MasterOdValue::to_string(Self) -> String
-pub impl Show for MasterOdValue
 
 pub(all) struct MonitorFn {
   run : (Runtime) -> MonitorResult
@@ -636,8 +560,6 @@ pub(all) struct MonitorResult {
   name : String
   verdict : Verdict
 } derive(Eq, @debug.Debug)
-pub fn MonitorResult::to_string(Self) -> String
-pub impl Show for MonitorResult
 
 pub struct NullRunProgressSink {
   _unused : Unit
@@ -649,12 +571,8 @@ pub(all) struct ObservedSlaveAddress {
   position : UInt
   current_station_address : UInt
 } derive(Eq, @debug.Debug)
-pub fn ObservedSlaveAddress::to_string(Self) -> String
-pub impl Show for ObservedSlaveAddress
 
 type OperationalStartupStep derive(Eq, @debug.Debug)
-pub fn OperationalStartupStep::to_string(Self) -> String
-pub impl Show for OperationalStartupStep
 
 pub(all) struct QueueEndpoint {
   tx_pending : Array[EoeEndpointFrame]
@@ -670,10 +588,8 @@ pub fn QueueEndpoint::rx_depth(Self) -> Int
 pub fn QueueEndpoint::set_up(Self, Bool) -> Unit
 pub fn QueueEndpoint::submit_tx(Self, UInt, Bytes) -> Bool
 pub fn QueueEndpoint::to_json(Self) -> Json
-pub fn QueueEndpoint::to_string(Self) -> String
 pub fn QueueEndpoint::tx_depth(Self) -> Int
 pub fn QueueEndpoint::write_frame(Self, Bytes) -> Bool
-pub impl Show for QueueEndpoint
 
 pub(all) struct ReportEntry {
   cycle : Int64
@@ -682,8 +598,6 @@ pub(all) struct ReportEntry {
   detail : String
   verdict : Verdict
 } derive(@debug.Debug)
-pub fn ReportEntry::to_string(Self) -> String
-pub impl Show for ReportEntry
 
 pub(all) enum RunFault {
   StartupTransitionFailed(station~ : UInt, target~ : @protocol.EsmState, current~ : @protocol.EsmState?, error_indication~ : Bool?, status_code~ : UInt?, raw_status_code~ : UInt?, control_wkc~ : UInt?)
@@ -691,8 +605,6 @@ pub(all) enum RunFault {
   RuntimeRecoveryRequired(expected_wkc~ : UInt, observed_wkc_errors~ : Int64)
   DcDrift(delta_ns~ : Int64)
 } derive(Eq, @debug.Debug)
-pub fn RunFault::to_string(Self) -> String
-pub impl Show for RunFault
 
 pub(all) struct RunLoopSettings {
   cycles : Int
@@ -702,16 +614,12 @@ pub(all) struct RunLoopSettings {
   max_consecutive_timeouts : Int
 } derive(Eq, @debug.Debug)
 pub fn RunLoopSettings::fixed_cycles(Int) -> Self
-pub fn RunLoopSettings::to_string(Self) -> String
 pub fn RunLoopSettings::until_fault() -> Self
-pub impl Show for RunLoopSettings
 
 pub(all) enum RunMode {
   FreeRun
   DcSync
 } derive(Eq, @debug.Debug)
-pub fn RunMode::to_string(Self) -> String
-pub impl Show for RunMode
 
 pub(all) enum RunPhase {
   Scanning
@@ -721,8 +629,6 @@ pub(all) enum RunPhase {
   Stopping
   Done
 } derive(Eq, @debug.Debug)
-pub fn RunPhase::to_string(Self) -> String
-pub impl Show for RunPhase
 
 pub(all) struct RunProgress {
   cycles_completed : Int64
@@ -734,8 +640,6 @@ pub(all) struct RunProgress {
   telemetry : Telemetry
   consecutive_timeouts : Int
 } derive(@debug.Debug)
-pub fn RunProgress::to_string(Self) -> String
-pub impl Show for RunProgress
 
 pub(all) struct RunReport {
   scan : ScanReport
@@ -750,8 +654,6 @@ pub(all) struct RunReport {
   fault : RunFault?
 } derive(@debug.Debug)
 pub fn RunReport::format(Self) -> String
-pub fn RunReport::to_string(Self) -> String
-pub impl Show for RunReport
 
 pub(all) struct RunStartupPreparation {
   pdo_ctx : @protocol.PdoContext
@@ -797,8 +699,6 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(Self, N, @hal.Durat
 pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(Self, N, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
 pub fn Runtime::set_timeout_threshold(Self, Int) -> Unit
-pub fn Runtime::to_string(Self) -> String
-pub impl Show for Runtime
 
 pub(all) struct RuntimeMetricsSummary {
   cycles : Int64
@@ -811,8 +711,6 @@ pub(all) struct RuntimeMetricsSummary {
   dc_delay_updates : Int64
   emergency_events : Int64
 } derive(Eq, @debug.Debug)
-pub fn RuntimeMetricsSummary::to_string(Self) -> String
-pub impl Show for RuntimeMetricsSummary
 
 pub(all) enum RuntimeState {
   Idle
@@ -822,23 +720,17 @@ pub(all) enum RuntimeState {
   Stopping
   Error(@hal.EcError)
 } derive(@debug.Debug)
-pub fn RuntimeState::to_string(Self) -> String
-pub impl Show for RuntimeState
 
 pub(all) struct ScanReport {
   slave_count : Int
   slaves : Array[SlaveReport]
 } derive(Eq, @debug.Debug)
 pub fn ScanReport::format(Self) -> String
-pub fn ScanReport::to_string(Self) -> String
-pub impl Show for ScanReport
 
 pub(all) enum ScanStationAddressStrategy {
   PreserveExistingUniqueNonZero
   TwinCATCompatible
 } derive(Eq, @debug.Debug)
-pub fn ScanStationAddressStrategy::to_string(Self) -> String
-pub impl Show for ScanStationAddressStrategy
 
 pub(all) struct SlaveDiagnosis {
   station_address : UInt
@@ -849,8 +741,6 @@ pub(all) struct SlaveDiagnosis {
   diagnosis_counter : UInt?
   dl_error_counters : @protocol.DlErrorCounters?
 } derive(Eq, @debug.Debug)
-pub fn SlaveDiagnosis::to_string(Self) -> String
-pub impl Show for SlaveDiagnosis
 
 pub(all) struct SlaveReport {
   position : Int
@@ -862,8 +752,6 @@ pub(all) struct SlaveReport {
   serial : UInt
   identification : UInt
 } derive(Eq, @debug.Debug)
-pub fn SlaveReport::to_string(Self) -> String
-pub impl Show for SlaveReport
 
 pub(all) struct SlaveStartupPreparation {
   mapping : @mailbox.SlaveMapping
@@ -881,8 +769,6 @@ pub(all) struct SmWatchdogValidation {
   config : @protocol.SmWatchdogConfig
   watchdog_active : Bool
 } derive(Eq, @debug.Debug)
-pub fn SmWatchdogValidation::to_string(Self) -> String
-pub impl Show for SmWatchdogValidation
 
 pub(all) enum StartupCommandTransition {
   InitToPreOp
@@ -897,8 +783,6 @@ pub(all) enum StartupCommandTransition {
   OpToSafeOp
   BootToInit
 } derive(Eq, @debug.Debug)
-pub fn StartupCommandTransition::to_string(Self) -> String
-pub impl Show for StartupCommandTransition
 
 pub(all) struct StartupMailboxCommand {
   transition : StartupCommandTransition
@@ -906,12 +790,8 @@ pub(all) struct StartupMailboxCommand {
   subindex : Byte
   data : Bytes
 } derive(Eq, @debug.Debug)
-pub fn StartupMailboxCommand::to_string(Self) -> String
-pub impl Show for StartupMailboxCommand
 
 type StartupRecoveryStrategy derive(Eq, @debug.Debug)
-pub fn StartupRecoveryStrategy::to_string(Self) -> String
-pub impl Show for StartupRecoveryStrategy
 
 pub(all) struct StateSurfaceSummary {
   target_state : @protocol.EsmState?
@@ -922,16 +802,12 @@ pub(all) struct StateSurfaceSummary {
   al_status_code : UInt?
   wkc : UInt?
 } derive(Eq, @debug.Debug)
-pub fn StateSurfaceSummary::to_string(Self) -> String
-pub impl Show for StateSurfaceSummary
 
 pub(all) struct StationStartupMailboxPlan {
   station : UInt
   mailbox_config : @mailbox.MailboxConfig
   commands : Array[StartupMailboxCommand]
 } derive(Eq, @debug.Debug)
-pub fn StationStartupMailboxPlan::to_string(Self) -> String
-pub impl Show for StationStartupMailboxPlan
 
 pub(all) struct Telemetry {
   mut cycles : Int64
@@ -946,23 +822,17 @@ pub(all) struct Telemetry {
 } derive(Eq, @debug.Debug)
 pub fn Telemetry::new() -> Self
 pub fn Telemetry::reset(Self) -> Unit
-pub fn Telemetry::to_string(Self) -> String
-pub impl Show for Telemetry
 
 pub(all) struct TopologyFingerprint {
   slave_count : Int
   identity_hash : Int64
 } derive(Eq, @debug.Debug)
-pub fn TopologyFingerprint::to_string(Self) -> String
-pub impl Show for TopologyFingerprint
 
 pub(all) enum TopologyFingerprintMatch {
   Identical
   SlaveCountChanged(expected~ : Int, actual~ : Int)
   IdentityChanged
 } derive(Eq, @debug.Debug)
-pub fn TopologyFingerprintMatch::to_string(Self) -> String
-pub impl Show for TopologyFingerprintMatch
 
 pub(all) enum ValidateDifferenceCategory {
   Topology
@@ -970,16 +840,12 @@ pub(all) enum ValidateDifferenceCategory {
   Configuration
   Informational
 } derive(Eq, @debug.Debug)
-pub fn ValidateDifferenceCategory::to_string(Self) -> String
-pub impl Show for ValidateDifferenceCategory
 
 pub(all) enum ValidateGrade {
   Pass
   Warn
   Block
 } derive(Eq, @debug.Debug)
-pub fn ValidateGrade::to_string(Self) -> String
-pub impl Show for ValidateGrade
 
 pub(all) struct ValidateReport {
   expected_source : ConfigurationSource
@@ -992,8 +858,6 @@ pub(all) struct ValidateReport {
   grade : ValidateGrade
 } derive(@debug.Debug)
 pub fn ValidateReport::format(Self) -> String
-pub fn ValidateReport::to_string(Self) -> String
-pub impl Show for ValidateReport
 
 pub(all) enum ValidationResult {
   Ok
@@ -1006,8 +870,6 @@ pub(all) enum ValidationResult {
   OptionalMissing(position~ : Int, group_id~ : UInt?)
   Extra(position~ : Int)
 } derive(@debug.Debug)
-pub fn ValidationResult::to_string(Self) -> String
-pub impl Show for ValidationResult
 
 pub(all) enum Verdict {
   Pass
@@ -1017,8 +879,6 @@ pub(all) enum Verdict {
 } derive(Eq, @debug.Debug)
 pub fn Verdict::is_passing(Self) -> Bool
 pub fn Verdict::severity(Self) -> Int
-pub fn Verdict::to_string(Self) -> String
-pub impl Show for Verdict
 
 pub(all) struct VerificationReport {
   title : String
@@ -1036,19 +896,17 @@ pub fn VerificationReport::add_meta(Self, String, String) -> Unit
 pub fn VerificationReport::new(String) -> Self
 pub fn VerificationReport::to_json(Self) -> String
 pub fn VerificationReport::to_markdown(Self) -> String
-pub fn VerificationReport::to_string(Self) -> String
-pub impl Show for VerificationReport
 
 // Type aliases
 
 // Traits
 pub(open) trait EoeEndpoint {
-  read_frame(Self) -> Bytes?
-  write_frame(Self, Bytes) -> Bool
-  is_up(Self) -> Bool
+  fn read_frame(Self) -> Bytes?
+  fn write_frame(Self, Bytes) -> Bool
+  fn is_up(Self) -> Bool
 }
 
 pub(open) trait RunProgressSink {
-  emit(Self, RunProgress) -> Unit
+  fn emit(Self, RunProgress) -> Unit
 }
 

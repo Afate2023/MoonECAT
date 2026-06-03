@@ -39,17 +39,13 @@ pub(all) struct HostCapabilityContract {
   file_write : Bool
   shared_memory : Bool
 } derive(Eq, @debug.Debug)
-pub fn HostCapabilityContract::to_string(Self) -> String
-pub impl Show for HostCapabilityContract
 
 pub(all) enum PluginCommand {
   Scan
   Validate
   Run
 } derive(Eq, @debug.Debug)
-pub fn PluginCommand::to_string(Self) -> String
 pub fn PluginCommand::to_wire(Self) -> String
-pub impl Show for PluginCommand
 
 pub(all) struct PluginRequest {
   version : String
@@ -58,8 +54,6 @@ pub(all) struct PluginRequest {
   timeout_ns : Int64?
   payload : Json
 } derive(Eq, @debug.Debug)
-pub fn PluginRequest::to_string(Self) -> String
-pub impl Show for PluginRequest
 
 pub(all) struct PluginResponse {
   version : String
@@ -70,8 +64,6 @@ pub(all) struct PluginResponse {
   payload : Json
   diagnostics : Json
 } derive(Eq, @debug.Debug)
-pub fn PluginResponse::to_string(Self) -> String
-pub impl Show for PluginResponse
 
 // Type aliases
 

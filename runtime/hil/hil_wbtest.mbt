@@ -103,7 +103,7 @@ test "HilCycleHook on_post_cycle terminated path" {
     recovery_pending: false,
   }
   let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, StopGraceful)
+  @debug.assert_eq(directive, StopGraceful)
   assert_true(hook.session.terminated)
   assert_eq(hook.session.termination_reason, "limit reached")
 }
@@ -176,7 +176,7 @@ test "HilCycleHook on_post_cycle error path" {
     recovery_pending: false,
   }
   let directive = hook.on_post_cycle(snap, ctx)
-  assert_eq(directive, StopGraceful)
+  @debug.assert_eq(directive, StopGraceful)
   assert_true(hook.session.terminated)
   assert_eq(hook.session.termination_reason, "solver diverged")
 }

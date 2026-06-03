@@ -74,7 +74,7 @@ pub fn monitor_startup_state(rt : Runtime) -> MonitorResult {
   let name = "startup_state"
   match rt.state {
     Error(e) =>
-      { name, verdict: Block("runtime in error state: " + e.to_string()) }
+      { name, verdict: Block("runtime in error state: " + @debug.to_string(e)) }
     Running(_) => { name, verdict: Pass }
     Idle => { name, verdict: Warn("runtime is idle, not yet started") }
     Scanning => { name, verdict: Warn("runtime is scanning") }

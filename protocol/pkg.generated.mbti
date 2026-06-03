@@ -386,8 +386,6 @@ pub(all) enum AddressMode {
   ConfiguredStation(UInt)
   Logical(UInt)
 } derive(Eq, @debug.Debug)
-pub fn AddressMode::to_string(Self) -> String
-pub impl Show for AddressMode
 
 pub(all) enum AddressType {
   AutoIncrement
@@ -395,15 +393,11 @@ pub(all) enum AddressType {
   Broadcast
   Logical
 } derive(Eq, @debug.Debug)
-pub fn AddressType::to_string(Self) -> String
-pub impl Show for AddressType
 
 pub(all) struct DcInitResult {
   reference_station : UInt
   configured_count : Int
 } derive(Eq, @debug.Debug)
-pub fn DcInitResult::to_string(Self) -> String
-pub impl Show for DcInitResult
 
 pub(all) struct DcPortTimes {
   port0 : UInt
@@ -411,16 +405,12 @@ pub(all) struct DcPortTimes {
   port2 : UInt
   port3 : UInt
 } derive(Eq, @debug.Debug)
-pub fn DcPortTimes::to_string(Self) -> String
-pub impl Show for DcPortTimes
 
 pub(all) struct DlErrorCounters {
   ports : FixedArray[PortErrorCounters]
   ecat_pu_errors : UInt
   pdi_errors : UInt
 } derive(Eq, @debug.Debug)
-pub fn DlErrorCounters::to_string(Self) -> String
-pub impl Show for DlErrorCounters
 
 pub(all) enum EcCommand {
   NOP
@@ -441,8 +431,6 @@ pub(all) enum EcCommand {
 } derive(Eq, @debug.Debug)
 pub fn EcCommand::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EcCommand::to_byte(Self) -> Byte
-pub fn EcCommand::to_string(Self) -> String
-pub impl Show for EcCommand
 
 pub(all) struct EcFrame {
   dst_mac : FixedArray[Byte]
@@ -451,8 +439,6 @@ pub(all) struct EcFrame {
 } derive(Eq, @debug.Debug)
 pub fn EcFrame::decode(Bytes) -> Self raise @hal.EcError
 pub fn EcFrame::encode(Self) -> Bytes
-pub fn EcFrame::to_string(Self) -> String
-pub impl Show for EcFrame
 
 pub(all) enum EsmState {
   Init
@@ -464,8 +450,6 @@ pub(all) enum EsmState {
 pub fn EsmState::can_transition(Self, Self) -> Bool
 pub fn EsmState::from_byte(Byte) -> Self raise @hal.EcError
 pub fn EsmState::to_byte(Self) -> Byte
-pub fn EsmState::to_string(Self) -> String
-pub impl Show for EsmState
 
 pub(all) struct EsmStateRequestObservation {
   state : EsmState
@@ -474,16 +458,12 @@ pub(all) struct EsmStateRequestObservation {
   raw_status_code : UInt?
   control_wkc : UInt
 } derive(Eq, @debug.Debug)
-pub fn EsmStateRequestObservation::to_string(Self) -> String
-pub impl Show for EsmStateRequestObservation
 
 pub(all) struct EsmStatusSnapshot {
   state : EsmState
   error_indication : Bool
   status_code : UInt?
 } derive(Eq, @debug.Debug)
-pub fn EsmStatusSnapshot::to_string(Self) -> String
-pub impl Show for EsmStatusSnapshot
 
 pub(all) struct EsmTimeoutPolicy {
   init : @hal.Duration?
@@ -492,8 +472,6 @@ pub(all) struct EsmTimeoutPolicy {
   op : @hal.Duration?
   boot : @hal.Duration?
 } derive(Eq, @debug.Debug)
-pub fn EsmTimeoutPolicy::to_string(Self) -> String
-pub impl Show for EsmTimeoutPolicy
 
 pub(all) struct FrameBuilder {
   mut next_index : Int
@@ -506,8 +484,6 @@ pub fn FrameBuilder::is_empty(Self) -> Bool
 pub fn FrameBuilder::length(Self) -> Int
 pub fn FrameBuilder::new() -> Self
 pub fn FrameBuilder::reset(Self) -> Unit
-pub fn FrameBuilder::to_string(Self) -> String
-pub impl Show for FrameBuilder
 
 pub(all) struct MutablePdoContext {
   image : @hal.MutableProcessImage
@@ -518,8 +494,6 @@ pub(all) struct MutablePdoContext {
 pub fn MutablePdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
 pub fn MutablePdoContext::get_slave_inputs(Self, UInt) -> FixedArray[Byte] raise @hal.EcError
 pub fn MutablePdoContext::set_slave_outputs(Self, UInt, FixedArray[Byte]) -> Unit raise @hal.EcError
-pub fn MutablePdoContext::to_string(Self) -> String
-pub impl Show for MutablePdoContext
 
 pub(all) struct PdoContext {
   image : ProcessImage
@@ -531,15 +505,11 @@ pub(all) struct PdoContext {
 pub fn PdoContext::build(Array[(@mailbox.SlaveMapping, UInt)], UInt) -> Self
 pub fn PdoContext::get_slave_inputs(Self, UInt) -> Bytes raise @hal.EcError
 pub fn PdoContext::set_slave_outputs(Self, UInt, Bytes) -> Unit raise @hal.EcError
-pub fn PdoContext::to_string(Self) -> String
-pub impl Show for PdoContext
 
 pub(all) struct PdoExchangeResult {
   wkc : UInt
   irq : UInt
 } derive(Eq, @debug.Debug)
-pub fn PdoExchangeResult::to_string(Self) -> String
-pub impl Show for PdoExchangeResult
 
 pub(all) struct PdoMapping {
   station : UInt
@@ -550,16 +520,12 @@ pub(all) struct PdoMapping {
   input_offset : Int
   input_length : Int
 } derive(Eq, @debug.Debug)
-pub fn PdoMapping::to_string(Self) -> String
-pub impl Show for PdoMapping
 
 pub(all) struct Pdu {
   header : PduHeader
   data : Bytes
   wkc : UInt
 } derive(Eq, @debug.Debug)
-pub fn Pdu::to_string(Self) -> String
-pub impl Show for Pdu
 
 pub(all) struct PduHeader {
   command : EcCommand
@@ -568,8 +534,6 @@ pub(all) struct PduHeader {
   len_flags : UInt
   irq : UInt
 } derive(Eq, @debug.Debug)
-pub fn PduHeader::to_string(Self) -> String
-pub impl Show for PduHeader
 
 pub(all) struct PortErrorCounters {
   frame_errors : UInt
@@ -577,8 +541,6 @@ pub(all) struct PortErrorCounters {
   forwarded_rx_errors : UInt
   lost_link_count : UInt
 } derive(Eq, @debug.Debug)
-pub fn PortErrorCounters::to_string(Self) -> String
-pub impl Show for PortErrorCounters
 
 pub(all) struct ProcessImage {
   mut outputs : Bytes
@@ -587,15 +549,11 @@ pub(all) struct ProcessImage {
   input_size : Int
 } derive(@debug.Debug)
 pub fn ProcessImage::new(Int, Int) -> Self
-pub fn ProcessImage::to_string(Self) -> String
-pub impl Show for ProcessImage
 
 pub(all) struct ScanResult {
   slave_count : Int
   slaves : Array[SlaveInfo]
 } derive(@debug.Debug)
-pub fn ScanResult::to_string(Self) -> String
-pub impl Show for ScanResult
 
 pub(all) struct SlaveInfo {
   position : Int
@@ -605,8 +563,6 @@ pub(all) struct SlaveInfo {
   dl_status : UInt
   sii : @mailbox.SiiData?
 } derive(@debug.Debug)
-pub fn SlaveInfo::to_string(Self) -> String
-pub impl Show for SlaveInfo
 
 pub(all) struct SmWatchdogConfig {
   divider : UInt
@@ -615,8 +571,6 @@ pub(all) struct SmWatchdogConfig {
   pdata_status : Bool
   pdata_counter : UInt
 } derive(Eq, @debug.Debug)
-pub fn SmWatchdogConfig::to_string(Self) -> String
-pub impl Show for SmWatchdogConfig
 
 // Type aliases
 

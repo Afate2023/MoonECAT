@@ -40,7 +40,7 @@ pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with send(self, data)
       n
     }
     Err(e) => {
-      self.log.append(NicEvent::SendFailed(e.to_string()))
+      self.log.append(NicEvent::SendFailed(@debug.to_string(e)))
       raise e
     }
   }
@@ -72,7 +72,7 @@ pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with recv(
       raise @hal.EcError::RecvFailed(msg)
     }
     Err(e) => {
-      self.log.append(NicEvent::RecvFailed(e.to_string()))
+      self.log.append(NicEvent::RecvFailed(@debug.to_string(e)))
       raise e
     }
   }

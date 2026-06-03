@@ -42,7 +42,7 @@ pub fn decode_emergency_frame(
   let mbh = MailboxHeader::from_bytes(frame)
   if mbh.mb_type != CoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox for emergency, got " + mbh.mb_type.to_string(),
+      "expected CoE mailbox for emergency, got " + @debug.to_string(mbh.mb_type),
     )
   }
   // Verify we have enough data for CoE header + Emergency payload

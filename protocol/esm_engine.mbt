@@ -274,7 +274,7 @@ pub fn[N : @hal.Nic] clear_al_error(
       "failed to clear AL error indication: station=" +
       station.to_string() +
       " state=" +
-      cleared.state.to_string() +
+      @debug.to_string(cleared.state) +
       " status_code=" +
       status_code_text,
     )
@@ -343,7 +343,7 @@ pub fn[N : @hal.Nic] clear_al_error_ap(
       "failed to clear AP AL error indication: position=" +
       position.to_string() +
       " state=" +
-      cleared.state.to_string() +
+      @debug.to_string(cleared.state) +
       " status_code=" +
       status_code_text,
     )
@@ -635,8 +635,8 @@ pub fn[N : @hal.Nic] transition_through(
     let target = path[i]
     if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
-        from=current.to_string(),
-        to=target.to_string(),
+        from=@debug.to_string(current),
+        to=@debug.to_string(target),
       )
     }
     let confirmed = request_state(nic, station, target, timeout) catch {
@@ -670,8 +670,8 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
     let target = path[i]
     if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
-        from=current.to_string(),
-        to=target.to_string(),
+        from=@debug.to_string(current),
+        to=@debug.to_string(target),
       )
     }
     let step_timeout = esm_timeout_for(target, policy)
@@ -704,8 +704,8 @@ pub fn[N : @hal.Nic] transition_through_observe(
     let target = path[i]
     if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
-        from=current.to_string(),
-        to=target.to_string(),
+        from=@debug.to_string(current),
+        to=@debug.to_string(target),
       )
     }
     let observed = request_state_observe(nic, station, target, timeout) catch {
@@ -738,8 +738,8 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(
     let target = path[i]
     if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
-        from=current.to_string(),
-        to=target.to_string(),
+        from=@debug.to_string(current),
+        to=@debug.to_string(target),
       )
     }
     let step_timeout = esm_timeout_for(target, policy)
@@ -771,8 +771,8 @@ pub fn[N : @hal.Nic] transition_through_ap(
     let target = path[i]
     if !current.can_transition(target) {
       raise @hal.EcError::EsmTransitionFailed(
-        from=current.to_string(),
-        to=target.to_string(),
+        from=@debug.to_string(current),
+        to=@debug.to_string(target),
       )
     }
     let confirmed = request_state_ap(nic, position, target, timeout) catch {

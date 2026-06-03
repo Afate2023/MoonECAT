@@ -83,7 +83,7 @@ pub fn VerificationReport::to_markdown(self : VerificationReport) -> String {
   buf.write_string("## Summary\n\n")
   buf.write_string("| Field | Value |\n|---|---|\n")
   buf.write_string("| Verdict | ")
-  buf.write_string(self.summary_verdict.to_string())
+  buf.write_string(@debug.to_string(self.summary_verdict))
   buf.write_string(" |\n")
   buf.write_string("| Total Cycles | ")
   buf.write_string(self.total_cycles.to_string())
@@ -108,7 +108,7 @@ pub fn VerificationReport::to_markdown(self : VerificationReport) -> String {
       buf.write_string("| ")
       buf.write_string(r.name)
       buf.write_string(" | ")
-      buf.write_string(r.verdict.to_string())
+      buf.write_string(@debug.to_string(r.verdict))
       buf.write_string(" |\n")
     }
     buf.write_string("\n")
@@ -137,7 +137,7 @@ pub fn VerificationReport::to_markdown(self : VerificationReport) -> String {
       buf.write_string(" | ")
       buf.write_string(e.detail)
       buf.write_string(" | ")
-      buf.write_string(e.verdict.to_string())
+      buf.write_string(@debug.to_string(e.verdict))
       buf.write_string(" |\n")
     }
   }
@@ -152,7 +152,7 @@ pub fn VerificationReport::to_json(self : VerificationReport) -> String {
   buf.write_string("\"title\":\"")
   buf.write_string(escape_json(self.title))
   buf.write_string("\",\"verdict\":\"")
-  buf.write_string(escape_json(self.summary_verdict.to_string()))
+  buf.write_string(escape_json(@debug.to_string(self.summary_verdict)))
   buf.write_string("\",\"total_cycles\":")
   buf.write_string(self.total_cycles.to_string())
   buf.write_string(",\"duration_ns\":")
@@ -165,7 +165,7 @@ pub fn VerificationReport::to_json(self : VerificationReport) -> String {
     buf.write_string("{\"name\":\"")
     buf.write_string(escape_json(r.name))
     buf.write_string("\",\"verdict\":\"")
-    buf.write_string(escape_json(r.verdict.to_string()))
+    buf.write_string(escape_json(@debug.to_string(r.verdict)))
     buf.write_string("\"}")
   }
   buf.write_string("],\"timeline\":[")
@@ -180,7 +180,7 @@ pub fn VerificationReport::to_json(self : VerificationReport) -> String {
     buf.write_string("\",\"detail\":\"")
     buf.write_string(escape_json(e.detail))
     buf.write_string("\",\"verdict\":\"")
-    buf.write_string(escape_json(e.verdict.to_string()))
+    buf.write_string(escape_json(@debug.to_string(e.verdict)))
     buf.write_string("\"}")
   }
   buf.write_string("],\"faults\":[")

@@ -25,7 +25,7 @@ let process_data_eeprom_word_count : Int = 128
 fn main {
   let _ = cli_main() catch {
     err => {
-      println("moonecat error: " + err.to_string())
+      println("moonecat error: " + @debug.to_string(err))
       ()
     }
   }

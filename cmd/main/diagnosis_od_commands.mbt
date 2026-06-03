@@ -384,7 +384,7 @@ fn diagnosis_output_json(
   Json::object({
     "station": Json::number(report.station_address.to_double()),
     "al_state": match report.al_state {
-      Some(state) => Json::string(state.to_string())
+      Some(state) => Json::string(@debug.to_string(state))
       None => Json::null()
     },
     "al_error_flag": match report.al_error_flag {
@@ -439,7 +439,7 @@ fn diagnosis_output_json(
 fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
   let buf = StringBuilder(size_hint=192)
   let al_state_text = match report.al_state {
-    Some(state) => state.to_string()
+    Some(state) => @debug.to_string(state)
     None => "unknown"
   }
   let al_error_flag_text = match report.al_error_flag {
@@ -704,7 +704,7 @@ fn od_failure_report(
     value_hex: None,
     value_u32: None,
     error_category: Some(od_error_category(err)),
-    error_detail: Some(err.to_string()),
+    error_detail: Some(@debug.to_string(err)),
     abort_code: match err {
       @hal.EcError::SdoAbort(code) => Some(code)
       _ => None

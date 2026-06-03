@@ -333,8 +333,8 @@ test "diagnosis_timeout_step RecvTimeout wraps" {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
-  assert_true(e.to_string().contains("timeout at test.step"))
-  assert_true(e.to_string().contains("RecvTimeout"))
+  assert_true(@debug.to_string(e).contains("timeout at test.step"))
+  assert_true(@debug.to_string(e).contains("RecvTimeout"))
 }
 
 ///|
@@ -346,7 +346,7 @@ test "diagnosis_timeout_step MailboxTimeout wraps" {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
-  assert_true(e.to_string().contains("MailboxTimeout"))
+  assert_true(@debug.to_string(e).contains("MailboxTimeout"))
 }
 
 ///|
@@ -360,8 +360,8 @@ test "diagnosis_timeout_step Internal timeout chains" {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
-  assert_true(e.to_string().contains("outer.step -> "))
-  assert_true(e.to_string().contains("timeout at inner.step"))
+  assert_true(@debug.to_string(e).contains("outer.step -> "))
+  assert_true(@debug.to_string(e).contains("timeout at inner.step"))
 }
 
 ///|
@@ -373,7 +373,7 @@ test "diagnosis_timeout_step other error wraps" {
     e => Err(e)
   }
   guard outcome is Err(e) else { fail("expected error") }
-  assert_true(e.to_string().contains("LinkDown"))
+  assert_true(@debug.to_string(e).contains("LinkDown"))
 }
 
 ///|

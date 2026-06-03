@@ -222,7 +222,7 @@ fn decode_esc_fmmu_window(
 fn esc_register_report_json(report : EscRegisterReport) -> Json {
   Json::object({
     "station": Json::number(report.station.to_double()),
-    "al_state": Json::string(report.al_state.to_string()),
+    "al_state": Json::string(@debug.to_string(report.al_state)),
     "al_error_flag": Json::boolean(report.al_error_flag),
     "al_status_code": option_uint_json(report.al_status_code),
     "al_status_code_description": match report.al_status_code {
@@ -344,7 +344,7 @@ fn esc_register_report_text(report : EscRegisterReport) -> String {
   buf.write_string("EtherCAT ESC Register Snapshot\n")
   buf.write_string("============================\n")
   buf.write_string("Station: " + report.station.to_string() + "\n")
-  buf.write_string("AL State: " + report.al_state.to_string() + "\n")
+  buf.write_string("AL State: " + @debug.to_string(report.al_state) + "\n")
   buf.write_string("AL Error Flag: " + al_error_flag_text + "\n")
   buf.write_string("AL Status Code: " + al_status_code_text + "\n\n")
   buf.write_string("SyncManagers\n")

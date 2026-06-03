@@ -3595,8 +3595,8 @@ test "EoeRelayStats new is zeroed" {
 test "EoeRelayDirection display" {
   let d1 : @runtime.EoeRelayDirection = @runtime.HostToSlave
   let d2 : @runtime.EoeRelayDirection = @runtime.SlaveToHost
-  assert_true(d1.to_string().contains("HostToSlave"))
-  assert_true(d2.to_string().contains("SlaveToHost"))
+  assert_true(@debug.to_string(d1).contains("HostToSlave"))
+  assert_true(@debug.to_string(d2).contains("SlaveToHost"))
 }
 
 // ===== Coverage: validate.mbt — validation_difference_category =====

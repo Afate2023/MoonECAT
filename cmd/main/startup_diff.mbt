@@ -52,7 +52,7 @@ fn[N : @hal.Nic] build_startup_diff_report(
   }
   let actual_esc_error = match actual_esc_result {
     Ok(_) => None
-    Err(err) => Some(err.to_string())
+    Err(err) => Some(@debug.to_string(err))
   }
   let online_refined_result : Result[
     @runtime.SlaveStartupPreparation,
@@ -77,7 +77,7 @@ fn[N : @hal.Nic] build_startup_diff_report(
   }
   let online_expected_error = match online_refined_result {
     Ok(_) => None
-    Err(err) => Some(err.to_string())
+    Err(err) => Some(@debug.to_string(err))
   }
   let online_mailbox_commands = match online_refined_result {
     Ok(preparation) => preparation.startup_mailbox_commands
@@ -135,7 +135,7 @@ fn startup_mailbox_command_json(
   command : @runtime.StartupMailboxCommand,
 ) -> Json {
   Json::object({
-    "transition": Json::string(command.transition.to_string()),
+    "transition": Json::string(@debug.to_string(command.transition)),
     "index": Json::number(command.index.to_double()),
     "subindex": Json::number(command.subindex.to_uint().to_double()),
     "data_hex": Json::string(bytes_hex(command.data)),
@@ -228,7 +228,7 @@ fn startup_diff_report_text(report : StartupDiffReport) -> String {
 fn startup_mailbox_command_text(
   command : @runtime.StartupMailboxCommand,
 ) -> String {
-  command.transition.to_string() +
+  @debug.to_string(command.transition) +
   " 0x" +
   format_hex(command.index, 4) +
   ":" +

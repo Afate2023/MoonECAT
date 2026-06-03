@@ -47,7 +47,7 @@ test "worst_verdict selects highest severity" {
 ///|
 test "worst_verdict empty results returns Pass" {
   let results : Array[@runtime.MonitorResult] = []
-  assert_eq(@runtime.worst_verdict(results), @runtime.Verdict::Pass)
+  @debug.assert_eq(@runtime.worst_verdict(results), @runtime.Verdict::Pass)
 }
 
 ///|
@@ -56,7 +56,7 @@ test "monitor_consecutive_timeouts: pass when zero" {
   let rt = @runtime.Runtime::new(config)
   let r = @runtime.monitor_consecutive_timeouts(rt)
   assert_eq(r.name, "consecutive_timeouts")
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -86,7 +86,7 @@ test "monitor_wkc_errors: pass when zero" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
   let r = @runtime.monitor_wkc_errors(rt)
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -104,7 +104,7 @@ test "monitor_dc_drift: pass when disabled" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
   let r = @runtime.monitor_dc_drift(rt)
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -122,7 +122,7 @@ test "monitor_startup_state: pass when running" {
   let rt = @runtime.Runtime::new(config)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let r = @runtime.monitor_startup_state(rt)
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -155,7 +155,7 @@ test "monitor_cycle_success_rate: pass when no cycles" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
   let r = @runtime.monitor_cycle_success_rate(rt, 80)
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -179,7 +179,7 @@ test "monitor_cycle_success_rate: pass when above threshold" {
   rt.telemetry.timeouts = 1L
   // success = (100 - 3) / 100 = 97% >= 80%
   let r = @runtime.monitor_cycle_success_rate(rt, 80)
-  assert_eq(r.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(r.verdict, @runtime.Verdict::Pass)
 }
 
 ///|
@@ -202,7 +202,7 @@ test "run_monitors all pass in healthy running state" {
   rt.configure_pdo(ctx, 3U)
   let (results, worst) = @runtime.run_monitors(rt)
   assert_eq(results.length(), 6)
-  assert_eq(worst, @runtime.Verdict::Pass)
+  @debug.assert_eq(worst, @runtime.Verdict::Pass)
 }
 
 // ===== Batch 16: monitor_startup_state Stopping =====

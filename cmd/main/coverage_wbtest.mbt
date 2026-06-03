@@ -36,16 +36,16 @@ test "format helpers physical_port_name covers reserved port" {
 
 ///|
 test "cli show bridge renders backend and progress output as readable text" {
-  @debug.assert_eq(CliBackend::to_string(NativeAuto), "NativeAuto")
+  @debug.assert_eq(@debug.to_string(NativeAuto), "NativeAuto")
   @debug.assert_eq(
-    CliBackend::to_string(NativeWindowsNpcap),
+    @debug.to_string(NativeWindowsNpcap),
     "NativeWindowsNpcap",
   )
-  @debug.assert_eq(RunProgressOutput::to_string(Ndjson), "Ndjson")
+  @debug.assert_eq(@debug.to_string(Ndjson), "Ndjson")
   let buf = StringBuilder(size_hint=16)
-  buf.write_object(Mock)
+  buf.write_string(@debug.to_string(Mock))
   buf.write_string(",")
-  buf.write_object(Text)
+  buf.write_string(@debug.to_string(Text))
   @debug.assert_eq(buf.to_string(), "Mock,Text")
 }
 

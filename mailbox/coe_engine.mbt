@@ -260,7 +260,7 @@ pub fn decode_sdo_response(
   // Verify it's a CoE mailbox
   if mbh.mb_type != CoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox, got " + mbh.mb_type.to_string(),
+      "expected CoE mailbox, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let off = mailbox_header_len
@@ -752,7 +752,7 @@ pub fn decode_sdo_info_response(
   }
   if mbh.mb_type != CoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox, got " + mbh.mb_type.to_string(),
+      "expected CoE mailbox, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let off = mailbox_header_len

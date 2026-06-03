@@ -56,7 +56,7 @@ fn foe_raise_error(
   text : String,
 ) -> Unit raise @hal.EcError {
   let suffix = if text.length() > 0 { " - " + text } else { "" }
-  raise @hal.EcError::MailboxProtocol("FoE error: " + code.to_string() + suffix)
+  raise @hal.EcError::MailboxProtocol("FoE error: " + @debug.to_string(code) + suffix)
 }
 
 ///|
@@ -162,7 +162,7 @@ pub fn[N : @hal.Nic] foe_download(
     @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
     _ =>
       raise @hal.EcError::MailboxProtocol(
-        "FoE download: expected Ack, got " + resp0.to_string(),
+        "FoE download: expected Ack, got " + @debug.to_string(resp0),
       )
   }
   // Step 2: Send Data segments
@@ -197,7 +197,7 @@ pub fn[N : @hal.Nic] foe_download(
       @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
       _ =>
         raise @hal.EcError::MailboxProtocol(
-          "FoE download: expected Ack, got " + resp_n.to_string(),
+          "FoE download: expected Ack, got " + @debug.to_string(resp_n),
         )
     }
     offset = chunk_end
@@ -270,7 +270,7 @@ pub fn[N : @hal.Nic] foe_upload(
       @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
       _ =>
         raise @hal.EcError::MailboxProtocol(
-          "FoE upload: expected Data, got " + resp.to_string(),
+          "FoE upload: expected Data, got " + @debug.to_string(resp),
         )
     }
   }
@@ -312,7 +312,7 @@ pub fn[N : @hal.Nic] foe_download_ap(
     @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
     _ =>
       raise @hal.EcError::MailboxProtocol(
-        "FoE download: expected Ack, got " + resp0.to_string(),
+        "FoE download: expected Ack, got " + @debug.to_string(resp0),
       )
   }
   let total = data.length()
@@ -346,7 +346,7 @@ pub fn[N : @hal.Nic] foe_download_ap(
       @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
       _ =>
         raise @hal.EcError::MailboxProtocol(
-          "FoE download: expected Ack, got " + resp_n.to_string(),
+          "FoE download: expected Ack, got " + @debug.to_string(resp_n),
         )
     }
     offset = chunk_end
@@ -410,7 +410,7 @@ pub fn[N : @hal.Nic] foe_upload_ap(
       @mailbox.FoeResponse::FoeError(code=c, text=t) => foe_raise_error(c, t)
       _ =>
         raise @hal.EcError::MailboxProtocol(
-          "FoE upload: expected Data, got " + resp.to_string(),
+          "FoE upload: expected Data, got " + @debug.to_string(resp),
         )
     }
   }

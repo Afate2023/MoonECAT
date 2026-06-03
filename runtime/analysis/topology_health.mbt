@@ -281,7 +281,7 @@ pub fn TopologyHealthAnalyzer::analyze(
         " (pos " +
         s.position.to_string() +
         "): link grade " +
-        grade.to_string() +
+        @debug.to_string(grade) +
         ", score " +
         score.to_string(),
       )
@@ -324,7 +324,7 @@ pub fn TopologyHealthReport::to_json(self : TopologyHealthReport) -> String {
   buf.write_string("  \"system_health_score\": ")
   buf.write_string(self.system_health_score.to_string())
   buf.write_string(",\n  \"system_grade\": \"")
-  buf.write_string(self.system_grade.to_string())
+  buf.write_string(@debug.to_string(self.system_grade))
   buf.write_string("\",\n  \"max_propagation_delay_ns\": ")
   buf.write_string(self.max_propagation_delay_ns.to_string())
   buf.write_string(",\n  \"total_cable_length_m\": ")
@@ -361,7 +361,7 @@ pub fn TopologyHealthReport::to_json(self : TopologyHealthReport) -> String {
     buf.write_string(", \"health_score\": ")
     buf.write_string(s.health_score.to_string())
     buf.write_string(", \"grade\": \"")
-    buf.write_string(s.grade.to_string())
+    buf.write_string(@debug.to_string(s.grade))
     buf.write_string("\" }")
   }
   buf.write_string("\n  ],\n  \"warnings\": [\n")

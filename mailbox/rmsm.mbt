@@ -53,7 +53,7 @@ pub fn Rmsm::new(max_retries? : Int = 3) -> Rmsm {
 pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
   guard self.state is Idle else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot begin transaction in state " + self.state.to_string(),
+      "RMSM: cannot begin transaction in state " + @debug.to_string(self.state),
     )
   }
   let cnt = self.counter.next()
@@ -69,7 +69,7 @@ pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
 pub fn Rmsm::begin_retry_transaction(self : Rmsm) -> Byte raise @hal.EcError {
   guard self.state is Idle else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot begin retry transaction in state " + self.state.to_string(),
+      "RMSM: cannot begin retry transaction in state " + @debug.to_string(self.state),
     )
   }
   let cnt = self.counter.next()
@@ -88,7 +88,7 @@ pub fn Rmsm::validate_response(
 ) -> Bool raise @hal.EcError {
   guard self.state is WaitingForResponse(expected) else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: unexpected response in state " + self.state.to_string(),
+      "RMSM: unexpected response in state " + @debug.to_string(self.state),
     )
   }
   // Check for repeat (same counter as last received)
@@ -118,7 +118,7 @@ pub fn Rmsm::begin_read_repeat(
 ) -> Byte raise @hal.EcError {
   guard self.state is WaitingForResponse(_) else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot request mailbox repeat in state " + self.state.to_string(),
+      "RMSM: cannot request mailbox repeat in state " + @debug.to_string(self.state),
     )
   }
   self.repeat_request = !self.repeat_request

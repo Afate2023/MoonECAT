@@ -77,8 +77,6 @@ pub(all) enum NativeBackendKind {
   LinuxRawSocket
   WindowsNpcap
 } derive(Eq, @debug.Debug)
-pub fn NativeBackendKind::to_string(Self) -> String
-pub impl Show for NativeBackendKind
 
 pub(all) struct NativeInterfaceInfo {
   name : String
@@ -89,15 +87,11 @@ pub(all) struct NativeInterfaceInfo {
   wireless : Bool
   index : Int?
 } derive(Eq, @debug.Debug)
-pub fn NativeInterfaceInfo::to_string(Self) -> String
-pub impl Show for NativeInterfaceInfo
 
 pub(all) struct NativeInterfaceListing {
   backend : NativeBackendKind
   interfaces : Array[NativeInterfaceInfo]
 } derive(Eq, @debug.Debug)
-pub fn NativeInterfaceListing::to_string(Self) -> String
-pub impl Show for NativeInterfaceListing
 
 pub(all) struct NativeNic {
   config : NativeNicConfig
@@ -107,9 +101,7 @@ pub(all) struct NativeNic {
 } derive(Eq, @debug.Debug)
 pub fn NativeNic::new(NativeNicConfig) -> Self
 pub fn NativeNic::open_with_config(NativeNicConfig) -> Self raise @hal.EcError
-pub fn NativeNic::to_string(Self) -> String
 pub impl @hal.Nic for NativeNic
-pub impl Show for NativeNic
 
 pub(all) struct NativeNicConfig {
   interface_name : String
@@ -118,8 +110,6 @@ pub(all) struct NativeNicConfig {
   promisc : Bool
   timeout_ms : Int
 } derive(Eq, @debug.Debug)
-pub fn NativeNicConfig::to_string(Self) -> String
-pub impl Show for NativeNicConfig
 
 pub(all) struct NativeZeroCopyNic {
   config : NativeNicConfig

@@ -17,8 +17,6 @@ pub(all) struct BridgeConfig {
   max_batch : Int
 } derive(@debug.Debug)
 pub fn BridgeConfig::new(SharedMemoryRegion, capacity? : Int, slot_size? : Int, max_batch? : Int) -> Self
-pub fn BridgeConfig::to_string(Self) -> String
-pub impl Show for BridgeConfig
 
 pub(all) struct BridgeStats {
   mut total_pushed : Int64
@@ -29,9 +27,7 @@ pub(all) struct BridgeStats {
 pub fn BridgeStats::new() -> Self
 pub fn BridgeStats::record_pop(Self) -> Unit
 pub fn BridgeStats::record_push(Self, Bool) -> Unit
-pub fn BridgeStats::to_string(Self) -> String
 pub fn BridgeStats::update_fill(Self, Int) -> Unit
-pub impl Show for BridgeStats
 
 pub(all) struct EventRing {
   capacity : Int
@@ -46,17 +42,13 @@ pub fn EventRing::len(Self) -> Int
 pub fn EventRing::new(Int, Int) -> Self
 pub fn EventRing::pop(Self) -> RingEntry?
 pub fn EventRing::push(Self, Bytes) -> Bool
-pub fn EventRing::to_string(Self) -> String
-pub impl Show for EventRing
 
 pub(all) struct McuClock {
   platform : McuPlatform
   timer_freq_hz : Int64
 } derive(@debug.Debug)
 pub fn McuClock::new(McuPlatform, Int64) -> Self
-pub fn McuClock::to_string(Self) -> String
 pub impl @hal.Clock for McuClock
-pub impl Show for McuClock
 
 pub(all) struct McuNic {
   config : McuNicConfig
@@ -65,9 +57,7 @@ pub(all) struct McuNic {
   mut rx_count : Int64
 } derive(@debug.Debug)
 pub fn McuNic::new(McuNicConfig) -> Self
-pub fn McuNic::to_string(Self) -> String
 pub impl @hal.Nic for McuNic
-pub impl Show for McuNic
 
 pub(all) struct McuNicConfig {
   platform : McuPlatform
@@ -77,8 +67,6 @@ pub(all) struct McuNicConfig {
   ring_size : Int
 } derive(@debug.Debug)
 pub fn McuNicConfig::default(McuPlatform) -> Self
-pub fn McuNicConfig::to_string(Self) -> String
-pub impl Show for McuNicConfig
 
 pub(all) enum McuPlatform {
   RzN2L
@@ -86,25 +74,19 @@ pub(all) enum McuPlatform {
   Stm32H7Lan9252
   Generic
 } derive(Eq, @debug.Debug)
-pub fn McuPlatform::to_string(Self) -> String
-pub impl Show for McuPlatform
 
 pub(all) struct McuZeroCopyNic {
   config : McuNicConfig
   mut opened : Bool
 } derive(@debug.Debug)
 pub fn McuZeroCopyNic::new(McuNicConfig) -> Self
-pub fn McuZeroCopyNic::to_string(Self) -> String
 pub impl @hal.ZeroCopyNic for McuZeroCopyNic
-pub impl Show for McuZeroCopyNic
 
 pub(all) struct RingEntry {
   seq : UInt
   length : Int
   data : Bytes
 } derive(@debug.Debug)
-pub fn RingEntry::to_string(Self) -> String
-pub impl Show for RingEntry
 
 pub(all) struct SharedMemoryRegion {
   name : String
@@ -113,8 +95,6 @@ pub(all) struct SharedMemoryRegion {
   cache_coherent : Bool
 } derive(@debug.Debug)
 pub fn SharedMemoryRegion::new(String, UInt, Int, cache_coherent? : Bool) -> Self
-pub fn SharedMemoryRegion::to_string(Self) -> String
-pub impl Show for SharedMemoryRegion
 
 // Type aliases
 

@@ -3,7 +3,7 @@
 fn main {
   let _ = cli_main() catch {
     err => {
-      println("moonecat eni-json error: " + err.to_string())
+      println("moonecat eni-json error: " + @debug.to_string(err))
       ()
     }
   }

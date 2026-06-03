@@ -3106,7 +3106,7 @@ fn run_fault_text(fault : RunFault) -> String {
       control_wkc~
     ) => {
       let current_text = match current {
-        Some(state) => state.to_string()
+        Some(state) => @debug.to_string(state)
         None => "unknown"
       }
       let error_text = match error_indication {
@@ -3129,7 +3129,7 @@ fn run_fault_text(fault : RunFault) -> String {
       "startup transition failed: station=" +
       station.to_string() +
       " target=" +
-      target.to_string() +
+      @debug.to_string(target) +
       " current=" +
       current_text +
       " error_flag=" +
@@ -3189,7 +3189,7 @@ pub fn RunReport::format(self : RunReport) -> String {
     self.cycles_requested.to_string() +
     " OK\n",
   )
-  buf.write_string("Phase: " + self.final_phase.to_string() + "\n")
+  buf.write_string("Phase: " + @debug.to_string(self.final_phase) + "\n")
   let tel = self.telemetry
   buf.write_string(
     "Telemetry: tx=" +

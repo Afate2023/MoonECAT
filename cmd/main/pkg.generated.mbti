@@ -12,8 +12,6 @@ import {
 
 // Types and methods
 type CliBackend derive(Eq, @debug.Debug)
-pub fn CliBackend::to_string(Self) -> String
-pub impl Show for CliBackend
 
 type CliNdjsonRunProgressSink
 pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
@@ -44,8 +42,6 @@ type PdoDirectionReport
 type PdoMappingObjectReport
 
 type RunProgressOutput derive(Eq, @debug.Debug)
-pub fn RunProgressOutput::to_string(Self) -> String
-pub impl Show for RunProgressOutput
 
 type StartupDiffReport
 

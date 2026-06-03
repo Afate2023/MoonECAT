@@ -451,8 +451,8 @@ fn master_od_entry_json(entry : MasterOdEntry) -> Json {
     "index_hex": Json::string("0x" + hex_uint16(entry.index)),
     "subindex": Json::number(entry.subindex.to_uint().to_double()),
     "name": Json::string(entry.name),
-    "data_type": Json::string(entry.data_type.to_string()),
-    "access": Json::string(entry.access.to_string()),
+    "data_type": Json::string(@debug.to_string(entry.data_type)),
+    "access": Json::string(@debug.to_string(entry.access)),
     "value": master_od_value_json(entry.value),
     "value_formatted": Json::string(entry.value.format()),
   })

@@ -269,7 +269,7 @@ pub fn decode_foe_response(
   let mbh = MailboxHeader::from_bytes(data)
   if mbh.mb_type != FoE {
     raise @hal.EcError::MailboxProtocol(
-      "expected FoE mailbox, got " + mbh.mb_type.to_string(),
+      "expected FoE mailbox, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let payload_len = mbh.length.reinterpret_as_int()
@@ -323,7 +323,7 @@ pub fn decode_foe_response(
     Busy => (mbh, FoeBusy)
     _ =>
       raise @hal.EcError::MailboxProtocol(
-        "unexpected FoE opcode in response: " + opcode.to_string(),
+        "unexpected FoE opcode in response: " + @debug.to_string(opcode),
       )
   }
 }
