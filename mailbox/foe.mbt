@@ -146,7 +146,7 @@ pub fn encode_foe_read(
 ) -> Bytes {
   let name_bytes = filename.to_array().map(fn(c) { c.to_int().to_byte() })
   let payload_len = foe_header_len + name_bytes.length()
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -180,7 +180,7 @@ pub fn encode_foe_write(
 ) -> Bytes {
   let name_bytes = filename.to_array().map(fn(c) { c.to_int().to_byte() })
   let payload_len = foe_header_len + name_bytes.length()
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -213,7 +213,7 @@ pub fn encode_foe_data(
   data : Bytes,
 ) -> Bytes {
   let payload_len = foe_header_len + data.length()
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -239,7 +239,7 @@ pub fn encode_foe_data(
 /// Encode a FoE Ack frame.
 pub fn encode_foe_ack(counter : Byte, packet_number : UInt) -> Bytes {
   let payload_len = foe_header_len
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,

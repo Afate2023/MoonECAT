@@ -287,7 +287,7 @@ fn validate_grade_label(grade : ValidateGrade) -> String {
 ///|
 /// Format a ValidateReport as a human-readable string.
 pub fn ValidateReport::format(self : ValidateReport) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("EtherCAT Validation Report\n")
   buf.write_string("==========================\n")
   buf.write_string(

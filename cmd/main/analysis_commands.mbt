@@ -251,7 +251,7 @@ fn replay_report_text(
   verdict : String,
   remaining_events : Int,
 ) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT Replay Report\n")
   buf.write_string("======================\n")
   buf.write_string("Verdict: " + verdict + "\n")
@@ -410,7 +410,7 @@ fn scenario_result_json(result : @mock.ScenarioResult) -> Json {
 
 ///|
 fn scenario_result_text(result : @mock.ScenarioResult) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT Scenario Report\n")
   buf.write_string("========================\n")
   buf.write_string("Scenario: " + result.name + "\n")
@@ -473,7 +473,7 @@ fn jitter_profile_text(
   stats : @analysis.JitterStats,
   period_ns : Int64,
 ) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT DC Jitter Profile\n")
   buf.write_string("==========================\n")
   buf.write_string("Nominal Period: " + period_ns.to_string() + " ns\n")
@@ -556,7 +556,7 @@ fn auto_tune_result_json(result : @analysis.AutoTuneResult) -> Json {
 
 ///|
 fn auto_tune_result_text(result : @analysis.AutoTuneResult) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT PDO Auto-Tune Report\n")
   buf.write_string("=============================\n")
   buf.write_string(
@@ -657,7 +657,7 @@ fn topo_health_json(report : @analysis.TopologyHealthReport) -> Json {
 
 ///|
 fn topo_health_text(report : @analysis.TopologyHealthReport) -> String {
-  let buf = @buffer.new(size_hint=512)
+  let buf = StringBuilder(size_hint=512)
   buf.write_string("MoonECAT Topology Health Report\n")
   buf.write_string("===============================\n")
   buf.write_string("System health: ")
@@ -742,7 +742,7 @@ fn cycle_perf_text(
   stats : @analysis.CyclePerfStats,
   trend : @analysis.PerfTrend,
 ) -> String {
-  let buf = @buffer.new(size_hint=512)
+  let buf = StringBuilder(size_hint=512)
   buf.write_string("MoonECAT Cycle Performance Report\n")
   buf.write_string("=================================\n")
   buf.write_string("Total cycles: ")
@@ -819,7 +819,7 @@ fn comm_quality_text(
   score : @analysis.QualityScore,
   slave_count : Int,
 ) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT Communication Quality Report\n")
   buf.write_string("=====================================\n")
   buf.write_string("Overall: ")

@@ -319,7 +319,7 @@ pub fn TopologyHealthAnalyzer::analyze(
 ///|
 /// 输出拓扑健康报告 JSON
 pub fn TopologyHealthReport::to_json(self : TopologyHealthReport) -> String {
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{\n")
   buf.write_string("  \"system_health_score\": ")
   buf.write_string(self.system_health_score.to_string())

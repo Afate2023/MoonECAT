@@ -610,7 +610,7 @@ fn state_transition_report_json(report : StateTransitionReport) -> Json {
 
 ///|
 fn state_transition_report_text(report : StateTransitionReport) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("EtherCAT State Transition\n")
   buf.write_string("=========================\n")
   buf.write_string("Mode: " + report.mode + "\n")

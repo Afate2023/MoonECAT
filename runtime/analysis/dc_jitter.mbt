@@ -264,7 +264,7 @@ pub fn DcJitterProfiler::is_within_tolerance(
 /// 输出抖动分析报告 JSON
 pub fn DcJitterProfiler::to_json(self : DcJitterProfiler) -> String {
   let s = self.stats()
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{\n")
   buf.write_string("  \"nominal_period_ns\": ")
   buf.write_string(self.nominal_period_ns.to_string())
@@ -327,7 +327,7 @@ pub fn MultiChannelJitterProfiler::record(
 pub fn MultiChannelJitterProfiler::summary_json(
   self : MultiChannelJitterProfiler,
 ) -> String {
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{ \"channels\": [\n")
   for i = 0; i < self.channels.length(); i = i + 1 {
     let (name, profiler) = self.channels[i]

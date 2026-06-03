@@ -226,7 +226,7 @@ pub fn write_slice_outputs(
   } else {
     slice.output_length
   }
-  let buf = @buffer.new(size_hint=image.output_size)
+  let buf = Buffer(size_hint=image.output_size)
   for i = 0; i < image.output_size; i = i + 1 {
     if i >= slice.output_offset && i < slice.output_offset + len {
       buf.write_byte(data[i - slice.output_offset])

@@ -44,7 +44,7 @@ fn mailbox_request_address(_station : UInt) -> UInt {
 ///|
 /// Encode a mailbox header into 6 bytes.
 pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
-  let buf = @buffer.new(size_hint=mailbox_header_len)
+  let buf = Buffer(size_hint=mailbox_header_len)
   // Bytes 0-1: Length (LE)
   buf.write_byte((self.length & 0xFFU).to_byte())
   buf.write_byte(((self.length >> 8) & 0xFFU).to_byte())
@@ -186,7 +186,7 @@ pub(all) struct SdoResponse {
 ///|
 /// Build a complete mailbox frame for an SDO request (expedited).
 pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
-  let buf = @buffer.new(
+  let buf = Buffer(
     size_hint=mailbox_header_len + coe_header_len + sdo_header_len,
   )
   let data_len = coe_header_len + sdo_header_len
@@ -518,7 +518,7 @@ pub fn build_sdo_upload_segment_request(
   station : UInt,
   toggle : Bool,
 ) -> Bytes {
-  let buf = @buffer.new(
+  let buf = Buffer(
     size_hint=mailbox_header_len + coe_header_len + sdo_header_len,
   )
   let data_len = coe_header_len + sdo_header_len
@@ -560,7 +560,7 @@ pub fn build_sdo_download_segment_request(
       "SDO download segment too large (>7 bytes)",
     )
   }
-  let buf = @buffer.new(
+  let buf = Buffer(
     size_hint=mailbox_header_len + coe_header_len + 1 + segment.length(),
   )
   let data_len = coe_header_len + 1 + segment.length()
@@ -604,7 +604,7 @@ pub fn build_sdo_info_get_od_list_request(
   list_type : UInt,
 ) -> Bytes {
   let payload_len = coe_header_len + sdo_info_header_len + 2
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: mailbox_request_address(station),
@@ -639,7 +639,7 @@ pub fn build_sdo_info_get_od_request(
   index : UInt,
 ) -> Bytes {
   let payload_len = coe_header_len + sdo_info_header_len + 2
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: mailbox_request_address(station),
@@ -675,7 +675,7 @@ pub fn build_sdo_info_get_oe_request(
   value_info : Byte,
 ) -> Bytes {
   let payload_len = coe_header_len + sdo_info_header_len + 4
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: mailbox_request_address(station),

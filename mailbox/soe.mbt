@@ -126,7 +126,7 @@ pub fn encode_soe_read_req(
   idn : UInt,
 ) -> Bytes {
   let payload_len = soe_header_len
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -156,7 +156,7 @@ pub fn encode_soe_write_req(
   data : Bytes,
 ) -> Bytes {
   let payload_len = soe_header_len + data.length()
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,

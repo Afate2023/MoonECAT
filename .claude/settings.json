@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk -F/ 'NF>1{print $1\"/\"} NF==1{print $1}')",
+      "Bash(moon check *)",
+      "Bash(grep -B1 \"use \\\\`Buffer\\(\\)\\\\`\")",
+      "Bash(grep -oE \"C:\\\\\\\\\\\\\\\\MoonECAT\\\\\\\\\\\\\\\\[A-Za-z0-9_\\\\\\\\\\\\\\\\]+\\\\.mbt\")",
+      "Bash(tee /tmp/full_check.txt)",
+      "Bash(moon fmt *)",
+      "Bash(moon info *)",
+      "Bash(git checkout *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

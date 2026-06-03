@@ -273,7 +273,7 @@ pub fn calculate_slave_mapping_from_sii(
 ///|
 /// Encode an SmConfig into 8 bytes suitable for writing to SM registers.
 pub fn SmConfig::to_bytes(self : SmConfig) -> Bytes {
-  let buf = @buffer.new(size_hint=8)
+  let buf = Buffer(size_hint=8)
   // Bytes 0-1: physical start address (LE)
   buf.write_byte((self.physical_start & 0xFFU).reinterpret_as_int().to_byte())
   buf.write_byte(
@@ -296,7 +296,7 @@ pub fn SmConfig::to_bytes(self : SmConfig) -> Bytes {
 ///|
 /// Encode an FmmuConfig into 16 bytes suitable for writing to FMMU registers.
 pub fn FmmuConfig::to_bytes(self : FmmuConfig) -> Bytes {
-  let buf = @buffer.new(size_hint=16)
+  let buf = Buffer(size_hint=16)
   // Bytes 0-3: logical start address (LE 32-bit)
   buf.write_byte((self.logical_start & 0xFFU).reinterpret_as_int().to_byte())
   buf.write_byte(

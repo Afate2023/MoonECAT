@@ -33,7 +33,7 @@ fn decode_u32_le(payload : Bytes, offset : Int) -> UInt {
 
 ///|
 fn bytes_hex(payload : Bytes) -> String {
-  let buf = @buffer.new(size_hint=payload.length() * 2 + 2)
+  let buf = StringBuilder(size_hint=payload.length() * 2 + 2)
   buf.write_string("0x")
   for i = 0; i < payload.length(); i = i + 1 {
     buf.write_string(hex_digit((payload[i].to_int() >> 4) & 0x0F))
@@ -102,7 +102,7 @@ fn production_weekday_name(weekday : Int) -> String {
 
 ///|
 fn bytes_preview_hex(data : BytesView, max_bytes : Int) -> String {
-  let buf = @buffer.new(size_hint=max_bytes * 3)
+  let buf = StringBuilder(size_hint=max_bytes * 3)
   let limit = if data.length() < max_bytes { data.length() } else { max_bytes }
   for i = 0; i < limit; i = i + 1 {
     if i > 0 {
@@ -177,7 +177,7 @@ fn hex_digit(value : Int) -> String {
 
 ///|
 fn format_hex(value : UInt, digits : Int) -> String {
-  let buf = @buffer.new(size_hint=digits + 2)
+  let buf = StringBuilder(size_hint=digits + 2)
   buf.write_string("0x")
   let mut index = digits - 1
   while index >= 0 {

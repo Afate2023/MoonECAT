@@ -89,7 +89,7 @@ fn mailbox_readback_report_json(report : MailboxReadbackReport) -> Json {
 
 ///|
 fn mailbox_readback_report_text(report : MailboxReadbackReport) -> String {
-  let buf = @buffer.new(size_hint=1024)
+  let buf = StringBuilder(size_hint=1024)
   buf.write_string("Mailbox SyncManager Readback\n")
   buf.write_string("==========================\n")
   buf.write_string("Station: " + report.station.to_string() + "\n")

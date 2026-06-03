@@ -251,7 +251,7 @@ pub fn CommQualityScorer::score_from_telemetry(
 ///|
 /// 输出质量评分 JSON
 pub fn QualityScore::to_json(self : QualityScore) -> String {
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{\n")
   buf.write_string("  \"overall\": ")
   buf.write_string(self.overall.to_string())

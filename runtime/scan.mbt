@@ -389,7 +389,7 @@ fn read_u32_le(data : Bytes, offset : Int) -> UInt {
 ///|
 /// Format a ScanReport as a human-readable string.
 pub fn ScanReport::format(self : ScanReport) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("EtherCAT Bus Scan Report\n")
   buf.write_string("========================\n")
   buf.write_string("Slaves found: " + self.slave_count.to_string() + "\n\n")

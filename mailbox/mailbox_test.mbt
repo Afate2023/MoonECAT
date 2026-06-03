@@ -3366,7 +3366,7 @@ test "decode_sdo_response abort with short payload" {
   // CoE header: service=SdoResponse (3 << 12 = 0x3000), lower 12 = 0
   // SDO cmd byte = 0x80 (abort transfer)
   // But sdo_payload=7 < 8 鈫?"SDO abort payload too short"
-  let buf = @buffer.new()
+  let buf = Buffer()
   // mailbox header: length=9 (LE), address=0, channel=0, priority=0, type=0x03, counter=1<<4
   buf.write_byte(b'\x09') // length lo
   buf.write_byte(b'\x00') // length hi
@@ -3394,7 +3394,7 @@ test "decode_sdo_response abort with short payload" {
 test "decode_sdo_response segmented upload" {
   // cs=000, toggle=0, n_unused=2, last=1 鈫?cmd_byte = 0x05
   // sdo_payload_len = 1 + 5 = 6 (enough for seg data 7-2=5)
-  let buf = @buffer.new()
+  let buf = Buffer()
   // mailbox header: length=8 (coe_hdr=2 + sdo_payload=6)
   buf.write_byte(b'\x08')
   buf.write_byte(b'\x00')
@@ -3422,7 +3422,7 @@ test "decode_sdo_response segmented upload" {
 test "decode_sdo_response segmented upload empty segment" {
   // cs=000, toggle=0, n_unused=7, last=1 鈫?seg_len = 7-7=0 鈫?Bytes::new(0)
   // cmd_byte: n_unused=7 (bits 3:1)=0x0E, last=1 鈫?0x0F
-  let buf = @buffer.new()
+  let buf = Buffer()
   // mailbox header: length=3 (coe_hdr=2 + 1 cmd byte)
   buf.write_byte(b'\x03')
   buf.write_byte(b'\x00')
@@ -3445,7 +3445,7 @@ test "decode_sdo_response segmented upload empty segment" {
 test "decode_sdo_response header too short" {
   // Non-segmented, non-abort: cmd=DownloadResponse(0x60), cs=011
   // But sdo_payload < sdo_header_len(8)
-  let buf = @buffer.new()
+  let buf = Buffer()
   // length=4 鈫?payload=4, coe=2, sdo_payload=2 < 8
   buf.write_byte(b'\x04')
   buf.write_byte(b'\x00')
@@ -3470,7 +3470,7 @@ test "decode_sdo_response header too short" {
 test "decode_sdo_response non-expedited upload with extra data" {
   // UploadResponse (cs=010, bits[7:5]), non-expedited (bit1=0), size_indicated (bit0=1)
   // cmd_byte: 010_00001 = 0x41
-  let buf = @buffer.new()
+  let buf = Buffer()
   // length=14 (coe=2 + sdo_header=8 + extra=4)
   buf.write_byte(b'\x0E')
   buf.write_byte(b'\x00')
@@ -3518,7 +3518,7 @@ test "decode_sdo_info_response frame too short" {
 ///|
 test "decode_sdo_info_response payload too short" {
   // Mailbox header says length=3, but need coe(2)+info(4)=6
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x03') // length=3
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3539,7 +3539,7 @@ test "decode_sdo_info_response payload too short" {
 ///|
 test "decode_sdo_info_response truncated data" {
   // Header says length=20 but we only provide 12 bytes total
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x14') // length=20
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3560,7 +3560,7 @@ test "decode_sdo_info_response truncated data" {
 ///|
 test "decode_sdo_info_response wrong mailbox type" {
   // mb_type=FoE(5) instead of CoE(3)
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x06') // length=6 (coe=2+info=4)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3585,7 +3585,7 @@ test "decode_sdo_info_response wrong mailbox type" {
 ///|
 test "decode_sdo_info_response wrong service field" {
   // service=3 (SdoResponse) instead of 8 (SdoInfo)
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x06') // length=6
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3610,7 +3610,7 @@ test "decode_sdo_info_response wrong service field" {
 ///|
 test "decode_sdo_info_response empty body" {
   // length=6 = coe(2)+info(4) 鈫?body_len=0 鈫?Bytes::new(0)
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x06') // length=6
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3634,7 +3634,7 @@ test "decode_sdo_info_response empty body" {
 
 ///|
 test "decode_foe_response payload too short for opcode" {
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x01') // length=1 (< 2)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3652,7 +3652,7 @@ test "decode_foe_response payload too short for opcode" {
 ///|
 test "decode_foe_response data empty segment" {
   // Data opcode=3, payload >= foe_header_len(6) but data_end <= data_start
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x06') // length=6 (foe_header_len)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3680,7 +3680,7 @@ test "decode_foe_response data empty segment" {
 ///|
 test "decode_foe_response ack short payload" {
   // Ack opcode=4, payload < foe_header_len 鈫?packet_number=0
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x02') // length=2 (just opcode+reserved)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3698,7 +3698,7 @@ test "decode_foe_response ack short payload" {
 ///|
 test "decode_foe_response error short payload" {
   // Error opcode=5, payload < foe_header_len 鈫?error_code=NotDefined, text=""
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x02') // length=2
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3716,7 +3716,7 @@ test "decode_foe_response error short payload" {
 ///|
 test "decode_foe_response error no text" {
   // Error opcode=5, payload == foe_header_len 鈫?text=""
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x06') // length=6
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3744,7 +3744,7 @@ test "decode_foe_response error no text" {
 ///|
 test "decode_foe_response unexpected opcode" {
   // opcode=1 (Read), not valid in response
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x02')
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3765,7 +3765,7 @@ test "decode_foe_response unexpected opcode" {
 ///|
 test "decode_soe_response error short payload" {
   // SoE error response with total_len < data_start+2 鈫?error_code=0
-  let buf = @buffer.new()
+  let buf = Buffer()
   // length=4: just enough for SoE header (4 bytes)
   buf.write_byte(b'\x04')
   buf.write_byte(b'\x00')
@@ -3786,7 +3786,7 @@ test "decode_soe_response error short payload" {
 ///|
 test "decode_soe_response read no data" {
   // ReadRes with no data after header 鈫?Bytes::new(0)
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x04') // length=4
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3817,7 +3817,7 @@ test "decode_soe_response read no data" {
 ///|
 test "decode_soe_response notification no data" {
   // Notification opcode=5, no data after header 鈫?Bytes::new(0)
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x04') // length=4
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
@@ -3851,7 +3851,7 @@ test "parse_sii_strings empty data" {
 ///|
 test "parse_sii_strings offset past end" {
   // n_strings=3 but only 1 string fits, offset goes past end
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x03') // n_strings=3
   buf.write_byte(b'\x02') // str_len=2
   buf.write_byte(b'\x41') // 'A'
@@ -3866,7 +3866,7 @@ test "parse_sii_strings offset past end" {
 ///|
 test "parse_sii_strings string extends past end" {
   // n_strings=2, first string OK, second has str_len that extends past data
-  let buf = @buffer.new()
+  let buf = Buffer()
   buf.write_byte(b'\x02') // n_strings=2
   buf.write_byte(b'\x01') // str_len=1
   buf.write_byte(b'\x41') // 'A'
@@ -3909,7 +3909,7 @@ test "SiiOverlayCandidate status_label opaque" {
 ///|
 test "decode_eoe_response fragment empty data" {
   // Frame type=0, data_start >= frame.length 鈫?Bytes::new(0)
-  let buf = @buffer.new()
+  let buf = Buffer()
   // mailbox header: length=4 (eoe_header_len=4, no extra data)
   buf.write_byte(b'\x04')
   buf.write_byte(b'\x00')

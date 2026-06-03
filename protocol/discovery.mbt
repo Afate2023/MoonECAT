@@ -291,7 +291,7 @@ pub fn[N : @hal.Nic] assign_station_address(
   station_address : UInt,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  let buf = @buffer.new(size_hint=2)
+  let buf = Buffer(size_hint=2)
   buf.write_byte((station_address & 0xFFU).reinterpret_as_int().to_byte())
   buf.write_byte(
     ((station_address >> 8) & 0xFFU).reinterpret_as_int().to_byte(),
@@ -370,7 +370,7 @@ pub fn[N : @hal.Nic] enable_alias_addressing(
     (dl.data[2].to_uint() << 16) |
     (dl.data[3].to_uint() << 24)
   let updated = current | (1U << dl_control_alias_enable_bit)
-  let buf = @buffer.new(size_hint=4)
+  let buf = Buffer(size_hint=4)
   buf.write_byte((updated & 0xFFU).reinterpret_as_int().to_byte())
   buf.write_byte(((updated >> 8) & 0xFFU).reinterpret_as_int().to_byte())
   buf.write_byte(((updated >> 16) & 0xFFU).reinterpret_as_int().to_byte())

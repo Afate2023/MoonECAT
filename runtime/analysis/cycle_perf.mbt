@@ -309,7 +309,7 @@ fn isqrt64(n : Int64) -> Int64 {
 ///|
 /// 输出周期性能报告 JSON
 pub fn CyclePerfStats::to_json(self : CyclePerfStats) -> String {
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{\n")
   buf.write_string("  \"total_cycles\": ")
   buf.write_string(self.total_cycles.to_string())

@@ -62,23 +62,23 @@ pub(all) enum SimStepResult {
 /// The runtime invokes these in deterministic order within each CycleHook callback.
 pub(open) trait CoSimAdapter {
   /// Initialize the adapter with simulation parameters.
-  init_(Self, CoSimConfig) -> Unit
+  fn init_(Self, CoSimConfig) -> Unit
 
   /// Write EtherCAT outputs into the plant model's input ports.
   /// Called before `step()`. The adapter reads from `image.outputs` at the
   /// given slice region and translates to physical quantities.
-  write_outputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  fn write_outputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
 
   /// Advance the plant model by one time step.
-  step(Self, SimTime, Int64) -> SimStepResult
+  fn step(Self, SimTime, Int64) -> SimStepResult
 
   /// Read plant model outputs back into EtherCAT inputs.
   /// Called after `step()`. The adapter writes to `image.inputs` at the
   /// given slice region.
-  read_inputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  fn read_inputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
 
   /// One-time cleanup.
-  shutdown(Self) -> Unit
+  fn shutdown(Self) -> Unit
 }
 
 ///|
@@ -107,12 +107,12 @@ pub fn LoopbackCoSimAdapter::new() -> LoopbackCoSimAdapter {
 }
 
 ///|
-pub impl CoSimAdapter for LoopbackCoSimAdapter with init_(self, _config) {
+pub impl CoSimAdapter for LoopbackCoSimAdapter with fn init_(self, _config) {
   ignore(self)
 }
 
 ///|
-pub impl CoSimAdapter for LoopbackCoSimAdapter with write_outputs(
+pub impl CoSimAdapter for LoopbackCoSimAdapter with fn write_outputs(
   self,
   _image,
   _slice,
@@ -121,13 +121,13 @@ pub impl CoSimAdapter for LoopbackCoSimAdapter with write_outputs(
 }
 
 ///|
-pub impl CoSimAdapter for LoopbackCoSimAdapter with step(self, current, dt) {
+pub impl CoSimAdapter for LoopbackCoSimAdapter with fn step(self, current, dt) {
   self.sim_time = current.advance(dt)
   Ok(self.sim_time)
 }
 
 ///|
-pub impl CoSimAdapter for LoopbackCoSimAdapter with read_inputs(
+pub impl CoSimAdapter for LoopbackCoSimAdapter with fn read_inputs(
   self,
   image,
   slice,
@@ -139,7 +139,7 @@ pub impl CoSimAdapter for LoopbackCoSimAdapter with read_inputs(
   } else {
     slice.input_length
   }
-  let buf = @buffer.new(size_hint=image.input_size)
+  let buf = Buffer(size_hint=image.input_size)
   for i = 0; i < image.input_size; i = i + 1 {
     if i >= slice.input_offset && i < slice.input_offset + len {
       buf.write_byte(
@@ -153,6 +153,6 @@ pub impl CoSimAdapter for LoopbackCoSimAdapter with read_inputs(
 }
 
 ///|
-pub impl CoSimAdapter for LoopbackCoSimAdapter with shutdown(self) {
+pub impl CoSimAdapter for LoopbackCoSimAdapter with fn shutdown(self) {
   ignore(self)
 }

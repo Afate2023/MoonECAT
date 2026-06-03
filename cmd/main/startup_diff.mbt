@@ -175,7 +175,7 @@ fn startup_diff_report_json(report : StartupDiffReport) -> Json {
 
 ///|
 fn startup_diff_report_text(report : StartupDiffReport) -> String {
-  let buf = @buffer.new(size_hint=2048)
+  let buf = StringBuilder(size_hint=2048)
   let online_error_text = match report.online_expected_error {
     Some(err) => err
     None => "unknown error"

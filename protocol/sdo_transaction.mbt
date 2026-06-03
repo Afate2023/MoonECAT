@@ -494,7 +494,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
   context : String,
   retry : Bool,
 ) -> Bytes raise @hal.EcError {
-  let acc = @buffer.new(
+  let acc = Buffer(
     size_hint=match initial.complete_size {
       Some(sz) => sz.reinterpret_as_int()
       None => 64
@@ -553,7 +553,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
   context : String,
   retry : Bool,
 ) -> Bytes raise @hal.EcError {
-  let acc = @buffer.new(
+  let acc = Buffer(
     size_hint=match initial.complete_size {
       Some(sz) => sz.reinterpret_as_int()
       None => 64
@@ -682,7 +682,7 @@ fn[N : @hal.Nic] sdo_info_collect_payload(
   context : String,
 ) -> Bytes raise @hal.EcError {
   mailbox_send(nic, station, mb_config, request_frame, timeout)
-  let acc = @buffer.new(size_hint=64)
+  let acc = Buffer(size_hint=64)
   let mut first = true
   let mut done = false
   while !done {

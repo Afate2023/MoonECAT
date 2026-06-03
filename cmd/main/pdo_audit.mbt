@@ -271,7 +271,7 @@ fn pdo_direction_objects_text(direction : PdoDirectionReport) -> String {
 
 ///|
 fn pdo_audit_report_text(report : PdoAuditReport) -> String {
-  let buf = @buffer.new(size_hint=1024)
+  let buf = StringBuilder(size_hint=1024)
   buf.write_string("PDO Audit\n")
   buf.write_string("---------\n")
   buf.write_string("Plan Source: " + report.plan_source + "\n")

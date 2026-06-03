@@ -236,7 +236,7 @@ pub fn[N : @hal.Nic] foe_upload(
   let read_frame = @mailbox.encode_foe_read(counter0, password, filename)
   mailbox_send(nic, station, mb_config, read_frame, timeout)
   // Step 2: Receive Data segments
-  let result = @buffer.new(size_hint=1024)
+  let result = Buffer(size_hint=1024)
   let mut expected_pn : UInt = 1U
   for ;; {
     let resp = recv_foe_validated_fp(nic, station, mb_config, rmsm, timeout)
@@ -378,7 +378,7 @@ pub fn[N : @hal.Nic] foe_upload_ap(
   let counter0 = rmsm.begin_transaction()
   let read_frame = @mailbox.encode_foe_read(counter0, password, filename)
   mailbox_send_ap(nic, position, mb_config, read_frame, timeout)
-  let result = @buffer.new(size_hint=1024)
+  let result = Buffer(size_hint=1024)
   let mut expected_pn : UInt = 1U
   for ;; {
     let resp = recv_foe_validated_ap(nic, position, mb_config, rmsm, timeout)

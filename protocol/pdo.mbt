@@ -270,7 +270,7 @@ pub fn PdoContext::set_slave_outputs(
         )
       }
       // Copy data into the process image outputs
-      let buf = @buffer.new(size_hint=self.image.output_size)
+      let buf = Buffer(size_hint=self.image.output_size)
       for j = 0; j < self.image.output_size; j = j + 1 {
         if j >= m.output_offset && j < m.output_offset + m.output_length {
           buf.write_byte(data[j - m.output_offset])

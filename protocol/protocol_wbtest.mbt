@@ -307,7 +307,7 @@ test "read_u16_le and read_u32_le" {
 
 ///|
 test "write_u16_le and write_u32_le" {
-  let buf = @buffer.new()
+  let buf = Buffer()
   write_u16_le(buf, 0xABCDU)
   write_u32_le(buf, 0x12345678U)
   let out = buf.to_bytes()

@@ -317,7 +317,7 @@ fn sii_category_title(
 
 ///|
 fn append_sii_strings_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   strings : Array[String],
 ) -> Unit {
@@ -353,7 +353,7 @@ fn append_sii_strings_section(
 
 ///|
 fn append_sii_general_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   info : @mailbox.SiiGeneral,
   strings : Array[String],
@@ -496,7 +496,7 @@ fn append_sii_general_section(
 
 ///|
 fn append_sii_fmmu_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   fmmu : Array[@mailbox.FmmuDirection],
 ) -> Unit {
@@ -519,7 +519,7 @@ fn append_sii_fmmu_section(
 
 ///|
 fn append_sii_fmmu_ex_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   fmmu_ex : Array[@mailbox.SiiFmmuEx],
 ) -> Unit {
@@ -562,7 +562,7 @@ fn append_sii_fmmu_ex_section(
 
 ///|
 fn append_sii_sm_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   sms : Array[@mailbox.SiiSmEntry],
 ) -> Unit {
@@ -612,7 +612,7 @@ fn append_sii_sm_section(
 
 ///|
 fn append_sii_dc_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   dc : @mailbox.SiiDcClock,
   strings : Array[String],
@@ -665,7 +665,7 @@ fn append_sii_dc_section(
 
 ///|
 fn append_sii_timeouts_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   timeouts : @mailbox.SiiTimeouts,
 ) -> Unit {
@@ -711,7 +711,7 @@ fn append_sii_timeouts_section(
 
 ///|
 fn append_sii_sync_unit_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   sync_units : Array[@mailbox.SiiSyncUnit],
 ) -> Unit {
@@ -758,7 +758,7 @@ fn append_sii_sync_unit_section(
 
 ///|
 fn append_sii_pdo_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
   pdos : Array[@mailbox.SiiPdo],
   strings : Array[String],
@@ -827,7 +827,7 @@ fn append_sii_pdo_section(
 
 ///|
 fn append_sii_raw_category_section(
-  buf : @buffer.Buffer,
+  buf : StringBuilder,
   entry : @mailbox.SiiCategoryEntry,
 ) -> Unit {
   let category_class = entry.category_class().label()
@@ -878,7 +878,7 @@ fn read_sii_text(
   let general = sii.general
   let strings = sii.strings
   let categories = sii.categories
-  let buf = @buffer.new(size_hint=2048)
+  let buf = StringBuilder(size_hint=2048)
   buf.write_string("First print preamble and config\n")
   buf.write_string(
     "Position: ................... " + position.to_string() + "\n",

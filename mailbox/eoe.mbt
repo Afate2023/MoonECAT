@@ -170,7 +170,7 @@ pub fn encode_eoe_fragment(
   data : Bytes,
 ) -> Bytes {
   let payload_len = eoe_header_len + data.length()
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -224,7 +224,7 @@ pub fn encode_eoe_set_ip_req(
     param_total += p.length()
   }
   let payload_len = eoe_header_len + 1 + param_total
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,
@@ -256,7 +256,7 @@ pub fn encode_eoe_set_ip_req(
 /// Encode an EoE Get IP parameter request.
 pub fn encode_eoe_get_ip_req(counter : Byte, port : UInt) -> Bytes {
   let payload_len = eoe_header_len
-  let buf = @buffer.new(size_hint=mailbox_header_len + payload_len)
+  let buf = Buffer(size_hint=mailbox_header_len + payload_len)
   let mbh : MailboxHeader = {
     length: payload_len.reinterpret_as_uint(),
     address: 0U,

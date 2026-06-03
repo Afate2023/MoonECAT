@@ -154,7 +154,7 @@ pub fn EoeRelay::to_json(self : EoeRelay) -> Json {
 ///|
 /// Format relay status as human-readable text.
 pub fn EoeRelay::format_text(self : EoeRelay) -> String {
-  let buf = @buffer.new(size_hint=128)
+  let buf = StringBuilder(size_hint=128)
   buf.write_string("EoE Embedded Relay\n")
   buf.write_string("  Active: ")
   buf.write_string(self.active.to_string())

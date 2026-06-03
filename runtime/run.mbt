@@ -1203,7 +1203,7 @@ fn pdo_mapping_entry_u32(entry : @mailbox.SiiPdoEntry) -> UInt {
 
 ///|
 fn pdo_complete_access_data(pdo : @mailbox.SiiPdo) -> Bytes {
-  let buf = @buffer.new(size_hint=1 + pdo.entries.length() * 4)
+  let buf = Buffer(size_hint=1 + pdo.entries.length() * 4)
   buf.write_byte(pdo.entry_count)
   for entry in pdo.entries {
     let mapping = pdo_mapping_entry_u32(entry)
@@ -1226,7 +1226,7 @@ fn sm_assignment_complete_access_data(
       selected.push(pdo.pdo_index)
     }
   }
-  let buf = @buffer.new(size_hint=1 + selected.length() * 2)
+  let buf = Buffer(size_hint=1 + selected.length() * 2)
   buf.write_byte(selected.length().to_byte())
   for index in selected {
     buf.write_byte((index & 0xFFU).to_byte())
@@ -3158,7 +3158,7 @@ fn run_fault_text(fault : RunFault) -> String {
 ///|
 /// Format a RunReport as a human-readable summary.
 pub fn RunReport::format(self : RunReport) -> String {
-  let buf = @buffer.new(size_hint=512)
+  let buf = StringBuilder(size_hint=512)
   let fault_text = match self.fault {
     Some(fault) => run_fault_text(fault)
     None => "none"

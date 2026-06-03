@@ -434,7 +434,7 @@ fn zc_run_report_text(
   timeout_count : Int64,
   wkc_errors : Int64,
 ) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("MoonECAT Zero-Copy Run Report\n")
   buf.write_string("=============================\n")
   buf.write_string("Mode: zero-copy (FramePool + FixedArray)\n")

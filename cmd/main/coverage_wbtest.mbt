@@ -36,7 +36,7 @@ test "cli show bridge renders backend and progress output as readable text" {
   assert_eq(CliBackend::to_string(NativeAuto), "NativeAuto")
   assert_eq(CliBackend::to_string(NativeWindowsNpcap), "NativeWindowsNpcap")
   assert_eq(RunProgressOutput::to_string(Ndjson), "Ndjson")
-  let buf = @buffer.new(size_hint=16)
+  let buf = StringBuilder(size_hint=16)
   buf.write_object(Mock)
   buf.write_string(",")
   buf.write_object(Text)

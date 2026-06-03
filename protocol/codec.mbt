@@ -55,7 +55,7 @@ fn encode_pdu(buf : @buffer.Buffer, pdu : Pdu, is_last : Bool) -> Unit {
 ///|
 /// Encode an EcFrame into raw Ethernet bytes.
 pub fn EcFrame::encode(self : EcFrame) -> Bytes {
-  let buf = @buffer.new(size_hint=@hal.max_frame_size)
+  let buf = Buffer(size_hint=@hal.max_frame_size)
   // Ethernet II header: dst MAC
   for i in 0..<6 {
     buf.write_byte(self.dst_mac[i])

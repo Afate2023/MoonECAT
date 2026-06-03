@@ -282,7 +282,7 @@ fn startup_trace_report_json(report : StartupTraceReport) -> Json {
 
 ///|
 fn startup_trace_report_text(report : StartupTraceReport) -> String {
-  let buf = @buffer.new(size_hint=2048)
+  let buf = StringBuilder(size_hint=2048)
   let initial_state_text = match report.initial_state {
     Some(value) => value.to_string()
     None => "unknown"

@@ -437,7 +437,7 @@ fn diagnosis_output_json(
 
 ///|
 fn diagnosis_report_text(report : @runtime.SlaveDiagnosis) -> String {
-  let buf = @buffer.new(size_hint=192)
+  let buf = StringBuilder(size_hint=192)
   let al_state_text = match report.al_state {
     Some(state) => state.to_string()
     None => "unknown"
@@ -584,7 +584,7 @@ fn od_report_json(report : OdBrowseReport) -> Json {
 
 ///|
 fn od_report_text(report : OdBrowseReport) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("EtherCAT Object Dictionary\n")
   buf.write_string("==========================\n")
   let station_text = match report.station_address {

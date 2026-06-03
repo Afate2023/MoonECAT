@@ -275,7 +275,7 @@ test "hex_digit 6" {
 ///|
 test "parse_sii_sm unknown type fallback" {
   // Build an 8-byte SM entry with type_byte=0xFF → Unused
-  let buf = @buffer.new()
+  let buf = Buffer()
   // physical_start (2 bytes LE)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x10')
@@ -301,7 +301,7 @@ test "parse_sii_sm unknown type fallback" {
 ///|
 test "parse_sii_pdo truncated entry" {
   // A PDO with entry_count=2 but only 1 entry fits (8 bytes header + 8 bytes entry1 = 16)
-  let buf = @buffer.new()
+  let buf = Buffer()
   // PDO header: 8 bytes
   // pdo_index (2 LE)
   buf.write_byte(b'\x00')
@@ -427,7 +427,7 @@ test "parse_sii_sync_units with valid data" {
 ///|
 test "parse_sii_pdo with TxPdo data" {
   // Minimal PDO: 8-byte header with 0 entries
-  let buf = @buffer.new()
+  let buf = Buffer()
   // pdo_index (2 LE)
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x16')

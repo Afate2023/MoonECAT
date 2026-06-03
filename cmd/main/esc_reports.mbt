@@ -331,7 +331,7 @@ fn expected_esc_register_report_json(
 
 ///|
 fn esc_register_report_text(report : EscRegisterReport) -> String {
-  let buf = @buffer.new(size_hint=768)
+  let buf = StringBuilder(size_hint=768)
   let al_error_flag_text = if report.al_error_flag { "set" } else { "clear" }
   let al_status_code_text = match report.al_status_code {
     Some(code) =>
@@ -420,7 +420,7 @@ fn esc_register_report_text(report : EscRegisterReport) -> String {
 fn expected_esc_register_report_text(
   report : ExpectedEscRegisterReport,
 ) -> String {
-  let buf = @buffer.new(size_hint=640)
+  let buf = StringBuilder(size_hint=640)
   buf.write_string("Expected EtherCAT ESC Process Mapping\n")
   buf.write_string("====================================\n")
   buf.write_string("Station: " + report.station.to_string() + "\n\n")

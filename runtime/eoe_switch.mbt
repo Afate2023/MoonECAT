@@ -86,7 +86,7 @@ fn EoeReassemblyBuffer::is_complete(self : EoeReassemblyBuffer) -> Bool {
 ///|
 /// Assemble the complete Ethernet frame from collected fragments.
 fn EoeReassemblyBuffer::assemble(self : EoeReassemblyBuffer) -> Bytes {
-  let buf = @buffer.new(size_hint=self.total_bytes)
+  let buf = Buffer(size_hint=self.total_bytes)
   let count = self.expected_count.reinterpret_as_int()
   for i = 0; i < count; i = i + 1 {
     guard self.fragments[i] is Some(frag) else { continue }
@@ -462,7 +462,7 @@ pub fn EoeSwitch::to_json(self : EoeSwitch) -> Json {
 ///|
 /// Format EoE switch status as human-readable text.
 pub fn EoeSwitch::format_text(self : EoeSwitch) -> String {
-  let buf = @buffer.new(size_hint=256)
+  let buf = StringBuilder(size_hint=256)
   buf.write_string("EoE Virtual Switch\n")
   buf.write_string("  Stations: ")
   buf.write_string(self.stations.length().to_string())
@@ -509,7 +509,7 @@ fn uint_to_hex(v : UInt) -> String {
     return "0"
   }
   let digits = "0123456789abcdef".to_array()
-  let buf = @buffer.new(size_hint=8)
+  let buf = StringBuilder(size_hint=8)
   let mut val = v
   let chars : Array[Char] = []
   while val > 0U {

@@ -396,13 +396,13 @@ fn ipv4_noise_frame() -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for NoiseMockNic with open_(name) {
+pub impl @hal.Nic for NoiseMockNic with fn open_(name) {
   ignore(name)
   NoiseMockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for NoiseMockNic with send(self, data) {
+pub impl @hal.Nic for NoiseMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -411,7 +411,7 @@ pub impl @hal.Nic for NoiseMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for NoiseMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -424,7 +424,7 @@ pub impl @hal.Nic for NoiseMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for NoiseMockNic with close(self) {
+pub impl @hal.Nic for NoiseMockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -993,13 +993,13 @@ fn esm_status_code_bytes(status_code : UInt) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for EsmControlNic with open_(name) {
+pub impl @hal.Nic for EsmControlNic with fn open_(name) {
   ignore(name)
   EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
 }
 
 ///|
-pub impl @hal.Nic for EsmControlNic with send(self, data) {
+pub impl @hal.Nic for EsmControlNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1048,7 +1048,7 @@ pub impl @hal.Nic for EsmControlNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for EsmControlNic with recv(self, timeout~) {
+pub impl @hal.Nic for EsmControlNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1057,7 +1057,7 @@ pub impl @hal.Nic for EsmControlNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for EsmControlNic with close(self) {
+pub impl @hal.Nic for EsmControlNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1097,13 +1097,13 @@ fn esm_rollback_status_bytes(nic : EsmRollbackToInitNic) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for EsmRollbackToInitNic with open_(name) {
+pub impl @hal.Nic for EsmRollbackToInitNic with fn open_(name) {
   ignore(name)
   EsmRollbackToInitNic::new(@protocol.EsmState::PreOp, 0x001EU)
 }
 
 ///|
-pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
+pub impl @hal.Nic for EsmRollbackToInitNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1143,7 +1143,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for EsmRollbackToInitNic with recv(self, timeout~) {
+pub impl @hal.Nic for EsmRollbackToInitNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1152,7 +1152,7 @@ pub impl @hal.Nic for EsmRollbackToInitNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for EsmRollbackToInitNic with close(self) {
+pub impl @hal.Nic for EsmRollbackToInitNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1194,13 +1194,13 @@ fn esm_op_needs_pdo_status_bytes(nic : EsmOpNeedsPdoNic) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for EsmOpNeedsPdoNic with open_(name) {
+pub impl @hal.Nic for EsmOpNeedsPdoNic with fn open_(name) {
   ignore(name)
   EsmOpNeedsPdoNic::new(@protocol.EsmState::SafeOp)
 }
 
 ///|
-pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
+pub impl @hal.Nic for EsmOpNeedsPdoNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1246,7 +1246,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for EsmOpNeedsPdoNic with recv(self, timeout~) {
+pub impl @hal.Nic for EsmOpNeedsPdoNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1255,7 +1255,7 @@ pub impl @hal.Nic for EsmOpNeedsPdoNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for EsmOpNeedsPdoNic with close(self) {
+pub impl @hal.Nic for EsmOpNeedsPdoNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1292,13 +1292,13 @@ fn esm_op_failure_snapshot_status_bytes(nic : EsmOpFailureSnapshotNic) -> Bytes 
 }
 
 ///|
-pub impl @hal.Nic for EsmOpFailureSnapshotNic with open_(name) {
+pub impl @hal.Nic for EsmOpFailureSnapshotNic with fn open_(name) {
   ignore(name)
   EsmOpFailureSnapshotNic::new()
 }
 
 ///|
-pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
+pub impl @hal.Nic for EsmOpFailureSnapshotNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1351,7 +1351,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for EsmOpFailureSnapshotNic with recv(self, timeout~) {
+pub impl @hal.Nic for EsmOpFailureSnapshotNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1360,7 +1360,7 @@ pub impl @hal.Nic for EsmOpFailureSnapshotNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for EsmOpFailureSnapshotNic with close(self) {
+pub impl @hal.Nic for EsmOpFailureSnapshotNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1948,13 +1948,13 @@ fn build_ap_mailbox_sdo_upload_response(
 }
 
 ///|
-pub impl @hal.Nic for RepeatMailboxMockNic with open_(name) {
+pub impl @hal.Nic for RepeatMailboxMockNic with fn open_(name) {
   ignore(name)
   RepeatMailboxMockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
+pub impl @hal.Nic for RepeatMailboxMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -2017,7 +2017,7 @@ pub impl @hal.Nic for RepeatMailboxMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for RepeatMailboxMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -2026,18 +2026,18 @@ pub impl @hal.Nic for RepeatMailboxMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for RepeatMailboxMockNic with close(self) {
+pub impl @hal.Nic for RepeatMailboxMockNic with fn close(self) {
   self.is_open = false
 }
 
 ///|
-pub impl @hal.Nic for TimeoutMailboxMockNic with open_(name) {
+pub impl @hal.Nic for TimeoutMailboxMockNic with fn open_(name) {
   ignore(name)
   TimeoutMailboxMockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
+pub impl @hal.Nic for TimeoutMailboxMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -2062,7 +2062,7 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for TimeoutMailboxMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for TimeoutMailboxMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -2071,18 +2071,18 @@ pub impl @hal.Nic for TimeoutMailboxMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for TimeoutMailboxMockNic with close(self) {
+pub impl @hal.Nic for TimeoutMailboxMockNic with fn close(self) {
   self.is_open = false
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxMockNic with open_(name) {
+pub impl @hal.Nic for ApMailboxMockNic with fn open_(name) {
   ignore(name)
   ApMailboxMockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
+pub impl @hal.Nic for ApMailboxMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -2140,7 +2140,7 @@ pub impl @hal.Nic for ApMailboxMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for ApMailboxMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -2149,7 +2149,7 @@ pub impl @hal.Nic for ApMailboxMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxMockNic with close(self) {
+pub impl @hal.Nic for ApMailboxMockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -2360,13 +2360,13 @@ fn build_eeprom_response(
 }
 
 ///|
-pub impl @hal.Nic for EepromMockNic with open_(name) {
+pub impl @hal.Nic for EepromMockNic with fn open_(name) {
   ignore(name)
   EepromMockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for EepromMockNic with send(self, data) {
+pub impl @hal.Nic for EepromMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -2411,7 +2411,7 @@ pub impl @hal.Nic for EepromMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for EepromMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for EepromMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -2420,7 +2420,7 @@ pub impl @hal.Nic for EepromMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for EepromMockNic with close(self) {
+pub impl @hal.Nic for EepromMockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -3868,7 +3868,7 @@ test "PdoContext set_slave_outputs preserves other slave data" {
   // Two slave mappings: slave 0x1001 at offset 0 (2 bytes), slave 0x1002 at offset 2 (2 bytes)
   let image = @protocol.ProcessImage::new(4, 0)
   // Pre-fill outputs
-  let buf = @buffer.new(size_hint=4)
+  let buf = Buffer(size_hint=4)
   buf.write_byte(b'\xAA')
   buf.write_byte(b'\xBB')
   buf.write_byte(b'\xCC')

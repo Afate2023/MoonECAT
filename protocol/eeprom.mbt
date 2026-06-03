@@ -236,7 +236,7 @@ pub fn[N : @hal.Nic] eeprom_read(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   let target_length = word_count * 4
-  let buf = @buffer.new(size_hint=target_length)
+  let buf = Buffer(size_hint=target_length)
   let mut current_word = start_word
   let mut remaining = target_length
   eeprom_prepare_master(nic, station, timeout)
@@ -329,7 +329,7 @@ pub fn[N : @hal.Nic] eeprom_read_ap(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   let target_length = word_count * 4
-  let buf = @buffer.new(size_hint=target_length)
+  let buf = Buffer(size_hint=target_length)
   let mut current_word = start_word
   let mut remaining = target_length
   eeprom_prepare_master_ap(nic, position, timeout)

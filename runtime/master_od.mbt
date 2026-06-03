@@ -481,7 +481,7 @@ fn master_od_value_json(value : MasterOdValue) -> Json {
 pub fn MasterObjectDictionary::format_text(
   self : MasterObjectDictionary,
 ) -> String {
-  let buf = @buffer.new(size_hint=1024)
+  let buf = StringBuilder(size_hint=1024)
   buf.write_string("Master Object Dictionary\n")
   buf.write_string("========================\n")
   let current_indices = self.indices()

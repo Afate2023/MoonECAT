@@ -309,7 +309,7 @@ pub fn validate_recommendations(
 ///|
 /// 输出调优结果 JSON
 pub fn AutoTuneResult::to_json(self : AutoTuneResult) -> String {
-  let buf = @buffer.new()
+  let buf = StringBuilder()
   buf.write_string("{\n")
   buf.write_string("  \"success\": ")
   buf.write_string(self.success.to_string())
