@@ -12,7 +12,7 @@ pub(all) struct PluginRequest {
   request_id : String
   timeout_ns : Int64?
   payload : Json
-}
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct PluginResponse {
@@ -23,7 +23,7 @@ pub(all) struct PluginResponse {
   error_message : String?
   payload : Json
   diagnostics : Json
-}
+} derive(Eq, Debug)
 
 ///|
 pub fn PluginCommand::to_wire(self : PluginCommand) -> String {

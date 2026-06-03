@@ -1,7 +1,7 @@
 ///|
 test "format helpers decode_payload_u32_le rejects empty and oversized payloads" {
-  assert_eq(decode_payload_u32_le(Bytes::new(0)), None)
-  assert_eq(
+  @debug.assert_eq(decode_payload_u32_le(Bytes::new(0)), None)
+  @debug.assert_eq(
     decode_payload_u32_le(
       Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00', b'\x00']),
     ),
@@ -11,8 +11,11 @@ test "format helpers decode_payload_u32_le rejects empty and oversized payloads"
 
 ///|
 test "format helpers decode_payload_u32_le assembles partial little-endian values" {
-  assert_eq(decode_payload_u32_le(Bytes::from_array([b'\x12'])), Some(0x12U))
-  assert_eq(
+  @debug.assert_eq(
+    decode_payload_u32_le(Bytes::from_array([b'\x12'])),
+    Some(0x12U),
+  )
+  @debug.assert_eq(
     decode_payload_u32_le(
       Bytes::from_array([b'\x78', b'\x56', b'\x34', b'\x12']),
     ),
@@ -22,25 +25,28 @@ test "format helpers decode_payload_u32_le assembles partial little-endian value
 
 ///|
 test "format helpers decode u16/u32 little endian return zero on short payloads" {
-  assert_eq(decode_u16_le(Bytes::from_array([b'\x01']), 0), 0U)
-  assert_eq(decode_u32_le(Bytes::from_array([b'\x01', b'\x02']), 0), 0U)
+  @debug.assert_eq(decode_u16_le(Bytes::from_array([b'\x01']), 0), 0U)
+  @debug.assert_eq(decode_u32_le(Bytes::from_array([b'\x01', b'\x02']), 0), 0U)
 }
 
 ///|
 test "format helpers physical_port_name covers reserved port" {
-  assert_eq(physical_port_name(b'\x02'), "reserved")
+  @debug.assert_eq(physical_port_name(b'\x02'), "reserved")
 }
 
 ///|
 test "cli show bridge renders backend and progress output as readable text" {
-  assert_eq(CliBackend::to_string(NativeAuto), "NativeAuto")
-  assert_eq(CliBackend::to_string(NativeWindowsNpcap), "NativeWindowsNpcap")
-  assert_eq(RunProgressOutput::to_string(Ndjson), "Ndjson")
+  @debug.assert_eq(CliBackend::to_string(NativeAuto), "NativeAuto")
+  @debug.assert_eq(
+    CliBackend::to_string(NativeWindowsNpcap),
+    "NativeWindowsNpcap",
+  )
+  @debug.assert_eq(RunProgressOutput::to_string(Ndjson), "Ndjson")
   let buf = StringBuilder(size_hint=16)
   buf.write_object(Mock)
   buf.write_string(",")
   buf.write_object(Text)
-  assert_eq(buf.to_string(), "Mock,Text")
+  @debug.assert_eq(buf.to_string(), "Mock,Text")
 }
 
 ///|
@@ -63,14 +69,14 @@ test "cli resolve_native_cli_config honors explicit interface flag" {
     NativeLinuxRaw,
     timeout,
   )
-  assert_eq(config.backend, @native.LinuxRawSocket)
-  assert_eq(config.interface_name, "eth7")
+  @debug.assert_eq(config.backend, @native.LinuxRawSocket)
+  @debug.assert_eq(config.interface_name, "eth7")
 }
 
 ///|
 test "cli mailbox_sm_window_matches checks size and ignores reserved status byte" {
   let short = Bytes::from_array([b'\x00', b'\x00', b'\x00'])
-  assert_eq(mailbox_sm_window_matches(short, short), false)
+  @debug.assert_eq(mailbox_sm_window_matches(short, short), false)
   let expected = Bytes::from_array([
     b'\x00', b'\x10', b'\x80', b'\x00', b'\x26', b'\x00', b'\x01', b'\x00',
   ])
@@ -81,7 +87,7 @@ test "cli mailbox_sm_window_matches checks size and ignores reserved status byte
   let actual_diff = Bytes::from_array([
     b'\x00', b'\x10', b'\x80', b'\x00', b'\x27', b'\x00', b'\x01', b'\x00',
   ])
-  assert_eq(mailbox_sm_window_matches(expected, actual_diff), false)
+  @debug.assert_eq(mailbox_sm_window_matches(expected, actual_diff), false)
 }
 
 ///|
@@ -200,7 +206,7 @@ test "cli read_cli_text_file surfaces filesystem errors with context" {
 
 ///|
 test "cli require_uint_flag returns parsed value or default" {
-  assert_eq(
+  @debug.assert_eq(
     require_uint_flag(
       ["moonecat", "scan", "--position", "12"],
       "--position",
@@ -208,12 +214,15 @@ test "cli require_uint_flag returns parsed value or default" {
     ),
     12U,
   )
-  assert_eq(require_uint_flag(["moonecat", "scan"], "--position", 7U), 7U)
+  @debug.assert_eq(
+    require_uint_flag(["moonecat", "scan"], "--position", 7U),
+    7U,
+  )
 }
 
 ///|
 test "cli require_station_flag enforces explicit station value" {
-  assert_eq(
+  @debug.assert_eq(
     require_station_flag(["moonecat", "esc-regs", "--station", "4097"]),
     4097U,
   )
@@ -228,19 +237,22 @@ test "cli require_station_flag enforces explicit station value" {
 
 ///|
 test "cli pdo_policy_name maps the prefer-live toggle" {
-  assert_eq(pdo_policy_name(true), "prefer-live")
-  assert_eq(pdo_policy_name(false), "force-configured")
+  @debug.assert_eq(pdo_policy_name(true), "prefer-live")
+  @debug.assert_eq(pdo_policy_name(false), "force-configured")
 }
 
 ///|
 test "cli pdo_effective_source picks force/live/plan branches" {
-  assert_eq(pdo_effective_source("esi-json", false, true), "forced-esi")
-  assert_eq(
+  @debug.assert_eq(pdo_effective_source("esi-json", false, true), "forced-esi")
+  @debug.assert_eq(
     pdo_effective_source("online-sii", false, false),
     "forced-online-sii",
   )
-  assert_eq(pdo_effective_source("esi-json", true, true), "live")
-  assert_eq(pdo_effective_source("online-sii", true, false), "online-sii")
+  @debug.assert_eq(pdo_effective_source("esi-json", true, true), "live")
+  @debug.assert_eq(
+    pdo_effective_source("online-sii", true, false),
+    "online-sii",
+  )
 }
 
 ///|
@@ -261,11 +273,11 @@ test "cli pdo mapping entry raw round trips through normalization" {
   let live_word : UInt = 0x60400210U
   let normalized = normalize_pdo_mapping_entry_raw(live_word)
   // After normalization the top byte must carry the bit length (0x10).
-  assert_eq((normalized >> 24) & 0xFFU, 0x10U)
+  @debug.assert_eq((normalized >> 24) & 0xFFU, 0x10U)
   // ...the next byte the subindex (0x02)...
-  assert_eq((normalized >> 16) & 0xFFU, 0x02U)
+  @debug.assert_eq((normalized >> 16) & 0xFFU, 0x02U)
   // ...and the low half preserves the object index (0x6040).
-  assert_eq(normalized & 0xFFFFU, 0x6040U)
+  @debug.assert_eq(normalized & 0xFFFFU, 0x6040U)
 }
 
 ///|
@@ -293,18 +305,18 @@ fn sample_sii_pdo() -> @mailbox.SiiPdo {
 ///|
 test "cli pdo_direction_from_sii projects assigned indices and entry triplets" {
   let direction = pdo_direction_from_sii([sample_sii_pdo()], 0x1C12U)
-  assert_eq(direction.assignment_index, 0x1C12U)
-  assert_eq(direction.assigned_pdos, [0x1600U])
-  assert_eq(direction.objects.length(), 1)
-  assert_eq(direction.objects[0].index, 0x1600U)
-  assert_eq(direction.objects[0].entries, [0x10006040U])
+  @debug.assert_eq(direction.assignment_index, 0x1C12U)
+  @debug.assert_eq(direction.assigned_pdos, [0x1600U])
+  @debug.assert_eq(direction.objects.length(), 1)
+  @debug.assert_eq(direction.objects[0].index, 0x1600U)
+  @debug.assert_eq(direction.objects[0].entries, [0x10006040U])
 }
 
 ///|
 test "cli pdo_uint_arrays_equal handles length and element differences" {
   assert_true(pdo_uint_arrays_equal([1U, 2U], [1U, 2U]))
-  assert_eq(pdo_uint_arrays_equal([1U, 2U], [1U]), false)
-  assert_eq(pdo_uint_arrays_equal([1U, 2U], [1U, 3U]), false)
+  @debug.assert_eq(pdo_uint_arrays_equal([1U, 2U], [1U]), false)
+  @debug.assert_eq(pdo_uint_arrays_equal([1U, 2U], [1U, 3U]), false)
 }
 
 ///|
@@ -408,9 +420,9 @@ test "cli scan_report_json serializes per-slave fields" {
 
 ///|
 test "cli option helpers fall through to null for None inputs" {
-  assert_eq(option_bool_json(None).stringify(), "null")
-  assert_eq(option_esm_state_json(None).stringify(), "null")
-  assert_eq(option_identity_json(None).stringify(), "null")
+  @debug.assert_eq(option_bool_json(None).stringify(), "null")
+  @debug.assert_eq(option_esm_state_json(None).stringify(), "null")
+  @debug.assert_eq(option_identity_json(None).stringify(), "null")
 }
 
 ///|

@@ -1,10 +1,10 @@
 ///|
 test "cli parse_backend supports explicit native backends" {
-  assert_eq(
+  @debug.assert_eq(
     parse_backend(["moonecat", "list-if", "--backend", "native-windows-npcap"]),
     NativeWindowsNpcap,
   )
-  assert_eq(
+  @debug.assert_eq(
     parse_backend(["moonecat", "list-if", "--backend", "native-linux-raw"]),
     NativeLinuxRaw,
   )
@@ -12,8 +12,8 @@ test "cli parse_backend supports explicit native backends" {
 
 ///|
 test "cli parse_backend defaults to mock and native" {
-  assert_eq(parse_backend(["moonecat", "scan"]), Mock)
-  assert_eq(
+  @debug.assert_eq(parse_backend(["moonecat", "scan"]), Mock)
+  @debug.assert_eq(
     parse_backend(["moonecat", "scan", "--backend", "native"]),
     NativeAuto,
   )
@@ -21,7 +21,7 @@ test "cli parse_backend defaults to mock and native" {
 
 ///|
 test "cli require_interface_name validates flag presence" {
-  assert_eq(
+  @debug.assert_eq(
     require_interface_name(["moonecat", "scan", "--if", "eth0"]),
     "eth0",
   )
@@ -33,15 +33,15 @@ test "cli require_interface_name validates flag presence" {
 
 ///|
 test "cli native config helper maps explicit backends" {
-  assert_eq(
+  @debug.assert_eq(
     native_config_for_backend(@native.WindowsNpcap, "npcap0").backend,
     @native.WindowsNpcap,
   )
-  assert_eq(
+  @debug.assert_eq(
     native_config_for_backend(@native.LinuxRawSocket, "eth0").backend,
     @native.LinuxRawSocket,
   )
-  assert_eq(
+  @debug.assert_eq(
     native_config_for_backend(@native.Auto, "eth0").backend,
     @native.Auto,
   )
@@ -92,8 +92,8 @@ test "cli native auto select picks first probing candidate with slaves" {
       _ => Err(@hal.EcError::Internal("unexpected candidate"))
     }
   })
-  assert_eq(config.backend, @native.WindowsNpcap)
-  assert_eq(config.interface_name, "eth1")
+  @debug.assert_eq(config.backend, @native.WindowsNpcap)
+  @debug.assert_eq(config.interface_name, "eth1")
 }
 
 ///|
@@ -152,7 +152,7 @@ test "cli native auto select error keeps filtered and probe notes" {
 
 ///|
 test "cli skipped interface reason is stable" {
-  assert_eq(
+  @debug.assert_eq(
     skipped_native_interface_reason({
       name: "loop",
       description: "",
@@ -164,7 +164,7 @@ test "cli skipped interface reason is stable" {
     }),
     "loopback",
   )
-  assert_eq(
+  @debug.assert_eq(
     skipped_native_interface_reason({
       name: "wifi",
       description: "",
@@ -180,8 +180,8 @@ test "cli skipped interface reason is stable" {
 
 ///|
 test "cli numeric flag parsers accept valid integers" {
-  assert_eq(parse_uint_flag("--position", "12"), 12U)
-  assert_eq(parse_int_flag("--words", "128"), 128)
+  @debug.assert_eq(parse_uint_flag("--position", "12"), 12U)
+  @debug.assert_eq(parse_int_flag("--words", "128"), 128)
 }
 
 ///|
@@ -194,8 +194,11 @@ test "cli numeric flag parsers reject invalid integers" {
 
 ///|
 test "cli timeout flag defaults to 1ms and parses milliseconds" {
-  assert_eq(resolve_timeout(["moonecat", "scan"]), @hal.Duration(1_000_000L))
-  assert_eq(
+  @debug.assert_eq(
+    resolve_timeout(["moonecat", "scan"]),
+    @hal.Duration(1_000_000L),
+  )
+  @debug.assert_eq(
     resolve_timeout(["moonecat", "diagnosis", "--timeout-ms", "50"]),
     @hal.Duration(50_000_000L),
   )
@@ -211,8 +214,8 @@ test "cli timeout flag rejects non-positive values" {
 
 ///|
 test "cli run cycles default and parse explicit values" {
-  assert_eq(resolve_run_cycles(["moonecat", "run"], false), 10)
-  assert_eq(
+  @debug.assert_eq(resolve_run_cycles(["moonecat", "run"], false), 10)
+  @debug.assert_eq(
     resolve_run_cycles(["moonecat", "run", "--cycles", "250"], false),
     250,
   )
@@ -247,11 +250,11 @@ test "cli run loop settings parse timing and timeout controls" {
     true,
     false,
   )
-  assert_eq(settings.until_fault, true)
-  assert_eq(settings.cycles, 0)
-  assert_eq(settings.cycle_period_ns, Some(500_000L))
-  assert_eq(settings.output_period_ns, Some(20_000_000L))
-  assert_eq(settings.max_consecutive_timeouts, 7)
+  @debug.assert_eq(settings.until_fault, true)
+  @debug.assert_eq(settings.cycles, 0)
+  @debug.assert_eq(settings.cycle_period_ns, Some(500_000L))
+  @debug.assert_eq(settings.output_period_ns, Some(20_000_000L))
+  @debug.assert_eq(settings.max_consecutive_timeouts, 7)
 }
 
 ///|
@@ -276,8 +279,8 @@ test "cli run loop settings allow ndjson progress with json" {
     true,
     true,
   )
-  assert_eq(settings.until_fault, true)
-  assert_eq(settings.output_period_ns, Some(1_000_000_000L))
+  @debug.assert_eq(settings.until_fault, true)
+  @debug.assert_eq(settings.output_period_ns, Some(1_000_000_000L))
 }
 
 ///|
@@ -293,9 +296,15 @@ test "cli run loop settings reject ndjson progress without output period" {
 
 ///|
 test "cli resolve run progress output selects silent text and ndjson" {
-  assert_eq(resolve_run_progress_output(false, false, None), Silent)
-  assert_eq(resolve_run_progress_output(false, false, Some(1_000_000L)), Text)
-  assert_eq(resolve_run_progress_output(true, true, Some(1_000_000L)), Ndjson)
+  @debug.assert_eq(resolve_run_progress_output(false, false, None), Silent)
+  @debug.assert_eq(
+    resolve_run_progress_output(false, false, Some(1_000_000L)),
+    Text,
+  )
+  @debug.assert_eq(
+    resolve_run_progress_output(true, true, Some(1_000_000L)),
+    Ndjson,
+  )
 }
 
 ///|
@@ -318,9 +327,9 @@ test "cli resolve validate expected configuration defaults to scan projection" {
   let expected = resolve_validate_expected_configuration(scan_report, [
     "moonecat", "validate",
   ])
-  assert_eq(expected.source, @runtime.OfflineConfig)
-  assert_eq(expected.total_slaves, 1)
-  assert_eq(expected.slaves[0].configured_address, Some(0x1001U))
+  @debug.assert_eq(expected.source, @runtime.OfflineConfig)
+  @debug.assert_eq(expected.total_slaves, 1)
+  @debug.assert_eq(expected.slaves[0].configured_address, Some(0x1001U))
 }
 
 ///|
@@ -338,11 +347,11 @@ test "cli resolve validate expected configuration rejects XML ENI input" {
 
 ///|
 test "cli esm state parser accepts canonical names" {
-  assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
-  assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)
-  assert_eq(parse_esm_state_flag("--state", "safeop"), @protocol.SafeOp)
-  assert_eq(parse_esm_state_flag("--state", "op"), @protocol.Op)
-  assert_eq(parse_esm_state_flag("--state", "boot"), @protocol.Boot)
+  @debug.assert_eq(parse_esm_state_flag("--state", "init"), @protocol.Init)
+  @debug.assert_eq(parse_esm_state_flag("--state", "pre-op"), @protocol.PreOp)
+  @debug.assert_eq(parse_esm_state_flag("--state", "safeop"), @protocol.SafeOp)
+  @debug.assert_eq(parse_esm_state_flag("--state", "op"), @protocol.Op)
+  @debug.assert_eq(parse_esm_state_flag("--state", "boot"), @protocol.Boot)
 }
 
 ///|
@@ -355,7 +364,7 @@ test "cli esm state parser rejects unknown names" {
 
 ///|
 test "cli optional esm state flag defaults and parses values" {
-  assert_eq(
+  @debug.assert_eq(
     optional_esm_state_flag(
       ["moonecat", "run"],
       "--startup-state",
@@ -363,7 +372,7 @@ test "cli optional esm state flag defaults and parses values" {
     ),
     @protocol.Op,
   )
-  assert_eq(
+  @debug.assert_eq(
     optional_esm_state_flag(
       ["moonecat", "run", "--startup-state", "safeop"],
       "--startup-state",
@@ -375,18 +384,18 @@ test "cli optional esm state flag defaults and parses values" {
 
 ///|
 test "cli optional shutdown state flag supports default and none" {
-  assert_eq(
+  @debug.assert_eq(
     optional_shutdown_state_flag(["moonecat", "run"], "--shutdown-state"),
     Some(@protocol.Init),
   )
-  assert_eq(
+  @debug.assert_eq(
     optional_shutdown_state_flag(
       ["moonecat", "run", "--shutdown-state", "none"],
       "--shutdown-state",
     ),
     None,
   )
-  assert_eq(
+  @debug.assert_eq(
     optional_shutdown_state_flag(
       ["moonecat", "run", "--shutdown-state", "preop"],
       "--shutdown-state",
@@ -420,8 +429,8 @@ test "cli preferred sii dc clock favors assign activate" {
     },
   ])
   guard selected is Some(clock) else { fail("expected a preferred DC clock") }
-  assert_eq(clock.assign_activate, 0x0300U)
-  assert_eq(clock.cycle_time_0, 1_000_000U)
+  @debug.assert_eq(clock.assign_activate, 0x0300U)
+  @debug.assert_eq(clock.cycle_time_0, 1_000_000U)
 }
 
 ///|
@@ -436,7 +445,7 @@ test "cli dc cycle period helper maps nonzero cycle" {
     name_idx: b'\x00',
     description_idx: b'\x00',
   })
-  assert_eq(result, Some(1_000_000L))
+  @debug.assert_eq(result, Some(1_000_000L))
   let none_result = @runtime.dc_cycle_period_ns({
     cycle_time_0: 0U,
     shift_time_0: 0U,
@@ -447,24 +456,24 @@ test "cli dc cycle period helper maps nonzero cycle" {
     name_idx: b'\x00',
     description_idx: b'\x00',
   })
-  assert_eq(none_result, None)
+  @debug.assert_eq(none_result, None)
 }
 
 ///|
 test "cli master config helper enables dc when cycle is present" {
   let dc_config = @runtime.master_config_with_optional_dc(Some(250_000L))
   assert_true(dc_config.dc_enabled)
-  assert_eq(dc_config.cycle_period_ns, 250_000L)
+  @debug.assert_eq(dc_config.cycle_period_ns, 250_000L)
 
   let default_config = @runtime.master_config_with_optional_dc(None)
   assert_true(!default_config.dc_enabled)
-  assert_eq(default_config.cycle_period_ns, 1_000_000L)
+  @debug.assert_eq(default_config.cycle_period_ns, 1_000_000L)
 }
 
 ///|
 test "cli optional byte flag parses values and defaults" {
-  assert_eq(optional_byte_flag(["moonecat", "od"], "--subindex"), None)
-  assert_eq(
+  @debug.assert_eq(optional_byte_flag(["moonecat", "od"], "--subindex"), None)
+  @debug.assert_eq(
     optional_byte_flag(["moonecat", "od", "--subindex", "7"], "--subindex"),
     Some(b'\x07'),
   )
@@ -482,29 +491,29 @@ test "cli optional byte flag rejects out-of-range values" {
 ///|
 test "cli resolve od query supports list object and entry modes" {
   let list_query = resolve_od_query(["moonecat", "od"])
-  assert_eq(list_query.list_type, 0U)
-  assert_eq(list_query.index, None)
-  assert_eq(list_query.subindex, None)
-  assert_eq(list_query.read_value, false)
+  @debug.assert_eq(list_query.list_type, 0U)
+  @debug.assert_eq(list_query.index, None)
+  @debug.assert_eq(list_query.subindex, None)
+  @debug.assert_eq(list_query.read_value, false)
 
   let object_query = resolve_od_query(["moonecat", "od", "--index", "7187"])
-  assert_eq(object_query.index, Some(7187U))
-  assert_eq(object_query.subindex, None)
-  assert_eq(object_query.read_value, false)
+  @debug.assert_eq(object_query.index, Some(7187U))
+  @debug.assert_eq(object_query.subindex, None)
+  @debug.assert_eq(object_query.read_value, false)
 
   let entry_query = resolve_od_query([
     "moonecat", "od", "--index", "6656", "--subindex", "1",
   ])
-  assert_eq(entry_query.index, Some(6656U))
-  assert_eq(entry_query.subindex, Some(b'\x01'))
-  assert_eq(entry_query.read_value, false)
+  @debug.assert_eq(entry_query.index, Some(6656U))
+  @debug.assert_eq(entry_query.subindex, Some(b'\x01'))
+  @debug.assert_eq(entry_query.read_value, false)
 
   let value_query = resolve_od_query([
     "moonecat", "od", "--index", "7186", "--read-value",
   ])
-  assert_eq(value_query.index, Some(7186U))
-  assert_eq(value_query.subindex, Some(b'\x00'))
-  assert_eq(value_query.read_value, true)
+  @debug.assert_eq(value_query.index, Some(7186U))
+  @debug.assert_eq(value_query.subindex, Some(b'\x00'))
+  @debug.assert_eq(value_query.read_value, true)
 }
 
 ///|
@@ -533,7 +542,7 @@ test "cli resolve diagnosis station uses explicit or single slave" {
     ],
   }
   let slave = resolve_cli_slave(scan_report, None)
-  assert_eq(slave.station_address, 0x1001U)
+  @debug.assert_eq(slave.station_address, 0x1001U)
 }
 
 ///|
@@ -564,8 +573,8 @@ test "cli resolve diagnosis slave finds explicit station" {
     ],
   }
   let slave = resolve_cli_slave(scan_report, Some(0x1002U))
-  assert_eq(slave.position, 1)
-  assert_eq(slave.station_address, 0x1002U)
+  @debug.assert_eq(slave.position, 1)
+  @debug.assert_eq(slave.station_address, 0x1002U)
 }
 
 ///|
@@ -897,15 +906,15 @@ test "cli od report text includes entry description fields" {
 
 ///|
 test "cli od error category distinguishes major failure classes" {
-  assert_eq(
+  @debug.assert_eq(
     od_error_category(@hal.EcError::MailboxTimeout),
     "transport-failure",
   )
-  assert_eq(
+  @debug.assert_eq(
     od_error_category(@hal.EcError::SdoAbort(0x06020000U)),
     "protocol-failure",
   )
-  assert_eq(
+  @debug.assert_eq(
     od_error_category(@hal.EcError::NotSupported("od requires native")),
     "unsupported",
   )
@@ -1170,12 +1179,12 @@ test "cli od stage preserves mailbox protocol classification" {
 ///|
 test "cli transition path falls back through init when needed" {
   let path = @protocol.build_transition_route(@protocol.Op, @protocol.Boot)
-  assert_eq(path.length(), 5)
-  assert_eq(path[0], @protocol.Op)
-  assert_eq(path[1], @protocol.SafeOp)
-  assert_eq(path[2], @protocol.PreOp)
-  assert_eq(path[3], @protocol.Init)
-  assert_eq(path[4], @protocol.Boot)
+  @debug.assert_eq(path.length(), 5)
+  @debug.assert_eq(path[0], @protocol.Op)
+  @debug.assert_eq(path[1], @protocol.SafeOp)
+  @debug.assert_eq(path[2], @protocol.PreOp)
+  @debug.assert_eq(path[3], @protocol.Init)
+  @debug.assert_eq(path[4], @protocol.Boot)
 }
 
 ///|
@@ -1191,14 +1200,14 @@ test "cli state transition report uses broadcast when station is omitted" {
     timeout,
   )
   nic.close()
-  assert_eq(report.mode, "broadcast")
-  assert_eq(report.station, None)
-  assert_eq(report.current, None)
-  assert_eq(report.final_state, None)
-  assert_eq(report.status_code, None)
-  assert_eq(report.raw_status_code, None)
-  assert_eq(report.control_wkc, None)
-  assert_eq(report.wkc, Some(0U))
+  @debug.assert_eq(report.mode, "broadcast")
+  @debug.assert_eq(report.station, None)
+  @debug.assert_eq(report.current, None)
+  @debug.assert_eq(report.final_state, None)
+  @debug.assert_eq(report.status_code, None)
+  @debug.assert_eq(report.raw_status_code, None)
+  @debug.assert_eq(report.control_wkc, None)
+  @debug.assert_eq(report.wkc, Some(0U))
 }
 
 ///|
@@ -1273,13 +1282,13 @@ fn strict_status_code_bytes(status_code : UInt) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for StrictTransitionNic with open_(name) {
+pub impl @hal.Nic for StrictTransitionNic with fn open_(name) {
   ignore(name)
   StrictTransitionNic::new(@protocol.EsmState::Init, false, 0U)
 }
 
 ///|
-pub impl @hal.Nic for StrictTransitionNic with send(self, data) {
+pub impl @hal.Nic for StrictTransitionNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1328,7 +1337,7 @@ pub impl @hal.Nic for StrictTransitionNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for StrictTransitionNic with recv(self, timeout~) {
+pub impl @hal.Nic for StrictTransitionNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1337,7 +1346,7 @@ pub impl @hal.Nic for StrictTransitionNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for StrictTransitionNic with close(self) {
+pub impl @hal.Nic for StrictTransitionNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1456,7 +1465,7 @@ test "cli station mailbox route applies boot and init path commands on virtual b
   guard observed is Some(result) else {
     fail("expected Boot -> PreOp route observation")
   }
-  assert_eq(result.state, @protocol.PreOp)
+  @debug.assert_eq(result.state, @protocol.PreOp)
   let rmsm = @mailbox.Rmsm::new(max_retries=0)
   let first_payload = @protocol.sdo_upload_retry(
     nic,
@@ -1476,8 +1485,8 @@ test "cli station mailbox route applies boot and init path commands on virtual b
     b'\x00',
     timeout,
   )
-  assert_eq(first_payload[0], b'\x01')
-  assert_eq(second_payload[0], b'\x02')
+  @debug.assert_eq(first_payload[0], b'\x01')
+  @debug.assert_eq(second_payload[0], b'\x02')
 }
 
 ///|
@@ -1504,7 +1513,7 @@ test "cli station mailbox route applies op to safeop command on virtual bus" {
   guard observed is Some(result) else {
     fail("expected Op -> SafeOp route observation")
   }
-  assert_eq(result.state, @protocol.SafeOp)
+  @debug.assert_eq(result.state, @protocol.SafeOp)
   let rmsm = @mailbox.Rmsm::new(max_retries=0)
   let payload = @protocol.sdo_upload_retry(
     nic,
@@ -1515,7 +1524,7 @@ test "cli station mailbox route applies op to safeop command on virtual bus" {
     b'\x00',
     timeout,
   )
-  assert_eq(payload[0], b'\x03')
+  @debug.assert_eq(payload[0], b'\x03')
 }
 
 ///|
@@ -1530,19 +1539,22 @@ test "cli state path recovers configuration error to init" {
     true,
     timeout,
   )
-  assert_eq(report.mode, "station-path")
-  assert_eq(report.current, Some(@protocol.EsmState::SafeOp))
-  assert_eq(report.final_state, Some(@protocol.EsmState::Init))
-  assert_eq(report.al_error_flag, Some(false))
-  assert_eq(report.status_code, None)
-  assert_eq(report.raw_status_code, None)
-  assert_eq(report.control_wkc, None)
-  assert_eq(nic.control_writes.length(), 2)
-  assert_eq(
+  @debug.assert_eq(report.mode, "station-path")
+  @debug.assert_eq(report.current, Some(@protocol.EsmState::SafeOp))
+  @debug.assert_eq(report.final_state, Some(@protocol.EsmState::Init))
+  @debug.assert_eq(report.al_error_flag, Some(false))
+  @debug.assert_eq(report.status_code, None)
+  @debug.assert_eq(report.raw_status_code, None)
+  @debug.assert_eq(report.control_wkc, None)
+  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
-  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  @debug.assert_eq(
+    nic.control_writes[1] & b'\x0F',
+    @protocol.EsmState::Init.to_byte(),
+  )
 }
 
 ///|
@@ -1712,7 +1724,7 @@ test "cli startup diff messages capture mailbox and register mismatches" {
     offline_mailbox,
     online_mailbox,
   )
-  assert_eq(differences.length(), 5)
+  @debug.assert_eq(differences.length(), 5)
   assert_true(differences[0].contains("mailbox[0]"))
   assert_true(differences[1].contains("offline SM2 raw"))
   assert_true(differences[2].contains("online SM2 raw"))
@@ -1781,7 +1793,7 @@ test "cli startup diff messages degrade when online expected is unavailable" {
     [],
     [],
   )
-  assert_eq(differences.length(), 1)
+  @debug.assert_eq(differences.length(), 1)
   assert_true(differences[0].contains("online expected unavailable"))
 }
 
@@ -1801,7 +1813,7 @@ test "cli startup diff messages degrade when actual esc is unavailable" {
     [],
     [],
   )
-  assert_eq(differences.length(), 2)
+  @debug.assert_eq(differences.length(), 2)
   assert_true(differences[0].contains("actual esc unavailable"))
   assert_true(differences[1].contains("online expected unavailable"))
 }
@@ -1895,8 +1907,8 @@ test "cli mailbox readback report text highlights mismatch details" {
 
 ///|
 test "cli mailbox readback source keeps esi-json when requested" {
-  assert_eq(mailbox_readback_source([]), "online-sii")
-  assert_eq(
+  @debug.assert_eq(mailbox_readback_source([]), "online-sii")
+  @debug.assert_eq(
     mailbox_readback_source(["--esi-json", "References/sample.esi.json"]),
     "esi-json",
   )
@@ -1904,8 +1916,8 @@ test "cli mailbox readback source keeps esi-json when requested" {
 
 ///|
 test "cli startup trace source stays online for live path" {
-  assert_eq(startup_trace_source([]), "online-sii")
-  assert_eq(
+  @debug.assert_eq(startup_trace_source([]), "online-sii")
+  @debug.assert_eq(
     startup_trace_source(["--esi-json", "References/sample.esi.json"]),
     "esi-json",
   )
@@ -2139,7 +2151,7 @@ test "parse scan report json roundtrip" {
   let json = @json.parse(scan_report_json(report).stringify(indent=2)[:]) catch {
     _ => panic()
   }
-  assert_eq(parse_scan_report_json(json), report)
+  @debug.assert_eq(parse_scan_report_json(json), report)
 }
 
 ///|
@@ -2327,12 +2339,12 @@ test "cli run progress text formats key counters" {
 
 ///|
 test "cli native backend mapping stays stable" {
-  assert_eq(cli_backend_to_native_backend(NativeAuto), @native.Auto)
-  assert_eq(
+  @debug.assert_eq(cli_backend_to_native_backend(NativeAuto), @native.Auto)
+  @debug.assert_eq(
     cli_backend_to_native_backend(NativeWindowsNpcap),
     @native.WindowsNpcap,
   )
-  assert_eq(
+  @debug.assert_eq(
     cli_backend_to_native_backend(NativeLinuxRaw),
     @native.LinuxRawSocket,
   )
@@ -2556,12 +2568,12 @@ test "cli decode esc syncmanager window decodes physical fields" {
       b'\x00', b'\x11', b'\x06', b'\x00', b'\x64', b'\x00', b'\x01', b'\x00',
     ]),
   )
-  assert_eq(report.index, 2)
-  assert_eq(report.register_offset, 0x0810U)
-  assert_eq(report.physical_start, 0x1100U)
-  assert_eq(report.length, 6U)
-  assert_eq(report.control, b'\x64')
-  assert_eq(report.activate, b'\x01')
+  @debug.assert_eq(report.index, 2)
+  @debug.assert_eq(report.register_offset, 0x0810U)
+  @debug.assert_eq(report.physical_start, 0x1100U)
+  @debug.assert_eq(report.length, 6U)
+  @debug.assert_eq(report.control, b'\x64')
+  @debug.assert_eq(report.activate, b'\x01')
 }
 
 ///|
@@ -2574,12 +2586,12 @@ test "cli decode esc fmmu window decodes addressing fields" {
       b'\x11', b'\x00', b'\x02', b'\x01', b'\x00', b'\x00', b'\x00',
     ]),
   )
-  assert_eq(report.index, 0)
-  assert_eq(report.logical_start, 0x1000U)
-  assert_eq(report.length, 6U)
-  assert_eq(report.physical_start, 0x1100U)
-  assert_eq(report.type_register, b'\x02')
-  assert_eq(report.activate, b'\x01')
+  @debug.assert_eq(report.index, 0)
+  @debug.assert_eq(report.logical_start, 0x1000U)
+  @debug.assert_eq(report.length, 6U)
+  @debug.assert_eq(report.physical_start, 0x1100U)
+  @debug.assert_eq(report.type_register, b'\x02')
+  @debug.assert_eq(report.activate, b'\x01')
 }
 
 ///|
@@ -2624,12 +2636,12 @@ test "cli expected syncmanager report encodes computed config" {
     input_bytes: 10,
   }
   let report = expected_sync_manager_register_report(mapping, 2)
-  assert_eq(report.index, 2)
-  assert_eq(report.register_offset, 0x0810U)
-  assert_eq(report.physical_start, 0x1100U)
-  assert_eq(report.length, 6U)
-  assert_eq(report.control, b'\x64')
-  assert_eq(report.activate, b'\x01')
+  @debug.assert_eq(report.index, 2)
+  @debug.assert_eq(report.register_offset, 0x0810U)
+  @debug.assert_eq(report.physical_start, 0x1100U)
+  @debug.assert_eq(report.length, 6U)
+  @debug.assert_eq(report.control, b'\x64')
+  @debug.assert_eq(report.activate, b'\x01')
 }
 
 ///|
@@ -2662,13 +2674,13 @@ test "cli expected fmmu report encodes computed config" {
     input_bytes: 10,
   }
   let report = expected_fmmu_register_report(mapping, 0)
-  assert_eq(report.index, 0)
-  assert_eq(report.register_offset, 0x0600U)
-  assert_eq(report.logical_start, 0x1000U)
-  assert_eq(report.length, 6U)
-  assert_eq(report.physical_start, 0x1100U)
-  assert_eq(report.type_register, b'\x02')
-  assert_eq(report.activate, b'\x01')
+  @debug.assert_eq(report.index, 0)
+  @debug.assert_eq(report.register_offset, 0x0600U)
+  @debug.assert_eq(report.logical_start, 0x1000U)
+  @debug.assert_eq(report.length, 6U)
+  @debug.assert_eq(report.physical_start, 0x1100U)
+  @debug.assert_eq(report.type_register, b'\x02')
+  @debug.assert_eq(report.activate, b'\x01')
 }
 
 ///|
@@ -2677,9 +2689,9 @@ test "virtual slave template from ESI JSON produces valid identity and EEPROM" {
   let templates = @mock.virtual_slave_templates_from_esi_json(json_text)
   assert_true(templates.length() > 0)
   let template = templates[0]
-  assert_eq(template.identity.vendor_id, 1894U)
-  assert_eq(template.identity.product_code, 2320U)
-  assert_eq(template.identity.revision, 1U)
+  @debug.assert_eq(template.identity.vendor_id, 1894U)
+  @debug.assert_eq(template.identity.product_code, 2320U)
+  @debug.assert_eq(template.identity.revision, 1U)
   assert_true(template.sii_eeprom.length() > 0)
   assert_true(
     template.startup_preparation.mapping.output_bytes > 0 ||
@@ -2691,14 +2703,14 @@ test "virtual slave template from ESI JSON produces valid identity and EEPROM" {
 test "VirtualBus from ESI JSON scans and discovers slaves" {
   let json_text = sample_esi_json_text()
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
-  assert_eq(templates.length(), 1)
+  @debug.assert_eq(templates.length(), 1)
   let nic = @mock.VirtualNic::new(bus)
   let timeout = @hal.Duration(50_000_000L)
   let scan_report = @runtime.scan(nic, timeout)
-  assert_eq(scan_report.slave_count, 1)
+  @debug.assert_eq(scan_report.slave_count, 1)
   let slave = scan_report.slaves[0]
-  assert_eq(slave.vendor_id, 1894U)
-  assert_eq(slave.product_code, 2320U)
+  @debug.assert_eq(slave.vendor_id, 1894U)
+  @debug.assert_eq(slave.product_code, 2320U)
   nic.close()
 }
 

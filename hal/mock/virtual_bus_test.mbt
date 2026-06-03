@@ -83,7 +83,7 @@ test "VirtualBus: BRD count_slaves returns correct WKC" {
   let bus = make_three_slave_bus()
   let nic = @mock.VirtualNic::new(bus)
   let count = @protocol.count_slaves(nic, @hal.Duration(50_000_000L))
-  assert_eq(count, 3)
+  @debug.assert_eq(count, 3)
 }
 
 ///|
@@ -98,8 +98,8 @@ test "VirtualBus: APRD reads register from correct slave" {
     1,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(pdu.wkc, 1U)
-  assert_eq(pdu.data[0], b'\x02') // ESC type
+  @debug.assert_eq(pdu.wkc, 1U)
+  @debug.assert_eq(pdu.data[0], b'\x02') // ESC type
 }
 
 ///|
@@ -116,8 +116,8 @@ test "VirtualBus: APWR assigns station address" {
     1,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(pdu.wkc, 1U)
-  assert_eq(pdu.data[0], b'\x02')
+  @debug.assert_eq(pdu.wkc, 1U)
+  @debug.assert_eq(pdu.data[0], b'\x02')
 }
 
 ///|
@@ -140,7 +140,7 @@ test "VirtualBus: assign and read station addresses for 3 slaves" {
       i.reinterpret_as_uint(),
       @hal.Duration(50_000_000L),
     )
-    assert_eq(addr, (0x1001 + i).reinterpret_as_uint())
+    @debug.assert_eq(addr, (0x1001 + i).reinterpret_as_uint())
   }
 }
 
@@ -159,7 +159,7 @@ test "VirtualBus: ESM state transition Init -> PreOp" {
     al_ctrl,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(pdu.wkc, 1U)
+  @debug.assert_eq(pdu.wkc, 1U)
   // Read AL Status
   let status_pdu = @protocol.read_register_fp(
     nic,
@@ -168,7 +168,7 @@ test "VirtualBus: ESM state transition Init -> PreOp" {
     2,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(status_pdu.data[0], b'\x02') // PreOp
+  @debug.assert_eq(status_pdu.data[0], b'\x02') // PreOp
 }
 
 ///|
@@ -198,7 +198,7 @@ test "VirtualBus: CoE SDO roundtrip uses mailbox SM windows" {
   let payload = @protocol.sdo_upload_retry(
     nic, 0x1001U, mailbox_config, rmsm, 0x2000U, b'\x00', timeout,
   )
-  assert_eq(payload[0], b'\x2A')
+  @debug.assert_eq(payload[0], b'\x2A')
 }
 
 ///|
@@ -233,10 +233,10 @@ test "VirtualBus: SII EEPROM read via register access" {
     @hal.Duration(50_000_000L),
   )
   // Vendor ID should be 0x00000002
-  assert_eq(sii_pdu.data[0], b'\x02')
-  assert_eq(sii_pdu.data[1], b'\x00')
-  assert_eq(sii_pdu.data[2], b'\x00')
-  assert_eq(sii_pdu.data[3], b'\x00')
+  @debug.assert_eq(sii_pdu.data[0], b'\x02')
+  @debug.assert_eq(sii_pdu.data[1], b'\x00')
+  @debug.assert_eq(sii_pdu.data[2], b'\x00')
+  @debug.assert_eq(sii_pdu.data[3], b'\x00')
 }
 
 ///|
@@ -245,9 +245,9 @@ test "VirtualNic: close prevents further send/recv" {
   let nic = @mock.VirtualNic::new(bus)
   nic.close()
   let send_result = try? nic.send(Bytes::new(0))
-  inspect(send_result, content="Err(LinkDown)")
+  @debug.debug_inspect(send_result, content="Err(LinkDown)")
   let recv_result = try? nic.recv(timeout=@hal.Duration(1000L))
-  inspect(recv_result, content="Err(LinkDown)")
+  @debug.debug_inspect(recv_result, content="Err(LinkDown)")
 }
 
 ///|
@@ -262,7 +262,7 @@ test "VirtualBus: FPWR to non-existent station gives WKC=0" {
     1,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(pdu.wkc, 0U)
+  @debug.assert_eq(pdu.wkc, 0U)
 }
 
 ///|
@@ -280,12 +280,12 @@ test "VirtualBus: BWR writes to all slaves" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, @hal.Duration(50_000_000L))
   // WKC should be 3 (one per slave)
-  assert_eq(response.pdus[0].wkc, 3U)
+  @debug.assert_eq(response.pdus[0].wkc, 3U)
   // Verify all slaves transitioned to PreOp
   for i in 0..<3 {
     let slave = bus.get_slave(i)
     guard slave is Some(s) else { fail("slave not found") }
-    assert_eq(s.al_state, b'\x02') // PreOp
+    @debug.assert_eq(s.al_state, b'\x02') // PreOp
   }
 }
 
@@ -311,8 +311,8 @@ test "VirtualSlave: invalid ESM transition sets error bit" {
     2,
     @hal.Duration(50_000_000L),
   )
-  assert_eq(status.data[0] & b'\x0F', b'\x01') // Still Init
-  assert_eq(status.data[0] & b'\x10', b'\x10') // Error bit set
+  @debug.assert_eq(status.data[0] & b'\x0F', b'\x01') // Still Init
+  @debug.assert_eq(status.data[0] & b'\x10', b'\x10') // Error bit set
   // AL Status Code should be non-zero
   let code = @protocol.read_register_ap(
     nic,
@@ -331,7 +331,7 @@ test "VirtualBus: full discovery flow with 3 slaves" {
   let timeout = @hal.Duration(50_000_000L)
   // Step 1: Count slaves
   let count = @protocol.count_slaves(nic, timeout)
-  assert_eq(count, 3)
+  @debug.assert_eq(count, 3)
   // Step 2: Assign station addresses
   for i in 0..<count {
     @protocol.assign_station_address(
@@ -350,7 +350,7 @@ test "VirtualBus: full discovery flow with 3 slaves" {
       1,
       timeout,
     )
-    assert_eq(pdu.wkc, 1U)
+    @debug.assert_eq(pdu.wkc, 1U)
   }
   // Step 4: Transition all to PreOp
   for i in 0..<count {
@@ -372,7 +372,7 @@ test "VirtualBus: full discovery flow with 3 slaves" {
       2,
       timeout,
     )
-    assert_eq(status.data[0] & b'\x0F', b'\x02') // PreOp
+    @debug.assert_eq(status.data[0] & b'\x0F', b'\x02') // PreOp
   }
 }
 
@@ -469,20 +469,20 @@ test "VirtualSlave: FMMU register write and parse" {
   // Parse FMMU entries via get_fmmu
   guard bus.get_slave(0) is Some(slave) else { fail("slave not found") }
   let fmmu0 = slave.get_fmmu(0)
-  assert_eq(fmmu0.logical_start, 0x0000U)
-  assert_eq(fmmu0.length, 4U)
-  assert_eq(fmmu0.physical_start, 0x1000U)
-  assert_eq(fmmu0.direction, 0x02)
+  @debug.assert_eq(fmmu0.logical_start, 0x0000U)
+  @debug.assert_eq(fmmu0.length, 4U)
+  @debug.assert_eq(fmmu0.physical_start, 0x1000U)
+  @debug.assert_eq(fmmu0.direction, 0x02)
   assert_true(fmmu0.activate)
   let fmmu1 = slave.get_fmmu(1)
-  assert_eq(fmmu1.logical_start, 0x0004U)
-  assert_eq(fmmu1.length, 2U)
-  assert_eq(fmmu1.physical_start, 0x1004U)
-  assert_eq(fmmu1.direction, 0x01)
+  @debug.assert_eq(fmmu1.logical_start, 0x0004U)
+  @debug.assert_eq(fmmu1.length, 2U)
+  @debug.assert_eq(fmmu1.physical_start, 0x1004U)
+  @debug.assert_eq(fmmu1.direction, 0x01)
   assert_true(fmmu1.activate)
   // active_fmmus should return exactly 2
   let active = slave.active_fmmus()
-  assert_eq(active.length(), 2)
+  @debug.assert_eq(active.length(), 2)
 }
 
 ///|
@@ -505,13 +505,13 @@ test "VirtualBus: LWR writes process data via FMMU" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 1 (write only)
-  assert_eq(response.pdus[0].wkc, 1U)
+  @debug.assert_eq(response.pdus[0].wkc, 1U)
   // Verify slave's process_data at physical 0x1000
   guard bus.get_slave(0) is Some(slave) else { fail("slave not found") }
-  assert_eq(slave.process_data[0x1000], b'\xAA')
-  assert_eq(slave.process_data[0x1001], b'\xBB')
-  assert_eq(slave.process_data[0x1002], b'\xCC')
-  assert_eq(slave.process_data[0x1003], b'\xDD')
+  @debug.assert_eq(slave.process_data[0x1000], b'\xAA')
+  @debug.assert_eq(slave.process_data[0x1001], b'\xBB')
+  @debug.assert_eq(slave.process_data[0x1002], b'\xCC')
+  @debug.assert_eq(slave.process_data[0x1003], b'\xDD')
 }
 
 ///|
@@ -538,10 +538,10 @@ test "VirtualBus: LRD reads process data via FMMU" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 1 (read only)
-  assert_eq(response.pdus[0].wkc, 1U)
+  @debug.assert_eq(response.pdus[0].wkc, 1U)
   // Verify response contains the slave's input data
-  assert_eq(response.pdus[0].data[0], b'\x55')
-  assert_eq(response.pdus[0].data[1], b'\xAA')
+  @debug.assert_eq(response.pdus[0].data[0], b'\x55')
+  @debug.assert_eq(response.pdus[0].data[1], b'\xAA')
 }
 
 ///|
@@ -573,15 +573,15 @@ test "VirtualBus: LRW with both read and write FMMUs" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 3 (both read AND write)
-  assert_eq(response.pdus[0].wkc, 3U)
+  @debug.assert_eq(response.pdus[0].wkc, 3U)
   // Verify outputs written to process_data
-  assert_eq(slave.process_data[0x1000], b'\x11')
-  assert_eq(slave.process_data[0x1001], b'\x22')
-  assert_eq(slave.process_data[0x1002], b'\x33')
-  assert_eq(slave.process_data[0x1003], b'\x44')
+  @debug.assert_eq(slave.process_data[0x1000], b'\x11')
+  @debug.assert_eq(slave.process_data[0x1001], b'\x22')
+  @debug.assert_eq(slave.process_data[0x1002], b'\x33')
+  @debug.assert_eq(slave.process_data[0x1003], b'\x44')
   // Verify inputs read back in response
-  assert_eq(response.pdus[0].data[4], b'\xDE')
-  assert_eq(response.pdus[0].data[5], b'\xAD')
+  @debug.assert_eq(response.pdus[0].data[4], b'\xDE')
+  @debug.assert_eq(response.pdus[0].data[5], b'\xAD')
 }
 
 ///|
@@ -616,18 +616,18 @@ test "VirtualBus: LRW multi-slave PDO exchange" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 1 (write from slave1) + 1 (read from slave2) = 2
-  assert_eq(response.pdus[0].wkc, 2U)
+  @debug.assert_eq(response.pdus[0].wkc, 2U)
   // Verify EL2004 got the output data
   guard bus.get_slave(1) is Some(output_slave) else {
     fail("output slave not found")
   }
-  assert_eq(output_slave.process_data[0x1000], b'\x01')
-  assert_eq(output_slave.process_data[0x1001], b'\x02')
-  assert_eq(output_slave.process_data[0x1002], b'\x03')
-  assert_eq(output_slave.process_data[0x1003], b'\x04')
+  @debug.assert_eq(output_slave.process_data[0x1000], b'\x01')
+  @debug.assert_eq(output_slave.process_data[0x1001], b'\x02')
+  @debug.assert_eq(output_slave.process_data[0x1002], b'\x03')
+  @debug.assert_eq(output_slave.process_data[0x1003], b'\x04')
   // Verify response has EL1008 input data at bytes 4-5
-  assert_eq(response.pdus[0].data[4], b'\xFF')
-  assert_eq(response.pdus[0].data[5], b'\x0F')
+  @debug.assert_eq(response.pdus[0].data[4], b'\xFF')
+  @debug.assert_eq(response.pdus[0].data[5], b'\x0F')
 }
 
 ///|
@@ -646,7 +646,7 @@ test "VirtualBus: LRW with no matching FMMU gives WKC=0" {
   )
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
-  assert_eq(response.pdus[0].wkc, 0U)
+  @debug.assert_eq(response.pdus[0].wkc, 0U)
 }
 
 ///|
@@ -668,10 +668,10 @@ test "VirtualBus: inactive FMMU is ignored" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 0 because FMMU is not activated
-  assert_eq(response.pdus[0].wkc, 0U)
+  @debug.assert_eq(response.pdus[0].wkc, 0U)
   // Process data should remain untouched
   guard bus.get_slave(0) is Some(slave) else { fail("slave not found") }
-  assert_eq(slave.process_data[0x1000], b'\x00')
+  @debug.assert_eq(slave.process_data[0x1000], b'\x00')
 }
 
 ///|
@@ -681,7 +681,7 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   let timeout = @hal.Duration(50_000_000L)
   // Step 1: Count slaves
   let count = @protocol.count_slaves(nic, timeout)
-  assert_eq(count, 3)
+  @debug.assert_eq(count, 3)
   // Step 2: Assign station addresses
   setup_bus_with_addresses(bus, nic, count)
   // Step 3: Transition all Init → PreOp
@@ -691,7 +691,7 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   // Verify all in PreOp
   for i in 0..<count {
     guard bus.get_slave(i) is Some(s) else { fail("slave not found") }
-    assert_eq(s.al_state & b'\x0F', b'\x02')
+    @debug.assert_eq(s.al_state & b'\x0F', b'\x02')
   }
   // Step 4: Configure FMMU on slaves (in PreOp)
   // Slave 1 (EL2004): outputs — FMMU0: logical 0x0000, 4 bytes, physical 0x1000, write
@@ -708,7 +708,7 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   // Verify all in Op
   for i in 0..<count {
     guard bus.get_slave(i) is Some(s) else { fail("slave not found") }
-    assert_eq(s.al_state & b'\x0F', b'\x08')
+    @debug.assert_eq(s.al_state & b'\x0F', b'\x08')
   }
   // Step 6: Simulate input data on EL1008
   guard bus.get_slave(2) is Some(input_slave) else {
@@ -728,14 +728,14 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   )
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
-  assert_eq(response.pdus[0].wkc, 2U) // 1 write + 1 read
+  @debug.assert_eq(response.pdus[0].wkc, 2U) // 1 write + 1 read
   // Verify outputs arrived at EL2004
   guard bus.get_slave(1) is Some(output_slave) else {
     fail("output slave not found")
   }
-  assert_eq(output_slave.process_data[0x1000], b'\x0F')
+  @debug.assert_eq(output_slave.process_data[0x1000], b'\x0F')
   // Verify inputs read from EL1008
-  assert_eq(response.pdus[0].data[4], b'\xA5')
+  @debug.assert_eq(response.pdus[0].data[4], b'\xA5')
   // Step 8: Second PDO cycle with changed data
   input_slave.process_data[0x1000] = b'\x5A' // input changed
   let builder2 = @protocol.FrameBuilder::new()
@@ -750,9 +750,9 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   )
   let frame2 = builder2.build()
   let response2 = @protocol.transact(nic, frame2, timeout)
-  assert_eq(response2.pdus[0].wkc, 2U)
-  assert_eq(output_slave.process_data[0x1000], b'\xF0') // updated output
-  assert_eq(response2.pdus[0].data[4], b'\x5A') // updated input
+  @debug.assert_eq(response2.pdus[0].wkc, 2U)
+  @debug.assert_eq(output_slave.process_data[0x1000], b'\xF0') // updated output
+  @debug.assert_eq(response2.pdus[0].data[4], b'\x5A') // updated input
 }
 
 // ===== APRW / FPRW / BRW / NOP coverage =====
@@ -773,9 +773,9 @@ test "VirtualBus: APRW reads and writes register" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC should be 3 for APRW (read + write)
-  assert_eq(response.pdus[0].wkc, 3U)
+  @debug.assert_eq(response.pdus[0].wkc, 3U)
   // Response data should be the OLD value (read happened before write)
-  assert_eq(response.pdus[0].data[0], b'\x42')
+  @debug.assert_eq(response.pdus[0].data[0], b'\x42')
 }
 
 ///|
@@ -798,9 +798,9 @@ test "VirtualBus: FPRW reads and writes by station address" {
   )
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
-  assert_eq(response.pdus[0].wkc, 3U)
+  @debug.assert_eq(response.pdus[0].wkc, 3U)
   // Response should contain old value
-  assert_eq(response.pdus[0].data[0], b'\x55')
+  @debug.assert_eq(response.pdus[0].data[0], b'\x55')
 }
 
 ///|
@@ -841,12 +841,12 @@ test "VirtualBus: BRW broadcasts read-write to all slaves" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // WKC = 3 per slave × 3 slaves = 9
-  assert_eq(response.pdus[0].wkc, 9U)
+  @debug.assert_eq(response.pdus[0].wkc, 9U)
   // Response data is OR of all slaves' values. Each slave read is OR'd into out_data,
   // but the write also overwrites each slave's register with the frame data (0xFF).
   // So the OR of reads produces 0x01|0x02|0x04 = 0x07 PLUS OR with the write data 0xFF = 0xFF.
   // Actually the data flows through all slaves and gets OR'd together.
-  assert_eq(response.pdus[0].data[0], b'\xFF')
+  @debug.assert_eq(response.pdus[0].data[0], b'\xFF')
 }
 
 ///|
@@ -860,15 +860,15 @@ test "VirtualBus: NOP command passes through" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // NOP should not increment WKC
-  assert_eq(response.pdus[0].wkc, 0U)
+  @debug.assert_eq(response.pdus[0].wkc, 0U)
 }
 
 ///|
 test "VirtualBus: slave_count returns correct count" {
   let bus = make_three_slave_bus()
-  assert_eq(bus.slave_count(), 3)
+  @debug.assert_eq(bus.slave_count(), 3)
   let empty_bus = @mock.VirtualBus::new([])
-  assert_eq(empty_bus.slave_count(), 0)
+  @debug.assert_eq(empty_bus.slave_count(), 0)
 }
 
 // ===== VirtualSlave state transitions =====
@@ -887,7 +887,7 @@ test "VirtualSlave: Init to Boot transition" {
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(status.data[0], b'\x03')
+  @debug.assert_eq(status.data[0], b'\x03')
 }
 
 ///|
@@ -915,7 +915,7 @@ test "VirtualSlave: PreOp to Init transition" {
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(status.data[0], b'\x01')
+  @debug.assert_eq(status.data[0], b'\x01')
 }
 
 ///|
@@ -950,7 +950,7 @@ test "VirtualSlave: SafeOp to PreOp transition" {
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(status.data[0], b'\x02')
+  @debug.assert_eq(status.data[0], b'\x02')
 }
 
 ///|
@@ -975,8 +975,8 @@ test "VirtualSlave: SII read beyond eeprom fills 0xFF" {
   let sii_pdu = @protocol.read_register_ap(
     nic, 0U, @protocol.reg_sii_data, 4, timeout,
   )
-  assert_eq(sii_pdu.data[0], b'\xFF')
-  assert_eq(sii_pdu.data[1], b'\xFF')
+  @debug.assert_eq(sii_pdu.data[0], b'\xFF')
+  @debug.assert_eq(sii_pdu.data[1], b'\xFF')
 }
 
 ///|
@@ -987,8 +987,8 @@ test "VirtualSlave: read_process_data" {
   slave.process_data[0x100] = b'\x42'
   slave.process_data[0x101] = b'\x43'
   let data = slave.read_process_data(0x100, 2)
-  assert_eq(data[0], b'\x42')
-  assert_eq(data[1], b'\x43')
+  @debug.assert_eq(data[0], b'\x42')
+  @debug.assert_eq(data[1], b'\x43')
 }
 
 ///|
@@ -997,8 +997,8 @@ test "VirtualSlave: write_process_data" {
   let slave = @mock.VirtualSlave::new(0, id, make_sii(id))
   let arr : FixedArray[Byte] = [b'\xAA', b'\xBB', b'\xCC']
   slave.write_process_data(0x200, arr, 1, 2) // write arr[1..3] to phys 0x200
-  assert_eq(slave.process_data[0x200], b'\xBB')
-  assert_eq(slave.process_data[0x201], b'\xCC')
+  @debug.assert_eq(slave.process_data[0x200], b'\xBB')
+  @debug.assert_eq(slave.process_data[0x201], b'\xCC')
 }
 
 // ===== ARMW/FRMW pass-through coverage =====
@@ -1018,7 +1018,7 @@ test "VirtualBus: ARMW command passes through without modifying" {
   let frame = builder.build()
   let response = @protocol.transact(nic, frame, timeout)
   // ARMW is NOP for VirtualBus — wkc should be 0
-  assert_eq(response.pdus[0].wkc, 0U)
+  @debug.assert_eq(response.pdus[0].wkc, 0U)
 }
 
 // ===== Boot → Init state transition =====
@@ -1048,7 +1048,7 @@ test "VirtualSlave: Boot to Init transition" {
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(status.data[0], b'\x01')
+  @debug.assert_eq(status.data[0], b'\x01')
 }
 
 // ===== VirtualSlave process_logical with FMMU =====
@@ -1091,9 +1091,9 @@ test "VirtualSlave: process_logical read through FMMU" {
     0x1000U, 2, pdu_data, out_data, true, false,
   )
   assert_true(did_read)
-  assert_eq(did_write, false)
-  assert_eq(out_data[0], b'\xDE')
-  assert_eq(out_data[1], b'\xAD')
+  @debug.assert_eq(did_write, false)
+  @debug.assert_eq(out_data[0], b'\xDE')
+  @debug.assert_eq(out_data[1], b'\xAD')
 }
 
 ///|
@@ -1123,11 +1123,11 @@ test "VirtualSlave: process_logical write through FMMU" {
   let (did_read, did_write) = slave.process_logical(
     0x2000U, 3, pdu_data, out_data, false, true,
   )
-  assert_eq(did_read, false)
+  @debug.assert_eq(did_read, false)
   assert_true(did_write)
-  assert_eq(slave.process_data[0x0200], b'\xCA')
-  assert_eq(slave.process_data[0x0201], b'\xFE')
-  assert_eq(slave.process_data[0x0202], b'\xBE')
+  @debug.assert_eq(slave.process_data[0x0200], b'\xCA')
+  @debug.assert_eq(slave.process_data[0x0201], b'\xFE')
+  @debug.assert_eq(slave.process_data[0x0202], b'\xBE')
 }
 
 // ===== FaultNic coverage =====
@@ -1199,7 +1199,7 @@ test "FaultNic: recv with FrameCorrupt injects corruption" {
   let _ = nic.send(frame.encode())
   // Recv should get corrupted data (byte 0 → 0xFF)
   let data = nic.recv(timeout=@hal.Duration(50_000_000L))
-  assert_eq(data[0], b'\xFF')
+  @debug.assert_eq(data[0], b'\xFF')
 }
 
 ///|
@@ -1277,5 +1277,5 @@ test "VirtualSlave: SafeOp to Init transition" {
   let status = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(status.data[0], b'\x01')
+  @debug.assert_eq(status.data[0], b'\x01')
 }

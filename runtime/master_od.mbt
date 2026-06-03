@@ -517,7 +517,7 @@ fn od_base_name(name : String) -> String {
   let mut i = 0
   while i + 2 < name.length() {
     if name[i] == ' ' && name[i + 1] == '/' && name[i + 2] == ' ' {
-      return name[:i].to_string()
+      return name[:i].to_owned()
     }
     i = i + 1
   }

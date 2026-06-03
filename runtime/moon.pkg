@@ -13,4 +13,5 @@ import {
   "afate/MoonECAT/hal/mock",
   "afate/MoonECAT/runtime/analysis" @analysis,
   "afate/MoonECAT/runtime/simulation" @simulation,
+  "moonbitlang/core/debug",
 } for "test"

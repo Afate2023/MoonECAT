@@ -727,7 +727,7 @@ pub fn parse_sii_strings(data : BytesView) -> Array[String] {
       break
     }
     let slice = data[offset:offset + str_len]
-    let bytes = slice.to_bytes()
+    let bytes = slice.to_owned()
     let decoded : Result[String, Error] = try? @utf8.decode(bytes)
     match decoded {
       Ok(text) => result.push(text)

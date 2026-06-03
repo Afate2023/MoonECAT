@@ -35,15 +35,15 @@ test "eni-json converter projects XML into runtime ENI JSON interchange" {
     #|</EtherCATConfig>
   let json_text = convert_eni_xml_to_json_string(xml)
   let model = @runtime.configuration_from_eni_json(json_text)
-  assert_eq(model.source, @runtime.EniImport)
-  assert_eq(model.total_slaves, 1)
-  assert_eq(model.slaves[0].configured_address, Some(1001U))
-  assert_eq(model.slaves[0].identification, Some(0x20U))
-  assert_eq(
+  @debug.assert_eq(model.source, @runtime.EniImport)
+  @debug.assert_eq(model.total_slaves, 1)
+  @debug.assert_eq(model.slaves[0].configured_address, Some(1001U))
+  @debug.assert_eq(model.slaves[0].identification, Some(0x20U))
+  @debug.assert_eq(
     model.slaves[0].identity,
     Some({ vendor_id: 2U, product_code: 0x04D2U, revision: 1U, serial: 4660U }),
   )
-  assert_eq(
+  @debug.assert_eq(
     model.slaves[0].process_data_summary,
     Some({
       sync_manager_count: 2,
@@ -117,21 +117,21 @@ test "eni-json converter projects ESI XML into shared ESI JSON interchange" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices.length(), 1)
-  assert_eq(document.devices[0].vendor_id, 1U)
-  assert_eq(document.devices[0].product_code, 2U)
-  assert_eq(document.devices[0].profile_no, Some(402U))
-  assert_eq(document.devices[0].init_commands.length(), 1)
-  assert_eq(document.devices[0].mailbox.coe_present, true)
+  @debug.assert_eq(document.devices.length(), 1)
+  @debug.assert_eq(document.devices[0].vendor_id, 1U)
+  @debug.assert_eq(document.devices[0].product_code, 2U)
+  @debug.assert_eq(document.devices[0].profile_no, Some(402U))
+  @debug.assert_eq(document.devices[0].init_commands.length(), 1)
+  @debug.assert_eq(document.devices[0].mailbox.coe_present, true)
   let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
-  assert_eq(report.header.vendor_id, 1U)
-  assert_eq(report.header.product_code, 2U)
+  @debug.assert_eq(report.header.vendor_id, 1U)
+  @debug.assert_eq(report.header.product_code, 2U)
   guard report.general is Some(general) else {
     fail("expected offline sii general section")
   }
-  assert_eq(general.ds402_channels, b'\x01')
-  assert_eq(report.startup_mailbox_commands.length(), 1)
-  assert_eq(report.categories.length() > 0, true)
+  @debug.assert_eq(general.ds402_channels, b'\x01')
+  @debug.assert_eq(report.startup_mailbox_commands.length(), 1)
+  @debug.assert_eq(report.categories.length() > 0, true)
 }
 
 ///|
@@ -161,19 +161,19 @@ test "eni-json converter preserves device-level pdos for offline sii projection"
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices[0].rx_pdos.length(), 1)
-  assert_eq(document.devices[0].tx_pdos.length(), 1)
+  @debug.assert_eq(document.devices[0].rx_pdos.length(), 1)
+  @debug.assert_eq(document.devices[0].tx_pdos.length(), 1)
   let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
-  assert_eq(report.rx_pdo.length(), 1)
-  assert_eq(report.tx_pdo.length(), 1)
-  assert_eq(report.rx_pdo[0].pdo_index, 0x1600U)
-  assert_eq(report.tx_pdo[0].pdo_index, 0x1A00U)
+  @debug.assert_eq(report.rx_pdo.length(), 1)
+  @debug.assert_eq(report.tx_pdo.length(), 1)
+  @debug.assert_eq(report.rx_pdo[0].pdo_index, 0x1600U)
+  @debug.assert_eq(report.tx_pdo[0].pdo_index, 0x1A00U)
   guard report.general is Some(general) else {
     fail("expected offline sii general section")
   }
-  assert_eq(general.ds402_channels, b'\x01')
-  assert_eq(report.startup_mailbox_commands.length(), 1)
-  assert_eq(report.startup_mailbox_commands[0].index, 0x6060U)
+  @debug.assert_eq(general.ds402_channels, b'\x01')
+  @debug.assert_eq(report.startup_mailbox_commands.length(), 1)
+  @debug.assert_eq(report.startup_mailbox_commands[0].index, 0x6060U)
 }
 
 ///|
@@ -203,17 +203,20 @@ test "eni-json converter preserves PS initcmd and 16-bit pdo bitlen" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices[0].init_commands.length(), 1)
-  assert_eq(document.devices[0].init_commands[0].transition, "PS")
-  assert_eq(document.devices[0].rx_pdos[0].entries[0].bit_length, b'\x10')
+  @debug.assert_eq(document.devices[0].init_commands.length(), 1)
+  @debug.assert_eq(document.devices[0].init_commands[0].transition, "PS")
+  @debug.assert_eq(
+    document.devices[0].rx_pdos[0].entries[0].bit_length,
+    b'\x10',
+  )
   let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
-  assert_eq(report.rx_pdo[0].entries[0].bit_length, b'\x10')
-  assert_eq(report.startup_mailbox_commands.length() > 0, true)
-  assert_eq(
+  @debug.assert_eq(report.rx_pdo[0].entries[0].bit_length, b'\x10')
+  @debug.assert_eq(report.startup_mailbox_commands.length() > 0, true)
+  @debug.assert_eq(
     report.startup_mailbox_commands[0].transition,
     @runtime.PreOpToSafeOp,
   )
-  assert_eq(report.startup_mailbox_commands[0].index, 0x1C12U)
+  @debug.assert_eq(report.startup_mailbox_commands[0].index, 0x1C12U)
 }
 
 ///|
@@ -247,20 +250,29 @@ test "eni-json converter expands multi-transition initcmd across switch path" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices[0].init_commands.length(), 4)
-  assert_eq(document.devices[0].init_commands[0].transition, "IP")
-  assert_eq(document.devices[0].init_commands[1].transition, "PS")
-  assert_eq(document.devices[0].init_commands[2].transition, "SO")
-  assert_eq(document.devices[0].init_commands[3].transition, "OI")
+  @debug.assert_eq(document.devices[0].init_commands.length(), 4)
+  @debug.assert_eq(document.devices[0].init_commands[0].transition, "IP")
+  @debug.assert_eq(document.devices[0].init_commands[1].transition, "PS")
+  @debug.assert_eq(document.devices[0].init_commands[2].transition, "SO")
+  @debug.assert_eq(document.devices[0].init_commands[3].transition, "OI")
   let report = @runtime.offline_sii_report_from_esi_json(json_text, 0)
-  assert_eq(report.startup_mailbox_commands.length(), 4)
-  assert_eq(report.startup_mailbox_commands[0].transition, @runtime.InitToPreOp)
-  assert_eq(
+  @debug.assert_eq(report.startup_mailbox_commands.length(), 4)
+  @debug.assert_eq(
+    report.startup_mailbox_commands[0].transition,
+    @runtime.InitToPreOp,
+  )
+  @debug.assert_eq(
     report.startup_mailbox_commands[1].transition,
     @runtime.PreOpToSafeOp,
   )
-  assert_eq(report.startup_mailbox_commands[2].transition, @runtime.SafeOpToOp)
-  assert_eq(report.startup_mailbox_commands[3].transition, @runtime.OpToInit)
+  @debug.assert_eq(
+    report.startup_mailbox_commands[2].transition,
+    @runtime.SafeOpToOp,
+  )
+  @debug.assert_eq(
+    report.startup_mailbox_commands[3].transition,
+    @runtime.OpToInit,
+  )
 }
 
 // ===== Batch 13: coverage gaps in esi_projection =====
@@ -292,13 +304,13 @@ test "esi-xml projects non-self-closing mailbox protocol tags" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices.length(), 1)
+  @debug.assert_eq(document.devices.length(), 1)
   let mb = document.devices[0].mailbox
-  assert_eq(mb.eoe, true)
-  assert_eq(mb.foe, true)
-  assert_eq(mb.soe, true)
-  assert_eq(mb.voe, true)
-  assert_eq(mb.aoe, true)
+  @debug.assert_eq(mb.eoe, true)
+  @debug.assert_eq(mb.foe, true)
+  @debug.assert_eq(mb.soe, true)
+  @debug.assert_eq(mb.voe, true)
+  @debug.assert_eq(mb.aoe, true)
 }
 
 ///|
@@ -327,15 +339,15 @@ test "esi-xml projects module with TxPdo and module Name text" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.modules.length(), 1)
+  @debug.assert_eq(document.modules.length(), 1)
   let m = document.modules[0]
-  assert_eq(m.module_ident, 0x20U)
-  assert_eq(m.module_name, "mod-type")
-  assert_eq(m.rx_pdos.length(), 1)
-  assert_eq(m.tx_pdos.length(), 1)
-  assert_eq(m.tx_pdos[0].name, "TxPdo1")
-  assert_eq(m.tx_pdos[0].entries.length(), 1)
-  assert_eq(m.tx_pdos[0].entries[0].depend_on_slot_index, true)
+  @debug.assert_eq(m.module_ident, 0x20U)
+  @debug.assert_eq(m.module_name, "mod-type")
+  @debug.assert_eq(m.rx_pdos.length(), 1)
+  @debug.assert_eq(m.tx_pdos.length(), 1)
+  @debug.assert_eq(m.tx_pdos[0].name, "TxPdo1")
+  @debug.assert_eq(m.tx_pdos[0].entries.length(), 1)
+  @debug.assert_eq(m.tx_pdos[0].entries[0].depend_on_slot_index, true)
 }
 
 ///|
@@ -364,5 +376,5 @@ test "esi-xml CData in config data" {
     #|</EtherCATInfo>
   let json_text = convert_esi_xml_to_json_string(xml)
   let document = @runtime.parse_esi_json_document(json_text)
-  assert_eq(document.devices[0].config_data.length(), 5)
+  @debug.assert_eq(document.devices[0].config_data.length(), 5)
 }

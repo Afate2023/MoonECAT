@@ -10,6 +10,7 @@ import {
   "afate/MoonECAT/hal",
   "afate/MoonECAT/hal/mock",
   "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
 } for "test"
 
 options(

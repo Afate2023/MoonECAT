@@ -13,8 +13,8 @@ test "scan station address strategy seam keeps twincat path replaceable" {
     observed,
     TwinCATCompatible,
   )
-  assert_eq(preserved, [0x1001U, 0x1002U, 0x1003U])
-  assert_eq(twincat, preserved)
+  @debug.assert_eq(preserved, [0x1001U, 0x1002U, 0x1003U])
+  @debug.assert_eq(twincat, preserved)
 }
 
 ///|
@@ -99,8 +99,8 @@ test "runtime required sii read word count expands to eeprom metadata size" {
       _ => b'\x00'
     }
   })
-  assert_eq(required_sii_read_word_count(bytes, 128), 512)
-  assert_eq(required_sii_read_word_count(bytes, 600), 600)
+  @debug.assert_eq(required_sii_read_word_count(bytes, 128), 512)
+  @debug.assert_eq(required_sii_read_word_count(bytes, 600), 600)
 }
 
 ///|
@@ -356,13 +356,13 @@ fn StartupMailboxDrainNic::new() -> StartupMailboxDrainNic {
 }
 
 ///|
-pub impl @hal.Nic for StartupMailboxDrainNic with open_(name) {
+pub impl @hal.Nic for StartupMailboxDrainNic with fn open_(name) {
   ignore(name)
   StartupMailboxDrainNic::new()
 }
 
 ///|
-pub impl @hal.Nic for StartupMailboxDrainNic with send(self, data) {
+pub impl @hal.Nic for StartupMailboxDrainNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -414,7 +414,7 @@ pub impl @hal.Nic for StartupMailboxDrainNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for StartupMailboxDrainNic with recv(self, timeout~) {
+pub impl @hal.Nic for StartupMailboxDrainNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -423,18 +423,18 @@ pub impl @hal.Nic for StartupMailboxDrainNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for StartupMailboxDrainNic with close(self) {
+pub impl @hal.Nic for StartupMailboxDrainNic with fn close(self) {
   self.is_open = false
 }
 
 ///|
-pub impl @hal.Nic for ActivePdoLengthsNic with open_(name) {
+pub impl @hal.Nic for ActivePdoLengthsNic with fn open_(name) {
   ignore(name)
   ActivePdoLengthsNic::new()
 }
 
 ///|
-pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
+pub impl @hal.Nic for ActivePdoLengthsNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -535,7 +535,7 @@ pub impl @hal.Nic for ActivePdoLengthsNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ActivePdoLengthsNic with recv(self, timeout~) {
+pub impl @hal.Nic for ActivePdoLengthsNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -544,7 +544,7 @@ pub impl @hal.Nic for ActivePdoLengthsNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ActivePdoLengthsNic with close(self) {
+pub impl @hal.Nic for ActivePdoLengthsNic with fn close(self) {
   self.is_open = false
 }
 
@@ -565,7 +565,7 @@ test "active process data lengths in preop use object mapping lengths" {
     mailbox_config,
     @hal.Duration(1000L),
   )
-  assert_eq(lengths, (Some(6), Some(6)))
+  @debug.assert_eq(lengths, (Some(6), Some(6)))
 }
 
 ///|
@@ -662,12 +662,12 @@ test "refine startup preparation in preop retries transient mailbox timeout" {
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.sm_configs[2].length, 6U)
-  assert_eq(refined.mapping.sm_configs[3].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
-  assert_eq(refined.mapping.output_bytes, 6)
-  assert_eq(refined.mapping.input_bytes, 6)
+  @debug.assert_eq(refined.mapping.sm_configs[2].length, 6U)
+  @debug.assert_eq(refined.mapping.sm_configs[3].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
+  @debug.assert_eq(refined.mapping.output_bytes, 6)
+  @debug.assert_eq(refined.mapping.input_bytes, 6)
 }
 
 ///|
@@ -787,12 +787,12 @@ test "refine startup preparation in preop refreshes mailbox mapping before retry
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.sm_configs[2].length, 6U)
-  assert_eq(refined.mapping.sm_configs[3].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
-  assert_eq(refined.mapping.output_bytes, 6)
-  assert_eq(refined.mapping.input_bytes, 6)
+  @debug.assert_eq(refined.mapping.sm_configs[2].length, 6U)
+  @debug.assert_eq(refined.mapping.sm_configs[3].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
+  @debug.assert_eq(refined.mapping.output_bytes, 6)
+  @debug.assert_eq(refined.mapping.input_bytes, 6)
 }
 
 ///|
@@ -906,13 +906,16 @@ test "refine startup preparation in preop keeps live PDO layout and drops remap 
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.output_bytes, 6)
-  assert_eq(refined.mapping.input_bytes, 6)
-  assert_eq(refined.startup_mailbox_commands.length(), 2)
-  assert_eq(refined.startup_mailbox_commands[0].index, 0x2000U)
-  assert_eq(refined.startup_mailbox_commands[0].transition, PreOpToSafeOp)
-  assert_eq(refined.startup_mailbox_commands[1].index, 0x6060U)
-  assert_eq(refined.startup_mailbox_commands[1].transition, SafeOpToOp)
+  @debug.assert_eq(refined.mapping.output_bytes, 6)
+  @debug.assert_eq(refined.mapping.input_bytes, 6)
+  @debug.assert_eq(refined.startup_mailbox_commands.length(), 2)
+  @debug.assert_eq(refined.startup_mailbox_commands[0].index, 0x2000U)
+  @debug.assert_eq(
+    refined.startup_mailbox_commands[0].transition,
+    PreOpToSafeOp,
+  )
+  @debug.assert_eq(refined.startup_mailbox_commands[1].index, 0x6060U)
+  @debug.assert_eq(refined.startup_mailbox_commands[1].transition, SafeOpToOp)
 }
 
 ///|
@@ -1014,11 +1017,11 @@ test "refine startup preparation in preop respects forced configured PDO plan" {
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.output_bytes, 32)
-  assert_eq(refined.mapping.input_bytes, 16)
-  assert_eq(refined.startup_mailbox_commands.length(), 2)
-  assert_eq(refined.startup_mailbox_commands[0].index, 0x1600U)
-  assert_eq(refined.startup_mailbox_commands[1].index, 0x1C12U)
+  @debug.assert_eq(refined.mapping.output_bytes, 32)
+  @debug.assert_eq(refined.mapping.input_bytes, 16)
+  @debug.assert_eq(refined.startup_mailbox_commands.length(), 2)
+  @debug.assert_eq(refined.startup_mailbox_commands[0].index, 0x1600U)
+  @debug.assert_eq(refined.startup_mailbox_commands[1].index, 0x1C12U)
 }
 
 ///|
@@ -1138,17 +1141,17 @@ test "refine startup preparation in preop keeps configured remap when only esc l
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.sm_configs[2].length, 26U)
-  assert_eq(refined.mapping.sm_configs[3].length, 22U)
-  assert_eq(refined.mapping.fmmu_configs[0].length, 26U)
-  assert_eq(refined.mapping.fmmu_configs[1].length, 22U)
-  assert_eq(refined.mapping.output_bytes, 26)
-  assert_eq(refined.mapping.input_bytes, 22)
-  assert_eq(refined.startup_mailbox_commands.length(), 4)
-  assert_eq(refined.startup_mailbox_commands[0].index, 0x1600U)
-  assert_eq(refined.startup_mailbox_commands[1].index, 0x1A00U)
-  assert_eq(refined.startup_mailbox_commands[2].index, 0x1C12U)
-  assert_eq(refined.startup_mailbox_commands[3].index, 0x1C13U)
+  @debug.assert_eq(refined.mapping.sm_configs[2].length, 26U)
+  @debug.assert_eq(refined.mapping.sm_configs[3].length, 22U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[0].length, 26U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[1].length, 22U)
+  @debug.assert_eq(refined.mapping.output_bytes, 26)
+  @debug.assert_eq(refined.mapping.input_bytes, 22)
+  @debug.assert_eq(refined.startup_mailbox_commands.length(), 4)
+  @debug.assert_eq(refined.startup_mailbox_commands[0].index, 0x1600U)
+  @debug.assert_eq(refined.startup_mailbox_commands[1].index, 0x1A00U)
+  @debug.assert_eq(refined.startup_mailbox_commands[2].index, 0x1C12U)
+  @debug.assert_eq(refined.startup_mailbox_commands[3].index, 0x1C13U)
 }
 
 ///|
@@ -1243,12 +1246,12 @@ test "refine startup preparation in preop trusts confirmed pdo lengths over esc 
     preparation,
     @hal.Duration(1000L),
   )
-  assert_eq(refined.mapping.sm_configs[2].length, 6U)
-  assert_eq(refined.mapping.sm_configs[3].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
-  assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
-  assert_eq(refined.mapping.output_bytes, 6)
-  assert_eq(refined.mapping.input_bytes, 6)
+  @debug.assert_eq(refined.mapping.sm_configs[2].length, 6U)
+  @debug.assert_eq(refined.mapping.sm_configs[3].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[0].length, 6U)
+  @debug.assert_eq(refined.mapping.fmmu_configs[1].length, 6U)
+  @debug.assert_eq(refined.mapping.output_bytes, 6)
+  @debug.assert_eq(refined.mapping.input_bytes, 6)
 }
 
 ///|
@@ -1400,13 +1403,13 @@ fn ds402_sii_info(
 }
 
 ///|
-pub impl @hal.Nic for StrictRunTransitionNic with open_(name) {
+pub impl @hal.Nic for StrictRunTransitionNic with fn open_(name) {
   ignore(name)
   StrictRunTransitionNic::new(@protocol.EsmState::Init, false, 0U)
 }
 
 ///|
-pub impl @hal.Nic for StrictRunTransitionNic with send(self, data) {
+pub impl @hal.Nic for StrictRunTransitionNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1455,7 +1458,7 @@ pub impl @hal.Nic for StrictRunTransitionNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for StrictRunTransitionNic with recv(self, timeout~) {
+pub impl @hal.Nic for StrictRunTransitionNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -1464,7 +1467,7 @@ pub impl @hal.Nic for StrictRunTransitionNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for StrictRunTransitionNic with close(self) {
+pub impl @hal.Nic for StrictRunTransitionNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1500,13 +1503,16 @@ fn ds402_op_status_bytes(nic : Ds402OpNeedsShutdownControlwordNic) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with open_(name) {
+pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn open_(name) {
   ignore(name)
   Ds402OpNeedsShutdownControlwordNic::new()
 }
 
 ///|
-pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with send(self, data) {
+pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn send(
+  self,
+  data,
+) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -1586,7 +1592,7 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with recv(
+pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn recv(
   self,
   timeout~,
 ) {
@@ -1598,7 +1604,7 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with recv(
 }
 
 ///|
-pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with close(self) {
+pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn close(self) {
   self.is_open = false
 }
 
@@ -1618,13 +1624,16 @@ test "runtime startup transition recovers SafeOp configuration error to init" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(result.reached_target)
-  assert_eq(result.observation, None)
-  assert_eq(nic.control_writes.length(), 2)
-  assert_eq(
+  @debug.assert_eq(result.observation, None)
+  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
-  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  @debug.assert_eq(
+    nic.control_writes[1] & b'\x0F',
+    @protocol.EsmState::Init.to_byte(),
+  )
 }
 
 ///|
@@ -1643,17 +1652,20 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(result.reached_target)
-  assert_eq(
+  @debug.assert_eq(
     result.observation.map(fn(value) { value.raw_status_code }),
     Some(Some(0U)),
   )
-  assert_eq(nic.control_writes.length(), 3)
-  assert_eq(
+  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::PreOp.to_byte() | b'\x10',
   )
-  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
-  assert_eq(
+  @debug.assert_eq(
+    nic.control_writes[1] & b'\x0F',
+    @protocol.EsmState::Init.to_byte(),
+  )
+  @debug.assert_eq(
     nic.control_writes[2] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
@@ -1662,23 +1674,27 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
 ///|
 test "runtime operational startup steps preconfigure dc before op" {
   let steps = build_operational_startup_steps(true, true)
-  assert_eq(steps.length(), 5)
-  assert_eq(steps[0], TransitionToSafeOp)
-  assert_eq(steps[1], DcPreconfigure)
-  assert_eq(steps[2], WarmupProcessData)
-  assert_eq(steps[3], ValidateSmWatchdog)
-  assert_eq(steps[4], TransitionToOp)
+  @debug.assert_eq(steps.length(), 5)
+  @debug.assert_eq(steps[0], TransitionToSafeOp)
+  @debug.assert_eq(steps[1], DcPreconfigure)
+  @debug.assert_eq(steps[2], WarmupProcessData)
+  @debug.assert_eq(steps[3], ValidateSmWatchdog)
+  @debug.assert_eq(steps[4], TransitionToOp)
 }
 
 ///|
 test "runtime operational startup steps omit dc and warmup when not needed" {
   let steps = build_operational_startup_steps(false, false)
-  assert_eq(steps, [TransitionToSafeOp, ValidateSmWatchdog, TransitionToOp])
+  @debug.assert_eq(steps, [
+    TransitionToSafeOp,
+    ValidateSmWatchdog,
+    TransitionToOp,
+  ])
 }
 
 ///|
 test "runtime startup recovery rolls back init for preop configuration faults" {
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(
       Some(@protocol.EsmState::PreOp),
       @protocol.EsmState::Op,
@@ -1686,7 +1702,7 @@ test "runtime startup recovery rolls back init for preop configuration faults" {
     ),
     RollbackToInit,
   )
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(
       Some(@protocol.EsmState::PreOp),
       @protocol.EsmState::SafeOp,
@@ -1698,7 +1714,7 @@ test "runtime startup recovery rolls back init for preop configuration faults" {
 
 ///|
 test "runtime startup recovery keeps safeop for op-entry readiness faults" {
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(
       Some(@protocol.EsmState::SafeOp),
       @protocol.EsmState::Op,
@@ -1706,7 +1722,7 @@ test "runtime startup recovery keeps safeop for op-entry readiness faults" {
     ),
     HoldSafeOp,
   )
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(
       Some(@protocol.EsmState::SafeOp),
       @protocol.EsmState::Op,
@@ -1718,7 +1734,7 @@ test "runtime startup recovery keeps safeop for op-entry readiness faults" {
 
 ///|
 test "runtime startup recovery retries unknown transient faults" {
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(
       Some(@protocol.EsmState::PreOp),
       @protocol.EsmState::SafeOp,
@@ -1726,7 +1742,7 @@ test "runtime startup recovery retries unknown transient faults" {
     ),
     RetryTargetPath,
   )
-  assert_eq(
+  @debug.assert_eq(
     classify_startup_recovery_strategy(None, @protocol.EsmState::Op, None),
     RetryTargetPath,
   )
@@ -1742,9 +1758,9 @@ test "runtime startup mailbox fault stage maps to safeop for presafeop transitio
   )
   match fault {
     StartupTransitionFailed(station~, target~, current~, ..) => {
-      assert_eq(station, 0x1001U)
-      assert_eq(target, @protocol.SafeOp)
-      assert_eq(current, Some(@protocol.EsmState::PreOp))
+      @debug.assert_eq(station, 0x1001U)
+      @debug.assert_eq(target, @protocol.SafeOp)
+      @debug.assert_eq(current, Some(@protocol.EsmState::PreOp))
     }
     _ => fail("expected startup transition fault")
   }
@@ -1760,9 +1776,9 @@ test "runtime startup mailbox fault stage maps to op for safeop-to-op transition
   )
   match fault {
     StartupTransitionFailed(station~, target~, current~, ..) => {
-      assert_eq(station, 0x1001U)
-      assert_eq(target, @protocol.Op)
-      assert_eq(current, Some(@protocol.EsmState::SafeOp))
+      @debug.assert_eq(station, 0x1001U)
+      @debug.assert_eq(target, @protocol.Op)
+      @debug.assert_eq(current, Some(@protocol.EsmState::SafeOp))
     }
     _ => fail("expected startup transition fault")
   }
@@ -1784,7 +1800,7 @@ test "derive_startup_outputs seeds ds402 shutdown controlword at mapped offset" 
     ]),
   )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
-  assert_eq(
+  @debug.assert_eq(
     seed,
     Bytes::from_array([b'\x00', b'\x00', b'\x00', b'\x00', b'\x06', b'\x00']),
   )
@@ -1806,7 +1822,7 @@ test "derive_startup_outputs seeds ds402 mode byte when available" {
     ]),
   )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
-  assert_eq(
+  @debug.assert_eq(
     seed,
     Bytes::from_array([
       b'\x00', b'\x00', b'\x00', b'\x00', b'\x06', b'\x00', b'\x08',
@@ -1838,7 +1854,7 @@ test "derive_startup_outputs seeds ds402 mode word from explicit startup command
     ],
   )
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
-  assert_eq(
+  @debug.assert_eq(
     seed,
     Bytes::from_array([
       b'\x00', b'\x00', b'\x00', b'\x00', b'\x06', b'\x00', b'\x09', b'\x00',
@@ -1855,34 +1871,40 @@ test "derive_startup_mailbox_commands emits ds402 safeop-to-op mode command" {
       ds402_txpdo_category(),
     ]),
   )
-  assert_eq(commands.length(), 5)
-  assert_eq(commands[0].transition, PreOpToSafeOp)
-  assert_eq(commands[0].index, 0x1600U)
-  assert_eq(
+  @debug.assert_eq(commands.length(), 5)
+  @debug.assert_eq(commands[0].transition, PreOpToSafeOp)
+  @debug.assert_eq(commands[0].index, 0x1600U)
+  @debug.assert_eq(
     commands[0].data,
     Bytes::from_array([
       b'\x03', b'\x20', b'\x00', b'\x7A', b'\x60', b'\x10', b'\x00', b'\x40', b'\x60',
       b'\x08', b'\x00', b'\x60', b'\x60',
     ]),
   )
-  assert_eq(commands[1].transition, PreOpToSafeOp)
-  assert_eq(commands[1].index, 0x1A00U)
-  assert_eq(
+  @debug.assert_eq(commands[1].transition, PreOpToSafeOp)
+  @debug.assert_eq(commands[1].index, 0x1A00U)
+  @debug.assert_eq(
     commands[1].data,
     Bytes::from_array([
       b'\x02', b'\x10', b'\x00', b'\x41', b'\x60', b'\x20', b'\x00', b'\x64', b'\x60',
     ]),
   )
-  assert_eq(commands[2].transition, PreOpToSafeOp)
-  assert_eq(commands[2].index, 0x1C12U)
-  assert_eq(commands[2].data, Bytes::from_array([b'\x01', b'\x00', b'\x16']))
-  assert_eq(commands[3].transition, PreOpToSafeOp)
-  assert_eq(commands[3].index, 0x1C13U)
-  assert_eq(commands[3].data, Bytes::from_array([b'\x01', b'\x00', b'\x1A']))
-  assert_eq(commands[4].transition, SafeOpToOp)
-  assert_eq(commands[4].index, 0x6060U)
-  assert_eq(commands[4].subindex, b'\x00')
-  assert_eq(commands[4].data, Bytes::from_array([b'\x08']))
+  @debug.assert_eq(commands[2].transition, PreOpToSafeOp)
+  @debug.assert_eq(commands[2].index, 0x1C12U)
+  @debug.assert_eq(
+    commands[2].data,
+    Bytes::from_array([b'\x01', b'\x00', b'\x16']),
+  )
+  @debug.assert_eq(commands[3].transition, PreOpToSafeOp)
+  @debug.assert_eq(commands[3].index, 0x1C13U)
+  @debug.assert_eq(
+    commands[3].data,
+    Bytes::from_array([b'\x01', b'\x00', b'\x1A']),
+  )
+  @debug.assert_eq(commands[4].transition, SafeOpToOp)
+  @debug.assert_eq(commands[4].index, 0x6060U)
+  @debug.assert_eq(commands[4].subindex, b'\x00')
+  @debug.assert_eq(commands[4].data, Bytes::from_array([b'\x08']))
 }
 
 ///|
@@ -1968,7 +1990,7 @@ test "filter_redundant_startup_mailbox_commands drops seeded 16-bit ds402 mode c
   )
   let outputs = derive_startup_outputs_with_commands(mapping, sii, merged)
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
-  assert_eq(
+  @debug.assert_eq(
     seed,
     Bytes::from_array([
       b'\x00', b'\x00', b'\x00', b'\x00', b'\x06', b'\x00', b'\x09', b'\x00',
@@ -1977,7 +1999,7 @@ test "filter_redundant_startup_mailbox_commands drops seeded 16-bit ds402 mode c
   let filtered = filter_redundant_startup_mailbox_commands(
     merged, outputs, mapping, sii,
   )
-  assert_eq(filtered.length(), 4)
+  @debug.assert_eq(filtered.length(), 4)
   for command in filtered {
     assert_true(
       !(command.transition == SafeOpToOp &&
@@ -2035,7 +2057,7 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
   assert_true(fault is None)
   assert_true(nic.observed_shutdown_seed)
   assert_true(nic.observed_mode_seed)
-  assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
 }
 
 ///|
@@ -2077,13 +2099,13 @@ fn startup_mapping_status_bytes(nic : StartupMappingNic) -> Bytes {
 }
 
 ///|
-pub impl @hal.Nic for StartupMappingNic with open_(name) {
+pub impl @hal.Nic for StartupMappingNic with fn open_(name) {
   ignore(name)
   StartupMappingNic::new()
 }
 
 ///|
-pub impl @hal.Nic for StartupMappingNic with send(self, data) {
+pub impl @hal.Nic for StartupMappingNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -2161,7 +2183,7 @@ pub impl @hal.Nic for StartupMappingNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for StartupMappingNic with recv(self, timeout~) {
+pub impl @hal.Nic for StartupMappingNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -2170,7 +2192,7 @@ pub impl @hal.Nic for StartupMappingNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for StartupMappingNic with close(self) {
+pub impl @hal.Nic for StartupMappingNic with fn close(self) {
   self.is_open = false
 }
 
@@ -2228,13 +2250,13 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
     input_bytes: 16,
   }
   ignore(write_mailbox_mapping(nic, 0x1001U, mapping, @hal.Duration(1000L)))
-  assert_eq(nic.sm_write_offsets.length(), 2)
-  assert_eq(nic.sm_write_offsets[0], @protocol.reg_sm_base)
-  assert_eq(
+  @debug.assert_eq(nic.sm_write_offsets.length(), 2)
+  @debug.assert_eq(nic.sm_write_offsets[0], @protocol.reg_sm_base)
+  @debug.assert_eq(
     nic.sm_write_offsets[1],
     @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  assert_eq(nic.fmmu_write_offsets.length(), 0)
+  @debug.assert_eq(nic.fmmu_write_offsets.length(), 0)
 }
 
 ///|
@@ -2287,8 +2309,8 @@ test "runtime preop transition can use provided startup preparation" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
-  assert_eq(nic.sm_write_offsets.length(), 2)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
+  @debug.assert_eq(nic.sm_write_offsets.length(), 2)
 }
 
 ///|
@@ -2342,8 +2364,8 @@ test "runtime preop transition skips mailbox rewrite when already in preop" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
-  assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
+  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
 }
 
 ///|
@@ -2397,8 +2419,8 @@ test "runtime preop transition skips mailbox rewrite when already in safeop" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
 }
 
 ///|
@@ -2458,8 +2480,8 @@ test "runtime override refinement skips safeop stations" {
     @hal.Duration(1000L),
   )
   assert_true(refined.slave_preparations is Some(_))
-  assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
 }
 
 ///|
@@ -2540,9 +2562,9 @@ test "runtime safeop transition skips remap when already in safeop" {
     [],
   )
   assert_true(fault is None)
-  assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  assert_eq(nic.sm_write_offsets.length(), 0)
-  assert_eq(nic.fmmu_write_offsets.length(), 0)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(nic.fmmu_write_offsets.length(), 0)
 }
 
 ///|
@@ -2645,25 +2667,25 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
   ignore(
     write_process_data_mapping(nic, 0x1001U, mapping, @hal.Duration(1000L)),
   )
-  assert_eq(nic.sm_write_offsets.length(), 4)
-  assert_eq(
+  @debug.assert_eq(nic.sm_write_offsets.length(), 4)
+  @debug.assert_eq(
     nic.sm_write_offsets[0],
     @protocol.reg_sm_base + 2U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  assert_eq(
+  @debug.assert_eq(
     nic.sm_write_offsets[1],
     @protocol.reg_sm_base + 2U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  assert_eq(
+  @debug.assert_eq(
     nic.sm_write_offsets[2],
     @protocol.reg_sm_base + 3U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  assert_eq(
+  @debug.assert_eq(
     nic.sm_write_offsets[3],
     @protocol.reg_sm_base + 3U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  assert_eq(nic.fmmu_write_offsets.length(), 1)
-  assert_eq(nic.fmmu_write_offsets[0], @protocol.reg_fmmu_base)
+  @debug.assert_eq(nic.fmmu_write_offsets.length(), 1)
+  @debug.assert_eq(nic.fmmu_write_offsets[0], @protocol.reg_fmmu_base)
 }
 
 ///|
@@ -2685,8 +2707,8 @@ test "SmWatchdogValidation struct construction and equality" {
     config,
     watchdog_active: true,
   }
-  assert_eq(v1, v2)
-  assert_eq(v1.watchdog_active, true)
+  @debug.assert_eq(v1, v2)
+  @debug.assert_eq(v1.watchdog_active, true)
 }
 
 ///|
@@ -2703,8 +2725,8 @@ test "SmWatchdogValidation inactive when pdata_status false" {
     config,
     watchdog_active: false,
   }
-  assert_eq(v.watchdog_active, false)
-  assert_eq(v.config.pdata_status, false)
+  @debug.assert_eq(v.watchdog_active, false)
+  @debug.assert_eq(v.config.pdata_status, false)
 }
 
 ///|
@@ -2718,14 +2740,14 @@ test "lookup_esm_timeout_policy returns matching policy" {
   }
   let policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = [(0x1001U, policy)]
   let found = lookup_esm_timeout_policy(policies, 0x1001U)
-  assert_eq(found, policy)
+  @debug.assert_eq(found, policy)
 }
 
 ///|
 test "lookup_esm_timeout_policy returns default when not found" {
   let policies : Array[(UInt, @protocol.EsmTimeoutPolicy)] = []
   let found = lookup_esm_timeout_policy(policies, 0x1001U)
-  assert_eq(found, @protocol.default_esm_timeout_policy())
+  @debug.assert_eq(found, @protocol.default_esm_timeout_policy())
 }
 
 ///|
@@ -2738,7 +2760,7 @@ test "RunStartupPreparation includes esm_timeout_policies field" {
     esm_timeout_policies: [(0x1001U, @protocol.default_esm_timeout_policy())],
     slave_preparations: None,
   }
-  assert_eq(prep.esm_timeout_policies.length(), 1)
+  @debug.assert_eq(prep.esm_timeout_policies.length(), 1)
 }
 
 // ===== Coverage: validate.mbt — validation_grade_from_differences (private fn) =====
@@ -2746,13 +2768,13 @@ test "RunStartupPreparation includes esm_timeout_policies field" {
 ///|
 test "validation_grade_from_differences empty is Pass" {
   let diffs : Array[ConfigurationDifference] = []
-  assert_eq(validation_grade_from_differences(diffs), Pass)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Pass)
 }
 
 ///|
 test "validation_grade_from_differences Extra only is Warn" {
   let diffs : Array[ConfigurationDifference] = [Extra(position=1)]
-  assert_eq(validation_grade_from_differences(diffs), Warn)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Warn)
 }
 
 ///|
@@ -2760,7 +2782,7 @@ test "validation_grade_from_differences OptionalMissing only is Warn" {
   let diffs : Array[ConfigurationDifference] = [
     OptionalMissing(position=2, group_id=None),
   ]
-  assert_eq(validation_grade_from_differences(diffs), Warn)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Warn)
 }
 
 ///|
@@ -2769,13 +2791,13 @@ test "validation_grade_from_differences Mixed Extra+OptionalMissing is Warn" {
     Extra(position=0),
     OptionalMissing(position=1, group_id=Some(1U)),
   ]
-  assert_eq(validation_grade_from_differences(diffs), Warn)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Warn)
 }
 
 ///|
 test "validation_grade_from_differences Missing is Block" {
   let diffs : Array[ConfigurationDifference] = [Missing(position=0)]
-  assert_eq(validation_grade_from_differences(diffs), Block)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Block)
 }
 
 ///|
@@ -2784,7 +2806,7 @@ test "validation_grade_from_differences Mixed Extra+Missing is Block" {
     Extra(position=0),
     Missing(position=1),
   ]
-  assert_eq(validation_grade_from_differences(diffs), Block)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Block)
 }
 
 ///|
@@ -2796,7 +2818,7 @@ test "validation_grade_from_differences StationAddressMismatch is Block" {
       actual=Some(0x1002U),
     ),
   ]
-  assert_eq(validation_grade_from_differences(diffs), Block)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Block)
 }
 
 ///|
@@ -2813,7 +2835,7 @@ test "validation_grade_from_differences IdentityMismatch is Block" {
       actual=Some({ vendor_id: 5U, product_code: 6U, revision: 7U, serial: 8U }),
     ),
   ]
-  assert_eq(validation_grade_from_differences(diffs), Block)
+  @debug.assert_eq(validation_grade_from_differences(diffs), Block)
 }
 
 // ===== run_fault_issues white-box tests =====
@@ -2830,7 +2852,7 @@ test "run_fault_issues StartupTransitionFailed all None" {
     control_wkc=None,
   )
   let issues = run_fault_issues(fault)
-  assert_eq(issues.length(), 1)
+  @debug.assert_eq(issues.length(), 1)
   assert_true(issues[0].detail.contains("unknown"))
 }
 
@@ -2846,7 +2868,7 @@ test "run_fault_issues StartupTransitionFailed all Some" {
     control_wkc=Some(1U),
   )
   let issues = run_fault_issues(fault)
-  assert_eq(issues.length(), 1)
+  @debug.assert_eq(issues.length(), 1)
   assert_true(issues[0].detail.contains("clear"))
   assert_true(issues[0].detail.contains("Startup transition failed"))
 }
@@ -2858,7 +2880,7 @@ test "run_fault_issues TimeoutRecoveryRequired" {
     consecutive_timeouts=5,
   )
   let issues = run_fault_issues(fault)
-  assert_eq(issues.length(), 1)
+  @debug.assert_eq(issues.length(), 1)
   assert_true(issues[0].detail.contains("Timeout recovery"))
 }
 
@@ -2866,7 +2888,7 @@ test "run_fault_issues TimeoutRecoveryRequired" {
 test "run_fault_issues DcDrift" {
   let fault = RunFault::DcDrift(delta_ns=123456L)
   let issues = run_fault_issues(fault)
-  assert_eq(issues.length(), 1)
+  @debug.assert_eq(issues.length(), 1)
   assert_true(issues[0].detail.contains("DC drift"))
   assert_true(issues[0].detail.contains("123456"))
 }
@@ -2878,7 +2900,7 @@ test "run_fault_issues RuntimeRecoveryRequired" {
     observed_wkc_errors=7L,
   )
   let issues = run_fault_issues(fault)
-  assert_eq(issues.length(), 1)
+  @debug.assert_eq(issues.length(), 1)
   assert_true(issues[0].detail.contains("Runtime recovery"))
 }
 
@@ -2886,18 +2908,18 @@ test "run_fault_issues RuntimeRecoveryRequired" {
 
 ///|
 test "option_uint_or_zero None" {
-  assert_eq(option_uint_or_zero(None), 0U)
+  @debug.assert_eq(option_uint_or_zero(None), 0U)
 }
 
 ///|
 test "option_uint_or_zero Some" {
-  assert_eq(option_uint_or_zero(Some(42U)), 42U)
+  @debug.assert_eq(option_uint_or_zero(Some(42U)), 42U)
 }
 
 ///|
 test "option_identity_or_zero None" {
   let id = option_identity_or_zero(None)
-  assert_eq(id.vendor_id, 0U)
+  @debug.assert_eq(id.vendor_id, 0U)
 }
 
 ///|
@@ -2909,14 +2931,14 @@ test "option_identity_or_zero Some" {
     serial: 4U,
   }
   let id = option_identity_or_zero(Some(expected))
-  assert_eq(id.vendor_id, 1U)
+  @debug.assert_eq(id.vendor_id, 1U)
 }
 
 // ===== validate_grade_label =====
 
 ///|
 test "validate_grade_label Warn" {
-  assert_eq(validate_grade_label(Warn), "WARN")
+  @debug.assert_eq(validate_grade_label(Warn), "WARN")
 }
 
 // ===== validation_difference_issue Informational branch =====
@@ -2934,25 +2956,25 @@ test "validation_difference_issue Informational category" {
     ValidateDifferenceCategory::Informational =>
       (DiagnosticSourceLayer::Configuration, DiagnosticCategory::Configuration)
   }
-  assert_eq(source, DiagnosticSourceLayer::Configuration)
-  assert_eq(category, DiagnosticCategory::Configuration)
+  @debug.assert_eq(source, DiagnosticSourceLayer::Configuration)
+  @debug.assert_eq(category, DiagnosticCategory::Configuration)
 }
 
 // ===== diagnostic_level_code Degrade =====
 
 ///|
 test "diagnostic_level_code Degrade" {
-  assert_eq(diagnostic_level_code(DiagnosticLevel::Degrade), 1U)
+  @debug.assert_eq(diagnostic_level_code(DiagnosticLevel::Degrade), 1U)
 }
 
 ///|
 test "diagnostic_level_code Block" {
-  assert_eq(diagnostic_level_code(DiagnosticLevel::Block), 2U)
+  @debug.assert_eq(diagnostic_level_code(DiagnosticLevel::Block), 2U)
 }
 
 ///|
 test "diagnostic_level_code Info" {
-  assert_eq(diagnostic_level_code(DiagnosticLevel::Info), 0U)
+  @debug.assert_eq(diagnostic_level_code(DiagnosticLevel::Info), 0U)
 }
 
 // ===== read_u32_le short data =====
@@ -2960,21 +2982,21 @@ test "diagnostic_level_code Info" {
 ///|
 test "read_u32_le short data returns zero" {
   let data = Bytes::from_array([b'\x01', b'\x02'])
-  assert_eq(read_u32_le(data, 0), 0U)
+  @debug.assert_eq(read_u32_le(data, 0), 0U)
 }
 
 ///|
 test "read_u32_le offset near end" {
   let data = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04', b'\x05'])
   // offset=2, needs 4 more bytes from offset=2 but only 3 available
-  assert_eq(read_u32_le(data, 2), 0U)
+  @debug.assert_eq(read_u32_le(data, 2), 0U)
 }
 
 // ===== uint_to_hex zero =====
 
 ///|
 test "uint_to_hex zero" {
-  assert_eq(uint_to_hex(0U), "0")
+  @debug.assert_eq(uint_to_hex(0U), "0")
 }
 
 // ===== MasterOdValue format and JSON for uncovered variants =====
@@ -2982,13 +3004,13 @@ test "uint_to_hex zero" {
 ///|
 test "master_od_value_json U16" {
   let json = master_od_value_json(MasterOdValue::U16(0x1234U))
-  assert_true(json.to_string().contains("4660"))
+  assert_true(json.stringify().contains("4660"))
 }
 
 ///|
 test "master_od_value_json I32" {
   let json = master_od_value_json(MasterOdValue::I32(-42))
-  assert_true(json.to_string().contains("-42"))
+  assert_true(json.stringify().contains("-42"))
 }
 
 ///|
@@ -2996,7 +3018,7 @@ test "master_od_value_json Raw" {
   let json = master_od_value_json(
     MasterOdValue::Raw(Bytes::from_array([b'\xAB', b'\xCD'])),
   )
-  let s = json.to_string()
+  let s = json.stringify()
   assert_true(s.length() > 0)
 }
 
@@ -3006,7 +3028,7 @@ test "master_od_value_json Raw" {
 test "next_scan_station_address skips used addresses" {
   let used : Array[UInt] = [scan_station_address_base]
   let addr = next_scan_station_address(used) catch { _ => 0U }
-  assert_eq(addr, scan_station_address_base + 1U)
+  @debug.assert_eq(addr, scan_station_address_base + 1U)
 }
 
 // ===== highest_diagnostic_level =====
@@ -3014,7 +3036,7 @@ test "next_scan_station_address skips used addresses" {
 ///|
 test "highest_diagnostic_level empty is Info" {
   let result = highest_diagnostic_level([], DiagnosticLevel::Info)
-  assert_eq(result, DiagnosticLevel::Info)
+  @debug.assert_eq(result, DiagnosticLevel::Info)
 }
 
 ///|
@@ -3040,7 +3062,7 @@ test "highest_diagnostic_level picks Block over Degrade" {
     },
   ]
   let result = highest_diagnostic_level(issues, DiagnosticLevel::Info)
-  assert_eq(result, DiagnosticLevel::Block)
+  @debug.assert_eq(result, DiagnosticLevel::Block)
 }
 
 // ============================================================
@@ -3054,7 +3076,7 @@ test "highest_diagnostic_level picks Block over Degrade" {
 test "diagnosis_timeout_step Ok passes through" {
   let r : Result[Int, Error] = Ok(42)
   let v = diagnosis_timeout_step(r, "test-stage")
-  assert_eq(v, 42)
+  @debug.assert_eq(v, 42)
 }
 
 ///|
@@ -3132,7 +3154,7 @@ test "escape_json with quotes and newlines" {
 
 ///|
 test "escape_json plain string unchanged" {
-  assert_eq(escape_json("abc"), "abc")
+  @debug.assert_eq(escape_json("abc"), "abc")
 }
 
 // ===== EoeReassemblyBuffer is_complete with gap =====
@@ -3145,7 +3167,7 @@ test "EoeReassemblyBuffer is_complete returns false with gap" {
   // Insert fragment 2 as last (skipping fragment 1)
   let complete = buf.insert(2U, true, b"\x05\x06")
   // Should not be complete because fragment 1 is missing
-  assert_eq(complete, false)
+  @debug.assert_eq(complete, false)
 }
 
 ///|
@@ -3153,11 +3175,11 @@ test "EoeReassemblyBuffer insert and assemble" {
   let buf = EoeReassemblyBuffer::new(0U)
   let _ = buf.insert(0U, false, b"\x01\x02")
   let complete = buf.insert(1U, true, b"\x03\x04")
-  assert_eq(complete, true)
+  @debug.assert_eq(complete, true)
   let assembled = buf.assemble()
-  assert_eq(assembled.length(), 4)
-  assert_eq(assembled[0], b'\x01')
-  assert_eq(assembled[3], b'\x04')
+  @debug.assert_eq(assembled.length(), 4)
+  @debug.assert_eq(assembled[0], b'\x01')
+  @debug.assert_eq(assembled[3], b'\x04')
 }
 
 // ===== EoeStationContext get_reassembly eviction =====
@@ -3179,7 +3201,7 @@ test "EoeStationContext get_reassembly eviction when full" {
   }
   // All 4 slots full; requesting frame 10 should evict slot 0
   let buf = ctx.get_reassembly(10U)
-  assert_eq(buf.frame_number, 10U)
+  @debug.assert_eq(buf.frame_number, 10U)
 }
 
 // ===== EoeStationContext next_counter wraps 1-7 =====
@@ -3197,17 +3219,17 @@ test "EoeStationContext next_counter wraps at 7" {
   let ctx = EoeStationContext::new(0x1001U, mb_config)
   // Initial counter is 1
   let c1 = ctx.next_counter()
-  assert_eq(c1, b'\x01')
+  @debug.assert_eq(c1, b'\x01')
   // Advance through 2..7
   for _i = 0; _i < 5; _i = _i + 1 {
     let _ = ctx.next_counter()
   }
   // Next should be 7
   let c7 = ctx.next_counter()
-  assert_eq(c7, b'\x07')
+  @debug.assert_eq(c7, b'\x07')
   // Next wraps to 1
   let c_wrap = ctx.next_counter()
-  assert_eq(c_wrap, b'\x01')
+  @debug.assert_eq(c_wrap, b'\x01')
 }
 
 // ===== EoeStationContext next_frame_number wraps 0-15 =====
@@ -3229,7 +3251,7 @@ test "EoeStationContext next_frame_number wraps at 15" {
   }
   // After 16 advances, should be back to 0
   let n = ctx.next_frame_number()
-  assert_eq(n, 0U)
+  @debug.assert_eq(n, 0U)
 }
 
 // ===== diagnosis_restore_path =====
@@ -3237,15 +3259,15 @@ test "EoeStationContext next_frame_number wraps at 15" {
 ///|
 test "diagnosis_restore_path covers all states" {
   let path_preop = diagnosis_restore_path(@protocol.PreOp)
-  assert_eq(path_preop.length(), 1)
+  @debug.assert_eq(path_preop.length(), 1)
   let path_safeop = diagnosis_restore_path(@protocol.SafeOp)
-  assert_eq(path_safeop.length(), 2)
+  @debug.assert_eq(path_safeop.length(), 2)
   let path_op = diagnosis_restore_path(@protocol.Op)
-  assert_eq(path_op.length(), 3)
+  @debug.assert_eq(path_op.length(), 3)
   let path_init = diagnosis_restore_path(@protocol.Init)
-  assert_eq(path_init.length(), 2)
+  @debug.assert_eq(path_init.length(), 2)
   let path_boot = diagnosis_restore_path(@protocol.Boot)
-  assert_eq(path_boot.length(), 3)
+  @debug.assert_eq(path_boot.length(), 3)
 }
 
 // ── Batch 4: esi_json private helpers error paths ──
@@ -3407,7 +3429,7 @@ test "decode_esi_json_uint with non-number" {
 test "decode_esi_json_optional_uint Null returns None" {
   let json = @json.parse("null"[:]) catch { _ => panic() }
   let result = decode_esi_json_optional_uint(json)
-  assert_eq(result, None)
+  @debug.assert_eq(result, None)
 }
 
 ///|
@@ -3482,10 +3504,10 @@ test "decode_esi_json_byte negative" {
 test "decode_esi_json_bytes array fallback" {
   let json = @json.parse("[1, 2, 3]"[:]) catch { _ => panic() }
   let result = decode_esi_json_bytes(json)
-  assert_eq(result.length(), 3)
-  assert_eq(result[0], b'\x01')
-  assert_eq(result[1], b'\x02')
-  assert_eq(result[2], b'\x03')
+  @debug.assert_eq(result.length(), 3)
+  @debug.assert_eq(result[0], b'\x01')
+  @debug.assert_eq(result[1], b'\x02')
+  @debug.assert_eq(result[2], b'\x03')
 }
 
 ///|
@@ -3519,71 +3541,71 @@ test "map_esi_init_transition PS" {
 
 ///|
 test "map_esi_init_transition supports all legal ESM path codes" {
-  assert_eq(map_esi_init_transition("IP"), Some(InitToPreOp))
-  assert_eq(map_esi_init_transition("IB"), Some(InitToBoot))
-  assert_eq(map_esi_init_transition("PI"), Some(PreOpToInit))
-  assert_eq(map_esi_init_transition("PS"), Some(PreOpToSafeOp))
-  assert_eq(map_esi_init_transition("SI"), Some(SafeOpToInit))
-  assert_eq(map_esi_init_transition("SP"), Some(SafeOpToPreOp))
-  assert_eq(map_esi_init_transition("SO"), Some(SafeOpToOp))
-  assert_eq(map_esi_init_transition("OI"), Some(OpToInit))
-  assert_eq(map_esi_init_transition("OP"), Some(OpToPreOp))
-  assert_eq(map_esi_init_transition("OS"), Some(OpToSafeOp))
-  assert_eq(map_esi_init_transition("BI"), Some(BootToInit))
+  @debug.assert_eq(map_esi_init_transition("IP"), Some(InitToPreOp))
+  @debug.assert_eq(map_esi_init_transition("IB"), Some(InitToBoot))
+  @debug.assert_eq(map_esi_init_transition("PI"), Some(PreOpToInit))
+  @debug.assert_eq(map_esi_init_transition("PS"), Some(PreOpToSafeOp))
+  @debug.assert_eq(map_esi_init_transition("SI"), Some(SafeOpToInit))
+  @debug.assert_eq(map_esi_init_transition("SP"), Some(SafeOpToPreOp))
+  @debug.assert_eq(map_esi_init_transition("SO"), Some(SafeOpToOp))
+  @debug.assert_eq(map_esi_init_transition("OI"), Some(OpToInit))
+  @debug.assert_eq(map_esi_init_transition("OP"), Some(OpToPreOp))
+  @debug.assert_eq(map_esi_init_transition("OS"), Some(OpToSafeOp))
+  @debug.assert_eq(map_esi_init_transition("BI"), Some(BootToInit))
 }
 
 ///|
 test "map_esi_init_transition unknown returns None" {
   let result = map_esi_init_transition("XX")
-  assert_eq(result, None)
+  @debug.assert_eq(result, None)
 }
 
 ///|
 test "preferred_device_group_name with non-empty type_name" {
   let device = make_minimal_esi_device(type_name="MyType", device_name="MyDev")
-  assert_eq(preferred_device_group_name(device), "MyType")
+  @debug.assert_eq(preferred_device_group_name(device), "MyType")
 }
 
 ///|
 test "preferred_device_group_name with empty type_name" {
   let device = make_minimal_esi_device(type_name="", device_name="MyDev")
-  assert_eq(preferred_device_group_name(device), "MyDev")
+  @debug.assert_eq(preferred_device_group_name(device), "MyDev")
 }
 
 ///|
 test "preferred_device_name with non-empty device_name" {
   let device = make_minimal_esi_device(type_name="MyType", device_name="MyDev")
-  assert_eq(preferred_device_name(device), "MyDev")
+  @debug.assert_eq(preferred_device_name(device), "MyDev")
 }
 
 ///|
 test "preferred_device_name with empty device_name" {
   let device = make_minimal_esi_device(type_name="MyType", device_name="")
-  assert_eq(preferred_device_name(device), "MyType")
+  @debug.assert_eq(preferred_device_name(device), "MyType")
 }
 
 ///|
 test "intern_sii_string empty text returns zero byte" {
   let strings : Array[String] = []
   let result = intern_sii_string(strings, "")
-  assert_eq(result, b'\x00')
-  assert_eq(strings.length(), 0)
+  @debug.assert_eq(result, b'\x00')
+  @debug.assert_eq(strings.length(), 0)
 }
 
 ///|
 test "intern_sii_string adds new string" {
   let strings : Array[String] = []
   let idx = intern_sii_string(strings, "hello")
-  assert_eq(idx, b'\x01')
-  assert_eq(strings.length(), 1)
+  @debug.assert_eq(idx, b'\x01')
+  @debug.assert_eq(strings.length(), 1)
 }
 
 ///|
 test "intern_sii_string deduplicates" {
   let strings : Array[String] = ["hello"]
   let idx = intern_sii_string(strings, "hello")
-  assert_eq(idx, b'\x01')
-  assert_eq(strings.length(), 1)
+  @debug.assert_eq(idx, b'\x01')
+  @debug.assert_eq(strings.length(), 1)
 }
 
 ///|
@@ -3604,23 +3626,23 @@ test "is_ds402_profile None" {
 ///|
 test "decode_physical_ports YHKE" {
   let ports = decode_physical_ports("YHKE")
-  assert_eq(ports[0], b'\x01') // Y
-  assert_eq(ports[1], b'\x01') // H
-  assert_eq(ports[2], b'\x01') // K
-  assert_eq(ports[3], b'\x03') // E
+  @debug.assert_eq(ports[0], b'\x01') // Y
+  @debug.assert_eq(ports[1], b'\x01') // H
+  @debug.assert_eq(ports[2], b'\x01') // K
+  @debug.assert_eq(ports[3], b'\x03') // E
 }
 
 ///|
 test "decode_physical_ports short string" {
   let ports = decode_physical_ports("Y")
-  assert_eq(ports[0], b'\x01')
-  assert_eq(ports[1], b'\x00')
+  @debug.assert_eq(ports[0], b'\x01')
+  @debug.assert_eq(ports[1], b'\x00')
 }
 
 ///|
 test "decode_physical_ports unknown char" {
   let ports = decode_physical_ports("X")
-  assert_eq(ports[0], b'\x00')
+  @debug.assert_eq(ports[0], b'\x00')
 }
 
 ///|
@@ -3634,7 +3656,7 @@ test "materialize_sii_sm_entry enable false" {
     sm_type: "process-data-out",
   }
   let result = materialize_sii_sm_entry(sm)
-  assert_eq(result.activate, b'\x00')
+  @debug.assert_eq(result.activate, b'\x00')
 }
 
 ///|
@@ -3648,77 +3670,77 @@ test "materialize_sii_sm_entry enable true" {
     sm_type: "process-data-in",
   }
   let result = materialize_sii_sm_entry(sm)
-  assert_eq(result.activate, b'\x01')
+  @debug.assert_eq(result.activate, b'\x01')
 }
 
 ///|
 test "map_esi_data_type BOOL" {
-  assert_eq(map_esi_data_type("BOOL", b'\x01'), b'\x01')
+  @debug.assert_eq(map_esi_data_type("BOOL", b'\x01'), b'\x01')
 }
 
 ///|
 test "map_esi_data_type SINT" {
-  assert_eq(map_esi_data_type("SINT", b'\x08'), b'\x02')
+  @debug.assert_eq(map_esi_data_type("SINT", b'\x08'), b'\x02')
 }
 
 ///|
 test "map_esi_data_type INT" {
-  assert_eq(map_esi_data_type("INT", b'\x10'), b'\x03')
+  @debug.assert_eq(map_esi_data_type("INT", b'\x10'), b'\x03')
 }
 
 ///|
 test "map_esi_data_type DINT" {
-  assert_eq(map_esi_data_type("DINT", b'\x20'), b'\x04')
+  @debug.assert_eq(map_esi_data_type("DINT", b'\x20'), b'\x04')
 }
 
 ///|
 test "map_esi_data_type USINT" {
-  assert_eq(map_esi_data_type("USINT", b'\x08'), b'\x05')
+  @debug.assert_eq(map_esi_data_type("USINT", b'\x08'), b'\x05')
 }
 
 ///|
 test "map_esi_data_type BYTE" {
-  assert_eq(map_esi_data_type("BYTE", b'\x08'), b'\x05')
+  @debug.assert_eq(map_esi_data_type("BYTE", b'\x08'), b'\x05')
 }
 
 ///|
 test "map_esi_data_type UINT" {
-  assert_eq(map_esi_data_type("UINT", b'\x10'), b'\x06')
+  @debug.assert_eq(map_esi_data_type("UINT", b'\x10'), b'\x06')
 }
 
 ///|
 test "map_esi_data_type WORD" {
-  assert_eq(map_esi_data_type("WORD", b'\x10'), b'\x06')
+  @debug.assert_eq(map_esi_data_type("WORD", b'\x10'), b'\x06')
 }
 
 ///|
 test "map_esi_data_type UDINT" {
-  assert_eq(map_esi_data_type("UDINT", b'\x20'), b'\x07')
+  @debug.assert_eq(map_esi_data_type("UDINT", b'\x20'), b'\x07')
 }
 
 ///|
 test "map_esi_data_type DWORD" {
-  assert_eq(map_esi_data_type("DWORD", b'\x20'), b'\x07')
+  @debug.assert_eq(map_esi_data_type("DWORD", b'\x20'), b'\x07')
 }
 
 ///|
 test "map_esi_data_type unknown 8bit" {
-  assert_eq(map_esi_data_type("CUSTOM", b'\x08'), b'\x05')
+  @debug.assert_eq(map_esi_data_type("CUSTOM", b'\x08'), b'\x05')
 }
 
 ///|
 test "map_esi_data_type unknown 16bit" {
-  assert_eq(map_esi_data_type("CUSTOM", b'\x10'), b'\x06')
+  @debug.assert_eq(map_esi_data_type("CUSTOM", b'\x10'), b'\x06')
 }
 
 ///|
 test "map_esi_data_type unknown 32bit" {
-  assert_eq(map_esi_data_type("CUSTOM", b'\x20'), b'\x07')
+  @debug.assert_eq(map_esi_data_type("CUSTOM", b'\x20'), b'\x07')
 }
 
 ///|
 test "map_esi_data_type unknown other" {
-  assert_eq(map_esi_data_type("CUSTOM", b'\x04'), b'\x00')
+  @debug.assert_eq(map_esi_data_type("CUSTOM", b'\x04'), b'\x00')
 }
 
 ///|
@@ -3766,10 +3788,10 @@ test "build_sii_header empty sync_managers" {
   let device = make_minimal_esi_device()
   let sms : Array[@mailbox.SiiSmEntry] = []
   let header = build_sii_header(device, sms)
-  assert_eq(header.mailbox_rx_offset, 0U)
-  assert_eq(header.mailbox_rx_size, 0U)
-  assert_eq(header.mailbox_tx_offset, 0U)
-  assert_eq(header.mailbox_tx_size, 0U)
+  @debug.assert_eq(header.mailbox_rx_offset, 0U)
+  @debug.assert_eq(header.mailbox_rx_size, 0U)
+  @debug.assert_eq(header.mailbox_tx_offset, 0U)
+  @debug.assert_eq(header.mailbox_tx_size, 0U)
 }
 
 ///|
@@ -3786,10 +3808,10 @@ test "build_sii_header with 1 sync_manager" {
     },
   ]
   let header = build_sii_header(device, sms)
-  assert_eq(header.mailbox_rx_offset, 0x1000U)
-  assert_eq(header.mailbox_rx_size, 128U)
-  assert_eq(header.mailbox_tx_offset, 0U)
-  assert_eq(header.mailbox_tx_size, 0U)
+  @debug.assert_eq(header.mailbox_rx_offset, 0x1000U)
+  @debug.assert_eq(header.mailbox_rx_size, 128U)
+  @debug.assert_eq(header.mailbox_tx_offset, 0U)
+  @debug.assert_eq(header.mailbox_tx_size, 0U)
 }
 
 ///|
@@ -3814,38 +3836,38 @@ test "build_sii_header with 2 sync_managers" {
     },
   ]
   let header = build_sii_header(device, sms)
-  assert_eq(header.mailbox_rx_offset, 0x1000U)
-  assert_eq(header.mailbox_rx_size, 128U)
-  assert_eq(header.mailbox_tx_offset, 0x1400U)
-  assert_eq(header.mailbox_tx_size, 256U)
+  @debug.assert_eq(header.mailbox_rx_offset, 0x1000U)
+  @debug.assert_eq(header.mailbox_rx_size, 128U)
+  @debug.assert_eq(header.mailbox_tx_offset, 0x1400U)
+  @debug.assert_eq(header.mailbox_tx_size, 256U)
 }
 
 ///|
 test "known_sii_category_code all variants" {
-  assert_eq(known_sii_category_code(Strings), 0x0AU)
-  assert_eq(known_sii_category_code(DataTypes), 0x14U)
-  assert_eq(known_sii_category_code(General), 0x1EU)
-  assert_eq(known_sii_category_code(Fmmu), 0x28U)
-  assert_eq(known_sii_category_code(SyncManager), 0x29U)
-  assert_eq(known_sii_category_code(FmmuEx), 0x2AU)
-  assert_eq(known_sii_category_code(SyncUnit), 0x2BU)
-  assert_eq(known_sii_category_code(TxPdo), 0x32U)
-  assert_eq(known_sii_category_code(RxPdo), 0x33U)
-  assert_eq(known_sii_category_code(Dc), 0x3CU)
-  assert_eq(known_sii_category_code(Timeouts), 0x46U)
-  assert_eq(known_sii_category_code(Dictionary), 0x50U)
-  assert_eq(known_sii_category_code(Hardware), 0x5AU)
-  assert_eq(known_sii_category_code(VendorInformation), 0x64U)
-  assert_eq(known_sii_category_code(Images), 0x6EU)
-  assert_eq(known_sii_category_code(Raw), 0U)
+  @debug.assert_eq(known_sii_category_code(Strings), 0x0AU)
+  @debug.assert_eq(known_sii_category_code(DataTypes), 0x14U)
+  @debug.assert_eq(known_sii_category_code(General), 0x1EU)
+  @debug.assert_eq(known_sii_category_code(Fmmu), 0x28U)
+  @debug.assert_eq(known_sii_category_code(SyncManager), 0x29U)
+  @debug.assert_eq(known_sii_category_code(FmmuEx), 0x2AU)
+  @debug.assert_eq(known_sii_category_code(SyncUnit), 0x2BU)
+  @debug.assert_eq(known_sii_category_code(TxPdo), 0x32U)
+  @debug.assert_eq(known_sii_category_code(RxPdo), 0x33U)
+  @debug.assert_eq(known_sii_category_code(Dc), 0x3CU)
+  @debug.assert_eq(known_sii_category_code(Timeouts), 0x46U)
+  @debug.assert_eq(known_sii_category_code(Dictionary), 0x50U)
+  @debug.assert_eq(known_sii_category_code(Hardware), 0x5AU)
+  @debug.assert_eq(known_sii_category_code(VendorInformation), 0x64U)
+  @debug.assert_eq(known_sii_category_code(Images), 0x6EU)
+  @debug.assert_eq(known_sii_category_code(Raw), 0U)
 }
 
 ///|
 test "encode_sii_fmmu DynamicOutputs" {
   let fmmu : Array[@mailbox.FmmuDirection] = [DynamicOutputs, DynamicInputs]
   let result = encode_sii_fmmu(fmmu)
-  assert_eq(result[0], b'\x05')
-  assert_eq(result[1], b'\x06')
+  @debug.assert_eq(result[0], b'\x05')
+  @debug.assert_eq(result[1], b'\x06')
 }
 
 ///|
@@ -3862,79 +3884,79 @@ test "encode_sii_sync_managers DynamicProcessDataOut" {
   ]
   let result = encode_sii_sync_managers(sms)
   // sm_type byte is at offset 7 for each SM entry (8 bytes per entry)
-  assert_eq(result[7], b'\x05')
+  @debug.assert_eq(result[7], b'\x05')
 }
 
 ///|
 test "push_i16 positive" {
   let values : Array[Byte] = []
   push_i16(values, 256)
-  assert_eq(values[0], b'\x00')
-  assert_eq(values[1], b'\x01')
+  @debug.assert_eq(values[0], b'\x00')
+  @debug.assert_eq(values[1], b'\x01')
 }
 
 ///|
 test "push_i16 negative" {
   let values : Array[Byte] = []
   push_i16(values, -1)
-  assert_eq(values[0], b'\xFF')
-  assert_eq(values[1], b'\xFF')
+  @debug.assert_eq(values[0], b'\xFF')
+  @debug.assert_eq(values[1], b'\xFF')
 }
 
 ///|
 test "push_i16 negative small" {
   let values : Array[Byte] = []
   push_i16(values, -256)
-  assert_eq(values[0], b'\x00')
-  assert_eq(values[1], b'\xFF')
+  @debug.assert_eq(values[0], b'\x00')
+  @debug.assert_eq(values[1], b'\xFF')
 }
 
 ///|
 test "encode_eeprom_size_raw small" {
-  assert_eq(encode_eeprom_size_raw(0x80U), 0U)
-  assert_eq(encode_eeprom_size_raw(0x40U), 0U)
+  @debug.assert_eq(encode_eeprom_size_raw(0x80U), 0U)
+  @debug.assert_eq(encode_eeprom_size_raw(0x40U), 0U)
 }
 
 ///|
 test "encode_eeprom_size_raw larger" {
   // 0x100 = 256 bytes: (256 - 128) >> 7 = 1
-  assert_eq(encode_eeprom_size_raw(0x100U), 1U)
+  @debug.assert_eq(encode_eeprom_size_raw(0x100U), 1U)
   // 0x200 = 512: (512 - 128) >> 7 = 3
-  assert_eq(encode_eeprom_size_raw(0x200U), 3U)
+  @debug.assert_eq(encode_eeprom_size_raw(0x200U), 3U)
 }
 
 ///|
 test "build_mailbox_protocol_mask all false" {
   let mb = make_minimal_esi_mailbox()
   let mask = build_mailbox_protocol_mask(mb)
-  assert_eq(mask, 0U)
+  @debug.assert_eq(mask, 0U)
 }
 
 ///|
 test "pad_even_bytes odd length" {
   let data = Bytes::from_array([b'\x01', b'\x02', b'\x03'])
   let result = pad_even_bytes(data)
-  assert_eq(result.length(), 4)
-  assert_eq(result[3], b'\x00')
+  @debug.assert_eq(result.length(), 4)
+  @debug.assert_eq(result[3], b'\x00')
 }
 
 ///|
 test "pad_even_bytes even length" {
   let data = Bytes::from_array([b'\x01', b'\x02'])
   let result = pad_even_bytes(data)
-  assert_eq(result.length(), 2)
+  @debug.assert_eq(result.length(), 2)
 }
 
 ///|
 test "read_u16_from_bytes normal" {
   let data = Bytes::from_array([b'\x34', b'\x12'])
-  assert_eq(read_u16_from_bytes(data, 0), 0x1234U)
+  @debug.assert_eq(read_u16_from_bytes(data, 0), 0x1234U)
 }
 
 ///|
 test "read_u16_from_bytes out of bounds" {
   let data = Bytes::from_array([b'\x34'])
-  assert_eq(read_u16_from_bytes(data, 0), 0U)
+  @debug.assert_eq(read_u16_from_bytes(data, 0), 0U)
 }
 
 ///|
@@ -3968,36 +3990,36 @@ test "build_coe_details_byte all true" {
     voe: false,
   }
   let details = build_coe_details_byte(mb)
-  assert_eq(details.to_int() & 0x01, 1) // coe_present
-  assert_eq(details.to_int() & 0x02, 2) // coe_sdo_info
-  assert_eq(details.to_int() & 0x04, 4) // coe_pdo_assign
-  assert_eq(details.to_int() & 0x08, 8) // coe_pdo_config
-  assert_eq(details.to_int() & 0x20, 0x20) // coe_complete_access
+  @debug.assert_eq(details.to_int() & 0x01, 1) // coe_present
+  @debug.assert_eq(details.to_int() & 0x02, 2) // coe_sdo_info
+  @debug.assert_eq(details.to_int() & 0x04, 4) // coe_pdo_assign
+  @debug.assert_eq(details.to_int() & 0x08, 8) // coe_pdo_config
+  @debug.assert_eq(details.to_int() & 0x20, 0x20) // coe_complete_access
 }
 
 ///|
 test "encode_sii_strings basic" {
   let strings : Array[String] = ["AB", "C"]
   let result = encode_sii_strings(strings)
-  assert_eq(result[0], b'\x02') // count
-  assert_eq(result[1], b'\x02') // length of "AB"
-  assert_eq(result[2], b'\x41') // 'A'
-  assert_eq(result[3], b'\x42') // 'B'
-  assert_eq(result[4], b'\x01') // length of "C"
-  assert_eq(result[5], b'\x43') // 'C'
+  @debug.assert_eq(result[0], b'\x02') // count
+  @debug.assert_eq(result[1], b'\x02') // length of "AB"
+  @debug.assert_eq(result[2], b'\x41') // 'A'
+  @debug.assert_eq(result[3], b'\x42') // 'B'
+  @debug.assert_eq(result[4], b'\x01') // length of "C"
+  @debug.assert_eq(result[5], b'\x43') // 'C'
 }
 
 ///|
 test "minimum_eeprom_size empty categories" {
   let cats : Array[@mailbox.SiiCategoryEntry] = []
-  assert_eq(minimum_eeprom_size(cats), 132U) // 128 + 4
+  @debug.assert_eq(minimum_eeprom_size(cats), 132U) // 128 + 4
 }
 
 ///|
 test "max_uint" {
-  assert_eq(max_uint(10U, 20U), 20U)
-  assert_eq(max_uint(20U, 10U), 20U)
-  assert_eq(max_uint(5U, 5U), 5U)
+  @debug.assert_eq(max_uint(10U, 20U), 20U)
+  @debug.assert_eq(max_uint(20U, 10U), 20U)
+  @debug.assert_eq(max_uint(5U, 5U), 5U)
 }
 
 // ── Batch 4: esi_json helper constructors for testing ──
@@ -4136,14 +4158,14 @@ test "decode_optional_eni_json_string with non-string" {
 ///|
 test "decode_optional_eni_json_string None" {
   let result = decode_optional_eni_json_string(None)
-  assert_eq(result, None)
+  @debug.assert_eq(result, None)
 }
 
 ///|
 test "decode_optional_eni_json_string Some(Null)" {
   let json = @json.parse("null"[:]) catch { _ => panic() }
   let result = decode_optional_eni_json_string(Some(json))
-  assert_eq(result, None)
+  @debug.assert_eq(result, None)
 }
 
 ///|
@@ -4273,14 +4295,14 @@ test "decode_eni_json_presence non-optional string" {
 test "next_scan_station_address normal" {
   let used : Array[UInt] = []
   let addr = next_scan_station_address(used)
-  assert_eq(addr, 0x1001U)
+  @debug.assert_eq(addr, 0x1001U)
 }
 
 ///|
 test "next_scan_station_address skips used" {
   let used : Array[UInt] = [0x1001U, 0x1002U]
   let addr = next_scan_station_address(used)
-  assert_eq(addr, 0x1003U)
+  @debug.assert_eq(addr, 0x1003U)
 }
 
 ///|
@@ -4299,7 +4321,7 @@ test "project_esi_startup_mailbox_commands unknown transition" {
     ],
   }
   let cmds = project_esi_startup_mailbox_commands(device2)
-  assert_eq(cmds.length(), 0)
+  @debug.assert_eq(cmds.length(), 0)
 }
 
 ///|
@@ -4316,11 +4338,11 @@ test "project_esi_startup_mailbox_commands maps PS to PreOpToSafeOp" {
     ],
   }
   let cmds = project_esi_startup_mailbox_commands(device)
-  assert_eq(cmds.length(), 1)
-  assert_eq(cmds[0].transition, PreOpToSafeOp)
-  assert_eq(cmds[0].index, 0x1C12U)
-  assert_eq(cmds[0].subindex, b'\x00')
-  assert_eq(cmds[0].data, Bytes::from_array([b'\x01', b'\x00', b'\x16']))
+  @debug.assert_eq(cmds.length(), 1)
+  @debug.assert_eq(cmds[0].transition, PreOpToSafeOp)
+  @debug.assert_eq(cmds[0].index, 0x1C12U)
+  @debug.assert_eq(cmds[0].subindex, b'\x00')
+  @debug.assert_eq(cmds[0].data, Bytes::from_array([b'\x01', b'\x00', b'\x16']))
 }
 
 ///|
@@ -4349,10 +4371,10 @@ test "project_esi_startup_mailbox_commands preserves all mapped transitions" {
     ],
   }
   let cmds = project_esi_startup_mailbox_commands(device)
-  assert_eq(cmds.length(), 3)
-  assert_eq(cmds[0].transition, InitToPreOp)
-  assert_eq(cmds[1].transition, OpToPreOp)
-  assert_eq(cmds[2].transition, BootToInit)
+  @debug.assert_eq(cmds.length(), 3)
+  @debug.assert_eq(cmds[0].transition, InitToPreOp)
+  @debug.assert_eq(cmds[1].transition, OpToPreOp)
+  @debug.assert_eq(cmds[2].transition, BootToInit)
 }
 
 ///|
@@ -4380,12 +4402,12 @@ test "merge_startup_mailbox_commands keeps derived presafeop commands and overri
     },
   ]
   let merged = merge_startup_mailbox_commands(derived, explicit)
-  assert_eq(merged.length(), 2)
-  assert_eq(merged[0].transition, PreOpToSafeOp)
-  assert_eq(merged[0].index, 0x1C12U)
-  assert_eq(merged[1].transition, SafeOpToOp)
-  assert_eq(merged[1].index, 0x6060U)
-  assert_eq(merged[1].data, Bytes::from_array([b'\x09']))
+  @debug.assert_eq(merged.length(), 2)
+  @debug.assert_eq(merged[0].transition, PreOpToSafeOp)
+  @debug.assert_eq(merged[0].index, 0x1C12U)
+  @debug.assert_eq(merged[1].transition, SafeOpToOp)
+  @debug.assert_eq(merged[1].index, 0x6060U)
+  @debug.assert_eq(merged[1].data, Bytes::from_array([b'\x09']))
 }
 
 ///|
@@ -4426,8 +4448,8 @@ test "eni_json_document_from_configuration round trip" {
     ],
   }
   let doc = eni_json_document_from_configuration(config)
-  assert_eq(doc.slaves.length(), 1)
-  assert_eq(doc.slaves[0].position, 0)
+  @debug.assert_eq(doc.slaves.length(), 1)
+  @debug.assert_eq(doc.slaves[0].position, 0)
 }
 
 ///|
@@ -4457,58 +4479,58 @@ test "runtime_metrics_issues all branches" {
   t.retries = 3L
   let issues = runtime_metrics_issues(t, 100, 95)
   // 4 issues: timeouts>0, wkc_errors>0, retries>0, cycles_ok<cycles_requested
-  assert_eq(issues.length(), 4)
+  @debug.assert_eq(issues.length(), 4)
 }
 
 ///|
 test "runtime_metrics_issues clean" {
   let t = Telemetry::new()
   let issues = runtime_metrics_issues(t, 100, 100)
-  assert_eq(issues.length(), 0)
+  @debug.assert_eq(issues.length(), 0)
 }
 
 ///|
 test "diagnosis_bytes_preview empty" {
-  assert_eq(diagnosis_bytes_preview(b""), "<empty>")
+  @debug.assert_eq(diagnosis_bytes_preview(b""), "<empty>")
 }
 
 ///|
 test "diagnosis_bytes_preview single byte" {
-  assert_eq(diagnosis_bytes_preview(Bytes::make(1, 0xAB)), "0xAB")
+  @debug.assert_eq(diagnosis_bytes_preview(Bytes::make(1, 0xAB)), "0xAB")
 }
 
 ///|
 test "diagnosis_bytes_preview multi byte" {
   let data = Bytes::makei(2, fn(i) { if i == 0 { b'\x01' } else { b'\xFF' } })
-  assert_eq(diagnosis_bytes_preview(data), "0x01 0xFF")
+  @debug.assert_eq(diagnosis_bytes_preview(data), "0x01 0xFF")
 }
 
 ///|
 test "diagnosis_hex_byte covers all digits" {
-  assert_eq(diagnosis_hex_byte(b'\x00'), "0x00")
-  assert_eq(diagnosis_hex_byte(b'\x1A'), "0x1A")
-  assert_eq(diagnosis_hex_byte(b'\xBF'), "0xBF")
-  assert_eq(diagnosis_hex_byte(b'\xFF'), "0xFF")
+  @debug.assert_eq(diagnosis_hex_byte(b'\x00'), "0x00")
+  @debug.assert_eq(diagnosis_hex_byte(b'\x1A'), "0x1A")
+  @debug.assert_eq(diagnosis_hex_byte(b'\xBF'), "0xBF")
+  @debug.assert_eq(diagnosis_hex_byte(b'\xFF'), "0xFF")
 }
 
 ///|
 test "diagnosis_hex_digit all values" {
-  assert_eq(diagnosis_hex_digit(0), "0")
-  assert_eq(diagnosis_hex_digit(1), "1")
-  assert_eq(diagnosis_hex_digit(2), "2")
-  assert_eq(diagnosis_hex_digit(3), "3")
-  assert_eq(diagnosis_hex_digit(4), "4")
-  assert_eq(diagnosis_hex_digit(5), "5")
-  assert_eq(diagnosis_hex_digit(6), "6")
-  assert_eq(diagnosis_hex_digit(7), "7")
-  assert_eq(diagnosis_hex_digit(8), "8")
-  assert_eq(diagnosis_hex_digit(9), "9")
-  assert_eq(diagnosis_hex_digit(10), "A")
-  assert_eq(diagnosis_hex_digit(11), "B")
-  assert_eq(diagnosis_hex_digit(12), "C")
-  assert_eq(diagnosis_hex_digit(13), "D")
-  assert_eq(diagnosis_hex_digit(14), "E")
-  assert_eq(diagnosis_hex_digit(15), "F")
+  @debug.assert_eq(diagnosis_hex_digit(0), "0")
+  @debug.assert_eq(diagnosis_hex_digit(1), "1")
+  @debug.assert_eq(diagnosis_hex_digit(2), "2")
+  @debug.assert_eq(diagnosis_hex_digit(3), "3")
+  @debug.assert_eq(diagnosis_hex_digit(4), "4")
+  @debug.assert_eq(diagnosis_hex_digit(5), "5")
+  @debug.assert_eq(diagnosis_hex_digit(6), "6")
+  @debug.assert_eq(diagnosis_hex_digit(7), "7")
+  @debug.assert_eq(diagnosis_hex_digit(8), "8")
+  @debug.assert_eq(diagnosis_hex_digit(9), "9")
+  @debug.assert_eq(diagnosis_hex_digit(10), "A")
+  @debug.assert_eq(diagnosis_hex_digit(11), "B")
+  @debug.assert_eq(diagnosis_hex_digit(12), "C")
+  @debug.assert_eq(diagnosis_hex_digit(13), "D")
+  @debug.assert_eq(diagnosis_hex_digit(14), "E")
+  @debug.assert_eq(diagnosis_hex_digit(15), "F")
 }
 
 ///|
@@ -4519,13 +4541,13 @@ test "decode_le_u32_payload empty" {
 ///|
 test "decode_le_u32_payload single byte" {
   let data = Bytes::make(1, 0x42)
-  assert_eq(decode_le_u32_payload(data), Some(0x42U))
+  @debug.assert_eq(decode_le_u32_payload(data), Some(0x42U))
 }
 
 ///|
 test "decode_le_u32_payload two bytes" {
   let data = Bytes::makei(2, fn(i) { if i == 0 { b'\xCD' } else { b'\xAB' } })
-  assert_eq(decode_le_u32_payload(data), Some(0xABCDU))
+  @debug.assert_eq(decode_le_u32_payload(data), Some(0xABCDU))
 }
 
 ///|
@@ -4539,7 +4561,7 @@ test "decode_le_u32_payload four bytes" {
       _ => b'\x00'
     }
   })
-  assert_eq(decode_le_u32_payload(data), Some(0x12345678U))
+  @debug.assert_eq(decode_le_u32_payload(data), Some(0x12345678U))
 }
 
 ///|
@@ -4553,7 +4575,7 @@ test "decode_le_u32_payload more than 4 bytes takes first 4" {
       _ => b'\xFF'
     }
   })
-  assert_eq(decode_le_u32_payload(data), Some(0x04030201U))
+  @debug.assert_eq(decode_le_u32_payload(data), Some(0x04030201U))
 }
 
 ///|
@@ -4574,7 +4596,7 @@ test "lookup_esm_timeout_policy found" {
   }
   let policies = [(0x1001U, p1), (0x1002U, p2)]
   let p = lookup_esm_timeout_policy(policies, 0x1002U)
-  assert_eq(p.preop, Some(@hal.Duration(222L)))
+  @debug.assert_eq(p.preop, Some(@hal.Duration(222L)))
 }
 
 ///|
@@ -4587,22 +4609,22 @@ test "lookup_esm_timeout_policy not found returns default" {
 
 ///|
 test "has_process_data_length_override both None" {
-  assert_eq(has_process_data_length_override(None, None), false)
+  @debug.assert_eq(has_process_data_length_override(None, None), false)
 }
 
 ///|
 test "has_process_data_length_override output Some" {
-  assert_eq(has_process_data_length_override(Some(10), None), true)
+  @debug.assert_eq(has_process_data_length_override(Some(10), None), true)
 }
 
 ///|
 test "has_process_data_length_override input Some" {
-  assert_eq(has_process_data_length_override(None, Some(5)), true)
+  @debug.assert_eq(has_process_data_length_override(None, Some(5)), true)
 }
 
 ///|
 test "should_retry_process_data_lengths Ok no override" {
-  assert_eq(
+  @debug.assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(Ok((None, None))),
     true,
   )
@@ -4610,7 +4632,7 @@ test "should_retry_process_data_lengths Ok no override" {
 
 ///|
 test "should_retry_process_data_lengths Ok with override" {
-  assert_eq(
+  @debug.assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(
       Ok((Some(10), None)),
     ),
@@ -4620,7 +4642,7 @@ test "should_retry_process_data_lengths Ok with override" {
 
 ///|
 test "should_retry_process_data_lengths MailboxTimeout" {
-  assert_eq(
+  @debug.assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(
       Err(@hal.EcError::MailboxTimeout),
     ),
@@ -4630,7 +4652,7 @@ test "should_retry_process_data_lengths MailboxTimeout" {
 
 ///|
 test "should_retry_process_data_lengths MailboxProtocol deactivated" {
-  assert_eq(
+  @debug.assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(
       Err(
         @hal.EcError::MailboxProtocol("SM deactivated/reset after transition"),
@@ -4642,7 +4664,7 @@ test "should_retry_process_data_lengths MailboxProtocol deactivated" {
 
 ///|
 test "should_retry_process_data_lengths other error" {
-  assert_eq(
+  @debug.assert_eq(
     should_retry_process_data_lengths_after_mailbox_refresh(
       Err(@hal.EcError::RecvTimeout),
     ),
@@ -4652,17 +4674,17 @@ test "should_retry_process_data_lengths other error" {
 
 ///|
 test "prefer_dc_cycle_period current Some wins" {
-  assert_eq(prefer_dc_cycle_period(Some(100L), Some(200L)), Some(100L))
+  @debug.assert_eq(prefer_dc_cycle_period(Some(100L), Some(200L)), Some(100L))
 }
 
 ///|
 test "prefer_dc_cycle_period current None uses candidate" {
-  assert_eq(prefer_dc_cycle_period(None, Some(200L)), Some(200L))
+  @debug.assert_eq(prefer_dc_cycle_period(None, Some(200L)), Some(200L))
 }
 
 ///|
 test "prefer_dc_cycle_period both None" {
-  assert_eq(prefer_dc_cycle_period(None, None), None)
+  @debug.assert_eq(prefer_dc_cycle_period(None, None), None)
 }
 
 ///|
@@ -4683,7 +4705,7 @@ test "pdo_mapping_entry_u32 packs correctly" {
   let result = pdo_mapping_entry_u32(entry)
   // entry_index=0x6000, subindex=0x01, bit_length=0x10
   // = (0x6000 << 16) | (0x01 << 8) | 0x10
-  assert_eq(result, 0x60000110U)
+  @debug.assert_eq(result, 0x60000110U)
 }
 
 ///|
@@ -4696,7 +4718,7 @@ test "pdo_mapping_entry_u32 zero fields" {
     bit_length: b'\x00',
     flags: 0U,
   }
-  assert_eq(pdo_mapping_entry_u32(entry), 0U)
+  @debug.assert_eq(pdo_mapping_entry_u32(entry), 0U)
 }
 
 ///|
@@ -4752,7 +4774,7 @@ test "sii_prefers_not_lrw general None returns false" {
     rx_pdo: [],
     dc_clocks: [],
   }
-  assert_eq(sii_prefers_not_lrw(sii), false)
+  @debug.assert_eq(sii_prefers_not_lrw(sii), false)
 }
 
 ///|
@@ -4785,8 +4807,8 @@ test "map_with_process_data_lengths patches output SM" {
   }
   let patched = map_with_process_data_lengths(mapping, 0U, Some(16), None)
   // The output SM should be patched to 16
-  assert_eq(patched.sm_configs[0].length, 16U)
-  assert_eq(patched.output_bytes, 16)
+  @debug.assert_eq(patched.sm_configs[0].length, 16U)
+  @debug.assert_eq(patched.output_bytes, 16)
 }
 
 ///|
@@ -4818,15 +4840,15 @@ test "map_with_process_data_lengths None passthrough" {
     input_bytes: 0,
   }
   let patched = map_with_process_data_lengths(mapping, 0U, None, None)
-  assert_eq(patched.sm_configs[0].length, 4U)
+  @debug.assert_eq(patched.sm_configs[0].length, 4U)
 }
 
 ///|
 test "uint_to_hex nonzero values" {
-  assert_eq(uint_to_hex(0x1001U), "1001")
-  assert_eq(uint_to_hex(0xFFU), "ff")
-  assert_eq(uint_to_hex(1U), "1")
-  assert_eq(uint_to_hex(0U), "0")
+  @debug.assert_eq(uint_to_hex(0x1001U), "1001")
+  @debug.assert_eq(uint_to_hex(0xFFU), "ff")
+  @debug.assert_eq(uint_to_hex(1U), "1")
+  @debug.assert_eq(uint_to_hex(0U), "0")
 }
 
 ///|
@@ -4851,7 +4873,7 @@ test "pdo_complete_access_data single entry" {
   }
   let data = pdo_complete_access_data(pdo)
   // First byte = entry count
-  assert_eq(data[0], b'\x01')
+  @debug.assert_eq(data[0], b'\x01')
   // Then 4 bytes of mapping entry
   assert_true(data.length() == 5)
 }
@@ -4880,9 +4902,9 @@ test "sm_assignment_complete_access_data filters by sync_manager" {
   ]
   let data = sm_assignment_complete_access_data(pdos, b'\x02')
   // First byte = count of matching PDOs (only 1 with SM=2)
-  assert_eq(data[0], b'\x01')
+  @debug.assert_eq(data[0], b'\x01')
   // Then 2 bytes for index 0x1600
-  assert_eq(data.length(), 3)
+  @debug.assert_eq(data.length(), 3)
 }
 
 // ===== Batch 8: diagnosis, eoe_switch, scan private helpers =====
@@ -4891,23 +4913,23 @@ test "sm_assignment_complete_access_data filters by sync_manager" {
 test "diagnostic_level_rank ordering" {
   assert_true(diagnostic_level_rank(Info) < diagnostic_level_rank(Degrade))
   assert_true(diagnostic_level_rank(Degrade) < diagnostic_level_rank(Block))
-  assert_eq(diagnostic_level_rank(Info), 0)
-  assert_eq(diagnostic_level_rank(Degrade), 1)
-  assert_eq(diagnostic_level_rank(Block), 2)
+  @debug.assert_eq(diagnostic_level_rank(Info), 0)
+  @debug.assert_eq(diagnostic_level_rank(Degrade), 1)
+  @debug.assert_eq(diagnostic_level_rank(Block), 2)
 }
 
 ///|
 test "diagnostic_level_from_validate_grade mapping" {
-  assert_eq(diagnostic_level_from_validate_grade(Pass), Info)
-  assert_eq(diagnostic_level_from_validate_grade(Warn), Degrade)
-  assert_eq(diagnostic_level_from_validate_grade(Block), Block)
+  @debug.assert_eq(diagnostic_level_from_validate_grade(Pass), Info)
+  @debug.assert_eq(diagnostic_level_from_validate_grade(Warn), Degrade)
+  @debug.assert_eq(diagnostic_level_from_validate_grade(Block), Block)
 }
 
 ///|
 test "highest_diagnostic_level empty list uses fallback" {
   let issues : Array[DiagnosticIssue] = []
-  assert_eq(highest_diagnostic_level(issues, Info), Info)
-  assert_eq(highest_diagnostic_level(issues, Block), Block)
+  @debug.assert_eq(highest_diagnostic_level(issues, Info), Info)
+  @debug.assert_eq(highest_diagnostic_level(issues, Block), Block)
 }
 
 ///|
@@ -4926,7 +4948,7 @@ test "highest_diagnostic_level picks highest among issues" {
       detail: "warn",
     },
   ]
-  assert_eq(highest_diagnostic_level(issues, Info), Degrade)
+  @debug.assert_eq(highest_diagnostic_level(issues, Info), Degrade)
 }
 
 ///|
@@ -4939,7 +4961,7 @@ test "highest_diagnostic_level Block overrides all" {
       detail: "fatal",
     },
   ]
-  assert_eq(highest_diagnostic_level(issues, Info), Block)
+  @debug.assert_eq(highest_diagnostic_level(issues, Info), Block)
 }
 
 ///|
@@ -4968,15 +4990,15 @@ test "runtime_metrics_summary maps telemetry fields" {
     emergency_events: 0L,
   }
   let s = runtime_metrics_summary(tel)
-  assert_eq(s.cycles, 100L)
-  assert_eq(s.tx_frames, 50L)
-  assert_eq(s.rx_frames, 48L)
-  assert_eq(s.timeouts, 2L)
-  assert_eq(s.retries, 1L)
-  assert_eq(s.wkc_errors, 3L)
-  assert_eq(s.irq_events, 10L)
-  assert_eq(s.dc_delay_updates, 5L)
-  assert_eq(s.emergency_events, 0L)
+  @debug.assert_eq(s.cycles, 100L)
+  @debug.assert_eq(s.tx_frames, 50L)
+  @debug.assert_eq(s.rx_frames, 48L)
+  @debug.assert_eq(s.timeouts, 2L)
+  @debug.assert_eq(s.retries, 1L)
+  @debug.assert_eq(s.wkc_errors, 3L)
+  @debug.assert_eq(s.irq_events, 10L)
+  @debug.assert_eq(s.dc_delay_updates, 5L)
+  @debug.assert_eq(s.emergency_events, 0L)
 }
 
 ///|
@@ -4993,7 +5015,7 @@ test "runtime_metrics_issues no issues when clean" {
     emergency_events: 0L,
   }
   let issues = runtime_metrics_issues(tel, 10, 10)
-  assert_eq(issues.length(), 0)
+  @debug.assert_eq(issues.length(), 0)
 }
 
 ///|
@@ -5010,7 +5032,7 @@ test "runtime_metrics_issues timeout and wkc and retry and incomplete" {
     emergency_events: 0L,
   }
   let issues = runtime_metrics_issues(tel, 10, 7)
-  assert_eq(issues.length(), 4)
+  @debug.assert_eq(issues.length(), 4)
 }
 
 ///|
@@ -5105,10 +5127,10 @@ test "configuration_surface_summary maps scan report" {
     Some(Pass),
     0,
   )
-  assert_eq(s.slave_count, 2)
-  assert_eq(s.station_addresses.length(), 2)
-  assert_eq(s.station_addresses[0], 0x1001U)
-  assert_eq(s.difference_count, 0)
+  @debug.assert_eq(s.slave_count, 2)
+  @debug.assert_eq(s.station_addresses.length(), 2)
+  @debug.assert_eq(s.station_addresses[0], 0x1001U)
+  @debug.assert_eq(s.difference_count, 0)
 }
 
 // ===== EoE switch private helpers =====
@@ -5126,19 +5148,19 @@ test "EoeStationContext next_counter wraps 1 to 7" {
   let ctx = EoeStationContext::new(0x1001U, mb)
   // Initial mb_counter = 1
   let c1 = ctx.next_counter()
-  assert_eq(c1, b'\x01')
+  @debug.assert_eq(c1, b'\x01')
   let c2 = ctx.next_counter()
-  assert_eq(c2, b'\x02')
+  @debug.assert_eq(c2, b'\x02')
   // Advance to 7
   let _ = ctx.next_counter() // 3
   let _ = ctx.next_counter() // 4
   let _ = ctx.next_counter() // 5
   let _ = ctx.next_counter() // 6
   let c7 = ctx.next_counter()
-  assert_eq(c7, b'\x07')
+  @debug.assert_eq(c7, b'\x07')
   // Should wrap to 1
   let c_wrap = ctx.next_counter()
-  assert_eq(c_wrap, b'\x01')
+  @debug.assert_eq(c_wrap, b'\x01')
 }
 
 ///|
@@ -5154,10 +5176,10 @@ test "EoeStationContext next_frame_number wraps 0 to 15" {
   let ctx = EoeStationContext::new(0x1001U, mb)
   // Should produce 0..15 then wrap
   for i = 0; i < 16; i = i + 1 {
-    assert_eq(ctx.next_frame_number(), i.reinterpret_as_uint())
+    @debug.assert_eq(ctx.next_frame_number(), i.reinterpret_as_uint())
   }
   // Should wrap to 0
-  assert_eq(ctx.next_frame_number(), 0U)
+  @debug.assert_eq(ctx.next_frame_number(), 0U)
 }
 
 ///|
@@ -5172,7 +5194,7 @@ test "EoeStationContext get_reassembly allocates new buffer" {
   }
   let ctx = EoeStationContext::new(0x1001U, mb)
   let buf = ctx.get_reassembly(5U)
-  assert_eq(buf.frame_number, 5U)
+  @debug.assert_eq(buf.frame_number, 5U)
 }
 
 ///|
@@ -5189,7 +5211,7 @@ test "EoeStationContext get_reassembly returns existing" {
   let buf1 = ctx.get_reassembly(3U)
   buf1.total_bytes = 42
   let buf2 = ctx.get_reassembly(3U)
-  assert_eq(buf2.total_bytes, 42)
+  @debug.assert_eq(buf2.total_bytes, 42)
 }
 
 ///|
@@ -5207,7 +5229,7 @@ test "EoeStationContext clear_reassembly removes buffer" {
   ctx.clear_reassembly(7U)
   // After clearing, get_reassembly should return a new (empty) buffer
   let buf2 = ctx.get_reassembly(7U)
-  assert_eq(buf2.total_bytes, 0)
+  @debug.assert_eq(buf2.total_bytes, 0)
 }
 
 // ===== Batch 24: encode_sii_sync_managers DynamicProcessDataIn, build_general_projection =====
@@ -5226,7 +5248,7 @@ test "encode_sii_sync_managers DynamicProcessDataIn" {
   ]
   let result = encode_sii_sync_managers(sms)
   // sm_type byte is at offset 7 for each SM entry (8 bytes per entry)
-  assert_eq(result[7], b'\x06')
+  @debug.assert_eq(result[7], b'\x06')
 }
 
 ///|
@@ -5251,7 +5273,7 @@ test "build_general_projection soe true sets soe_channels" {
   }
   let strings : Array[String] = []
   let general = build_general_projection(device, strings)
-  assert_eq(general.soe_channels, b'\x01')
+  @debug.assert_eq(general.soe_channels, b'\x01')
   assert_true(general.soe_supported)
 }
 
@@ -5261,7 +5283,7 @@ test "build_general_projection non-ds402 sets ds402_channels zero" {
   // profile_no is None (not DS402)
   let strings : Array[String] = []
   let general = build_general_projection(device, strings)
-  assert_eq(general.ds402_channels, b'\x00')
+  @debug.assert_eq(general.ds402_channels, b'\x00')
 }
 
 ///|
@@ -5278,15 +5300,15 @@ test "intern_sii_string too many strings raises" {
 test "EoeReassemblyBuffer insert and assemble multi-fragment" {
   let buf = EoeReassemblyBuffer::new(0U)
   let complete1 = buf.insert(0U, false, b"\x01\x02")
-  assert_eq(complete1, false)
+  @debug.assert_eq(complete1, false)
   let complete2 = buf.insert(1U, true, b"\x03\x04")
-  assert_eq(complete2, true)
+  @debug.assert_eq(complete2, true)
   let assembled = buf.assemble()
-  assert_eq(assembled.length(), 4)
-  assert_eq(assembled[0], b'\x01')
-  assert_eq(assembled[1], b'\x02')
-  assert_eq(assembled[2], b'\x03')
-  assert_eq(assembled[3], b'\x04')
+  @debug.assert_eq(assembled.length(), 4)
+  @debug.assert_eq(assembled[0], b'\x01')
+  @debug.assert_eq(assembled[1], b'\x02')
+  @debug.assert_eq(assembled[2], b'\x03')
+  @debug.assert_eq(assembled[3], b'\x04')
 }
 
 ///|
@@ -5322,7 +5344,7 @@ test "identity_is_zero all zeros" {
     revision: 0U,
     serial: 0U,
   }
-  assert_eq(identity_is_zero(id), true)
+  @debug.assert_eq(identity_is_zero(id), true)
 }
 
 ///|
@@ -5333,22 +5355,22 @@ test "identity_is_zero nonzero vendor" {
     revision: 0U,
     serial: 0U,
   }
-  assert_eq(identity_is_zero(id), false)
+  @debug.assert_eq(identity_is_zero(id), false)
 }
 
 ///|
 test "array_contains_uint found" {
-  assert_eq(array_contains_uint([1U, 2U, 3U], 2U), true)
+  @debug.assert_eq(array_contains_uint([1U, 2U, 3U], 2U), true)
 }
 
 ///|
 test "array_contains_uint not found" {
-  assert_eq(array_contains_uint([1U, 2U, 3U], 4U), false)
+  @debug.assert_eq(array_contains_uint([1U, 2U, 3U], 4U), false)
 }
 
 ///|
 test "array_contains_uint empty" {
-  assert_eq(array_contains_uint([], 1U), false)
+  @debug.assert_eq(array_contains_uint([], 1U), false)
 }
 
 ///|
@@ -5357,7 +5379,7 @@ test "scan_station_address_occurs_once unique" {
     { position: 0U, current_station_address: 0x1001U },
     { position: 1U, current_station_address: 0x1002U },
   ]
-  assert_eq(scan_station_address_occurs_once(0x1001U, observed), true)
+  @debug.assert_eq(scan_station_address_occurs_once(0x1001U, observed), true)
 }
 
 ///|
@@ -5366,7 +5388,7 @@ test "scan_station_address_occurs_once duplicated" {
     { position: 0U, current_station_address: 0x1001U },
     { position: 1U, current_station_address: 0x1001U },
   ]
-  assert_eq(scan_station_address_occurs_once(0x1001U, observed), false)
+  @debug.assert_eq(scan_station_address_occurs_once(0x1001U, observed), false)
 }
 
 ///|
@@ -5374,7 +5396,7 @@ test "scan_station_address_occurs_once not present" {
   let observed : Array[ObservedSlaveAddress] = [
     { position: 0U, current_station_address: 0x1001U },
   ]
-  assert_eq(scan_station_address_occurs_once(0x9999U, observed), false)
+  @debug.assert_eq(scan_station_address_occurs_once(0x9999U, observed), false)
 }
 
 ///|
@@ -5382,7 +5404,7 @@ test "should_preserve_scan_station_address zero returns false" {
   let observed : Array[ObservedSlaveAddress] = [
     { position: 0U, current_station_address: 0U },
   ]
-  assert_eq(should_preserve_scan_station_address(0U, observed), false)
+  @debug.assert_eq(should_preserve_scan_station_address(0U, observed), false)
 }
 
 ///|
@@ -5390,7 +5412,10 @@ test "should_preserve_scan_station_address unique non-zero returns true" {
   let observed : Array[ObservedSlaveAddress] = [
     { position: 0U, current_station_address: 0x2000U },
   ]
-  assert_eq(should_preserve_scan_station_address(0x2000U, observed), true)
+  @debug.assert_eq(
+    should_preserve_scan_station_address(0x2000U, observed),
+    true,
+  )
 }
 
 ///|
@@ -5402,8 +5427,8 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero preserves un
   let planned = plan_scan_station_addresses_preserve_existing_unique_non_zero(
     observed,
   )
-  assert_eq(planned[0], 0x2000U)
-  assert_eq(planned[1], 0x3000U)
+  @debug.assert_eq(planned[0], 0x2000U)
+  @debug.assert_eq(planned[1], 0x3000U)
 }
 
 ///|
@@ -5416,8 +5441,8 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero reassigns du
     observed,
   )
   // Both duplicated → both get reassigned starting at scan_station_address_base
-  assert_eq(planned[0], 0x1001U) // scan_station_address_base = 0x1001, but also same as current
-  assert_eq(planned.length(), 2)
+  @debug.assert_eq(planned[0], 0x1001U) // scan_station_address_base = 0x1001, but also same as current
+  @debug.assert_eq(planned.length(), 2)
   // Second should be different from first
   assert_true(planned[0] != planned[1])
 }
@@ -5431,7 +5456,7 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero reassigns ze
     observed,
   )
   // Zero address gets reassigned
-  assert_eq(planned[0], 0x1001U) // scan_station_address_base
+  @debug.assert_eq(planned[0], 0x1001U) // scan_station_address_base
 }
 
 // ===== Batch 21: esi_json decode helpers — error paths =====
@@ -5482,14 +5507,14 @@ test "decode_esi_json_byte with negative value raises" {
 test "decode_esi_json_optional_uint with null returns None" {
   let json = @json.parse("null"[:]) catch { _ => panic() }
   let result = decode_esi_json_optional_uint(json)
-  assert_eq(result, None)
+  @debug.assert_eq(result, None)
 }
 
 ///|
 test "decode_esi_json_optional_uint with number returns Some" {
   let json = @json.parse("42"[:]) catch { _ => panic() }
   let result = decode_esi_json_optional_uint(json)
-  assert_eq(result, Some(42U))
+  @debug.assert_eq(result, Some(42U))
 }
 
 ///|
@@ -5497,9 +5522,9 @@ test "decode_esi_json_bytes with array fallback" {
   // When direct @json.from_json fails (Array of numbers), fallback to manual decode
   let json = @json.parse("[16, 32, 48]"[:]) catch { _ => panic() }
   let result = decode_esi_json_bytes(json)
-  assert_eq(result[0], b'\x10')
-  assert_eq(result[1], b'\x20')
-  assert_eq(result[2], b'\x30')
+  @debug.assert_eq(result[0], b'\x10')
+  @debug.assert_eq(result[1], b'\x20')
+  @debug.assert_eq(result[2], b'\x30')
 }
 
 ///|
@@ -5580,6 +5605,6 @@ test "resolve_selected_module_pdos skips missing module_ident" {
   }
   let modules : Array[EsiJsonModule] = [] // no modules → None path
   let (tx, rx) = resolve_selected_module_pdos(device, modules)
-  assert_eq(tx.length(), 0)
-  assert_eq(rx.length(), 0)
+  @debug.assert_eq(tx.length(), 0)
+  @debug.assert_eq(rx.length(), 0)
 }

@@ -1,7 +1,10 @@
 ///|
 test "verdict_to_diagnostic_level maps Pass and Warn to Info" {
-  assert_eq(@runtime.verdict_to_diagnostic_level(@runtime.Pass), @runtime.Info)
-  assert_eq(
+  @debug.assert_eq(
+    @runtime.verdict_to_diagnostic_level(@runtime.Pass),
+    @runtime.Info,
+  )
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Warn("w")),
     @runtime.Info,
   )
@@ -9,11 +12,11 @@ test "verdict_to_diagnostic_level maps Pass and Warn to Info" {
 
 ///|
 test "verdict_to_diagnostic_level maps Fail to Degrade and Block to Block" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Fail("f")),
     @runtime.Degrade,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Block("b")),
     @runtime.Block,
   )
@@ -34,9 +37,9 @@ test "monitor_result_to_issue converts Warn to Info issue" {
   guard @runtime.monitor_result_to_issue(r) is Some(issue) else {
     fail("expected Some")
   }
-  assert_eq(issue.source, @runtime.Monitor)
-  assert_eq(issue.category, @runtime.MonitorVerdict)
-  assert_eq(issue.level, @runtime.Info)
+  @debug.assert_eq(issue.source, @runtime.Monitor)
+  @debug.assert_eq(issue.category, @runtime.MonitorVerdict)
+  @debug.assert_eq(issue.level, @runtime.Info)
   assert_true(issue.detail.contains("timeout"))
   assert_true(issue.detail.contains("high"))
 }
@@ -50,8 +53,8 @@ test "monitor_result_to_issue converts Fail to Degrade issue" {
   guard @runtime.monitor_result_to_issue(r) is Some(issue) else {
     fail("expected Some")
   }
-  assert_eq(issue.level, @runtime.Degrade)
-  assert_eq(issue.source, @runtime.Monitor)
+  @debug.assert_eq(issue.level, @runtime.Degrade)
+  @debug.assert_eq(issue.source, @runtime.Monitor)
 }
 
 ///|
@@ -63,7 +66,7 @@ test "monitor_result_to_issue converts Block to Block issue" {
   guard @runtime.monitor_result_to_issue(r) is Some(issue) else {
     fail("expected Some")
   }
-  assert_eq(issue.level, @runtime.Block)
+  @debug.assert_eq(issue.level, @runtime.Block)
   assert_true(issue.detail.contains("fatal"))
 }
 
@@ -100,16 +103,16 @@ test "enrich_surface_with_monitors appends monitor issues" {
     surface, results, verdict,
   )
   // Pass is filtered out, Fail and Warn become issues
-  assert_eq(enriched.issues.length(), 2)
-  assert_eq(enriched.overall_level, @runtime.Degrade)
+  @debug.assert_eq(enriched.issues.length(), 2)
+  @debug.assert_eq(enriched.overall_level, @runtime.Degrade)
   guard enriched.monitor_verdicts is Some(vs) else {
     fail("expected monitor_verdicts")
   }
-  assert_eq(vs.length(), 3)
+  @debug.assert_eq(vs.length(), 3)
   guard enriched.overall_verdict is Some(v) else {
     fail("expected overall_verdict")
   }
-  assert_eq(v, @runtime.Fail("bad"))
+  @debug.assert_eq(v, @runtime.Fail("bad"))
 }
 
 ///|
@@ -150,9 +153,9 @@ test "enrich_surface_with_monitors preserves existing issues" {
     @runtime.Pass,
   )
   // Original issue preserved, no new issues from Pass
-  assert_eq(enriched.issues.length(), 1)
-  assert_eq(enriched.issues[0].detail, "pre-existing")
-  assert_eq(enriched.overall_level, @runtime.Block)
+  @debug.assert_eq(enriched.issues.length(), 1)
+  @debug.assert_eq(enriched.issues[0].detail, "pre-existing")
+  @debug.assert_eq(enriched.overall_level, @runtime.Block)
 }
 
 ///|
@@ -186,8 +189,8 @@ test "enrich_surface_with_fingerprint attaches fingerprint" {
   guard enriched.topology_fingerprint is Some(f) else {
     fail("expected fingerprint")
   }
-  assert_eq(f.slave_count, 3)
-  assert_eq(f.identity_hash, 12345L)
+  @debug.assert_eq(f.slave_count, 3)
+  @debug.assert_eq(f.identity_hash, 12345L)
 }
 
 ///|
@@ -252,9 +255,9 @@ test "enrich_surface_with_monitors escalates overall_level" {
     results,
     @runtime.Block("shutdown"),
   )
-  assert_eq(enriched.overall_level, @runtime.Block)
-  assert_eq(enriched.issues.length(), 1)
-  assert_eq(enriched.issues[0].level, @runtime.Block)
+  @debug.assert_eq(enriched.overall_level, @runtime.Block)
+  @debug.assert_eq(enriched.issues.length(), 1)
+  @debug.assert_eq(enriched.issues[0].level, @runtime.Block)
 }
 
 // ===== Batch 12: diagnosis.mbt pub function coverage =====
@@ -263,7 +266,7 @@ test "enrich_surface_with_monitors escalates overall_level" {
 test "parse_error_register_payload valid" {
   let payload = b"\xAB"
   let result = @runtime.parse_error_register_payload(payload)
-  assert_eq(result, b'\xAB')
+  @debug.assert_eq(result, b'\xAB')
 }
 
 ///|
@@ -281,7 +284,7 @@ test "parse_u32_payload valid" {
   // 0x04030201 in little-endian
   let payload = b"\x01\x02\x03\x04"
   let result = @runtime.parse_u32_payload(payload)
-  assert_eq(result, 0x04030201U)
+  @debug.assert_eq(result, 0x04030201U)
 }
 
 ///|
@@ -321,16 +324,16 @@ test "diagnostic_surface_from_slave_diagnosis with al_error_flag" {
     dl_error_counters: None,
   }
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
-  assert_eq(surface.station_address, Some(0x1001U))
+  @debug.assert_eq(surface.station_address, Some(0x1001U))
   // Should have 4 issues: al_error_flag, al_status_code, error_register, diagnosis_counter
-  assert_eq(surface.issues.length(), 4)
-  assert_eq(surface.issues[0].level, @runtime.Block) // al_error_flag
-  assert_eq(surface.issues[1].level, @runtime.Block) // al_status_code
-  assert_eq(surface.issues[2].level, @runtime.Degrade) // error_register
-  assert_eq(surface.issues[3].level, @runtime.Info) // diagnosis_counter
-  assert_eq(surface.overall_level, @runtime.Block)
-  assert_eq(surface.error_register, Some(b'\x42'))
-  assert_eq(surface.diagnosis_counter, Some(5U))
+  @debug.assert_eq(surface.issues.length(), 4)
+  @debug.assert_eq(surface.issues[0].level, @runtime.Block) // al_error_flag
+  @debug.assert_eq(surface.issues[1].level, @runtime.Block) // al_status_code
+  @debug.assert_eq(surface.issues[2].level, @runtime.Degrade) // error_register
+  @debug.assert_eq(surface.issues[3].level, @runtime.Info) // diagnosis_counter
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.error_register, Some(b'\x42'))
+  @debug.assert_eq(surface.diagnosis_counter, Some(5U))
 }
 
 ///|
@@ -360,8 +363,8 @@ test "diagnostic_surface_from_slave_diagnosis clean slave" {
     dl_error_counters: None,
   }
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
-  assert_eq(surface.issues.length(), 0)
-  assert_eq(surface.overall_level, @runtime.Info)
+  @debug.assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.overall_level, @runtime.Info)
 }
 
 ///|
@@ -392,13 +395,13 @@ test "diagnostic_surface_from_validate produces issues from differences" {
     grade: @runtime.Block,
   }
   let surface = @runtime.diagnostic_surface_from_validate(scan, report)
-  assert_eq(surface.issues.length(), 1)
-  assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.issues.length(), 1)
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
   guard surface.configuration_summary is Some(cs) else {
     fail("expected configuration_summary")
   }
-  assert_eq(cs.slave_count, 1)
-  assert_eq(cs.difference_count, 1)
+  @debug.assert_eq(cs.slave_count, 1)
+  @debug.assert_eq(cs.difference_count, 1)
 }
 
 ///|
@@ -454,11 +457,11 @@ test "diagnostic_surface_from_run includes telemetry and fault issues" {
   guard surface.runtime_metrics is Some(rm) else {
     fail("expected runtime_metrics")
   }
-  assert_eq(rm.cycles, 100L)
-  assert_eq(rm.timeouts, 3L)
+  @debug.assert_eq(rm.cycles, 100L)
+  @debug.assert_eq(rm.timeouts, 3L)
   // Issues: timeouts>0 (Degrade), cycles_ok<requested (Degrade), DcDrift (Block)
   assert_true(surface.issues.length() >= 3)
-  assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
 }
 
 ///|
@@ -472,10 +475,10 @@ test "diagnostic_surface_from_state_transition all issues" {
     Some(0x001AU),
     Some(0U),
   )
-  assert_eq(surface.station_address, Some(0x1001U))
+  @debug.assert_eq(surface.station_address, Some(0x1001U))
   // 4 issues: final_state != target, status_code != 0, al_error_flag, wkc == 0
-  assert_eq(surface.issues.length(), 4)
-  assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.issues.length(), 4)
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
 }
 
 ///|
@@ -489,8 +492,8 @@ test "diagnostic_surface_from_state_transition no issues" {
     Some(0U),
     Some(1U),
   )
-  assert_eq(surface.issues.length(), 0)
-  assert_eq(surface.overall_level, @runtime.Info)
+  @debug.assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.overall_level, @runtime.Info)
 }
 
 ///|
@@ -505,36 +508,36 @@ test "diagnostic_surface_from_state_transition None branches" {
     None,
   )
   // All None => no issues triggered
-  assert_eq(surface.issues.length(), 0)
-  assert_eq(surface.overall_level, @runtime.Info)
+  @debug.assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.overall_level, @runtime.Info)
 }
 
 ///|
 test "diagnosis_restore_path PreOp" {
   let path = @runtime.diagnosis_restore_path(@protocol.PreOp)
-  assert_eq(path, [@protocol.PreOp])
+  @debug.assert_eq(path, [@protocol.PreOp])
 }
 
 ///|
 test "diagnosis_restore_path SafeOp" {
   let path = @runtime.diagnosis_restore_path(@protocol.SafeOp)
-  assert_eq(path, [@protocol.PreOp, @protocol.SafeOp])
+  @debug.assert_eq(path, [@protocol.PreOp, @protocol.SafeOp])
 }
 
 ///|
 test "diagnosis_restore_path Op" {
   let path = @runtime.diagnosis_restore_path(@protocol.Op)
-  assert_eq(path, [@protocol.PreOp, @protocol.SafeOp, @protocol.Op])
+  @debug.assert_eq(path, [@protocol.PreOp, @protocol.SafeOp, @protocol.Op])
 }
 
 ///|
 test "diagnosis_restore_path Init" {
   let path = @runtime.diagnosis_restore_path(@protocol.Init)
-  assert_eq(path, [@protocol.PreOp, @protocol.Init])
+  @debug.assert_eq(path, [@protocol.PreOp, @protocol.Init])
 }
 
 ///|
 test "diagnosis_restore_path Boot" {
   let path = @runtime.diagnosis_restore_path(@protocol.Boot)
-  assert_eq(path, [@protocol.PreOp, @protocol.Init, @protocol.Boot])
+  @debug.assert_eq(path, [@protocol.PreOp, @protocol.Init, @protocol.Boot])
 }

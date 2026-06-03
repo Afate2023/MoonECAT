@@ -8,4 +8,5 @@ import {
 import {
   "afate/MoonECAT/fixtures",
   "moonbitlang/core/bench",
+  "moonbitlang/core/debug",
 } for "test"

@@ -6,21 +6,21 @@
 test "estimate_cable_length" {
   // 500ns delay ≈ 100m cable
   let len = @analysis.estimate_cable_length(500L)
-  inspect(len, content="100")
+  @debug.debug_inspect(len, content="100")
 }
 
 ///|
 test "grade_from_score boundaries" {
-  inspect(@analysis.grade_from_score(1000), content="Excellent")
-  inspect(@analysis.grade_from_score(950), content="Excellent")
-  inspect(@analysis.grade_from_score(949), content="Good")
-  inspect(@analysis.grade_from_score(800), content="Good")
-  inspect(@analysis.grade_from_score(799), content="Fair")
-  inspect(@analysis.grade_from_score(600), content="Fair")
-  inspect(@analysis.grade_from_score(599), content="Poor")
-  inspect(@analysis.grade_from_score(300), content="Poor")
-  inspect(@analysis.grade_from_score(299), content="Critical")
-  inspect(@analysis.grade_from_score(0), content="Critical")
+  @debug.debug_inspect(@analysis.grade_from_score(1000), content="Excellent")
+  @debug.debug_inspect(@analysis.grade_from_score(950), content="Excellent")
+  @debug.debug_inspect(@analysis.grade_from_score(949), content="Good")
+  @debug.debug_inspect(@analysis.grade_from_score(800), content="Good")
+  @debug.debug_inspect(@analysis.grade_from_score(799), content="Fair")
+  @debug.debug_inspect(@analysis.grade_from_score(600), content="Fair")
+  @debug.debug_inspect(@analysis.grade_from_score(599), content="Poor")
+  @debug.debug_inspect(@analysis.grade_from_score(300), content="Poor")
+  @debug.debug_inspect(@analysis.grade_from_score(299), content="Critical")
+  @debug.debug_inspect(@analysis.grade_from_score(0), content="Critical")
 }
 
 ///|
@@ -29,10 +29,10 @@ test "TopologyHealthAnalyzer perfect link" {
   a.add_slave(1U, 0, 100L)
   a.ingest_telemetry(0, 1000L, 1000L, 0L, 0L)
   let r = a.analyze()
-  inspect(r.slaves.length(), content="1")
-  inspect(r.system_health_score, content="1000")
-  inspect(r.system_grade, content="Excellent")
-  inspect(r.warnings.length(), content="0")
+  @debug.debug_inspect(r.slaves.length(), content="1")
+  @debug.debug_inspect(r.system_health_score, content="1000")
+  @debug.debug_inspect(r.system_grade, content="Excellent")
+  @debug.debug_inspect(r.warnings.length(), content="0")
 }
 
 ///|
@@ -45,13 +45,16 @@ test "TopologyHealthAnalyzer degraded link" {
   // Slave 1: 10% timeout + 5% WKC errors
   a.ingest_telemetry(1, 1000L, 950L, 100L, 50L)
   let r = a.analyze()
-  inspect(r.slaves.length(), content="2")
+  @debug.debug_inspect(r.slaves.length(), content="2")
   // Slave 1 should be bottleneck
-  inspect(r.bottleneck_index, content="Some(1)")
+  @debug.debug_inspect(r.bottleneck_index, content="Some(1)")
   // Slave 1 should have lower score
-  inspect(r.slaves[0].health_score > r.slaves[1].health_score, content="true")
+  @debug.debug_inspect(
+    r.slaves[0].health_score > r.slaves[1].health_score,
+    content="true",
+  )
   // System grade should be degraded
-  inspect(
+  @debug.debug_inspect(
     r.system_grade is (@analysis.Excellent | @analysis.Good),
     content="true",
   )
@@ -64,8 +67,8 @@ test "TopologyHealthAnalyzer cable warning" {
   a.add_slave(1U, 0, 600L)
   a.ingest_telemetry(0, 100L, 100L, 0L, 0L)
   let r = a.analyze()
-  inspect(r.warnings.length() > 0, content="true")
-  inspect(r.total_cable_length_m > 100.0, content="true")
+  @debug.debug_inspect(r.warnings.length() > 0, content="true")
+  @debug.debug_inspect(r.total_cable_length_m > 100.0, content="true")
 }
 
 ///|
@@ -75,8 +78,8 @@ test "TopologyHealthAnalyzer to_json" {
   a.ingest_telemetry(0, 100L, 100L, 0L, 0L)
   let r = a.analyze()
   let json = r.to_json()
-  inspect(json.contains("\"system_health_score\""), content="true")
-  inspect(json.contains("\"slaves\""), content="true")
+  @debug.debug_inspect(json.contains("\"system_health_score\""), content="true")
+  @debug.debug_inspect(json.contains("\"slaves\""), content="true")
 }
 
 ///|
@@ -91,8 +94,8 @@ test "TopologyHealthAnalyzer record_cycle" {
     a.record_cycle(0, 1L, 0L, true, false)
   }
   let r = a.analyze()
-  inspect(r.slaves[0].timeouts, content="5")
-  inspect(r.slaves[0].tx_frames, content="105")
+  @debug.debug_inspect(r.slaves[0].timeouts, content="5")
+  @debug.debug_inspect(r.slaves[0].tx_frames, content="105")
 }
 
 // === 4.4 Cycle Performance Analyzer ===
@@ -105,10 +108,10 @@ test "CyclePerfAnalyzer perfect timing" {
     a.record((i * 1_000_000).to_int64())
   }
   let s = a.stats()
-  inspect(s.total_cycles, content="10")
-  inspect(s.deadline_misses, content="0")
-  inspect(s.min_ns, content="1000000")
-  inspect(s.max_ns, content="1000000")
+  @debug.debug_inspect(s.total_cycles, content="10")
+  @debug.debug_inspect(s.deadline_misses, content="0")
+  @debug.debug_inspect(s.min_ns, content="1000000")
+  @debug.debug_inspect(s.max_ns, content="1000000")
 }
 
 ///|
@@ -122,8 +125,8 @@ test "CyclePerfAnalyzer deadline miss detection" {
   a.record(2_100_000L) // 100μs over → deadline miss (>1ms + 50μs tolerance)
   a.record(3_100_000L) // on time relative to previous
   let s = a.stats()
-  inspect(s.total_cycles, content="3")
-  inspect(s.deadline_misses, content="1")
+  @debug.debug_inspect(s.total_cycles, content="3")
+  @debug.debug_inspect(s.deadline_misses, content="1")
 }
 
 ///|
@@ -133,17 +136,17 @@ test "CyclePerfAnalyzer record_duration" {
   a.record_duration(1_000_100L)
   a.record_duration(999_900L)
   let s = a.stats()
-  inspect(s.total_cycles, content="3")
-  inspect(s.min_ns, content="999900")
-  inspect(s.max_ns, content="1000100")
+  @debug.debug_inspect(s.total_cycles, content="3")
+  @debug.debug_inspect(s.min_ns, content="999900")
+  @debug.debug_inspect(s.max_ns, content="1000100")
 }
 
 ///|
 test "CyclePerfAnalyzer stats empty" {
   let a = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   let s = a.stats()
-  inspect(s.total_cycles, content="0")
-  inspect(s.mean_ns, content="0")
+  @debug.debug_inspect(s.total_cycles, content="0")
+  @debug.debug_inspect(s.mean_ns, content="0")
 }
 
 ///|
@@ -153,7 +156,7 @@ test "CyclePerfAnalyzer reset" {
   a.record_duration(1_000_000L)
   a.reset()
   let s = a.stats()
-  inspect(s.total_cycles, content="0")
+  @debug.debug_inspect(s.total_cycles, content="0")
 }
 
 ///|
@@ -162,7 +165,7 @@ test "CyclePerfAnalyzer trend initial stable" {
   for i = 0; i < 15; i = i + 1 {
     a.record_duration(1_000_000L)
   }
-  inspect(a.trend(), content="Stable")
+  @debug.debug_inspect(a.trend(), content="Stable")
 }
 
 ///|
@@ -172,8 +175,8 @@ test "CyclePerfStats to_json" {
   a.record_duration(1_000_000L)
   let s = a.stats()
   let json = s.to_json()
-  inspect(json.contains("\"total_cycles\": 2"), content="true")
-  inspect(json.contains("\"deadline_misses\""), content="true")
+  @debug.debug_inspect(json.contains("\"total_cycles\": 2"), content="true")
+  @debug.debug_inspect(json.contains("\"deadline_misses\""), content="true")
 }
 
 ///|
@@ -184,22 +187,37 @@ test "isqrt64 via CyclePerfAnalyzer stddev" {
     a.record_duration(1_000_000L)
   }
   let s = a.stats()
-  inspect(s.stddev_ns, content="0")
+  @debug.debug_inspect(s.stddev_ns, content="0")
 }
 
 // === 4.5 Communication Quality Scorer ===
 
 ///|
 test "quality_grade_from_score boundaries" {
-  inspect(@analysis.quality_grade_from_score(1000), content="Excellent")
-  inspect(@analysis.quality_grade_from_score(900), content="Excellent")
-  inspect(@analysis.quality_grade_from_score(899), content="Good")
-  inspect(@analysis.quality_grade_from_score(750), content="Good")
-  inspect(@analysis.quality_grade_from_score(749), content="Acceptable")
-  inspect(@analysis.quality_grade_from_score(500), content="Acceptable")
-  inspect(@analysis.quality_grade_from_score(499), content="Poor")
-  inspect(@analysis.quality_grade_from_score(250), content="Poor")
-  inspect(@analysis.quality_grade_from_score(249), content="Critical")
+  @debug.debug_inspect(
+    @analysis.quality_grade_from_score(1000),
+    content="Excellent",
+  )
+  @debug.debug_inspect(
+    @analysis.quality_grade_from_score(900),
+    content="Excellent",
+  )
+  @debug.debug_inspect(@analysis.quality_grade_from_score(899), content="Good")
+  @debug.debug_inspect(@analysis.quality_grade_from_score(750), content="Good")
+  @debug.debug_inspect(
+    @analysis.quality_grade_from_score(749),
+    content="Acceptable",
+  )
+  @debug.debug_inspect(
+    @analysis.quality_grade_from_score(500),
+    content="Acceptable",
+  )
+  @debug.debug_inspect(@analysis.quality_grade_from_score(499), content="Poor")
+  @debug.debug_inspect(@analysis.quality_grade_from_score(250), content="Poor")
+  @debug.debug_inspect(
+    @analysis.quality_grade_from_score(249),
+    content="Critical",
+  )
 }
 
 ///|
@@ -212,7 +230,7 @@ test "score_dimension linear interpolation" {
     weight: 1000,
   }
   // 50 is midpoint → 500
-  inspect(@analysis.score_dimension(dim), content="500")
+  @debug.debug_inspect(@analysis.score_dimension(dim), content="500")
 }
 
 ///|
@@ -224,7 +242,7 @@ test "score_dimension at good threshold" {
     bad_threshold: 100L,
     weight: 1000,
   }
-  inspect(@analysis.score_dimension(dim), content="1000")
+  @debug.debug_inspect(@analysis.score_dimension(dim), content="1000")
 }
 
 ///|
@@ -236,15 +254,15 @@ test "score_dimension at bad threshold" {
     bad_threshold: 100L,
     weight: 1000,
   }
-  inspect(@analysis.score_dimension(dim), content="0")
+  @debug.debug_inspect(@analysis.score_dimension(dim), content="0")
 }
 
 ///|
 test "CommQualityScorer perfect telemetry" {
   let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
-  inspect(qs.overall, content="1000")
-  inspect(qs.grade, content="Excellent")
+  @debug.debug_inspect(qs.overall, content="1000")
+  @debug.debug_inspect(qs.grade, content="Excellent")
 }
 
 ///|
@@ -253,8 +271,8 @@ test "CommQualityScorer degraded telemetry" {
   // 5% timeouts, 2% WKC errors
   let qs = scorer.score_from_telemetry(1000L, 50L, 20L, 10L)
   // Should not be Excellent anymore
-  inspect(qs.overall < 1000, content="true")
-  inspect(qs.dimensions.length(), content="4")
+  @debug.debug_inspect(qs.overall < 1000, content="true")
+  @debug.debug_inspect(qs.dimensions.length(), content="4")
 }
 
 ///|
@@ -263,7 +281,7 @@ test "CommQualityScorer trend initial stable" {
   for _i = 0; _i < 15; _i = _i + 1 {
     let _ = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   }
-  inspect(scorer.trend(), content="Stable")
+  @debug.debug_inspect(scorer.trend(), content="Stable")
 }
 
 ///|
@@ -271,10 +289,10 @@ test "QualityScore to_json" {
   let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
   let json = qs.to_json()
-  inspect(json.contains("\"overall\""), content="true")
-  inspect(json.contains("\"grade\""), content="true")
-  inspect(json.contains("\"trend\""), content="true")
-  inspect(json.contains("\"dimensions\""), content="true")
+  @debug.debug_inspect(json.contains("\"overall\""), content="true")
+  @debug.debug_inspect(json.contains("\"grade\""), content="true")
+  @debug.debug_inspect(json.contains("\"trend\""), content="true")
+  @debug.debug_inspect(json.contains("\"dimensions\""), content="true")
 }
 
 ///|
@@ -297,5 +315,5 @@ test "compute_quality_score weighted" {
   ]
   let (overall, _) = @analysis.compute_quality_score(dims)
   // 1000*500 + 0*500 / 1000 = 500
-  inspect(overall, content="500")
+  @debug.debug_inspect(overall, content="500")
 }

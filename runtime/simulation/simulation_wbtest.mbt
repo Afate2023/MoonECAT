@@ -34,8 +34,8 @@ test "slices_overlap_input zero length" {
 
 ///|
 test "lcm with zero" {
-  assert_eq(lcm(0, 5), 0)
-  assert_eq(lcm(5, 0), 0)
+  @debug.assert_eq(lcm(0, 5), 0)
+  @debug.assert_eq(lcm(5, 0), 0)
 }
 
 ///|
@@ -68,10 +68,10 @@ test "analyze_multi_rate non-harmonic schedule" {
     ],
   }
   let analysis = analyze_multi_rate(schedule)
-  assert_eq(analysis.hyperperiod, 6)
-  assert_eq(analysis.is_harmonic, false)
-  assert_eq(analysis.worst_case_tasks_per_cycle, 2)
-  assert_eq(analysis.peak_cycles, [0])
+  @debug.assert_eq(analysis.hyperperiod, 6)
+  @debug.assert_eq(analysis.is_harmonic, false)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(analysis.peak_cycles, [0])
 }
 
 ///|
@@ -93,10 +93,10 @@ test "analyze_multi_rate with multiple peak cycles" {
     ],
   }
   let analysis = analyze_multi_rate(schedule)
-  assert_eq(analysis.hyperperiod, 2)
-  assert_eq(analysis.is_harmonic, true)
-  assert_eq(analysis.worst_case_tasks_per_cycle, 1)
-  assert_eq(analysis.peak_cycles, [0])
+  @debug.assert_eq(analysis.hyperperiod, 2)
+  @debug.assert_eq(analysis.is_harmonic, true)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 1)
+  @debug.assert_eq(analysis.peak_cycles, [0])
 }
 
 ///|

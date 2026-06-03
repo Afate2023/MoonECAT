@@ -1,26 +1,26 @@
 ///|
 test "Telemetry initializes to zero" {
   let t = @runtime.Telemetry::new()
-  assert_eq(t.cycles, 0L)
-  assert_eq(t.tx_frames, 0L)
-  assert_eq(t.rx_frames, 0L)
-  assert_eq(t.timeouts, 0L)
-  assert_eq(t.retries, 0L)
-  assert_eq(t.wkc_errors, 0L)
-  assert_eq(t.dc_delay_updates, 0L)
-  assert_eq(t.emergency_events, 0L)
+  @debug.assert_eq(t.cycles, 0L)
+  @debug.assert_eq(t.tx_frames, 0L)
+  @debug.assert_eq(t.rx_frames, 0L)
+  @debug.assert_eq(t.timeouts, 0L)
+  @debug.assert_eq(t.retries, 0L)
+  @debug.assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.dc_delay_updates, 0L)
+  @debug.assert_eq(t.emergency_events, 0L)
 }
 
 ///|
 test "RunMode display" {
-  inspect(@runtime.RunMode::FreeRun, content="FreeRun")
-  inspect(@runtime.RunMode::DcSync, content="DcSync")
+  @debug.debug_inspect(@runtime.RunMode::FreeRun, content="FreeRun")
+  @debug.debug_inspect(@runtime.RunMode::DcSync, content="DcSync")
 }
 
 ///|
 test "RuntimeState display" {
-  inspect(@runtime.RuntimeState::Idle, content="Idle")
-  inspect(
+  @debug.debug_inspect(@runtime.RuntimeState::Idle, content="Idle")
+  @debug.debug_inspect(
     @runtime.RuntimeState::Running(@runtime.RunMode::FreeRun),
     content="Running(FreeRun)",
   )
@@ -31,9 +31,9 @@ test "Runtime::new initializes correctly" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
   assert_true(rt.state is Idle)
-  assert_eq(rt.expected_wkc, 0U)
-  assert_eq(rt.consecutive_wkc_errors, 0)
-  assert_eq(rt.max_wkc_errors, 5)
+  @debug.assert_eq(rt.expected_wkc, 0U)
+  @debug.assert_eq(rt.consecutive_wkc_errors, 0)
+  @debug.assert_eq(rt.max_wkc_errors, 5)
   assert_true(rt.pdo_ctx is None)
 }
 
@@ -59,22 +59,22 @@ test "Runtime telemetry recording" {
   rt.record_timeout()
   rt.record_retry()
   let t = rt.get_telemetry()
-  assert_eq(t.timeouts, 2L)
-  assert_eq(t.retries, 1L)
+  @debug.assert_eq(t.timeouts, 2L)
+  @debug.assert_eq(t.retries, 1L)
 }
 
 ///|
 test "Runtime needs_recovery tracks consecutive WKC errors" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  assert_eq(rt.needs_recovery(), false)
+  @debug.assert_eq(rt.needs_recovery(), false)
   // Simulate consecutive WKC errors
   for _i = 0; _i < 5; _i = _i + 1 {
     rt.consecutive_wkc_errors = rt.consecutive_wkc_errors + 1
   }
-  assert_eq(rt.needs_recovery(), true)
+  @debug.assert_eq(rt.needs_recovery(), true)
   rt.reset_error_counter()
-  assert_eq(rt.needs_recovery(), false)
+  @debug.assert_eq(rt.needs_recovery(), false)
 }
 
 ///|
@@ -87,7 +87,7 @@ test "Runtime configure_pdo sets context" {
   let ctx = @protocol.PdoContext::build(mappings, 0x1000U)
   rt.configure_pdo(ctx, 3U)
   assert_true(rt.pdo_ctx is Some(_))
-  assert_eq(rt.expected_wkc, 3U)
+  @debug.assert_eq(rt.expected_wkc, 3U)
 }
 
 ///|
@@ -161,13 +161,13 @@ fn build_response_frame(
 }
 
 ///|
-pub impl @hal.Nic for SiiIdentityNic with open_(name) {
+pub impl @hal.Nic for SiiIdentityNic with fn open_(name) {
   ignore(name)
   SiiIdentityNic::new()
 }
 
 ///|
-pub impl @hal.Nic for SiiIdentityNic with send(self, data) {
+pub impl @hal.Nic for SiiIdentityNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -221,7 +221,7 @@ pub impl @hal.Nic for SiiIdentityNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for SiiIdentityNic with recv(self, timeout~) {
+pub impl @hal.Nic for SiiIdentityNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -230,7 +230,7 @@ pub impl @hal.Nic for SiiIdentityNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for SiiIdentityNic with close(self) {
+pub impl @hal.Nic for SiiIdentityNic with fn close(self) {
   self.is_open = false
 }
 
@@ -260,13 +260,13 @@ fn read_station_address_bytes(data : Bytes) -> UInt {
 }
 
 ///|
-pub impl @hal.Nic for ScanStationNic with open_(name) {
+pub impl @hal.Nic for ScanStationNic with fn open_(name) {
   ignore(name)
   ScanStationNic::new([])
 }
 
 ///|
-pub impl @hal.Nic for ScanStationNic with send(self, data) {
+pub impl @hal.Nic for ScanStationNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -333,7 +333,7 @@ pub impl @hal.Nic for ScanStationNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ScanStationNic with recv(self, timeout~) {
+pub impl @hal.Nic for ScanStationNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -342,7 +342,7 @@ pub impl @hal.Nic for ScanStationNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ScanStationNic with close(self) {
+pub impl @hal.Nic for ScanStationNic with fn close(self) {
   self.is_open = false
 }
 
@@ -358,13 +358,13 @@ fn TimeoutNic::new() -> TimeoutNic {
 }
 
 ///|
-pub impl @hal.Nic for TimeoutNic with open_(name) {
+pub impl @hal.Nic for TimeoutNic with fn open_(name) {
   ignore(name)
   TimeoutNic::new()
 }
 
 ///|
-pub impl @hal.Nic for TimeoutNic with send(self, data) {
+pub impl @hal.Nic for TimeoutNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -372,7 +372,7 @@ pub impl @hal.Nic for TimeoutNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for TimeoutNic with recv(self, timeout~) {
+pub impl @hal.Nic for TimeoutNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -381,7 +381,7 @@ pub impl @hal.Nic for TimeoutNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for TimeoutNic with close(self) {
+pub impl @hal.Nic for TimeoutNic with fn close(self) {
   self.is_open = false
 }
 
@@ -399,13 +399,13 @@ fn RejectEmptyBusTransitionNic::new() -> RejectEmptyBusTransitionNic {
 }
 
 ///|
-pub impl @hal.Nic for RejectEmptyBusTransitionNic with open_(name) {
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with fn open_(name) {
   ignore(name)
   RejectEmptyBusTransitionNic::new()
 }
 
 ///|
-pub impl @hal.Nic for RejectEmptyBusTransitionNic with send(self, data) {
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with fn send(self, data) {
   let frame = @protocol.EcFrame::decode(data)
   for pdu in frame.pdus {
     if pdu.header.command is @protocol.BWR &&
@@ -420,12 +420,12 @@ pub impl @hal.Nic for RejectEmptyBusTransitionNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for RejectEmptyBusTransitionNic with recv(self, timeout~) {
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with fn recv(self, timeout~) {
   self.inner.recv(timeout~)
 }
 
 ///|
-pub impl @hal.Nic for RejectEmptyBusTransitionNic with close(self) {
+pub impl @hal.Nic for RejectEmptyBusTransitionNic with fn close(self) {
   self.inner.close()
 }
 
@@ -494,13 +494,13 @@ fn single_slave_pdo_context() -> @protocol.PdoContext {
 }
 
 ///|
-pub impl @hal.Nic for ConfirmedRunNic with open_(name) {
+pub impl @hal.Nic for ConfirmedRunNic with fn open_(name) {
   ignore(name)
   ConfirmedRunNic::new(1U, true, false)
 }
 
 ///|
-pub impl @hal.Nic for ConfirmedRunNic with send(self, data) {
+pub impl @hal.Nic for ConfirmedRunNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -584,7 +584,7 @@ pub impl @hal.Nic for ConfirmedRunNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ConfirmedRunNic with recv(self, timeout~) {
+pub impl @hal.Nic for ConfirmedRunNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -593,7 +593,7 @@ pub impl @hal.Nic for ConfirmedRunNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ConfirmedRunNic with close(self) {
+pub impl @hal.Nic for ConfirmedRunNic with fn close(self) {
   self.is_open = false
 }
 
@@ -603,7 +603,7 @@ test "Runtime init_dc disabled keeps state Disabled" {
   let rt = @runtime.Runtime::new(config)
   let nic = @mock.MockNic::new()
   let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
-  assert_eq(ok, false)
+  @debug.assert_eq(ok, false)
   assert_true(rt.dc_state is Disabled)
   assert_true(rt.dc_reference_station is None)
 }
@@ -614,7 +614,7 @@ test "Runtime init_dc enabled sets Locked" {
   let rt = @runtime.Runtime::new(config)
   let nic = @mock.MockNic::new()
   let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
-  assert_eq(ok, true)
+  @debug.assert_eq(ok, true)
   assert_true(rt.dc_state is Locked)
   assert_true(rt.dc_reference_station is Some(_))
 }
@@ -629,7 +629,7 @@ test "Runtime run_cycles stops on dc drift" {
   rt.dc_stations = [0x1001U]
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
   let ok = rt.run_cycles(nic, 3, @hal.Duration(1000L))
-  assert_eq(ok, 1)
+  @debug.assert_eq(ok, 1)
   assert_true(rt.dc_state is Drifting(_))
   assert_true(rt.state is Error(_))
 }
@@ -642,8 +642,8 @@ test "Runtime run_until_fault stops on repeated wkc mismatch" {
   rt.configure_pdo(single_slave_pdo_context(), 1U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let ok = rt.run_until_fault(nic, @hal.Duration(1000L))
-  assert_eq(ok, 0)
-  assert_eq(rt.telemetry.wkc_errors, 5L)
+  @debug.assert_eq(ok, 0)
+  @debug.assert_eq(rt.telemetry.wkc_errors, 5L)
   assert_true(rt.state is Error(_))
 }
 
@@ -663,9 +663,9 @@ test "Runtime run_until_fault stops on repeated recv timeout" {
   rt.set_timeout_threshold(3)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let ok = rt.run_until_fault(nic, @hal.Duration(1000L))
-  assert_eq(ok, 0)
-  assert_eq(rt.telemetry.timeouts, 3L)
-  assert_eq(rt.consecutive_timeouts, 3)
+  @debug.assert_eq(ok, 0)
+  @debug.assert_eq(rt.telemetry.timeouts, 3L)
+  @debug.assert_eq(rt.consecutive_timeouts, 3)
   assert_true(rt.state is Error(_))
 }
 
@@ -680,22 +680,22 @@ test "Runtime run_cycle without pdo_ctx raises Internal error" {
   } noraise {
     _ => "should fail"
   }
-  assert_eq(result, "PDO context not configured")
+  @debug.assert_eq(result, "PDO context not configured")
 }
 
 ///|
 test "DcState display" {
-  inspect(@hil.DcState::Disabled, content="Disabled")
-  inspect(@hil.DcState::Measuring, content="Measuring")
-  inspect(@hil.DcState::Locked, content="Locked")
-  inspect(@hil.DcState::Drifting(100L), content="Drifting(100)")
+  @debug.debug_inspect(@hil.DcState::Disabled, content="Disabled")
+  @debug.debug_inspect(@hil.DcState::Measuring, content="Measuring")
+  @debug.debug_inspect(@hil.DcState::Locked, content="Locked")
+  @debug.debug_inspect(@hil.DcState::Drifting(100L), content="Drifting(100)")
 }
 
 ///|
 test "CycleResult equality" {
   let r1 : @hil.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
   let r2 : @hil.CycleResult = { wkc: 3U, expected_wkc: 3U, ok: true }
-  assert_eq(r1, r2)
+  @debug.assert_eq(r1, r2)
   let r3 : @hil.CycleResult = { wkc: 1U, expected_wkc: 3U, ok: false }
   assert_true(r1 != r3)
 }
@@ -735,14 +735,14 @@ test "Free-run: run_cycle succeeds when expected_wkc is 0" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = @mock.MockNic::new()
   let result = rt.run_cycle(nic, @hal.Duration(1000L))
-  assert_eq(result.ok, true)
-  assert_eq(result.wkc, 0U)
-  assert_eq(result.expected_wkc, 0U)
-  assert_eq(rt.consecutive_wkc_errors, 0)
+  @debug.assert_eq(result.ok, true)
+  @debug.assert_eq(result.wkc, 0U)
+  @debug.assert_eq(result.expected_wkc, 0U)
+  @debug.assert_eq(rt.consecutive_wkc_errors, 0)
   let t = rt.get_telemetry()
-  assert_eq(t.cycles, 1L)
-  assert_eq(t.tx_frames, 1L)
-  assert_eq(t.rx_frames, 1L)
+  @debug.assert_eq(t.cycles, 1L)
+  @debug.assert_eq(t.tx_frames, 1L)
+  @debug.assert_eq(t.rx_frames, 1L)
 }
 
 ///|
@@ -780,12 +780,12 @@ test "Free-run: run_cycles executes multiple cycles" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = @mock.MockNic::new()
   let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
-  assert_eq(success, 10)
+  @debug.assert_eq(success, 10)
   let t = rt.get_telemetry()
-  assert_eq(t.cycles, 10L)
-  assert_eq(t.tx_frames, 10L)
-  assert_eq(t.rx_frames, 10L)
-  assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.cycles, 10L)
+  @debug.assert_eq(t.tx_frames, 10L)
+  @debug.assert_eq(t.rx_frames, 10L)
+  @debug.assert_eq(t.wkc_errors, 0L)
 }
 
 ///|
@@ -804,13 +804,13 @@ test "Pressure: free-run core loop remains stable at high cycle count" {
   let nic = @mock.MockNic::new()
   let cycles = 1000
   let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
-  assert_eq(success, cycles)
+  @debug.assert_eq(success, cycles)
   let t = rt.get_telemetry()
-  assert_eq(t.cycles, cycles.to_int64())
-  assert_eq(t.tx_frames, cycles.to_int64())
-  assert_eq(t.rx_frames, cycles.to_int64())
-  assert_eq(t.timeouts, 0L)
-  assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.cycles, cycles.to_int64())
+  @debug.assert_eq(t.tx_frames, cycles.to_int64())
+  @debug.assert_eq(t.rx_frames, cycles.to_int64())
+  @debug.assert_eq(t.timeouts, 0L)
+  @debug.assert_eq(t.wkc_errors, 0L)
 }
 
 ///|
@@ -830,13 +830,13 @@ test "Pressure: timeout-heavy loop keeps accounting consistent" {
   let cycles = 1000
   rt.set_timeout_threshold(cycles + 1)
   let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
-  assert_eq(success, 0)
+  @debug.assert_eq(success, 0)
   let t = rt.get_telemetry()
-  assert_eq(t.cycles, cycles.to_int64())
-  assert_eq(t.tx_frames, cycles.to_int64())
-  assert_eq(t.rx_frames, 0L)
-  assert_eq(t.timeouts, cycles.to_int64())
-  assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.cycles, cycles.to_int64())
+  @debug.assert_eq(t.tx_frames, cycles.to_int64())
+  @debug.assert_eq(t.rx_frames, 0L)
+  @debug.assert_eq(t.timeouts, cycles.to_int64())
+  @debug.assert_eq(t.wkc_errors, 0L)
 }
 
 ///|
@@ -856,13 +856,13 @@ test "Pressure: telemetry remains monotonic across different loads" {
     rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
     let nic = @mock.MockNic::new()
     let success = rt.run_cycles(nic, load, @hal.Duration(1000L))
-    assert_eq(success, load)
+    @debug.assert_eq(success, load)
     let t = rt.get_telemetry()
-    assert_eq(t.cycles, load.to_int64())
-    assert_eq(t.tx_frames, load.to_int64())
-    assert_eq(t.rx_frames, load.to_int64())
-    assert_eq(t.timeouts, 0L)
-    assert_eq(t.wkc_errors, 0L)
+    @debug.assert_eq(t.cycles, load.to_int64())
+    @debug.assert_eq(t.tx_frames, load.to_int64())
+    @debug.assert_eq(t.rx_frames, load.to_int64())
+    @debug.assert_eq(t.timeouts, 0L)
+    @debug.assert_eq(t.wkc_errors, 0L)
   }
 }
 
@@ -881,11 +881,11 @@ test "Recovery: run_cycles records RecvTimeout and continues" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = TimeoutNic::new()
   let success = rt.run_cycles(nic, 4, @hal.Duration(1000L))
-  assert_eq(success, 0)
+  @debug.assert_eq(success, 0)
   let t = rt.get_telemetry()
-  assert_eq(t.timeouts, 4L)
-  assert_eq(t.cycles, 4L)
-  assert_eq(t.rx_frames, 0L)
+  @debug.assert_eq(t.timeouts, 4L)
+  @debug.assert_eq(t.cycles, 4L)
+  @debug.assert_eq(t.rx_frames, 0L)
   assert_true(!rt.needs_recovery())
 }
 
@@ -924,12 +924,12 @@ test "Recovery: WKC mismatch increments error counter" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = @mock.MockNic::new()
   let result = rt.run_cycle(nic, @hal.Duration(1000L))
-  assert_eq(result.ok, false)
-  assert_eq(result.wkc, 0U)
-  assert_eq(result.expected_wkc, 3U)
-  assert_eq(rt.consecutive_wkc_errors, 1)
+  @debug.assert_eq(result.ok, false)
+  @debug.assert_eq(result.wkc, 0U)
+  @debug.assert_eq(result.expected_wkc, 3U)
+  @debug.assert_eq(rt.consecutive_wkc_errors, 1)
   let t = rt.get_telemetry()
-  assert_eq(t.wkc_errors, 1L)
+  @debug.assert_eq(t.wkc_errors, 1L)
 }
 
 ///|
@@ -948,12 +948,12 @@ test "Recovery: consecutive WKC errors trigger recovery state" {
   let nic = @mock.MockNic::new()
   // Run 10 cycles; after 5 consecutive errors, should enter Error state
   let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
-  assert_eq(success, 0)
+  @debug.assert_eq(success, 0)
   assert_true(rt.state is Error(_))
   let t = rt.get_telemetry()
   // Should have tried 5 cycles (then broke on the 5th error)
-  assert_eq(t.wkc_errors, 5L)
-  assert_eq(t.cycles, 5L)
+  @debug.assert_eq(t.wkc_errors, 5L)
+  @debug.assert_eq(t.cycles, 5L)
 }
 
 ///|
@@ -973,12 +973,12 @@ test "Recovery: reset_error_counter allows resumption" {
   for _i = 0; _i < 3; _i = _i + 1 {
     let _r = rt.run_cycle(nic, @hal.Duration(1000L))
   }
-  assert_eq(rt.consecutive_wkc_errors, 3)
-  assert_eq(rt.needs_recovery(), false) // not yet at threshold (5)
+  @debug.assert_eq(rt.consecutive_wkc_errors, 3)
+  @debug.assert_eq(rt.needs_recovery(), false) // not yet at threshold (5)
   // Reset and verify counters cleared
   rt.reset_error_counter()
-  assert_eq(rt.consecutive_wkc_errors, 0)
-  assert_eq(rt.needs_recovery(), false)
+  @debug.assert_eq(rt.consecutive_wkc_errors, 0)
+  @debug.assert_eq(rt.needs_recovery(), false)
 }
 
 ///|
@@ -993,21 +993,21 @@ test "Recovery: Telemetry reset clears all counters" {
   t.dc_delay_updates = 8L
   t.emergency_events = 2L
   t.reset()
-  assert_eq(t.cycles, 0L)
-  assert_eq(t.tx_frames, 0L)
-  assert_eq(t.rx_frames, 0L)
-  assert_eq(t.timeouts, 0L)
-  assert_eq(t.retries, 0L)
-  assert_eq(t.wkc_errors, 0L)
-  assert_eq(t.dc_delay_updates, 0L)
-  assert_eq(t.emergency_events, 0L)
+  @debug.assert_eq(t.cycles, 0L)
+  @debug.assert_eq(t.tx_frames, 0L)
+  @debug.assert_eq(t.rx_frames, 0L)
+  @debug.assert_eq(t.timeouts, 0L)
+  @debug.assert_eq(t.retries, 0L)
+  @debug.assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.dc_delay_updates, 0L)
+  @debug.assert_eq(t.emergency_events, 0L)
 }
 
 ///|
 test "Emergency: configure_emergency_stations sets station list" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  assert_eq(rt.emergency_stations.length(), 0)
+  @debug.assert_eq(rt.emergency_stations.length(), 0)
   let mb_config : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
     out_size: 128U,
@@ -1017,9 +1017,9 @@ test "Emergency: configure_emergency_stations sets station list" {
     in_sm_index: 1,
   }
   rt.configure_emergency_stations([(0x1001U, mb_config)])
-  assert_eq(rt.emergency_stations.length(), 1)
+  @debug.assert_eq(rt.emergency_stations.length(), 1)
   let (station, _cfg) = rt.emergency_stations[0]
-  assert_eq(station, 0x1001U)
+  @debug.assert_eq(station, 0x1001U)
 }
 
 ///|
@@ -1027,7 +1027,7 @@ test "Emergency: telemetry starts at zero and accumulates" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
   let tel = rt.get_telemetry()
-  assert_eq(tel.emergency_events, 0L)
+  @debug.assert_eq(tel.emergency_events, 0L)
 }
 
 ///|
@@ -1045,43 +1045,47 @@ test "Emergency: no stations configured means no polling overhead" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = @mock.MockNic::new()
   let success = rt.run_cycles(nic, 5, @hal.Duration(1000L))
-  assert_eq(success, 5)
+  @debug.assert_eq(success, 5)
   let tel = rt.get_telemetry()
-  assert_eq(tel.emergency_events, 0L)
+  @debug.assert_eq(tel.emergency_events, 0L)
 }
 
 ///|
 test "Free-run: ESM transition path building" {
   // Verify transition paths from Init to higher states
   let path = @protocol.build_transition_path(@protocol.EsmState::Op)
-  assert_eq(path.length(), 4)
-  assert_eq(path[0], @protocol.EsmState::Init)
-  assert_eq(path[1], @protocol.EsmState::PreOp)
-  assert_eq(path[2], @protocol.EsmState::SafeOp)
-  assert_eq(path[3], @protocol.EsmState::Op)
+  @debug.assert_eq(path.length(), 4)
+  @debug.assert_eq(path[0], @protocol.EsmState::Init)
+  @debug.assert_eq(path[1], @protocol.EsmState::PreOp)
+  @debug.assert_eq(path[2], @protocol.EsmState::SafeOp)
+  @debug.assert_eq(path[3], @protocol.EsmState::Op)
 }
 
 ///|
 test "Free-run: ESM shutdown path building" {
   // Verify shutdown paths back to Init
   let path = @protocol.build_shutdown_path(@protocol.EsmState::Op)
-  assert_eq(path.length(), 4)
-  assert_eq(path[0], @protocol.EsmState::Op)
-  assert_eq(path[1], @protocol.EsmState::SafeOp)
-  assert_eq(path[2], @protocol.EsmState::PreOp)
-  assert_eq(path[3], @protocol.EsmState::Init)
+  @debug.assert_eq(path.length(), 4)
+  @debug.assert_eq(path[0], @protocol.EsmState::Op)
+  @debug.assert_eq(path[1], @protocol.EsmState::SafeOp)
+  @debug.assert_eq(path[2], @protocol.EsmState::PreOp)
+  @debug.assert_eq(path[3], @protocol.EsmState::Init)
 }
 
 ///|
 test "Diagnosis restore path uses legal state sequence" {
   let restore_op = @runtime.diagnosis_restore_path(@protocol.Op)
-  assert_eq(restore_op, [@protocol.PreOp, @protocol.SafeOp, @protocol.Op])
+  @debug.assert_eq(restore_op, [@protocol.PreOp, @protocol.SafeOp, @protocol.Op])
 }
 
 ///|
 test "Diagnosis restore path reaches boot via init" {
   let restore_boot = @runtime.diagnosis_restore_path(@protocol.Boot)
-  assert_eq(restore_boot, [@protocol.PreOp, @protocol.Init, @protocol.Boot])
+  @debug.assert_eq(restore_boot, [
+    @protocol.PreOp,
+    @protocol.Init,
+    @protocol.Boot,
+  ])
 }
 
 ///|
@@ -1116,21 +1120,21 @@ test "Free-run: PDO context build with multiple slaves" {
     input_bytes: 8,
   }
   let ctx = @protocol.PdoContext::build([(sm1, 1U), (sm2, 2U)], 0x1000U)
-  assert_eq(ctx.mappings.length(), 2)
-  assert_eq(ctx.image.output_size, 24) // 8 + 16
-  assert_eq(ctx.image.input_size, 12) // 4 + 8
-  assert_eq(ctx.logical_base, 0x1000U)
-  assert_eq(ctx.logical_size, 36) // 24 + 12
+  @debug.assert_eq(ctx.mappings.length(), 2)
+  @debug.assert_eq(ctx.image.output_size, 24) // 8 + 16
+  @debug.assert_eq(ctx.image.input_size, 12) // 4 + 8
+  @debug.assert_eq(ctx.logical_base, 0x1000U)
+  @debug.assert_eq(ctx.logical_size, 36) // 24 + 12
   // Check slave 1 mapping
-  assert_eq(ctx.mappings[0].output_offset, 0)
-  assert_eq(ctx.mappings[0].output_length, 8)
-  assert_eq(ctx.mappings[0].input_offset, 0)
-  assert_eq(ctx.mappings[0].input_length, 4)
+  @debug.assert_eq(ctx.mappings[0].output_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].output_length, 8)
+  @debug.assert_eq(ctx.mappings[0].input_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].input_length, 4)
   // Check slave 2 mapping
-  assert_eq(ctx.mappings[1].output_offset, 8)
-  assert_eq(ctx.mappings[1].output_length, 16)
-  assert_eq(ctx.mappings[1].input_offset, 4)
-  assert_eq(ctx.mappings[1].input_length, 8)
+  @debug.assert_eq(ctx.mappings[1].output_offset, 8)
+  @debug.assert_eq(ctx.mappings[1].output_length, 16)
+  @debug.assert_eq(ctx.mappings[1].input_offset, 4)
+  @debug.assert_eq(ctx.mappings[1].input_length, 8)
 }
 
 ///|
@@ -1161,13 +1165,13 @@ test "Free-run: set_slave_outputs and get_slave_inputs" {
   let out_data = b"\x01\x02\x03\x04"
   ctx.set_slave_outputs(1U, out_data)
   // Check that outputs are set in the process image
-  assert_eq(ctx.image.outputs[0], b'\x01')
-  assert_eq(ctx.image.outputs[3], b'\x04')
+  @debug.assert_eq(ctx.image.outputs[0], b'\x01')
+  @debug.assert_eq(ctx.image.outputs[3], b'\x04')
   // Set some input data manually and read it
   ctx.image.inputs = b"\xAA\xBB\xCC\xDD"
   let inputs = ctx.get_slave_inputs(1U)
-  assert_eq(inputs[0], b'\xAA')
-  assert_eq(inputs[3], b'\xDD')
+  @debug.assert_eq(inputs[0], b'\xAA')
+  @debug.assert_eq(inputs[3], b'\xDD')
 }
 
 // ========== Scan Command Tests ==========
@@ -1178,8 +1182,8 @@ test "scan with mock loopback returns empty report" {
   let timeout = @hal.Duration(1000L)
   let report = @runtime.scan(nic, timeout)
   // MockNic echoes back WKC=0, so count_slaves returns 0
-  assert_eq(report.slave_count, 0)
-  assert_eq(report.slaves.length(), 0)
+  @debug.assert_eq(report.slave_count, 0)
+  @debug.assert_eq(report.slaves.length(), 0)
 }
 
 ///|
@@ -1234,7 +1238,7 @@ test "SlaveReport equality" {
     serial: 0x1234U,
     identification: 0U,
   }
-  assert_eq(r1, r2)
+  @debug.assert_eq(r1, r2)
 }
 
 ///|
@@ -1293,10 +1297,10 @@ test "validate: all slaves match" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.total_expected, 2)
-  assert_eq(report.total_found, 2)
-  assert_eq(report.results.length(), 2)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.total_expected, 2)
+  @debug.assert_eq(report.total_found, 2)
+  @debug.assert_eq(report.results.length(), 2)
 }
 
 ///|
@@ -1332,7 +1336,7 @@ test "validate: identity mismatch detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.IdentityMismatch(..))
 }
 
@@ -1369,7 +1373,7 @@ test "validate: station address mismatch detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.StationAddressMismatch(..))
 }
 
@@ -1406,7 +1410,7 @@ test "validate: explicit identification mismatch detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.Ok)
   assert_true(report.results[1] is @runtime.IdentificationMismatch(..))
 }
@@ -1444,7 +1448,7 @@ test "validate: revision mismatch detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.IdentityMismatch(..))
 }
 
@@ -1481,7 +1485,7 @@ test "validate: serial mismatch detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[0] is @runtime.IdentityMismatch(..))
 }
 
@@ -1504,8 +1508,8 @@ test "validate: missing slave" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
-  assert_eq(report.results.length(), 1)
+  @debug.assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.results.length(), 1)
   assert_true(report.results[0] is @runtime.Missing(..))
 }
 
@@ -1552,8 +1556,8 @@ test "validate: extra slave detected" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
-  assert_eq(report.results.length(), 2)
+  @debug.assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.results.length(), 2)
   assert_true(report.results[0] is @runtime.Ok)
   assert_true(report.results[1] is @runtime.Extra(..))
 }
@@ -1586,8 +1590,8 @@ test "validate: no identity constraint accepts any slave" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.results.length(), 1)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.results.length(), 1)
 }
 
 ///|
@@ -1595,9 +1599,9 @@ test "validate: empty config and empty scan" {
   let scan : @runtime.ScanReport = { slave_count: 0, slaves: [] }
   let expected : Array[@hal.SlaveConfig] = []
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.total_expected, 0)
-  assert_eq(report.total_found, 0)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.total_expected, 0)
+  @debug.assert_eq(report.total_found, 0)
 }
 
 ///|
@@ -1618,14 +1622,14 @@ test "configuration_from_scan projects scan into unified model" {
     ],
   }
   let model = @runtime.configuration_from_scan(scan)
-  assert_eq(model.source, @runtime.OnlineScan)
-  assert_eq(model.total_slaves, 1)
-  assert_eq(model.slaves.length(), 1)
+  @debug.assert_eq(model.source, @runtime.OnlineScan)
+  @debug.assert_eq(model.total_slaves, 1)
+  @debug.assert_eq(model.slaves.length(), 1)
   let slave = model.slaves[0]
-  assert_eq(slave.position, 0)
-  assert_eq(slave.configured_address, Some(0x1001U))
-  assert_eq(slave.identification, Some(0x0020U))
-  assert_eq(
+  @debug.assert_eq(slave.position, 0)
+  @debug.assert_eq(slave.configured_address, Some(0x1001U))
+  @debug.assert_eq(slave.identification, Some(0x0020U))
+  @debug.assert_eq(
     slave.identity,
     Some({
       vendor_id: 0x0002U,
@@ -1654,12 +1658,12 @@ test "configuration_from_expected projects offline config into unified model" {
     },
   ]
   let model = @runtime.configuration_from_expected(expected)
-  assert_eq(model.source, @runtime.OfflineConfig)
-  assert_eq(model.total_slaves, 1)
+  @debug.assert_eq(model.source, @runtime.OfflineConfig)
+  @debug.assert_eq(model.total_slaves, 1)
   let slave = model.slaves[0]
-  assert_eq(slave.position, 1)
-  assert_eq(slave.configured_address, Some(0x1002U))
-  assert_eq(slave.identification, Some(0x0042U))
+  @debug.assert_eq(slave.position, 1)
+  @debug.assert_eq(slave.configured_address, Some(0x1002U))
+  @debug.assert_eq(slave.identification, Some(0x0042U))
 }
 
 ///|
@@ -1733,9 +1737,9 @@ test "compare_configurations reports topology and identity differences" {
     ],
   }
   let report = @runtime.compare_configurations(expected, actual)
-  assert_eq(report.all_ok, false)
-  assert_eq(report.total_expected, 2)
-  assert_eq(report.total_found, 2)
+  @debug.assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.total_expected, 2)
+  @debug.assert_eq(report.total_found, 2)
   assert_true(
     report.differences.contains(
       @runtime.IdentityMismatch(
@@ -1821,17 +1825,17 @@ test "configuration_from_eni_json projects ENI interchange into unified model" {
     #|  ]
     #|}
   let model = @runtime.configuration_from_eni_json(json)
-  assert_eq(model.source, @runtime.EniImport)
-  assert_eq(model.total_slaves, 2)
-  assert_eq(model.slaves.length(), 2)
-  assert_eq(model.slaves[0].position, 0)
-  assert_eq(model.slaves[0].configured_address, Some(1001U))
-  assert_eq(model.slaves[0].identification, Some(0U))
-  assert_eq(
+  @debug.assert_eq(model.source, @runtime.EniImport)
+  @debug.assert_eq(model.total_slaves, 2)
+  @debug.assert_eq(model.slaves.length(), 2)
+  @debug.assert_eq(model.slaves[0].position, 0)
+  @debug.assert_eq(model.slaves[0].configured_address, Some(1001U))
+  @debug.assert_eq(model.slaves[0].identification, Some(0U))
+  @debug.assert_eq(
     model.slaves[0].identity,
     Some({ vendor_id: 4739149U, product_code: 3U, revision: 1U, serial: 0U }),
   )
-  assert_eq(
+  @debug.assert_eq(
     model.slaves[0].process_data_summary,
     Some({
       sync_manager_count: 2,
@@ -1850,14 +1854,14 @@ test "configuration_from_eni_json projects ENI interchange into unified model" {
       dc_assign_activate_count: 1,
     }),
   )
-  assert_eq(model.slaves[1].position, 1)
-  assert_eq(model.slaves[1].configured_address, Some(1002U))
-  assert_eq(model.slaves[1].identification, Some(0x20U))
-  assert_eq(
+  @debug.assert_eq(model.slaves[1].position, 1)
+  @debug.assert_eq(model.slaves[1].configured_address, Some(1002U))
+  @debug.assert_eq(model.slaves[1].identification, Some(0x20U))
+  @debug.assert_eq(
     model.slaves[1].identity,
     Some({ vendor_id: 2U, product_code: 0x04D2U, revision: 1U, serial: 4660U }),
   )
-  assert_eq(
+  @debug.assert_eq(
     model.slaves[1].process_data_summary,
     Some({
       sync_manager_count: 1,
@@ -1954,8 +1958,8 @@ test "validate: matches by position even when expected order differs" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.results.length(), 2)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.results.length(), 2)
 }
 
 ///|
@@ -1991,8 +1995,8 @@ test "validate: reports missing and extra by position" {
     },
   ]
   let report = @runtime.validate(scan, expected)
-  assert_eq(report.all_ok, false)
-  assert_eq(report.results.length(), 2)
+  @debug.assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.results.length(), 2)
   assert_true(report.results[0] is @runtime.Missing(position=1))
   assert_true(report.results[1] is @runtime.Extra(position=0))
 }
@@ -2103,8 +2107,8 @@ test "validate_configuration grades extra-only topology as warn" {
     ],
   }
   let report = @runtime.validate_configuration(actual, expected)
-  assert_eq(report.grade, @runtime.Warn)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.grade, @runtime.Warn)
+  @debug.assert_eq(report.all_ok, false)
   assert_true(report.results[1] is @runtime.Extra(position=1))
 }
 
@@ -2183,7 +2187,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
     ],
   }
   let report = @runtime.validate_configuration(actual, expected)
-  assert_eq(report.grade, @runtime.Block)
+  @debug.assert_eq(report.grade, @runtime.Block)
   assert_true(
     report.differences.contains(
       @runtime.ProcessDataSummaryMismatch(
@@ -2193,7 +2197,7 @@ test "validate_configuration emits process-data summary mismatch when both sides
       ),
     ),
   )
-  assert_eq(report.results.length(), 2)
+  @debug.assert_eq(report.results.length(), 2)
   assert_true(report.results[1] is @runtime.ProcessDataMismatch(position=0))
 }
 
@@ -2225,15 +2229,15 @@ test "diagnostic surface from validate carries configuration summary and topolog
     grade: @runtime.Warn,
   }
   let surface = @runtime.diagnostic_surface_from_validate(scan, report)
-  assert_eq(surface.overall_level, @runtime.Degrade)
-  assert_eq(surface.issues.length(), 1)
-  assert_eq(surface.issues[0].source, @runtime.Topology)
-  assert_eq(surface.issues[0].category, @runtime.Topology)
+  @debug.assert_eq(surface.overall_level, @runtime.Degrade)
+  @debug.assert_eq(surface.issues.length(), 1)
+  @debug.assert_eq(surface.issues[0].source, @runtime.Topology)
+  @debug.assert_eq(surface.issues[0].category, @runtime.Topology)
   guard surface.configuration_summary is Some(summary) else {
     fail("expected configuration summary")
   }
-  assert_eq(summary.slave_count, 1)
-  assert_eq(summary.station_addresses, [0x1001U])
+  @debug.assert_eq(summary.slave_count, 1)
+  @debug.assert_eq(summary.station_addresses, [0x1001U])
 }
 
 ///|
@@ -2262,37 +2266,37 @@ test "diagnostic surface from slave diagnosis classifies register and mailbox is
     diagnosis_counter: Some(2U),
     dl_error_counters: None,
   })
-  assert_eq(surface.overall_level, @runtime.Block)
-  assert_eq(surface.issues.length(), 4)
-  assert_eq(surface.issues[0].source, @runtime.Registers)
-  assert_eq(surface.issues[1].source, @runtime.Registers)
-  assert_eq(surface.issues[2].source, @runtime.Mailbox)
-  assert_eq(surface.issues[3].category, @runtime.DiagnosisHistory)
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.issues.length(), 4)
+  @debug.assert_eq(surface.issues[0].source, @runtime.Registers)
+  @debug.assert_eq(surface.issues[1].source, @runtime.Registers)
+  @debug.assert_eq(surface.issues[2].source, @runtime.Mailbox)
+  @debug.assert_eq(surface.issues[3].category, @runtime.DiagnosisHistory)
 }
 
 ///|
 test "validation difference category and grade classify topology identity and configuration" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(@runtime.Missing(position=0)),
     @runtime.Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.OptionalMissing(position=1, group_id=Some(7U)),
     ),
     @runtime.Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(@runtime.Extra(position=1)),
     @runtime.Warn,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.OptionalMissing(position=1, group_id=Some(7U)),
     ),
     @runtime.Warn,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.IdentityMismatch(
         position=0,
@@ -2312,7 +2316,7 @@ test "validation difference category and grade classify topology identity and co
     ),
     @runtime.Identity,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.IdentificationMismatch(
         position=0,
@@ -2322,7 +2326,7 @@ test "validation difference category and grade classify topology identity and co
     ),
     @runtime.Configuration,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.AliasAddressMismatch(
         position=0,
@@ -2362,7 +2366,7 @@ test "validate_configuration grades optional missing hot-connect member as warn"
     slaves: [],
   }
   let report = @runtime.validate_configuration(actual, expected)
-  assert_eq(report.grade, @runtime.Warn)
+  @debug.assert_eq(report.grade, @runtime.Warn)
   assert_true(
     report.differences.contains(
       @runtime.OptionalMissing(position=3, group_id=Some(7U)),
@@ -2416,7 +2420,7 @@ test "validate_configuration treats alias mismatch as topology block" {
     ],
   }
   let report = @runtime.validate_configuration(actual, expected)
-  assert_eq(report.grade, @runtime.Block)
+  @debug.assert_eq(report.grade, @runtime.Block)
   assert_true(
     report.differences.contains(
       @runtime.AliasAddressMismatch(
@@ -2489,8 +2493,8 @@ test "offline config and ENI expectations share the same validation semantics" {
   let actual = @runtime.configuration_from_scan(scan)
   let offline_report = @runtime.validate_configuration(actual, expected_offline)
   let eni_report = @runtime.validate_configuration(actual, expected_eni)
-  assert_eq(offline_report.results.length(), 1)
-  assert_eq(eni_report.results.length(), 1)
+  @debug.assert_eq(offline_report.results.length(), 1)
+  @debug.assert_eq(eni_report.results.length(), 1)
   assert_true(
     offline_report.results[0]
     is @runtime.StationAddressMismatch(
@@ -2507,17 +2511,17 @@ test "offline config and ENI expectations share the same validation semantics" {
       actual=0x1001U
     ),
   )
-  assert_eq(offline_report.differences, eni_report.differences)
-  assert_eq(offline_report.grade, eni_report.grade)
-  assert_eq(offline_report.all_ok, eni_report.all_ok)
-  assert_eq(offline_report.expected_source, @runtime.OfflineConfig)
-  assert_eq(eni_report.expected_source, @runtime.EniImport)
+  @debug.assert_eq(offline_report.differences, eni_report.differences)
+  @debug.assert_eq(offline_report.grade, eni_report.grade)
+  @debug.assert_eq(offline_report.all_ok, eni_report.all_ok)
+  @debug.assert_eq(offline_report.expected_source, @runtime.OfflineConfig)
+  @debug.assert_eq(eni_report.expected_source, @runtime.EniImport)
 }
 
 ///|
 test "RunPhase equality" {
-  assert_eq(@runtime.RunPhase::Scanning, @runtime.RunPhase::Scanning)
-  assert_eq(@runtime.RunPhase::Done, @runtime.RunPhase::Done)
+  @debug.assert_eq(@runtime.RunPhase::Scanning, @runtime.RunPhase::Scanning)
+  @debug.assert_eq(@runtime.RunPhase::Done, @runtime.RunPhase::Done)
   assert_true(@runtime.RunPhase::Scanning != @runtime.RunPhase::Done)
 }
 
@@ -2647,8 +2651,8 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
     0,
     @hal.Duration(1000L),
   )
-  assert_eq(report.scan.slave_count, 0)
-  assert_eq(report.validation.all_ok, true)
+  @debug.assert_eq(report.scan.slave_count, 0)
+  @debug.assert_eq(report.validation.all_ok, true)
   assert_true(report.final_phase is @runtime.Done)
 }
 
@@ -2656,31 +2660,31 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
 test "scan reads slave identity from sii header" {
   let nic = SiiIdentityNic::new()
   let report = @runtime.scan(nic, @hal.Duration(1000L))
-  assert_eq(report.slave_count, 1)
-  assert_eq(report.slaves[0].vendor_id, 0x2U)
-  assert_eq(report.slaves[0].product_code, 0x044C2C52U)
-  assert_eq(report.slaves[0].revision, 0x00110000U)
-  assert_eq(report.slaves[0].serial, 0U)
+  @debug.assert_eq(report.slave_count, 1)
+  @debug.assert_eq(report.slaves[0].vendor_id, 0x2U)
+  @debug.assert_eq(report.slaves[0].product_code, 0x044C2C52U)
+  @debug.assert_eq(report.slaves[0].revision, 0x00110000U)
+  @debug.assert_eq(report.slaves[0].serial, 0U)
 }
 
 ///|
 test "scan preserves unique pre-existing station addresses" {
   let nic = ScanStationNic::new([0x2001U, 0x2002U])
   let report = @runtime.scan(nic, @hal.Duration(1000L))
-  assert_eq(report.slave_count, 2)
-  assert_eq(report.slaves[0].station_address, 0x2001U)
-  assert_eq(report.slaves[1].station_address, 0x2002U)
+  @debug.assert_eq(report.slave_count, 2)
+  @debug.assert_eq(report.slaves[0].station_address, 0x2001U)
+  @debug.assert_eq(report.slaves[1].station_address, 0x2002U)
 }
 
 ///|
 test "scan reassigns duplicate or zero station addresses into scan pool" {
   let nic = ScanStationNic::new([0U, 0U, 0x2001U, 0x2001U])
   let report = @runtime.scan(nic, @hal.Duration(1000L))
-  assert_eq(report.slave_count, 4)
-  assert_eq(report.slaves[0].station_address, 0x1001U)
-  assert_eq(report.slaves[1].station_address, 0x1002U)
-  assert_eq(report.slaves[2].station_address, 0x1003U)
-  assert_eq(report.slaves[3].station_address, 0x1004U)
+  @debug.assert_eq(report.slave_count, 4)
+  @debug.assert_eq(report.slaves[0].station_address, 0x1001U)
+  @debug.assert_eq(report.slaves[1].station_address, 0x1002U)
+  @debug.assert_eq(report.slaves[2].station_address, 0x1003U)
+  @debug.assert_eq(report.slaves[3].station_address, 0x1004U)
 }
 
 ///|
@@ -2704,12 +2708,12 @@ test "run with empty bus skips ESM broadcasts" {
     3,
     @hal.Duration(1000L),
   )
-  assert_eq(report.scan.slave_count, 0)
-  assert_eq(report.validation.all_ok, true)
-  assert_eq(report.cycles_ok, 3)
+  @debug.assert_eq(report.scan.slave_count, 0)
+  @debug.assert_eq(report.validation.all_ok, true)
+  @debug.assert_eq(report.cycles_ok, 3)
   assert_true(report.final_phase is @runtime.Done)
   assert_true(report.fault is None)
-  assert_eq(nic.state_transition_attempts, 0)
+  @debug.assert_eq(nic.state_transition_attempts, 0)
 }
 
 ///|
@@ -2733,9 +2737,9 @@ test "run confirms op via per-station transition without broadcast" {
   )
   assert_true(report.final_phase is @runtime.Done)
   assert_true(report.fault is None)
-  assert_eq(report.cycles_ok, 1)
-  assert_eq(nic.al_control_broadcast_attempts, 0)
-  assert_eq(nic.current_state, @protocol.Init.to_byte())
+  @debug.assert_eq(report.cycles_ok, 1)
+  @debug.assert_eq(nic.al_control_broadcast_attempts, 0)
+  @debug.assert_eq(nic.current_state, @protocol.Init.to_byte())
 }
 
 ///|
@@ -2752,12 +2756,12 @@ test "run reports runtime recovery fault after repeated wkc mismatch" {
     @hal.Duration(1000L),
   )
   assert_true(report.final_phase is @runtime.Operational)
-  assert_eq(report.cycles_ok, 0)
-  assert_eq(report.telemetry.wkc_errors, 5L)
+  @debug.assert_eq(report.cycles_ok, 0)
+  @debug.assert_eq(report.telemetry.wkc_errors, 5L)
   match report.fault {
     Some(@runtime.RuntimeRecoveryRequired(expected_wkc~, observed_wkc_errors~)) => {
-      assert_eq(expected_wkc, 1U)
-      assert_eq(observed_wkc_errors, 5L)
+      @debug.assert_eq(expected_wkc, 1U)
+      @debug.assert_eq(observed_wkc_errors, 5L)
     }
     _ => fail("expected runtime recovery fault")
   }
@@ -2842,7 +2846,7 @@ test "diagnostic surface from run includes runtime fault issues" {
     ),
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
-  assert_eq(surface.overall_level, @runtime.Block)
+  @debug.assert_eq(surface.overall_level, @runtime.Block)
   assert_true(
     surface.issues.any(fn(issue) {
       issue.category == @runtime.RuntimeMetrics &&
@@ -2886,8 +2890,8 @@ test "run with mock loopback: validation fails when slaves expected but not foun
     10,
     @hal.Duration(1000L),
   )
-  assert_eq(report.validation.all_ok, false)
-  assert_eq(report.cycles_ok, 0)
+  @debug.assert_eq(report.validation.all_ok, false)
+  @debug.assert_eq(report.cycles_ok, 0)
   assert_true(report.final_phase is @runtime.Validating)
 }
 
@@ -2912,16 +2916,16 @@ test "replay integration minimal flow: scan->validate->run->stop" {
     3,
     @hal.Duration(1000L),
   )
-  assert_eq(report.validation.all_ok, true)
-  assert_eq(report.cycles_requested, 3)
-  assert_eq(report.cycles_ok, 3)
+  @debug.assert_eq(report.validation.all_ok, true)
+  @debug.assert_eq(report.cycles_requested, 3)
+  @debug.assert_eq(report.cycles_ok, 3)
   assert_true(report.final_phase is @runtime.Done)
 }
 
 ///|
 test "diagnosis parser: error register" {
   let b = @runtime.parse_error_register_payload(b"\xAA")
-  assert_eq(b, b'\xAA')
+  @debug.assert_eq(b, b'\xAA')
 }
 
 ///|
@@ -2933,7 +2937,7 @@ test "diagnosis parser: error register rejects empty payload" {
 ///|
 test "diagnosis parser: u32 little-endian" {
   let v = @runtime.parse_u32_payload(b"\x78\x56\x34\x12")
-  assert_eq(v, 0x12345678U)
+  @debug.assert_eq(v, 0x12345678U)
 }
 
 ///|
@@ -2959,7 +2963,7 @@ test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
 
   // PDO path works before mailbox diagnosis call.
   let before = rt.run_cycles(nic, 2, @hal.Duration(1000L))
-  assert_eq(before, 2)
+  @debug.assert_eq(before, 2)
 
   let bad_cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2981,11 +2985,11 @@ test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
   assert_true(mailbox_result is Err(@hal.EcError::MailboxProtocol(_)))
 
   let after = rt.run_cycles(nic, 3, @hal.Duration(1000L))
-  assert_eq(after, 3)
+  @debug.assert_eq(after, 3)
   let t = rt.get_telemetry()
-  assert_eq(t.cycles, 5L)
-  assert_eq(t.timeouts, 0L)
-  assert_eq(t.wkc_errors, 0L)
+  @debug.assert_eq(t.cycles, 5L)
+  @debug.assert_eq(t.timeouts, 0L)
+  @debug.assert_eq(t.wkc_errors, 0L)
 }
 
 ///|
@@ -3097,10 +3101,10 @@ test "Master OD to_json produces valid structure" {
 
 ///|
 test "MasterOdValue format displays correctly" {
-  assert_eq(@runtime.MasterOdValue::U8(b'\xFF').format(), "0xff")
-  assert_eq(@runtime.MasterOdValue::U32(0x1234U).format(), "0x00001234")
-  assert_eq(@runtime.MasterOdValue::Str("hello").format(), "hello")
-  assert_eq(@runtime.MasterOdValue::I32(-1).format(), "-1")
+  @debug.assert_eq(@runtime.MasterOdValue::U8(b'\xFF').format(), "0xff")
+  @debug.assert_eq(@runtime.MasterOdValue::U32(0x1234U).format(), "0x00001234")
+  @debug.assert_eq(@runtime.MasterOdValue::Str("hello").format(), "hello")
+  @debug.assert_eq(@runtime.MasterOdValue::I32(-1).format(), "-1")
 }
 
 ///|
@@ -3142,7 +3146,7 @@ test "eoe_max_fragment_size computes 32-byte aligned" {
     in_sm_index: 1,
   }
   // 128 - 10 = 118, aligned to 32 = 96
-  assert_eq(@runtime.eoe_max_fragment_size(cfg), 96)
+  @debug.assert_eq(@runtime.eoe_max_fragment_size(cfg), 96)
 }
 
 ///|
@@ -3156,7 +3160,7 @@ test "eoe_max_fragment_size with small mailbox" {
     in_sm_index: 1,
   }
   // 10 - 10 = 0
-  assert_eq(@runtime.eoe_max_fragment_size(cfg), 0)
+  @debug.assert_eq(@runtime.eoe_max_fragment_size(cfg), 0)
 }
 
 ///|
@@ -3179,11 +3183,11 @@ test "EoeSwitch process_received reassembles single fragment" {
   let complete = sw.process_received(0x1001U, frame)
   assert_true(complete)
   let received = sw.drain_rx()
-  assert_eq(received.length(), 1)
-  assert_eq(received[0].station, 0x1001U)
-  assert_eq(received[0].data.length(), 20)
+  @debug.assert_eq(received.length(), 1)
+  @debug.assert_eq(received[0].station, 0x1001U)
+  @debug.assert_eq(received[0].data.length(), 20)
   for i = 0; i < 20; i = i + 1 {
-    assert_eq(received[0].data[i], i.to_byte())
+    @debug.assert_eq(received[0].data[i], i.to_byte())
   }
 }
 
@@ -3210,13 +3214,13 @@ test "EoeSwitch process_received reassembles multi-fragment" {
   let c1 = sw.process_received(0x1001U, f1)
   assert_true(c1)
   let received = sw.drain_rx()
-  assert_eq(received.length(), 1)
-  assert_eq(received[0].data.length(), 42)
+  @debug.assert_eq(received.length(), 1)
+  @debug.assert_eq(received[0].data.length(), 42)
   // Verify concatenation: first 32 bytes, then 10 bytes
-  assert_eq(received[0].data[0], b'\x00')
-  assert_eq(received[0].data[31], b'\x1F')
-  assert_eq(received[0].data[32], b'\x20')
-  assert_eq(received[0].data[41], b'\x29')
+  @debug.assert_eq(received[0].data[0], b'\x00')
+  @debug.assert_eq(received[0].data[31], b'\x1F')
+  @debug.assert_eq(received[0].data[32], b'\x20')
+  @debug.assert_eq(received[0].data[41], b'\x29')
 }
 
 ///|
@@ -3228,7 +3232,7 @@ test "EoeSwitch process_received ignores unknown station" {
   )
   let complete = sw.process_received(0x9999U, frame)
   assert_true(!complete)
-  assert_eq(sw.drain_rx().length(), 0)
+  @debug.assert_eq(sw.drain_rx().length(), 0)
 }
 
 ///|
@@ -3276,10 +3280,10 @@ test "EoeSwitch drain_rx empties queue" {
   let f2 = @mailbox.encode_eoe_fragment(b'\x02', 0U, true, 0U, 0U, 1U, p2)
   let _ = sw.process_received(0x1001U, f2)
   let batch = sw.drain_rx()
-  assert_eq(batch.length(), 2)
+  @debug.assert_eq(batch.length(), 2)
   // Second drain should be empty
   let empty = sw.drain_rx()
-  assert_eq(empty.length(), 0)
+  @debug.assert_eq(empty.length(), 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -3289,8 +3293,8 @@ test "EoeSwitch drain_rx empties queue" {
 ///|
 test "QueueEndpoint new defaults" {
   let ep = @runtime.QueueEndpoint::new()
-  assert_eq(ep.tx_depth(), 0)
-  assert_eq(ep.rx_depth(), 0)
+  @debug.assert_eq(ep.tx_depth(), 0)
+  @debug.assert_eq(ep.rx_depth(), 0)
   assert_true(ep.is_up())
 }
 
@@ -3299,13 +3303,13 @@ test "QueueEndpoint submit_tx and consume_rx round-trip" {
   let ep = @runtime.QueueEndpoint::new()
   let data = Bytes::makei(10, fn(i) { i.to_byte() })
   assert_true(ep.submit_tx(0x1001U, data))
-  assert_eq(ep.tx_depth(), 1)
+  @debug.assert_eq(ep.tx_depth(), 1)
   // consume_rx should be empty — submit_tx fills tx_pending, not rx_pending
   assert_true(ep.consume_rx() is None)
   // read_frame drains tx_pending (used by bridge)
   let frame = ep.read_frame()
   assert_true(frame is Some(_))
-  assert_eq(ep.tx_depth(), 0)
+  @debug.assert_eq(ep.tx_depth(), 0)
 }
 
 ///|
@@ -3313,15 +3317,15 @@ test "QueueEndpoint write_frame and consume_rx" {
   let ep = @runtime.QueueEndpoint::new()
   let data = Bytes::makei(8, fn(i) { (0x40 + i).to_byte() })
   assert_true(ep.write_frame(data))
-  assert_eq(ep.rx_depth(), 1)
+  @debug.assert_eq(ep.rx_depth(), 1)
   let f = ep.consume_rx()
   guard f is Some(f) else {
     assert_true(false)
     return
   }
-  assert_eq(f.data.length(), 8)
-  assert_eq(f.data[0], b'\x40')
-  assert_eq(ep.rx_depth(), 0)
+  @debug.assert_eq(f.data.length(), 8)
+  @debug.assert_eq(f.data[0], b'\x40')
+  @debug.assert_eq(ep.rx_depth(), 0)
 }
 
 ///|
@@ -3342,7 +3346,7 @@ test "QueueEndpoint overflow at max_depth" {
   assert_true(ep.submit_tx(2U, data))
   // Third should fail
   assert_true(!ep.submit_tx(3U, data))
-  assert_eq(ep.tx_depth(), 2)
+  @debug.assert_eq(ep.tx_depth(), 2)
 }
 
 ///|
@@ -3381,16 +3385,16 @@ test "bridge_eoe_cycle delivers rx frames to endpoint" {
   let ep = @runtime.QueueEndpoint::new()
   let nic = @mock.MockNic::new()
   let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
-  assert_eq(tx, 0)
-  assert_eq(rx, 1)
-  assert_eq(ep.rx_depth(), 1)
+  @debug.assert_eq(tx, 0)
+  @debug.assert_eq(rx, 1)
+  @debug.assert_eq(ep.rx_depth(), 1)
   let received = ep.consume_rx()
   guard received is Some(f) else {
     assert_true(false)
     return
   }
-  assert_eq(f.station, 0x1001U)
-  assert_eq(f.data.length(), 16)
+  @debug.assert_eq(f.station, 0x1001U)
+  @debug.assert_eq(f.data.length(), 16)
 }
 
 ///|
@@ -3411,10 +3415,10 @@ test "bridge_eoe_cycle drains tx_pending via switch" {
   let nic = @mock.MockNic::new()
   let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
   // MockNic accepts send, so tx_sent = 1
-  assert_eq(tx, 1)
-  assert_eq(rx, 0)
+  @debug.assert_eq(tx, 1)
+  @debug.assert_eq(rx, 0)
   // tx_pending should be fully drained
-  assert_eq(ep.tx_depth(), 0)
+  @debug.assert_eq(ep.tx_depth(), 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -3456,8 +3460,8 @@ test "EoeRelay inactive relay_cycle returns zero" {
     fn(_f) { true },
     fn() { None },
   )
-  assert_eq(rx, 0)
-  assert_eq(tx, 0)
+  @debug.assert_eq(rx, 0)
+  @debug.assert_eq(tx, 0)
 }
 
 ///|
@@ -3491,12 +3495,12 @@ test "EoeRelay relay_cycle delivers rx frames via handler" {
     },
     fn() { None },
   )
-  assert_eq(rx, 1)
-  assert_eq(tx, 0)
-  assert_eq(delivered.length(), 1)
+  @debug.assert_eq(rx, 1)
+  @debug.assert_eq(tx, 0)
+  @debug.assert_eq(delivered.length(), 1)
   assert_true(delivered[0].direction is @runtime.SlaveToHost)
-  assert_eq(delivered[0].station, 0x1001U)
-  assert_eq(delivered[0].data.length(), 12)
+  @debug.assert_eq(delivered[0].station, 0x1001U)
+  @debug.assert_eq(delivered[0].data.length(), 12)
 }
 
 ///|
@@ -3526,7 +3530,7 @@ test "EoeRelay relay_cycle handler rejection increments dropped" {
     fn(_f) { false },
     fn() { None },
   )
-  assert_eq(rx, 0) // handler rejected, so rx_count = 0
+  @debug.assert_eq(rx, 0) // handler rejected, so rx_count = 0
   let text = relay.format_text()
   assert_true(text.contains("Dropped: 1"))
 }
@@ -3574,9 +3578,9 @@ test "EoeRelay relay_cycle tx_provider sends frames" {
 ///|
 test "EoeRelayStats new is zeroed" {
   let stats = @runtime.EoeRelayStats::new()
-  assert_eq(stats.tx_relayed, 0L)
-  assert_eq(stats.rx_relayed, 0L)
-  assert_eq(stats.dropped, 0L)
+  @debug.assert_eq(stats.tx_relayed, 0L)
+  @debug.assert_eq(stats.rx_relayed, 0L)
+  @debug.assert_eq(stats.dropped, 0L)
   let j = stats.to_json()
   guard j is Json::Object(m) else {
     assert_true(false)
@@ -3599,19 +3603,19 @@ test "EoeRelayDirection display" {
 
 ///|
 test "validation_difference_category Topology variants" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::Missing(position=0),
     ),
     @runtime.ValidateDifferenceCategory::Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::Extra(position=1),
     ),
     @runtime.ValidateDifferenceCategory::Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::OptionalMissing(
         position=2,
@@ -3620,7 +3624,7 @@ test "validation_difference_category Topology variants" {
     ),
     @runtime.ValidateDifferenceCategory::Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::StationAddressMismatch(
         position=0,
@@ -3630,7 +3634,7 @@ test "validation_difference_category Topology variants" {
     ),
     @runtime.ValidateDifferenceCategory::Topology,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::AliasAddressMismatch(
         position=0,
@@ -3644,7 +3648,7 @@ test "validation_difference_category Topology variants" {
 
 ///|
 test "validation_difference_category Identity" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::IdentityMismatch(
         position=0,
@@ -3668,7 +3672,7 @@ test "validation_difference_category Identity" {
 
 ///|
 test "validation_difference_category Configuration variants" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::IdentificationMismatch(
         position=0,
@@ -3687,7 +3691,7 @@ test "validation_difference_category Configuration variants" {
     dc_op_mode_count: 0,
     dc_assign_activate_count: 0,
   }
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_category(
       @runtime.ConfigurationDifference::ProcessDataSummaryMismatch(
         position=0,
@@ -3703,13 +3707,13 @@ test "validation_difference_category Configuration variants" {
 
 ///|
 test "validation_difference_grade Warn for Extra and OptionalMissing" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::Extra(position=0),
     ),
     @runtime.ValidateGrade::Warn,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::OptionalMissing(
         position=1,
@@ -3722,7 +3726,7 @@ test "validation_difference_grade Warn for Extra and OptionalMissing" {
 
 ///|
 test "validation_difference_grade Block for Missing" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::Missing(position=0),
     ),
@@ -3732,7 +3736,7 @@ test "validation_difference_grade Block for Missing" {
 
 ///|
 test "validation_difference_grade Block for StationAddressMismatch" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::StationAddressMismatch(
         position=0,
@@ -3746,7 +3750,7 @@ test "validation_difference_grade Block for StationAddressMismatch" {
 
 ///|
 test "validation_difference_grade Block for IdentityMismatch" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.validation_difference_grade(
       @runtime.ConfigurationDifference::IdentityMismatch(
         position=0,
@@ -3778,14 +3782,14 @@ test "TopologyHealthAnalyzer perfect slave scores 1000" {
     analyzer.record_cycle(0, 1L, 1L, false, true)
   }
   let report = analyzer.analyze()
-  assert_eq(report.slaves.length(), 1)
-  assert_eq(report.slaves[0].tx_frames, 100L)
-  assert_eq(report.slaves[0].rx_frames, 100L)
-  assert_eq(report.slaves[0].timeouts, 0L)
-  assert_eq(report.slaves[0].wkc_errors, 0L)
-  assert_eq(report.slaves[0].health_score, 1000)
+  @debug.assert_eq(report.slaves.length(), 1)
+  @debug.assert_eq(report.slaves[0].tx_frames, 100L)
+  @debug.assert_eq(report.slaves[0].rx_frames, 100L)
+  @debug.assert_eq(report.slaves[0].timeouts, 0L)
+  @debug.assert_eq(report.slaves[0].wkc_errors, 0L)
+  @debug.assert_eq(report.slaves[0].health_score, 1000)
   assert_true(report.slaves[0].grade is @analysis.LinkGrade::Excellent)
-  assert_eq(report.system_health_score, 1000)
+  @debug.assert_eq(report.system_health_score, 1000)
 }
 
 ///|
@@ -3807,9 +3811,9 @@ test "TopologyHealthAnalyzer degraded slave" {
 test "TopologyHealthAnalyzer empty returns default score" {
   let analyzer = @analysis.TopologyHealthAnalyzer::new()
   let report = analyzer.analyze()
-  assert_eq(report.slaves.length(), 0)
+  @debug.assert_eq(report.slaves.length(), 0)
   // Empty analyzer defaults to perfect score (no errors observed)
-  assert_eq(report.system_health_score, 1000)
+  @debug.assert_eq(report.system_health_score, 1000)
 }
 
 ///|
@@ -3835,7 +3839,7 @@ test "TopologyHealthAnalyzer bottleneck detection" {
     analyzer.record_cycle(1, 1L, 0L, true, false)
   }
   let report = analyzer.analyze()
-  assert_eq(report.bottleneck_index, Some(1))
+  @debug.assert_eq(report.bottleneck_index, Some(1))
 }
 
 ///|
@@ -3845,7 +3849,7 @@ test "TopologyHealthAnalyzer record_cycle out of bounds ignored" {
   analyzer.record_cycle(99, 1L, 1L, false, true)
   analyzer.record_cycle(-1, 1L, 1L, false, true)
   let report = analyzer.analyze()
-  assert_eq(report.slaves[0].tx_frames, 0L)
+  @debug.assert_eq(report.slaves[0].tx_frames, 0L)
 }
 
 ///|
@@ -3854,10 +3858,10 @@ test "TopologyHealthAnalyzer ingest_telemetry" {
   analyzer.add_slave(0x1001U, 0, 500L)
   analyzer.ingest_telemetry(0, 1000L, 990L, 5L, 3L)
   let report = analyzer.analyze()
-  assert_eq(report.slaves[0].tx_frames, 1000L)
-  assert_eq(report.slaves[0].rx_frames, 990L)
-  assert_eq(report.slaves[0].timeouts, 5L)
-  assert_eq(report.slaves[0].wkc_errors, 3L)
+  @debug.assert_eq(report.slaves[0].tx_frames, 1000L)
+  @debug.assert_eq(report.slaves[0].rx_frames, 990L)
+  @debug.assert_eq(report.slaves[0].timeouts, 5L)
+  @debug.assert_eq(report.slaves[0].wkc_errors, 3L)
 }
 
 ///|
@@ -3891,11 +3895,11 @@ test "grade_from_score boundaries" {
 ///|
 test "VerificationReport new initializes correctly" {
   let report = @runtime.VerificationReport::new("Test Run")
-  assert_eq(report.title, "Test Run")
+  @debug.assert_eq(report.title, "Test Run")
   assert_true(report.summary_verdict is @runtime.Verdict::Pass)
-  assert_eq(report.timeline.length(), 0)
-  assert_eq(report.fault_injections.length(), 0)
-  assert_eq(report.metadata.length(), 0)
+  @debug.assert_eq(report.timeline.length(), 0)
+  @debug.assert_eq(report.fault_injections.length(), 0)
+  @debug.assert_eq(report.metadata.length(), 0)
 }
 
 ///|
@@ -3907,26 +3911,26 @@ test "VerificationReport add_event appends timeline" {
     "Init to PreOp",
     @runtime.Verdict::Pass,
   )
-  assert_eq(report.timeline.length(), 1)
-  assert_eq(report.timeline[0].cycle, 100L)
-  assert_eq(report.timeline[0].event_type, "StateTransition")
+  @debug.assert_eq(report.timeline.length(), 1)
+  @debug.assert_eq(report.timeline[0].cycle, 100L)
+  @debug.assert_eq(report.timeline[0].event_type, "StateTransition")
 }
 
 ///|
 test "VerificationReport add_fault appends fault_injections" {
   let report = @runtime.VerificationReport::new("Test")
   report.add_fault("link_down at cycle 50")
-  assert_eq(report.fault_injections.length(), 1)
-  assert_eq(report.fault_injections[0], "link_down at cycle 50")
+  @debug.assert_eq(report.fault_injections.length(), 1)
+  @debug.assert_eq(report.fault_injections[0], "link_down at cycle 50")
 }
 
 ///|
 test "VerificationReport add_meta appends metadata" {
   let report = @runtime.VerificationReport::new("Test")
   report.add_meta("Platform", "EtherCAT")
-  assert_eq(report.metadata.length(), 1)
-  assert_eq(report.metadata[0].0, "Platform")
-  assert_eq(report.metadata[0].1, "EtherCAT")
+  @debug.assert_eq(report.metadata.length(), 1)
+  @debug.assert_eq(report.metadata[0].0, "Platform")
+  @debug.assert_eq(report.metadata[0].1, "EtherCAT")
 }
 
 ///|
@@ -3970,8 +3974,8 @@ test "validate_configuration matching models returns all Ok" {
     slaves: [slave],
   }
   let report = @runtime.validate_configuration(model, model)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.grade, @runtime.ValidateGrade::Pass)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.grade, @runtime.ValidateGrade::Pass)
 }
 
 ///|
@@ -4010,7 +4014,7 @@ test "validate_configuration extra slave in actual" {
     slaves: [slave1],
   }
   let report = @runtime.validate_configuration(actual, expected)
-  assert_eq(report.grade, @runtime.ValidateGrade::Warn)
+  @debug.assert_eq(report.grade, @runtime.ValidateGrade::Warn)
 }
 
 // ===== Coverage: additional pure functions =====
@@ -4032,8 +4036,8 @@ test "compare_configurations identical" {
     slaves: [slave],
   }
   let report = @runtime.compare_configurations(model, model)
-  assert_eq(report.all_ok, true)
-  assert_eq(report.differences.length(), 0)
+  @debug.assert_eq(report.all_ok, true)
+  @debug.assert_eq(report.differences.length(), 0)
 }
 
 ///|
@@ -4042,10 +4046,10 @@ test "Verdict is_passing and severity" {
   let warn = @runtime.Verdict::Warn("w")
   let fail = @runtime.Verdict::Fail("f")
   let block = @runtime.Verdict::Block("b")
-  assert_eq(pass.is_passing(), true)
-  assert_eq(warn.is_passing(), true)
-  assert_eq(fail.is_passing(), false)
-  assert_eq(block.is_passing(), false)
+  @debug.assert_eq(pass.is_passing(), true)
+  @debug.assert_eq(warn.is_passing(), true)
+  @debug.assert_eq(fail.is_passing(), false)
+  @debug.assert_eq(block.is_passing(), false)
   assert_true(pass.severity() < fail.severity())
   assert_true(warn.severity() < block.severity())
 }
@@ -4054,12 +4058,14 @@ test "Verdict is_passing and severity" {
 
 ///|
 test "diagnosis_restore_path PreOp" {
-  assert_eq(@runtime.diagnosis_restore_path(@protocol.PreOp), [@protocol.PreOp])
+  @debug.assert_eq(@runtime.diagnosis_restore_path(@protocol.PreOp), [
+    @protocol.PreOp,
+  ])
 }
 
 ///|
 test "diagnosis_restore_path SafeOp" {
-  assert_eq(@runtime.diagnosis_restore_path(@protocol.SafeOp), [
+  @debug.assert_eq(@runtime.diagnosis_restore_path(@protocol.SafeOp), [
     @protocol.PreOp,
     @protocol.SafeOp,
   ])
@@ -4067,7 +4073,7 @@ test "diagnosis_restore_path SafeOp" {
 
 ///|
 test "diagnosis_restore_path Op" {
-  assert_eq(@runtime.diagnosis_restore_path(@protocol.Op), [
+  @debug.assert_eq(@runtime.diagnosis_restore_path(@protocol.Op), [
     @protocol.PreOp,
     @protocol.SafeOp,
     @protocol.Op,
@@ -4076,7 +4082,7 @@ test "diagnosis_restore_path Op" {
 
 ///|
 test "diagnosis_restore_path Init" {
-  assert_eq(@runtime.diagnosis_restore_path(@protocol.Init), [
+  @debug.assert_eq(@runtime.diagnosis_restore_path(@protocol.Init), [
     @protocol.PreOp,
     @protocol.Init,
   ])
@@ -4084,7 +4090,7 @@ test "diagnosis_restore_path Init" {
 
 ///|
 test "diagnosis_restore_path Boot" {
-  assert_eq(@runtime.diagnosis_restore_path(@protocol.Boot), [
+  @debug.assert_eq(@runtime.diagnosis_restore_path(@protocol.Boot), [
     @protocol.PreOp,
     @protocol.Init,
     @protocol.Boot,
@@ -4094,7 +4100,7 @@ test "diagnosis_restore_path Boot" {
 ///|
 test "parse_error_register_payload valid" {
   let result = @runtime.parse_error_register_payload(b"\x42")
-  assert_eq(result, b'\x42')
+  @debug.assert_eq(result, b'\x42')
 }
 
 ///|
@@ -4106,7 +4112,7 @@ test "parse_error_register_payload empty rejects" {
 ///|
 test "parse_u32_payload valid" {
   let result = @runtime.parse_u32_payload(b"\x01\x02\x03\x04")
-  assert_eq(result, 0x04030201U)
+  @debug.assert_eq(result, 0x04030201U)
 }
 
 ///|
@@ -4126,8 +4132,8 @@ test "diagnostic_surface_from_state_transition no issues when match" {
     Some(0U),
     Some(1U),
   )
-  assert_eq(surface.station_address, Some(0x1001U))
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.station_address, Some(0x1001U))
+  @debug.assert_eq(surface.issues.length(), 0)
   assert_true(surface.overall_level is @runtime.DiagnosticLevel::Info)
 }
 
@@ -4225,8 +4231,8 @@ test "diagnostic_surface_from_slave_diagnosis clean slave" {
     dl_error_counters: None,
   }
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
-  assert_eq(surface.station_address, Some(0x1001U))
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.station_address, Some(0x1001U))
+  @debug.assert_eq(surface.issues.length(), 0)
   assert_true(surface.overall_level is @runtime.DiagnosticLevel::Info)
 }
 
@@ -4349,7 +4355,7 @@ test "enrich_surface_with_fingerprint adds fingerprint" {
     identity_hash: 12345L,
   }
   let enriched = @runtime.enrich_surface_with_fingerprint(surface, fp)
-  assert_eq(enriched.topology_fingerprint, Some(fp))
+  @debug.assert_eq(enriched.topology_fingerprint, Some(fp))
 }
 
 ///|
@@ -4491,7 +4497,7 @@ test "score_dimension perfect value" {
     bad_threshold: 100L,
     weight: 100,
   }
-  assert_eq(@analysis.score_dimension(dim), 1000)
+  @debug.assert_eq(@analysis.score_dimension(dim), 1000)
 }
 
 ///|
@@ -4503,7 +4509,7 @@ test "score_dimension worst value" {
     bad_threshold: 100L,
     weight: 100,
   }
-  assert_eq(@analysis.score_dimension(dim), 0)
+  @debug.assert_eq(@analysis.score_dimension(dim), 0)
 }
 
 ///|
@@ -4518,9 +4524,9 @@ test "compute_quality_score single dimension" {
     },
   ]
   let (score, breakdown) = @analysis.compute_quality_score(dims)
-  assert_eq(score, 1000)
-  assert_eq(breakdown.length(), 1)
-  assert_eq(breakdown[0].0, "loss")
+  @debug.assert_eq(score, 1000)
+  @debug.assert_eq(breakdown.length(), 1)
+  @debug.assert_eq(breakdown[0].0, "loss")
 }
 
 ///|
@@ -4543,7 +4549,7 @@ test "compute_quality_score mixed dimensions" {
   ]
   let (score, _) = @analysis.compute_quality_score(dims)
   // 50% perfect + 50% worst → ~500
-  assert_eq(score, 500)
+  @debug.assert_eq(score, 500)
 }
 
 ///|
@@ -4551,7 +4557,7 @@ test "CommQualityScorer lifecycle" {
   let scorer = @analysis.CommQualityScorer::new()
   // Perfect telemetry: 1000 cycles, 0 timeouts, 0 wkc errors, 0 retries
   let qs = scorer.score_from_telemetry(1000L, 0L, 0L, 0L)
-  assert_eq(qs.overall, 1000)
+  @debug.assert_eq(qs.overall, 1000)
   assert_true(qs.grade is @analysis.QualityGrade::Excellent)
   scorer.record_score(qs.overall)
   assert_true(scorer.trend() is @analysis.QualityTrend::Stable)
@@ -4793,8 +4799,8 @@ test "CyclePerfAnalyzer record_duration with deadline miss" {
   // Record a normal duration
   analyzer.record_duration(1_000_000L)
   let stats = analyzer.stats()
-  assert_eq(stats.deadline_misses, 1L)
-  assert_eq(stats.total_cycles, 2L)
+  @debug.assert_eq(stats.deadline_misses, 1L)
+  @debug.assert_eq(stats.total_cycles, 2L)
 }
 
 ///|
@@ -4820,9 +4826,9 @@ test "CyclePerfAnalyzer trend degrading" {
 test "CyclePerfAnalyzer stats with zero cycles" {
   let analyzer = @analysis.CyclePerfAnalyzer::new(1_000_000L)
   let stats = analyzer.stats()
-  assert_eq(stats.total_cycles, 0L)
-  assert_eq(stats.min_ns, 0L)
-  assert_eq(stats.max_ns, 0L)
+  @debug.assert_eq(stats.total_cycles, 0L)
+  @debug.assert_eq(stats.min_ns, 0L)
+  @debug.assert_eq(stats.max_ns, 0L)
 }
 
 // ===== analyze_multi_rate tests =====
@@ -4834,8 +4840,8 @@ test "analyze_multi_rate empty tasks" {
     tasks: [],
   }
   let analysis = @simulation.analyze_multi_rate(schedule)
-  assert_eq(analysis.hyperperiod, 1)
-  assert_eq(analysis.worst_case_tasks_per_cycle, 0)
+  @debug.assert_eq(analysis.hyperperiod, 1)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 0)
   assert_true(analysis.is_harmonic)
 }
 
@@ -4870,10 +4876,10 @@ test "analyze_multi_rate non-harmonic with peak tie" {
     ],
   }
   let analysis = @simulation.analyze_multi_rate(schedule)
-  assert_eq(analysis.hyperperiod, 15)
+  @debug.assert_eq(analysis.hyperperiod, 15)
   assert_true(!analysis.is_harmonic)
   // Cycle 0: both t1 and t2 fire → 2 tasks. Other cycles have ≤1.
-  assert_eq(analysis.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 2)
 }
 
 ///|
@@ -4989,9 +4995,9 @@ test "validate_multi_rate non-harmonic warning" {
 ///|
 test "AutoTuneConfig conservative and aggressive" {
   let c = @analysis.AutoTuneConfig::conservative()
-  assert_eq(c.probe_iterations, 20)
+  @debug.assert_eq(c.probe_iterations, 20)
   let a = @analysis.AutoTuneConfig::aggressive()
-  assert_eq(a.probe_iterations, 5)
+  @debug.assert_eq(a.probe_iterations, 5)
 }
 
 // ===== HilSession tests =====
@@ -5052,9 +5058,9 @@ test "hil_session_summary with terminated step" {
   session.terminated = true
   session.termination_reason = "timeout"
   let summary = @hil.hil_session_summary(session)
-  assert_eq(summary.total_steps, 3)
-  assert_eq(summary.ok_steps, 2) // Ok + Terminated count as ok
-  assert_eq(summary.error_steps, 1)
+  @debug.assert_eq(summary.total_steps, 3)
+  @debug.assert_eq(summary.ok_steps, 2) // Ok + Terminated count as ok
+  @debug.assert_eq(summary.error_steps, 1)
   assert_true(summary.terminated)
 }
 
@@ -5198,8 +5204,8 @@ test "write_slice_outputs_inplace partial" {
   }
   let src = FixedArray::make(8, b'\xFF')
   @simulation.write_slice_outputs_inplace(image, slice, src, 2)
-  assert_eq(image.outputs[4], b'\xFF')
-  assert_eq(image.outputs[0], b'\x00')
+  @debug.assert_eq(image.outputs[4], b'\xFF')
+  @debug.assert_eq(image.outputs[0], b'\x00')
 }
 
 ///|
@@ -5215,9 +5221,9 @@ test "slice_inputs_view returns correct range" {
     input_length: 4,
   }
   let (buf, offset, len) = @simulation.slice_inputs_view(image, slice)
-  assert_eq(offset, 4)
-  assert_eq(len, 4)
-  assert_eq(buf[offset], b'\x04')
+  @debug.assert_eq(offset, 4)
+  @debug.assert_eq(len, 4)
+  @debug.assert_eq(buf[offset], b'\x04')
 }
 
 // ===== CommQualityScorer improving trend and zero-cycles =====
@@ -5246,7 +5252,7 @@ test "CommQualityScorer score_from_telemetry zero cycles" {
   let scorer = @analysis.CommQualityScorer::new()
   let qs = scorer.score_from_telemetry(0L, 0L, 0L, 0L)
   // With zero cycles, all rates are 0 → perfect score
-  assert_eq(qs.overall, 1000)
+  @debug.assert_eq(qs.overall, 1000)
 }
 
 // ===== diagnostic_surface_from_run with fault =====
@@ -5448,7 +5454,7 @@ test "build_master_od with diagnostic surface" {
   let od = @runtime.build_master_od(identity, None, None, Some(surface))
   assert_true(od.entries.length() > 0)
   let json = od.to_json()
-  assert_true(json.to_string().length() > 0)
+  assert_true(json.stringify().length() > 0)
 }
 
 // ===== diagnostic_surface_from_slave_diagnosis =====
@@ -5480,7 +5486,7 @@ test "diagnostic_surface_from_slave_diagnosis with al_error_flag" {
     dl_error_counters: None,
   }
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
-  assert_eq(surface.station_address, Some(0x1001U))
+  @debug.assert_eq(surface.station_address, Some(0x1001U))
   assert_true(surface.issues.length() >= 3) // al_error, al_status_code, error_register
   assert_true(
     surface.issues.iter().any(fn(i) { i.detail.contains("AL error flag") }),
@@ -5506,7 +5512,7 @@ test "diagnostic_surface_from_slave_diagnosis clean" {
     dl_error_counters: None,
   }
   let surface = @runtime.diagnostic_surface_from_slave_diagnosis(scan, diag)
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.issues.length(), 0)
 }
 
 // ===== diagnostic_surface_from_validate with configuration differences =====
@@ -5635,7 +5641,7 @@ test "diagnostic_surface_from_state_transition clean transition" {
     Some(0U),
     Some(1U), // wkc != 0
   )
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.issues.length(), 0)
 }
 
 // ===== monitor_result_to_issue =====
@@ -5659,7 +5665,7 @@ test "monitor_result_to_issue Warn returns issue" {
   assert_true(issue is Some(_))
   match issue {
     Some(i) => {
-      assert_eq(i.level, @runtime.DiagnosticLevel::Info)
+      @debug.assert_eq(i.level, @runtime.DiagnosticLevel::Info)
       assert_true(i.detail.contains("test_monitor"))
       assert_true(i.detail.contains("low"))
     }
@@ -5675,7 +5681,7 @@ test "monitor_result_to_issue Fail returns degrade" {
   }
   let issue = @runtime.monitor_result_to_issue(r)
   match issue {
-    Some(i) => assert_eq(i.level, @runtime.DiagnosticLevel::Degrade)
+    Some(i) => @debug.assert_eq(i.level, @runtime.DiagnosticLevel::Degrade)
     None => assert_true(false)
   }
 }
@@ -5688,7 +5694,7 @@ test "monitor_result_to_issue Block returns block" {
   }
   let issue = @runtime.monitor_result_to_issue(r)
   match issue {
-    Some(i) => assert_eq(i.level, @runtime.DiagnosticLevel::Block)
+    Some(i) => @debug.assert_eq(i.level, @runtime.DiagnosticLevel::Block)
     None => assert_true(false)
   }
 }
@@ -5706,7 +5712,7 @@ test "enrich_surface_with_monitors adds issues" {
     None,
     None,
   )
-  assert_eq(base.issues.length(), 0)
+  @debug.assert_eq(base.issues.length(), 0)
   let results : Array[@runtime.MonitorResult] = [
     { name: "m1", verdict: @runtime.Verdict::Warn("warning") },
     { name: "m2", verdict: @runtime.Verdict::Fail("failure") },
@@ -5749,19 +5755,19 @@ test "enrich_surface_with_fingerprint attaches fingerprint" {
 ///|
 test "diagnosis_restore_path to PreOp" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::PreOp)
-  assert_eq(path, [@protocol.EsmState::PreOp])
+  @debug.assert_eq(path, [@protocol.EsmState::PreOp])
 }
 
 ///|
 test "diagnosis_restore_path to SafeOp" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::SafeOp)
-  assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::SafeOp])
+  @debug.assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::SafeOp])
 }
 
 ///|
 test "diagnosis_restore_path to Op" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::Op)
-  assert_eq(path, [
+  @debug.assert_eq(path, [
     @protocol.EsmState::PreOp,
     @protocol.EsmState::SafeOp,
     @protocol.EsmState::Op,
@@ -5771,13 +5777,13 @@ test "diagnosis_restore_path to Op" {
 ///|
 test "diagnosis_restore_path to Init" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::Init)
-  assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::Init])
+  @debug.assert_eq(path, [@protocol.EsmState::PreOp, @protocol.EsmState::Init])
 }
 
 ///|
 test "diagnosis_restore_path to Boot" {
   let path = @runtime.diagnosis_restore_path(@protocol.EsmState::Boot)
-  assert_eq(path, [
+  @debug.assert_eq(path, [
     @protocol.EsmState::PreOp,
     @protocol.EsmState::Init,
     @protocol.EsmState::Boot,
@@ -5822,19 +5828,19 @@ test "diagnostic_surface_from_run with retries telemetry" {
 ///|
 test "DriftCompensationGains aggressive" {
   let gains = @simulation.DriftCompensationGains::aggressive()
-  assert_eq(gains.kp_num, 1L)
-  assert_eq(gains.kp_den, 2L)
-  assert_eq(gains.ki_num, 1L)
-  assert_eq(gains.ki_den, 20L)
+  @debug.assert_eq(gains.kp_num, 1L)
+  @debug.assert_eq(gains.kp_den, 2L)
+  @debug.assert_eq(gains.ki_num, 1L)
+  @debug.assert_eq(gains.ki_den, 20L)
 }
 
 ///|
 test "DriftCompensationGains conservative" {
   let gains = @simulation.DriftCompensationGains::conservative()
-  assert_eq(gains.kp_num, 1L)
-  assert_eq(gains.kp_den, 10L)
-  assert_eq(gains.ki_num, 1L)
-  assert_eq(gains.ki_den, 100L)
+  @debug.assert_eq(gains.kp_num, 1L)
+  @debug.assert_eq(gains.kp_den, 10L)
+  @debug.assert_eq(gains.ki_num, 1L)
+  @debug.assert_eq(gains.ki_den, 100L)
 }
 
 ///|
@@ -5847,7 +5853,7 @@ test "DriftCompensator compensate applies correction" {
   // First update: reference=1000, local=1100 => error = 100 - 0 = 100
   let correction = comp.compensate(sync, 1000L, 1100L)
   assert_true(correction != 0L)
-  assert_eq(comp.update_count, 1L)
+  @debug.assert_eq(comp.update_count, 1L)
 }
 
 ///|
@@ -5864,7 +5870,7 @@ test "DriftCompensator report generates report" {
     ignore(comp.compensate(sync, ref_ns, local_ns))
   }
   let report = comp.report(sync)
-  assert_eq(report.update_count, 5L)
+  @debug.assert_eq(report.update_count, 5L)
 }
 
 // ===== CommQualityScorer uncovered branches =====
@@ -5919,7 +5925,7 @@ test "compute_quality_score with multiple dimensions" {
   ]
   let (overall, per_dim) = @analysis.compute_quality_score(dims)
   assert_true(overall >= 0 && overall <= 1000)
-  assert_eq(per_dim.length(), 2)
+  @debug.assert_eq(per_dim.length(), 2)
 }
 
 ///|
@@ -5942,7 +5948,7 @@ test "CommQualityScorer score_from_telemetry with jitter" {
 test "parse_error_register_payload valid v2" {
   let payload = Bytes::from_array([b'\x42'])
   let result = @runtime.parse_error_register_payload(payload)
-  assert_eq(result, b'\x42')
+  @debug.assert_eq(result, b'\x42')
 }
 
 ///|
@@ -5958,7 +5964,7 @@ test "parse_u32_payload valid v2" {
   // 0x04030201 in little-endian
   let payload = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04'])
   let result = @runtime.parse_u32_payload(payload)
-  assert_eq(result, 0x04030201U)
+  @debug.assert_eq(result, 0x04030201U)
 }
 
 ///|
@@ -5972,11 +5978,11 @@ test "parse_u32_payload too short v2" {
 
 ///|
 test "verdict_to_diagnostic_level Pass and Warn are Info" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Pass),
     @runtime.DiagnosticLevel::Info,
   )
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Warn("w")),
     @runtime.DiagnosticLevel::Info,
   )
@@ -5984,7 +5990,7 @@ test "verdict_to_diagnostic_level Pass and Warn are Info" {
 
 ///|
 test "verdict_to_diagnostic_level Fail is Degrade" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Fail("f")),
     @runtime.DiagnosticLevel::Degrade,
   )
@@ -5992,7 +5998,7 @@ test "verdict_to_diagnostic_level Fail is Degrade" {
 
 ///|
 test "verdict_to_diagnostic_level Block is Block" {
-  assert_eq(
+  @debug.assert_eq(
     @runtime.verdict_to_diagnostic_level(@runtime.Verdict::Block("b")),
     @runtime.DiagnosticLevel::Block,
   )
@@ -6064,7 +6070,7 @@ test "topology_fingerprint with same slaves gives same hash" {
   }
   let fp1 = @runtime.topology_fingerprint(scan1)
   let fp2 = @runtime.topology_fingerprint(scan2)
-  assert_eq(fp1, fp2)
+  @debug.assert_eq(fp1, fp2)
 }
 
 ///|
@@ -6113,7 +6119,7 @@ test "topology_fingerprint_match identical" {
     identity_hash: 12345L,
   }
   let result = @runtime.fingerprint_match(fp, fp)
-  assert_eq(result, @runtime.TopologyFingerprintMatch::Identical)
+  @debug.assert_eq(result, @runtime.TopologyFingerprintMatch::Identical)
 }
 
 ///|
@@ -6143,7 +6149,7 @@ test "topology_fingerprint_match identity changed" {
     identity_hash: 99999L,
   }
   let result = @runtime.fingerprint_match(fp1, fp2)
-  assert_eq(result, @runtime.TopologyFingerprintMatch::IdentityChanged)
+  @debug.assert_eq(result, @runtime.TopologyFingerprintMatch::IdentityChanged)
 }
 
 // ===== monitor functions with Runtime =====
@@ -6202,7 +6208,7 @@ test "monitor_wkc_errors Warn branch" {
 test "monitor_wkc_errors zero errors pass" {
   let rt = @runtime.Runtime::new(@hal.MasterConfig::default())
   let result = @runtime.monitor_wkc_errors(rt)
-  assert_eq(result.verdict, @runtime.Verdict::Pass)
+  @debug.assert_eq(result.verdict, @runtime.Verdict::Pass)
 }
 
 // ===== monitor_startup_state Scanning =====
@@ -6246,7 +6252,7 @@ test "DriftCompensator compensate inactive returns zero" {
     @simulation.ClockDomain::Linux,
   )
   let correction = comp.compensate(sync, 1000L, 2000L)
-  assert_eq(correction, 0L)
+  @debug.assert_eq(correction, 0L)
 }
 
 // ===== DriftCompensator integral windup clamping =====
@@ -6303,14 +6309,14 @@ test "ExternalProcessBridge avg_latency_ns with steps" {
   let bridge = @simulation.ExternalProcessBridge::new(config)
   bridge.step_count = 10L
   bridge.total_latency_ns = 50_000L
-  assert_eq(bridge.avg_latency_ns(), 5_000L)
+  @debug.assert_eq(bridge.avg_latency_ns(), 5_000L)
 }
 
 ///|
 test "ExternalProcessBridge avg_latency_ns zero steps" {
   let config = @simulation.ExternalBridgeConfig::unix_socket("/tmp/test")
   let bridge = @simulation.ExternalProcessBridge::new(config)
-  assert_eq(bridge.avg_latency_ns(), 0L)
+  @debug.assert_eq(bridge.avg_latency_ns(), 0L)
 }
 
 // ===== encode_step_request / decode_step_response =====
@@ -6320,29 +6326,29 @@ test "encode_step_request with short outputs pads zeros" {
   let outputs = Bytes::from_array([b'\x01', b'\x02'])
   let encoded = @simulation.encode_step_request(100L, 200L, outputs, 4)
   // Total = 16 + 4 = 20
-  assert_eq(encoded.length(), 20)
+  @debug.assert_eq(encoded.length(), 20)
   // Last 2 bytes should be zero padding
-  assert_eq(encoded[18], b'\x00')
-  assert_eq(encoded[19], b'\x00')
+  @debug.assert_eq(encoded[18], b'\x00')
+  @debug.assert_eq(encoded[19], b'\x00')
 }
 
 ///|
 test "decode_step_response with short data pads zeros" {
   let data = Bytes::from_array([b'\x01']) // only status byte, no input data
   let (status, inputs) = @simulation.decode_step_response(data, 4)
-  assert_eq(status, b'\x01')
-  assert_eq(inputs.length(), 4)
+  @debug.assert_eq(status, b'\x01')
+  @debug.assert_eq(inputs.length(), 4)
   // All inputs should be zero since there's not enough data
   for i = 0; i < 4; i = i + 1 {
-    assert_eq(inputs[i], b'\x00')
+    @debug.assert_eq(inputs[i], b'\x00')
   }
 }
 
 ///|
 test "decode_step_response empty data" {
   let (status, inputs) = @simulation.decode_step_response(Bytes::new(0), 2)
-  assert_eq(status, b'\xFF')
-  assert_eq(inputs.length(), 2)
+  @debug.assert_eq(status, b'\xFF')
+  @debug.assert_eq(inputs.length(), 2)
 }
 
 // ===== HilSession getters =====
@@ -6355,10 +6361,10 @@ test "HilSession getters" {
   }
   let session = @hil.HilSession::new(1_000_000L, schedule)
   let sim_time = session.get_sim_time()
-  assert_eq(sim_time.to_ns(), 0L)
-  assert_eq(session.is_terminated(), false)
-  assert_eq(session.get_termination_reason(), "")
-  assert_eq(session.step_count(), 0)
+  @debug.assert_eq(sim_time.to_ns(), 0L)
+  @debug.assert_eq(session.is_terminated(), false)
+  @debug.assert_eq(session.get_termination_reason(), "")
+  @debug.assert_eq(session.step_count(), 0)
 }
 
 // ===== average_probe empty =====
@@ -6367,10 +6373,10 @@ test "HilSession getters" {
 test "average_probe empty array returns zero" {
   let probes : Array[@analysis.ProbeResult] = []
   let result = @analysis.average_probe(probes)
-  assert_eq(result.station, 0U)
-  assert_eq(result.forward_delay_ns, 0L)
-  assert_eq(result.reverse_delay_ns, 0L)
-  assert_eq(result.round_trip_ns, 0L)
+  @debug.assert_eq(result.station, 0U)
+  @debug.assert_eq(result.forward_delay_ns, 0L)
+  @debug.assert_eq(result.reverse_delay_ns, 0L)
+  @debug.assert_eq(result.round_trip_ns, 0L)
 }
 
 // ===== PdoAutoTuner analyze with round_trip > cycle_time =====
@@ -6394,7 +6400,7 @@ test "PdoAutoTuner analyze with no probe data" {
   let tuner = @analysis.PdoAutoTuner::new()
   let stations : Array[UInt] = [0x1001U]
   let result = tuner.analyze(stations, [])
-  assert_eq(result.success, false)
+  @debug.assert_eq(result.success, false)
   assert_true(result.messages.iter().any(fn(m) { m.contains("ERROR") }))
 }
 
@@ -6423,7 +6429,7 @@ test "validate_recommendations no errors when within limit" {
   let probe = @analysis.compute_probe_result(0x1001U, 300L, 400L, 200L)
   let result = tuner.analyze(stations, [[probe]])
   let errors = @analysis.validate_recommendations(result, 100_000_000L)
-  assert_eq(errors.length(), 0)
+  @debug.assert_eq(errors.length(), 0)
 }
 
 // ===== AutoTuneResult to_json coverage =====
@@ -6513,10 +6519,10 @@ test "DriftCompensator reset clears state" {
   ignore(comp.compensate(sync, 1000L, 2000L))
   assert_true(comp.update_count > 0L)
   comp.reset()
-  assert_eq(comp.integral_error_ns, 0L)
-  assert_eq(comp.last_error_ns, 0L)
-  assert_eq(comp.total_correction_ns, 0L)
-  assert_eq(comp.update_count, 0L)
+  @debug.assert_eq(comp.integral_error_ns, 0L)
+  @debug.assert_eq(comp.last_error_ns, 0L)
+  @debug.assert_eq(comp.total_correction_ns, 0L)
+  @debug.assert_eq(comp.update_count, 0L)
 }
 
 // ============================================================
@@ -6583,8 +6589,8 @@ test "parse_esi_json_document empty arrays succeeds" {
   let doc = @runtime.parse_esi_json_document(
     "{\"devices\": [], \"modules\": []}",
   )
-  assert_eq(doc.devices.length(), 0)
-  assert_eq(doc.modules.length(), 0)
+  @debug.assert_eq(doc.devices.length(), 0)
+  @debug.assert_eq(doc.modules.length(), 0)
 }
 
 ///|
@@ -6662,8 +6668,8 @@ test "esi_json_to_string and parse round-trip on empty doc" {
   let doc : @runtime.EsiJsonDocument = { devices: [], modules: [] }
   let json_str = @runtime.esi_json_to_string(doc)
   let doc2 = @runtime.parse_esi_json_document(json_str)
-  assert_eq(doc2.devices.length(), 0)
-  assert_eq(doc2.modules.length(), 0)
+  @debug.assert_eq(doc2.devices.length(), 0)
+  @debug.assert_eq(doc2.modules.length(), 0)
 }
 
 // ===== EoeSwitch process_received error paths =====
@@ -6672,16 +6678,16 @@ test "esi_json_to_string and parse round-trip on empty doc" {
 test "EoeSwitch process_received with empty frame returns false and increments rx_errors" {
   let sw = @runtime.EoeSwitch::new()
   let result = sw.process_received(0x1001U, b"")
-  assert_eq(result, false)
-  assert_eq(sw.rx_errors, 1L)
+  @debug.assert_eq(result, false)
+  @debug.assert_eq(sw.rx_errors, 1L)
 }
 
 ///|
 test "EoeSwitch process_received with garbage frame returns false" {
   let sw = @runtime.EoeSwitch::new()
   let result = sw.process_received(0x1001U, b"\x01\x02\x03")
-  assert_eq(result, false)
-  assert_eq(sw.rx_errors, 1L)
+  @debug.assert_eq(result, false)
+  @debug.assert_eq(sw.rx_errors, 1L)
 }
 
 ///|
@@ -6697,14 +6703,14 @@ test "EoeSwitch add_station prevents duplicate" {
   }
   sw.add_station(0x1001U, mb)
   sw.add_station(0x1001U, mb)
-  assert_eq(sw.stations.length(), 1)
+  @debug.assert_eq(sw.stations.length(), 1)
 }
 
 ///|
 test "EoeSwitch drain_rx returns empty when no frames" {
   let sw = @runtime.EoeSwitch::new()
   let frames = sw.drain_rx()
-  assert_eq(frames.length(), 0)
+  @debug.assert_eq(frames.length(), 0)
 }
 
 ///|
@@ -6717,7 +6723,7 @@ test "eoe_max_fragment_size with small mailbox returns zero" {
     in_size: 128U,
     in_sm_index: 1,
   }
-  assert_eq(@runtime.eoe_max_fragment_size(mb), 0)
+  @debug.assert_eq(@runtime.eoe_max_fragment_size(mb), 0)
 }
 
 ///|
@@ -6731,7 +6737,7 @@ test "eoe_max_fragment_size normal mailbox" {
     in_sm_index: 1,
   }
   // 128 - 10 = 118, rounded down to 32-byte boundary = 96
-  assert_eq(@runtime.eoe_max_fragment_size(mb), 96)
+  @debug.assert_eq(@runtime.eoe_max_fragment_size(mb), 96)
 }
 
 // ===== analyze_multi_rate tied peaks =====
@@ -6770,7 +6776,7 @@ test "analyze_multi_rate tied peak cycles" {
   // Both tasks fire on cycle 0, neither on cycle 1
   // Hyperperiod = lcm(2,2) = 2; cycle 0: 2 tasks, cycle 1: 0 tasks
   // Peak is cycle 0 only with 2 tasks
-  assert_eq(analysis.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 2)
   assert_true(analysis.peak_cycles.contains(0))
 }
 
@@ -6805,11 +6811,11 @@ test "analyze_multi_rate with harmonic divisors" {
   }
   let analysis = @simulation.analyze_multi_rate(schedule)
   assert_true(analysis.is_harmonic)
-  assert_eq(analysis.hyperperiod, 4)
+  @debug.assert_eq(analysis.hyperperiod, 4)
   // Worst case: cycle 0 (both tasks) → 2 tasks, out=12, in=12
-  assert_eq(analysis.worst_case_tasks_per_cycle, 2)
-  assert_eq(analysis.worst_case_output_bytes, 12)
-  assert_eq(analysis.worst_case_input_bytes, 12)
+  @debug.assert_eq(analysis.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(analysis.worst_case_output_bytes, 12)
+  @debug.assert_eq(analysis.worst_case_input_bytes, 12)
 }
 
 ///|
@@ -6877,7 +6883,7 @@ test "analyze_multi_rate tied peaks with equal count different IO" {
   }
   let analysis = @simulation.analyze_multi_rate(schedule)
   // hp = lcm(6,10,15) = 30
-  assert_eq(analysis.hyperperiod, 30)
+  @debug.assert_eq(analysis.hyperperiod, 30)
   // cycle 0: t1+t2+t3 = 3 tasks → worst
   // Other cycles should have ≤ 2 tasks
   assert_true(analysis.worst_case_tasks_per_cycle >= 2)
@@ -6982,8 +6988,8 @@ test "CyclePerfAnalyzer trend Improving" {
 test "CyclePerfAnalyzer stats fresh returns zeros" {
   let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   let s = a.stats()
-  assert_eq(s.total_cycles, 0L)
-  assert_eq(s.deadline_miss_rate_permille, 0)
+  @debug.assert_eq(s.total_cycles, 0L)
+  @debug.assert_eq(s.deadline_miss_rate_permille, 0)
 }
 
 ///|
@@ -6995,7 +7001,7 @@ test "score_dimension bad value returns 0" {
     bad_threshold: 50L,
     weight: 1,
   }
-  assert_eq(@analysis.score_dimension(dim), 0)
+  @debug.assert_eq(@analysis.score_dimension(dim), 0)
 }
 
 ///|
@@ -7013,7 +7019,7 @@ test "CommQualityScorer score_from_telemetry zero cycles rates" {
   let s = @analysis.CommQualityScorer::new(history_size=4)
   let score = s.score_from_telemetry(0L, 0L, 0L, 0L)
   // With 0 cycles, all rates should be 0 → perfect score
-  assert_eq(score.overall, 1000)
+  @debug.assert_eq(score.overall, 1000)
 }
 
 ///|
@@ -7031,7 +7037,7 @@ test "CommQualityScorer score_from_telemetry zero nominal_period_ns" {
     nominal_period_ns=0L,
   )
   // With nominal_period_ns=0, jitter_permille falls to 0 → perfect jitter score
-  assert_eq(score.overall, 1000)
+  @debug.assert_eq(score.overall, 1000)
 }
 
 ///|
@@ -7067,7 +7073,7 @@ test "compare_configurations alias None in actual" {
     ],
   }
   let report = @runtime.compare_configurations(expected, actual)
-  assert_eq(report.all_ok, false)
+  @debug.assert_eq(report.all_ok, false)
 }
 
 ///|
@@ -7104,7 +7110,7 @@ test "write_slice_outputs_inplace short src" {
   let src : FixedArray[Byte] = [b'\xAA', b'\xBB']
   @simulation.write_slice_outputs_inplace(image, slice, src, 1)
   // Only 1 byte should be written (available = 2-1 = 1)
-  assert_eq(image.outputs[0], b'\xBB')
+  @debug.assert_eq(image.outputs[0], b'\xBB')
 }
 
 ///|
@@ -7120,8 +7126,8 @@ test "write_slice_outputs short data" {
   @simulation.write_slice_outputs(image, slice, data)
   // Only 2 bytes from data, rest should remain zero
   let out = image.outputs
-  assert_eq(out[0], b'\xAA')
-  assert_eq(out[1], b'\xBB')
+  @debug.assert_eq(out[0], b'\xAA')
+  @debug.assert_eq(out[1], b'\xBB')
 }
 
 ///|
@@ -7136,15 +7142,15 @@ test "score_dimension interpolation midpoint" {
   }
   // excess = 55 - 10 = 45, range = 110 - 10 = 100
   // score = 1000 - 45*1000/100 = 1000 - 450 = 550
-  assert_eq(@analysis.score_dimension(dim), 550)
+  @debug.assert_eq(@analysis.score_dimension(dim), 550)
 }
 
 ///|
 test "compute_quality_score empty dimensions" {
   let dims : Array[@analysis.QualityDimension] = []
   let (overall, details) = @analysis.compute_quality_score(dims)
-  assert_eq(overall, 1000)
-  assert_eq(details.length(), 0)
+  @debug.assert_eq(overall, 1000)
+  @debug.assert_eq(details.length(), 0)
 }
 
 ///|
@@ -7176,8 +7182,8 @@ test "CyclePerfAnalyzer trend improving" {
 test "CyclePerfAnalyzer stats zero cycles" {
   let a = @analysis.CyclePerfAnalyzer::new(1_000_000L, window_size=4)
   let s = a.stats()
-  assert_eq(s.total_cycles, 0L)
-  assert_eq(s.min_ns, 0L)
+  @debug.assert_eq(s.total_cycles, 0L)
+  @debug.assert_eq(s.min_ns, 0L)
 }
 
 ///|
@@ -7248,7 +7254,7 @@ test "topology_fingerprint_from_config no identity" {
     ],
   }
   let fp = @runtime.topology_fingerprint_from_config(config)
-  assert_eq(fp.slave_count, 1)
+  @debug.assert_eq(fp.slave_count, 1)
 }
 
 ///|
@@ -7284,7 +7290,7 @@ test "topology_fingerprint_from_config multiple slaves sorted" {
     ],
   }
   let fp = @runtime.topology_fingerprint_from_config(config)
-  assert_eq(fp.slave_count, 2)
+  @debug.assert_eq(fp.slave_count, 2)
 }
 
 ///|
@@ -7373,9 +7379,9 @@ test "analyze_multi_rate equal peak and bytes update" {
 ///|
 test "RunLoopSettings fixed_cycles" {
   let s = @runtime.RunLoopSettings::fixed_cycles(100)
-  assert_eq(s.cycles, 100)
-  assert_eq(s.until_fault, false)
-  assert_eq(s.max_consecutive_timeouts, 5)
+  @debug.assert_eq(s.cycles, 100)
+  @debug.assert_eq(s.until_fault, false)
+  @debug.assert_eq(s.max_consecutive_timeouts, 5)
   assert_true(s.cycle_period_ns is None)
   assert_true(s.output_period_ns is None)
 }
@@ -7383,21 +7389,21 @@ test "RunLoopSettings fixed_cycles" {
 ///|
 test "RunLoopSettings until_fault" {
   let s = @runtime.RunLoopSettings::until_fault()
-  assert_eq(s.cycles, 0)
-  assert_eq(s.until_fault, true)
+  @debug.assert_eq(s.cycles, 0)
+  @debug.assert_eq(s.until_fault, true)
 }
 
 ///|
 test "master_config_with_optional_dc Some" {
   let config = @runtime.master_config_with_optional_dc(Some(1_000_000L))
-  assert_eq(config.dc_enabled, true)
-  assert_eq(config.cycle_period_ns, 1_000_000L)
+  @debug.assert_eq(config.dc_enabled, true)
+  @debug.assert_eq(config.cycle_period_ns, 1_000_000L)
 }
 
 ///|
 test "master_config_with_optional_dc None" {
   let config = @runtime.master_config_with_optional_dc(None)
-  assert_eq(config.dc_enabled, false)
+  @debug.assert_eq(config.dc_enabled, false)
 }
 
 ///|
@@ -7420,7 +7426,7 @@ test "required_sii_read_word_count with valid metadata" {
 test "required_sii_read_word_count with short data" {
   // Too-short data → parse fails → returns initial_word_count
   let data = Bytes::make(10, 0)
-  assert_eq(@runtime.required_sii_read_word_count(data, 128), 128)
+  @debug.assert_eq(@runtime.required_sii_read_word_count(data, 128), 128)
 }
 
 ///|
@@ -7594,7 +7600,7 @@ test "diagnostic_surface_from_run no fault" {
     fault: None,
   }
   let surface = @runtime.diagnostic_surface_from_run(report)
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.issues.length(), 0)
 }
 
 ///|
@@ -7652,7 +7658,7 @@ test "diagnostic_surface_from_state_transition all clean" {
     Some(0U),
     Some(1U),
   )
-  assert_eq(surface.issues.length(), 0)
+  @debug.assert_eq(surface.issues.length(), 0)
 }
 
 // ===== EoeSwitch: non-FragData response returns false =====
@@ -7680,7 +7686,7 @@ test "EoeSwitch process_received non-FragData returns false" {
      b'\x00', b'\x00', // fi2: result=0
   ])
   let result = sw.process_received(0x1001U, frame)
-  assert_eq(result, false)
+  @debug.assert_eq(result, false)
 }
 
 // ===== Batch 23: EoeSwitch error paths =====
@@ -7786,14 +7792,14 @@ test "analyze_multi_rate equal peak cycles with different IO" {
   }
   let result = @simulation.analyze_multi_rate(schedule)
   // hyperperiod = LCM(1,2) = 2
-  assert_eq(result.hyperperiod, 2)
+  @debug.assert_eq(result.hyperperiod, 2)
   // Cycle 0: both run → count=2, out=12, in=8
   // Cycle 1: only "fast" → count=1, out=4, in=2
   // Peak is at cycle=0 with count=2
-  assert_eq(result.worst_case_tasks_per_cycle, 2)
-  assert_eq(result.peak_cycles, [0])
-  assert_eq(result.worst_case_output_bytes, 12)
-  assert_eq(result.worst_case_input_bytes, 8)
+  @debug.assert_eq(result.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(result.peak_cycles, [0])
+  @debug.assert_eq(result.worst_case_output_bytes, 12)
+  @debug.assert_eq(result.worst_case_input_bytes, 8)
 }
 
 ///|
@@ -7845,9 +7851,9 @@ test "analyze_multi_rate multiple peaks at same count" {
   }
   let result = @simulation.analyze_multi_rate(schedule)
   // HP=1, cycle 0: both run → worst=2, peak=[0]
-  assert_eq(result.hyperperiod, 1)
-  assert_eq(result.worst_case_tasks_per_cycle, 2)
-  assert_eq(result.peak_cycles, [0])
+  @debug.assert_eq(result.hyperperiod, 1)
+  @debug.assert_eq(result.worst_case_tasks_per_cycle, 2)
+  @debug.assert_eq(result.peak_cycles, [0])
 }
 
 ///|
@@ -7963,10 +7969,10 @@ test "analyze_multi_rate multiple equal peaks detected" {
     ],
   }
   let result = @simulation.analyze_multi_rate(schedule)
-  assert_eq(result.hyperperiod, 15)
-  assert_eq(result.is_harmonic, false) // 3 and 5 are not powers of 2
-  assert_eq(result.worst_case_tasks_per_cycle, 2) // cycle 0
-  assert_eq(result.peak_cycles, [0])
-  assert_eq(result.worst_case_output_bytes, 30)
-  assert_eq(result.worst_case_input_bytes, 20)
+  @debug.assert_eq(result.hyperperiod, 15)
+  @debug.assert_eq(result.is_harmonic, false) // 3 and 5 are not powers of 2
+  @debug.assert_eq(result.worst_case_tasks_per_cycle, 2) // cycle 0
+  @debug.assert_eq(result.peak_cycles, [0])
+  @debug.assert_eq(result.worst_case_output_bytes, 30)
+  @debug.assert_eq(result.worst_case_input_bytes, 20)
 }

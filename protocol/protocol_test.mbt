@@ -19,14 +19,17 @@ test "EcCommand roundtrip byte conversion" {
   for cmd in cmds {
     let b = cmd.to_byte()
     let decoded = @protocol.EcCommand::from_byte(b)
-    assert_eq(cmd, decoded)
+    @debug.assert_eq(cmd, decoded)
   }
 }
 
 ///|
 test "EcCommand from_byte invalid raises error" {
   let result = try? @protocol.EcCommand::from_byte(b'\xFF')
-  inspect(result, content="Err(InvalidPdu(\"unknown command byte: 255\"))")
+  @debug.debug_inspect(
+    result,
+    content="Err(InvalidPdu(\"unknown command byte: 255\"))",
+  )
 }
 
 ///|
@@ -35,7 +38,7 @@ test "EsmState roundtrip byte conversion" {
   for state in states {
     let b = state.to_byte()
     let decoded = @protocol.EsmState::from_byte(b)
-    assert_eq(state, decoded)
+    @debug.assert_eq(state, decoded)
   }
 }
 
@@ -74,9 +77,9 @@ test "EcFrame encode/decode roundtrip - single NOP PDU" {
   }
   let encoded = frame.encode()
   let decoded = @protocol.EcFrame::decode(encoded)
-  assert_eq(decoded.pdus.length(), 1)
-  assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::NOP)
-  assert_eq(decoded.pdus[0].wkc, 0U)
+  @debug.assert_eq(decoded.pdus.length(), 1)
+  @debug.assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::NOP)
+  @debug.assert_eq(decoded.pdus[0].wkc, 0U)
 }
 
 ///|
@@ -128,13 +131,13 @@ test "EcFrame encode/decode roundtrip - BRD with data" {
   }
   let encoded = frame.encode()
   let decoded = @protocol.EcFrame::decode(encoded)
-  assert_eq(decoded.pdus.length(), 1)
-  assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::BRD)
-  assert_eq(decoded.pdus[0].header.index, b'\x42')
-  assert_eq(decoded.pdus[0].header.address, 0x1234U)
-  assert_eq(decoded.pdus[0].header.irq, 0x1234U)
-  assert_eq(decoded.pdus[0].data, data)
-  assert_eq(decoded.pdus[0].wkc, 1U)
+  @debug.assert_eq(decoded.pdus.length(), 1)
+  @debug.assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::BRD)
+  @debug.assert_eq(decoded.pdus[0].header.index, b'\x42')
+  @debug.assert_eq(decoded.pdus[0].header.address, 0x1234U)
+  @debug.assert_eq(decoded.pdus[0].header.irq, 0x1234U)
+  @debug.assert_eq(decoded.pdus[0].data, data)
+  @debug.assert_eq(decoded.pdus[0].wkc, 1U)
 }
 
 ///|
@@ -169,21 +172,21 @@ test "EcFrame encode/decode roundtrip - multiple PDUs" {
   }
   let encoded = frame.encode()
   let decoded = @protocol.EcFrame::decode(encoded)
-  assert_eq(decoded.pdus.length(), 2)
-  assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::APRD)
-  assert_eq(decoded.pdus[1].header.command, @protocol.EcCommand::FPWR)
-  assert_eq(decoded.pdus[1].data, Bytes::from_array([b'\xAA', b'\xBB']))
-  assert_eq(decoded.pdus[1].wkc, 1U)
+  @debug.assert_eq(decoded.pdus.length(), 2)
+  @debug.assert_eq(decoded.pdus[0].header.command, @protocol.EcCommand::APRD)
+  @debug.assert_eq(decoded.pdus[1].header.command, @protocol.EcCommand::FPWR)
+  @debug.assert_eq(decoded.pdus[1].data, Bytes::from_array([b'\xAA', b'\xBB']))
+  @debug.assert_eq(decoded.pdus[1].wkc, 1U)
 }
 
 ///|
 test "EcFrame decode fixture minimal_nop_frame" {
   let raw = @fixtures.minimal_nop_frame()
   let frame = @protocol.EcFrame::decode(raw)
-  assert_eq(frame.pdus.length(), 1)
-  assert_eq(frame.pdus[0].header.command, @protocol.EcCommand::NOP)
-  assert_eq(frame.pdus[0].data.length(), 0)
-  assert_eq(frame.pdus[0].wkc, 0U)
+  @debug.assert_eq(frame.pdus.length(), 1)
+  @debug.assert_eq(frame.pdus[0].header.command, @protocol.EcCommand::NOP)
+  @debug.assert_eq(frame.pdus[0].data.length(), 0)
+  @debug.assert_eq(frame.pdus[0].wkc, 0U)
 }
 
 ///|
@@ -209,41 +212,53 @@ test "EcFrame decode rejects wrong ethertype" {
 ///|
 test "address helpers - configured address packing" {
   let addr = @protocol.configured_address(0x1001U, 0x0130U)
-  assert_eq(addr, 0x01301001U)
-  assert_eq(@protocol.address_station(addr), 0x1001U)
-  assert_eq(@protocol.address_offset(addr), 0x0130U)
+  @debug.assert_eq(addr, 0x01301001U)
+  @debug.assert_eq(@protocol.address_station(addr), 0x1001U)
+  @debug.assert_eq(@protocol.address_offset(addr), 0x0130U)
 }
 
 ///|
 test "address helpers - broadcast address" {
   let addr = @protocol.broadcast_address(0x0130U)
-  assert_eq(addr, 0x01300000U)
-  assert_eq(@protocol.address_station(addr), 0U)
-  assert_eq(@protocol.address_offset(addr), 0x0130U)
+  @debug.assert_eq(addr, 0x01300000U)
+  @debug.assert_eq(@protocol.address_station(addr), 0U)
+  @debug.assert_eq(@protocol.address_offset(addr), 0x0130U)
 }
 
 ///|
 test "address helpers - auto increment address" {
   let addr = @protocol.auto_increment_address(0U)
-  assert_eq(addr, 0U)
+  @debug.assert_eq(addr, 0U)
   let addr2 = @protocol.auto_increment_address(3U)
-  assert_eq(addr2, 3U)
+  @debug.assert_eq(addr2, 3U)
 }
 
 ///|
 test "address helpers - logical address passthrough" {
   let addr = @protocol.logical_address(0xDEADBEEFU)
-  assert_eq(addr, 0xDEADBEEFU)
+  @debug.assert_eq(addr, 0xDEADBEEFU)
 }
 
 ///|
 test "command selection by address type" {
-  assert_eq(@protocol.read_command(AutoIncrement), @protocol.EcCommand::APRD)
-  assert_eq(@protocol.write_command(Configured), @protocol.EcCommand::FPWR)
-  assert_eq(@protocol.readwrite_command(Broadcast), @protocol.EcCommand::BRW)
-  assert_eq(@protocol.read_command(Logical), @protocol.EcCommand::LRD)
-  assert_eq(@protocol.write_command(Logical), @protocol.EcCommand::LWR)
-  assert_eq(@protocol.readwrite_command(Logical), @protocol.EcCommand::LRW)
+  @debug.assert_eq(
+    @protocol.read_command(AutoIncrement),
+    @protocol.EcCommand::APRD,
+  )
+  @debug.assert_eq(
+    @protocol.write_command(Configured),
+    @protocol.EcCommand::FPWR,
+  )
+  @debug.assert_eq(
+    @protocol.readwrite_command(Broadcast),
+    @protocol.EcCommand::BRW,
+  )
+  @debug.assert_eq(@protocol.read_command(Logical), @protocol.EcCommand::LRD)
+  @debug.assert_eq(@protocol.write_command(Logical), @protocol.EcCommand::LWR)
+  @debug.assert_eq(
+    @protocol.readwrite_command(Logical),
+    @protocol.EcCommand::LRW,
+  )
 }
 
 ///|
@@ -254,11 +269,11 @@ test "FrameBuilder - add and build single PDU" {
     @protocol.broadcast_address(0x0130U),
     Bytes::new(2),
   )
-  assert_eq(idx, b'\x00')
-  assert_eq(builder.length(), 1)
+  @debug.assert_eq(idx, b'\x00')
+  @debug.assert_eq(builder.length(), 1)
   let frame = builder.build()
-  assert_eq(frame.pdus.length(), 1)
-  assert_eq(frame.pdus[0].header.command, @protocol.EcCommand::BRD)
+  @debug.assert_eq(frame.pdus.length(), 1)
+  @debug.assert_eq(frame.pdus[0].header.command, @protocol.EcCommand::BRD)
   // After build, builder is reset
   assert_true(builder.is_empty())
 }
@@ -273,11 +288,11 @@ test "FrameBuilder - sequential index assignment" {
     Bytes::new(4),
   )
   let idx2 = builder.add(LRW, 0x1000U, Bytes::new(8))
-  assert_eq(idx0, b'\x00')
-  assert_eq(idx1, b'\x01')
-  assert_eq(idx2, b'\x02')
+  @debug.assert_eq(idx0, b'\x00')
+  @debug.assert_eq(idx1, b'\x01')
+  @debug.assert_eq(idx2, b'\x02')
   let frame = builder.build()
-  assert_eq(frame.pdus.length(), 3)
+  @debug.assert_eq(frame.pdus.length(), 3)
 }
 
 ///|
@@ -295,8 +310,8 @@ test "FrameBuilder - build and encode/decode roundtrip" {
   let found = @protocol.find_pdu_by_index(decoded, idx)
   assert_true(found is Some(_))
   guard found is Some(pdu)
-  assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
-  assert_eq(pdu.data, data)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
+  @debug.assert_eq(pdu.data, data)
 }
 
 ///|
@@ -322,8 +337,8 @@ test "transact loopback - NOP roundtrip via MockNic" {
     timeout,
   )
   // MockNic echoes the sent frame, so the response PDU should match
-  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
-  assert_eq(pdu.wkc, 0U)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  @debug.assert_eq(pdu.wkc, 0U)
 }
 
 ///|
@@ -338,8 +353,8 @@ test "transact loopback - BRD with payload via MockNic" {
     data,
     timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
-  assert_eq(pdu.data, data)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
+  @debug.assert_eq(pdu.data, data)
 }
 
 ///|
@@ -439,8 +454,8 @@ test "transact ignores non-ethercat noise frames before response" {
     Bytes::new(0),
     timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
-  assert_eq(pdu.wkc, 0U)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  @debug.assert_eq(pdu.wkc, 0U)
 }
 
 ///|
@@ -454,8 +469,8 @@ test "transact ignores short noise frames before response" {
     Bytes::new(0),
     timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
-  assert_eq(pdu.wkc, 0U)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
+  @debug.assert_eq(pdu.wkc, 0U)
 }
 
 ///|
@@ -470,7 +485,7 @@ test "transact_pdu_retry - succeeds on first try" {
     timeout,
     3,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::BRD)
 }
 
 ///|
@@ -479,7 +494,7 @@ test "count_slaves via mock loopback" {
   let timeout = @hal.Duration(1000L)
   // MockNic echoes frames, so WKC will be 0 (no real slaves)
   let count = @protocol.count_slaves(nic, timeout)
-  assert_eq(count, 0)
+  @debug.assert_eq(count, 0)
 }
 
 ///|
@@ -490,7 +505,7 @@ test "register read/write helpers compile and run" {
   let pdu = @protocol.read_register_ap(
     nic, 0U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::APRD)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::APRD)
 }
 
 ///|
@@ -503,16 +518,16 @@ test "SlaveInfo construction" {
     dl_status: 0U,
     sii: None,
   }
-  assert_eq(info.position, 0)
-  assert_eq(info.configured_address, 0x1001U)
+  @debug.assert_eq(info.position, 0)
+  @debug.assert_eq(info.configured_address, 0x1001U)
   assert_true(info.sii is None)
 }
 
 ///|
 test "ScanResult construction" {
   let scan : @protocol.ScanResult = { slave_count: 0, slaves: [] }
-  assert_eq(scan.slave_count, 0)
-  assert_eq(scan.slaves.length(), 0)
+  @debug.assert_eq(scan.slave_count, 0)
+  @debug.assert_eq(scan.slaves.length(), 0)
 }
 
 ///|
@@ -537,9 +552,9 @@ test "EcFrame roundtrip preserves large PDU data" {
     ],
   }
   let decoded = @protocol.EcFrame::decode(frame.encode())
-  assert_eq(decoded.pdus[0].data.length(), 256)
-  assert_eq(decoded.pdus[0].data, data)
-  assert_eq(decoded.pdus[0].wkc, 42U)
+  @debug.assert_eq(decoded.pdus[0].data.length(), 256)
+  @debug.assert_eq(decoded.pdus[0].data, data)
+  @debug.assert_eq(decoded.pdus[0].wkc, 42U)
 }
 
 ///|
@@ -568,8 +583,8 @@ test "EcFrame roundtrip preserves MAC addresses" {
     ],
   }
   let decoded = @protocol.EcFrame::decode(frame.encode())
-  assert_eq(decoded.dst_mac, custom_dst)
-  assert_eq(decoded.src_mac, custom_src)
+  @debug.assert_eq(decoded.dst_mac, custom_dst)
+  @debug.assert_eq(decoded.src_mac, custom_src)
 }
 
 ///|
@@ -593,8 +608,14 @@ test "EcFrame roundtrip preserves address through encode/decode" {
     ],
   }
   let decoded = @protocol.EcFrame::decode(frame.encode())
-  assert_eq(@protocol.address_station(decoded.pdus[0].header.address), 0x1001U)
-  assert_eq(@protocol.address_offset(decoded.pdus[0].header.address), 0x0130U)
+  @debug.assert_eq(
+    @protocol.address_station(decoded.pdus[0].header.address),
+    0x1001U,
+  )
+  @debug.assert_eq(
+    @protocol.address_offset(decoded.pdus[0].header.address),
+    0x0130U,
+  )
 }
 
 ///|
@@ -617,10 +638,10 @@ test "EcFrame encode writes ADP before ADO on wire" {
     ],
   }
   let encoded = frame.encode()
-  assert_eq(encoded[18], b'\x01')
-  assert_eq(encoded[19], b'\x10')
-  assert_eq(encoded[20], b'\x30')
-  assert_eq(encoded[21], b'\x01')
+  @debug.assert_eq(encoded[18], b'\x01')
+  @debug.assert_eq(encoded[19], b'\x10')
+  @debug.assert_eq(encoded[20], b'\x30')
+  @debug.assert_eq(encoded[21], b'\x01')
 }
 
 ///|
@@ -629,13 +650,13 @@ test "FrameBuilder index wraps at 256" {
   // Manually set next_index near wrap point
   builder.next_index = 254
   let idx254 = builder.add(NOP, 0U, Bytes::new(0))
-  assert_eq(idx254, b'\xFE')
+  @debug.assert_eq(idx254, b'\xFE')
   let _ = builder.build()
   let idx255 = builder.add(NOP, 0U, Bytes::new(0))
-  assert_eq(idx255, b'\xFF')
+  @debug.assert_eq(idx255, b'\xFF')
   let _ = builder.build()
   let idx0 = builder.add(NOP, 0U, Bytes::new(0))
-  assert_eq(idx0, b'\x00')
+  @debug.assert_eq(idx0, b'\x00')
 }
 
 ///|
@@ -676,7 +697,7 @@ test "all EcCommand values survive encode/decode" {
       ],
     }
     let decoded = @protocol.EcFrame::decode(frame.encode())
-    assert_eq(decoded.pdus[0].header.command, cmd)
+    @debug.assert_eq(decoded.pdus[0].header.command, cmd)
   }
 }
 
@@ -694,7 +715,7 @@ test "discovery - read_station_address_ap via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let station_address = @protocol.read_station_address_ap(nic, 0U, timeout)
-  assert_eq(station_address, 0U)
+  @debug.assert_eq(station_address, 0U)
 }
 
 ///|
@@ -704,7 +725,7 @@ test "discovery - read_register_fp command type" {
   let pdu = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::FPRD)
 }
 
 ///|
@@ -715,7 +736,7 @@ test "discovery - write_register_fp command type" {
   let pdu = @protocol.write_register_fp(
     nic, 0x1001U, @protocol.reg_al_control, data, timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::FPWR)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::FPWR)
 }
 
 ///|
@@ -726,23 +747,23 @@ test "discovery - write_register_ap command type" {
   let pdu = @protocol.write_register_ap(
     nic, 0U, @protocol.reg_station_address, data, timeout,
   )
-  assert_eq(pdu.header.command, @protocol.EcCommand::APWR)
+  @debug.assert_eq(pdu.header.command, @protocol.EcCommand::APWR)
 }
 
 ///|
 test "discovery - register address constants are reasonable" {
   // FMMU registers start at 0x0600
-  assert_eq(@protocol.reg_fmmu_base, 0x0600U)
-  assert_eq(@protocol.fmmu_entry_size, 16)
+  @debug.assert_eq(@protocol.reg_fmmu_base, 0x0600U)
+  @debug.assert_eq(@protocol.fmmu_entry_size, 16)
   // SM registers start at 0x0800
-  assert_eq(@protocol.reg_sm_base, 0x0800U)
-  assert_eq(@protocol.sm_entry_size, 8)
+  @debug.assert_eq(@protocol.reg_sm_base, 0x0800U)
+  @debug.assert_eq(@protocol.sm_entry_size, 8)
   // AL registers in expected range
   assert_true(@protocol.reg_al_status.reinterpret_as_int() >= 0x100)
   assert_true(@protocol.reg_al_control.reinterpret_as_int() >= 0x100)
-  assert_eq(@protocol.reg_dl_control, 0x0100U)
-  assert_eq(@protocol.reg_station_alias, 0x0012U)
-  assert_eq(@protocol.dl_control_alias_enable_bit, 24)
+  @debug.assert_eq(@protocol.reg_dl_control, 0x0100U)
+  @debug.assert_eq(@protocol.reg_station_alias, 0x0012U)
+  @debug.assert_eq(@protocol.dl_control_alias_enable_bit, 24)
   // SII registers
   assert_true(@protocol.reg_sii_control.reinterpret_as_int() >= 0x500)
 }
@@ -752,7 +773,7 @@ test "discovery - read_station_alias via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let station_alias = @protocol.read_station_alias(nic, 0x1001U, timeout)
-  assert_eq(station_alias, 0U)
+  @debug.assert_eq(station_alias, 0U)
 }
 
 ///|
@@ -802,8 +823,8 @@ test "SlaveInfo with SII data" {
   }
   assert_true(info.sii is Some(_))
   guard info.sii is Some(s)
-  assert_eq(s.vendor_id, 0x2U)
-  assert_eq(s.mailbox_protocols, 0xCU)
+  @debug.assert_eq(s.vendor_id, 0x2U)
+  @debug.assert_eq(s.mailbox_protocols, 0xCU)
 }
 
 ///|
@@ -815,7 +836,7 @@ test "identity validation - matching" {
     serial: 0U,
   }
   let actual = @fixtures.sample_ek1100_identity()
-  assert_eq(expected, actual)
+  @debug.assert_eq(expected, actual)
 }
 
 ///|
@@ -840,8 +861,8 @@ test "SlaveConfig construction" {
     configured_address: 0x1001U,
     presence: @hal.Mandatory,
   }
-  assert_eq(cfg.position, 0U)
-  assert_eq(cfg.configured_address, 0x1001U)
+  @debug.assert_eq(cfg.position, 0U)
+  @debug.assert_eq(cfg.configured_address, 0x1001U)
   assert_true(cfg.expected_identity is Some(_))
 }
 
@@ -886,9 +907,9 @@ test "FrameBuilder - max PDU capacity" {
   for _i = 0; _i < @protocol.max_pdus_per_frame; _i = _i + 1 {
     let _ = builder.add(NOP, 0U, Bytes::new(0))
   }
-  assert_eq(builder.length(), @protocol.max_pdus_per_frame)
+  @debug.assert_eq(builder.length(), @protocol.max_pdus_per_frame)
   let frame = builder.build()
-  assert_eq(frame.pdus.length(), @protocol.max_pdus_per_frame)
+  @debug.assert_eq(frame.pdus.length(), @protocol.max_pdus_per_frame)
 }
 
 ///|
@@ -898,54 +919,54 @@ test "full discovery flow simulation" {
   let timeout = @hal.Duration(1000L)
   // 1. Count slaves (mock returns 0)
   let count = @protocol.count_slaves(nic, timeout)
-  assert_eq(count, 0)
+  @debug.assert_eq(count, 0)
   // 2. Build scan result
   let scan : @protocol.ScanResult = { slave_count: count, slaves: [] }
-  assert_eq(scan.slave_count, 0)
-  assert_eq(scan.slaves.length(), 0)
+  @debug.assert_eq(scan.slave_count, 0)
+  @debug.assert_eq(scan.slaves.length(), 0)
 }
 
 ///|
 test "build_transition_path to Op" {
   let path = @protocol.build_transition_path(@protocol.EsmState::Op)
-  assert_eq(path.length(), 4)
-  assert_eq(path[0], @protocol.EsmState::Init)
-  assert_eq(path[1], @protocol.EsmState::PreOp)
-  assert_eq(path[2], @protocol.EsmState::SafeOp)
-  assert_eq(path[3], @protocol.EsmState::Op)
+  @debug.assert_eq(path.length(), 4)
+  @debug.assert_eq(path[0], @protocol.EsmState::Init)
+  @debug.assert_eq(path[1], @protocol.EsmState::PreOp)
+  @debug.assert_eq(path[2], @protocol.EsmState::SafeOp)
+  @debug.assert_eq(path[3], @protocol.EsmState::Op)
 }
 
 ///|
 test "build_transition_path to PreOp" {
   let path = @protocol.build_transition_path(@protocol.EsmState::PreOp)
-  assert_eq(path.length(), 2)
-  assert_eq(path[0], @protocol.EsmState::Init)
-  assert_eq(path[1], @protocol.EsmState::PreOp)
+  @debug.assert_eq(path.length(), 2)
+  @debug.assert_eq(path[0], @protocol.EsmState::Init)
+  @debug.assert_eq(path[1], @protocol.EsmState::PreOp)
 }
 
 ///|
 test "build_transition_path to Boot" {
   let path = @protocol.build_transition_path(@protocol.EsmState::Boot)
-  assert_eq(path.length(), 2)
-  assert_eq(path[0], @protocol.EsmState::Init)
-  assert_eq(path[1], @protocol.EsmState::Boot)
+  @debug.assert_eq(path.length(), 2)
+  @debug.assert_eq(path[0], @protocol.EsmState::Init)
+  @debug.assert_eq(path[1], @protocol.EsmState::Boot)
 }
 
 ///|
 test "build_shutdown_path from Op" {
   let path = @protocol.build_shutdown_path(@protocol.EsmState::Op)
-  assert_eq(path.length(), 4)
-  assert_eq(path[0], @protocol.EsmState::Op)
-  assert_eq(path[1], @protocol.EsmState::SafeOp)
-  assert_eq(path[2], @protocol.EsmState::PreOp)
-  assert_eq(path[3], @protocol.EsmState::Init)
+  @debug.assert_eq(path.length(), 4)
+  @debug.assert_eq(path[0], @protocol.EsmState::Op)
+  @debug.assert_eq(path[1], @protocol.EsmState::SafeOp)
+  @debug.assert_eq(path[2], @protocol.EsmState::PreOp)
+  @debug.assert_eq(path[3], @protocol.EsmState::Init)
 }
 
 ///|
 test "build_shutdown_path from Init is idempotent" {
   let path = @protocol.build_shutdown_path(@protocol.EsmState::Init)
-  assert_eq(path.length(), 1)
-  assert_eq(path[0], @protocol.EsmState::Init)
+  @debug.assert_eq(path.length(), 1)
+  @debug.assert_eq(path[0], @protocol.EsmState::Init)
 }
 
 ///|
@@ -1370,7 +1391,7 @@ test "build_strict_transition_route to Op respects PreOp and SafeOp" {
     @protocol.EsmState::Init,
     @protocol.EsmState::Op,
   )
-  assert_eq(path, [
+  @debug.assert_eq(path, [
     @protocol.EsmState::Init,
     @protocol.EsmState::PreOp,
     @protocol.EsmState::SafeOp,
@@ -1388,17 +1409,20 @@ test "transition_to_target_strict rotates through legal direct steps" {
     @protocol.EsmState::Op,
     timeout,
   )
-  assert_eq(final_state, @protocol.EsmState::Op)
-  assert_eq(nic.control_writes.length(), 3)
-  assert_eq(
+  @debug.assert_eq(final_state, @protocol.EsmState::Op)
+  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(
     nic.control_writes[0] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
-  assert_eq(
+  @debug.assert_eq(
     nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::SafeOp.to_byte(),
   )
-  assert_eq(nic.control_writes[2] & b'\x0F', @protocol.EsmState::Op.to_byte())
+  @debug.assert_eq(
+    nic.control_writes[2] & b'\x0F',
+    @protocol.EsmState::Op.to_byte(),
+  )
 }
 
 ///|
@@ -1411,11 +1435,11 @@ test "request_state_observe captures raw status code and control wkc" {
     @protocol.EsmState::PreOp,
     timeout,
   )
-  assert_eq(observed.state, @protocol.EsmState::PreOp)
+  @debug.assert_eq(observed.state, @protocol.EsmState::PreOp)
   assert_true(!observed.error_indication)
-  assert_eq(observed.status_code, None)
-  assert_eq(observed.raw_status_code, Some(0U))
-  assert_eq(observed.control_wkc, 1U)
+  @debug.assert_eq(observed.status_code, None)
+  @debug.assert_eq(observed.raw_status_code, Some(0U))
+  @debug.assert_eq(observed.control_wkc, 1U)
 }
 
 ///|
@@ -1430,9 +1454,9 @@ test "transition_to_target_strict_with_timeout_policy_observe returns last step 
     timeout,
   )
   guard observed is Some(value) else { fail("expected final step observation") }
-  assert_eq(value.state, @protocol.EsmState::SafeOp)
-  assert_eq(value.raw_status_code, Some(0U))
-  assert_eq(value.control_wkc, 1U)
+  @debug.assert_eq(value.state, @protocol.EsmState::SafeOp)
+  @debug.assert_eq(value.raw_status_code, Some(0U))
+  @debug.assert_eq(value.control_wkc, 1U)
 }
 
 ///|
@@ -1453,8 +1477,8 @@ test "request_state_with_process_data keeps sending PDO until Op is confirmed" {
     pdo_ctx,
     timeout,
   )
-  assert_eq(final_state, @protocol.EsmState::Op)
-  assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
+  @debug.assert_eq(final_state, @protocol.EsmState::Op)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
   assert_true(nic.pdo_after_op_request >= 1)
 }
 
@@ -1479,8 +1503,8 @@ test "request_state_with_process_data extends confirmation window beyond fixed 3
     pdo_ctx,
     timeout,
   )
-  assert_eq(final_state, @protocol.EsmState::Op)
-  assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
+  @debug.assert_eq(final_state, @protocol.EsmState::Op)
+  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
   assert_true(nic.pdo_after_op_request >= 48)
 }
 
@@ -1502,9 +1526,9 @@ test "request_state_with_process_data_snapshot captures AL error window" {
     pdo_ctx,
     timeout,
   )
-  assert_eq(snapshot.state, @protocol.EsmState::SafeOp)
+  @debug.assert_eq(snapshot.state, @protocol.EsmState::SafeOp)
   assert_true(snapshot.error_indication)
-  assert_eq(snapshot.status_code, Some(0x001BU))
+  @debug.assert_eq(snapshot.status_code, Some(0x001BU))
 }
 
 ///|
@@ -1528,26 +1552,29 @@ test "clear_al_error stabilizes state before caller chooses next target" {
   let nic = EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
   let timeout = @hal.Duration(1000L)
   let cleared = @protocol.clear_al_error(nic, 0x1001U, timeout)
-  assert_eq(cleared.state, @protocol.EsmState::SafeOp)
+  @debug.assert_eq(cleared.state, @protocol.EsmState::SafeOp)
   assert_true(!cleared.error_indication)
-  assert_eq(cleared.status_code, None)
+  @debug.assert_eq(cleared.status_code, None)
   let final_state = @protocol.transition_to_target_strict(
     nic,
     0x1001U,
     @protocol.EsmState::Init,
     timeout,
   )
-  assert_eq(final_state, @protocol.EsmState::Init)
-  assert_eq(nic.control_writes.length(), 3)
-  assert_eq(
+  @debug.assert_eq(final_state, @protocol.EsmState::Init)
+  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
-  assert_eq(
+  @debug.assert_eq(
     nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
-  assert_eq(nic.control_writes[2] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  @debug.assert_eq(
+    nic.control_writes[2] & b'\x0F',
+    @protocol.EsmState::Init.to_byte(),
+  )
 }
 
 ///|
@@ -1557,15 +1584,18 @@ test "recover_al_error_for_transition rolls configuration error back to init" {
   let recovered = @protocol.recover_al_error_for_transition(
     nic, 0x1001U, timeout,
   )
-  assert_eq(recovered.state, @protocol.EsmState::Init)
+  @debug.assert_eq(recovered.state, @protocol.EsmState::Init)
   assert_true(!recovered.error_indication)
-  assert_eq(recovered.status_code, None)
-  assert_eq(nic.control_writes.length(), 2)
-  assert_eq(
+  @debug.assert_eq(recovered.status_code, None)
+  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(
     nic.control_writes[0],
     @protocol.EsmState::PreOp.to_byte() | b'\x10',
   )
-  assert_eq(nic.control_writes[1] & b'\x0F', @protocol.EsmState::Init.to_byte())
+  @debug.assert_eq(
+    nic.control_writes[1] & b'\x0F',
+    @protocol.EsmState::Init.to_byte(),
+  )
 }
 
 ///|
@@ -1581,7 +1611,7 @@ test "broadcast_state via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout)
-  assert_eq(wkc, 0U) // MockNic echoes, WKC=0
+  @debug.assert_eq(wkc, 0U) // MockNic echoes, WKC=0
 }
 
 ///|
@@ -1604,28 +1634,28 @@ test "read_al_status_code via mock" {
   let timeout = @hal.Duration(1000L)
   let code = @protocol.read_al_status_code(nic, 0x1001U, timeout)
   // MockNic returns zeroed data, so status code = 0
-  assert_eq(code, 0U)
+  @debug.assert_eq(code, 0U)
 }
 
 ///|
 test "ESM default timeout values by target state" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_default_timeout(@protocol.EsmState::Init),
     @hal.Duration(5_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_default_timeout(@protocol.EsmState::PreOp),
     @hal.Duration(3_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_default_timeout(@protocol.EsmState::SafeOp),
     @hal.Duration(10_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_default_timeout(@protocol.EsmState::Op),
     @hal.Duration(10_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_default_timeout(@protocol.EsmState::Boot),
     @hal.Duration(5_000_000_000L),
   )
@@ -1640,16 +1670,16 @@ test "ESM timeout policy uses override then default" {
     op: None,
     boot: None,
   }
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.EsmState::Init, policy),
     @hal.Duration(9L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.EsmState::SafeOp, policy),
     @hal.Duration(11L),
   )
   // No override for PreOp -> falls back to default policy.
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.EsmState::PreOp, policy),
     @protocol.esm_default_timeout(@protocol.EsmState::PreOp),
   )
@@ -1658,10 +1688,10 @@ test "ESM timeout policy uses override then default" {
 ///|
 test "ProcessImage construction" {
   let img = @protocol.ProcessImage::new(32, 16)
-  assert_eq(img.output_size, 32)
-  assert_eq(img.input_size, 16)
-  assert_eq(img.outputs.length(), 32)
-  assert_eq(img.inputs.length(), 16)
+  @debug.assert_eq(img.output_size, 32)
+  @debug.assert_eq(img.input_size, 16)
+  @debug.assert_eq(img.outputs.length(), 32)
+  @debug.assert_eq(img.inputs.length(), 16)
 }
 
 ///|
@@ -1682,17 +1712,17 @@ test "PdoContext build from slave mappings" {
     [(sm1, 0x1001U), (sm2, 0x1002U)],
     0x10000U,
   )
-  assert_eq(ctx.mappings.length(), 2)
-  assert_eq(ctx.image.output_size, 40) // 32 + 8
-  assert_eq(ctx.image.input_size, 20) // 16 + 4
-  assert_eq(ctx.logical_size, 60) // 40 + 20
+  @debug.assert_eq(ctx.mappings.length(), 2)
+  @debug.assert_eq(ctx.image.output_size, 40) // 32 + 8
+  @debug.assert_eq(ctx.image.input_size, 20) // 16 + 4
+  @debug.assert_eq(ctx.logical_size, 60) // 40 + 20
   // First slave starts at logical base
-  assert_eq(ctx.mappings[0].output_logical, 0x10000U)
-  assert_eq(ctx.mappings[0].output_offset, 0)
-  assert_eq(ctx.mappings[0].output_length, 32)
+  @debug.assert_eq(ctx.mappings[0].output_logical, 0x10000U)
+  @debug.assert_eq(ctx.mappings[0].output_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].output_length, 32)
   // Second slave follows
-  assert_eq(ctx.mappings[1].output_offset, 32)
-  assert_eq(ctx.mappings[1].input_offset, 16)
+  @debug.assert_eq(ctx.mappings[1].output_offset, 32)
+  @debug.assert_eq(ctx.mappings[1].input_offset, 16)
 }
 
 ///|
@@ -1707,12 +1737,12 @@ test "PdoContext set and get slave data" {
   // Set outputs for slave
   let out_data = Bytes::from_array([b'\xAA', b'\xBB', b'\xCC', b'\xDD'])
   ctx.set_slave_outputs(0x1001U, out_data)
-  assert_eq(ctx.image.outputs[0], b'\xAA')
-  assert_eq(ctx.image.outputs[3], b'\xDD')
+  @debug.assert_eq(ctx.image.outputs[0], b'\xAA')
+  @debug.assert_eq(ctx.image.outputs[3], b'\xDD')
   // Get inputs (initially zero)
   let in_data = ctx.get_slave_inputs(0x1001U)
-  assert_eq(in_data.length(), 2)
-  assert_eq(in_data[0], b'\x00')
+  @debug.assert_eq(in_data.length(), 2)
+  @debug.assert_eq(in_data[0], b'\x00')
 }
 
 ///|
@@ -1758,7 +1788,7 @@ test "mailbox_poll via mock loopback" {
     in_sm_index: 1,
   }
   let ready = @protocol.mailbox_poll(nic, 0x1001U, cfg, timeout)
-  assert_eq(ready, false) // Echo returns zero data → not ready
+  @debug.assert_eq(ready, false) // Echo returns zero data → not ready
 }
 
 ///|
@@ -2171,8 +2201,8 @@ test "mailbox_poll_ap reads status via APRD" {
     cfg.in_sm_index.reinterpret_as_uint() *
     @protocol.sm_entry_size.reinterpret_as_uint()
   assert_true(ready)
-  assert_eq(nic.last_command, @protocol.APRD.to_byte())
-  assert_eq(nic.last_offset, expected_status_addr)
+  @debug.assert_eq(nic.last_command, @protocol.APRD.to_byte())
+  @debug.assert_eq(nic.last_offset, expected_status_addr)
 }
 
 ///|
@@ -2188,8 +2218,8 @@ test "mailbox_send_ap writes output mailbox via APWR" {
     in_sm_index: 1,
   }
   @protocol.mailbox_send_ap(nic, 0U, cfg, Bytes::new(16), timeout)
-  assert_eq(nic.last_command, @protocol.APWR.to_byte())
-  assert_eq(nic.last_offset, 0x1000U)
+  @debug.assert_eq(nic.last_command, @protocol.APWR.to_byte())
+  @debug.assert_eq(nic.last_offset, 0x1000U)
 }
 
 ///|
@@ -2205,9 +2235,9 @@ test "mailbox_read_ap reads input mailbox via APRD" {
     in_sm_index: 1,
   }
   let data = @protocol.mailbox_read_ap(nic, 0U, cfg, timeout)
-  assert_eq(nic.last_command, @protocol.APRD.to_byte())
-  assert_eq(nic.last_offset, 0x1080U)
-  assert_eq(data.length(), 128)
+  @debug.assert_eq(nic.last_command, @protocol.APRD.to_byte())
+  @debug.assert_eq(nic.last_offset, 0x1080U)
+  @debug.assert_eq(data.length(), 128)
 }
 
 ///|
@@ -2234,8 +2264,8 @@ test "mailbox_recv_rmsm requests repeat and returns replayed frame" {
   )
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
   assert_true(nic.repeat_triggered)
-  assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
-  assert_eq(mbh.counter, b'\x01')
+  @debug.assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
+  @debug.assert_eq(mbh.counter, b'\x01')
 }
 
 ///|
@@ -2281,7 +2311,7 @@ test "mailbox_recv_ap_rmsm requests repeat and returns replayed frame" {
   )
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
   assert_true(nic.repeat_triggered)
-  assert_eq(mbh.counter, b'\x01')
+  @debug.assert_eq(mbh.counter, b'\x01')
 }
 
 ///|
@@ -2306,7 +2336,10 @@ test "sdo_upload_ap reads expedited payload via AP mailbox transport" {
     b'\x00',
     timeout,
   )
-  assert_eq(payload, Bytes::from_array([b'\xAA', b'\x00', b'\x00', b'\x00']))
+  @debug.assert_eq(
+    payload,
+    Bytes::from_array([b'\xAA', b'\x00', b'\x00', b'\x00']),
+  )
 }
 
 ///|
@@ -2431,7 +2464,7 @@ test "eeprom_read_word via mock loopback" {
   let nic = EepromMockNic::new()
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read_word(nic, 0x1001U, 0U, timeout)
-  assert_eq(data.length(), 4)
+  @debug.assert_eq(data.length(), 4)
 }
 
 ///|
@@ -2439,7 +2472,7 @@ test "eeprom_read multi-word via mock" {
   let nic = EepromMockNic::new()
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read(nic, 0x1001U, 0U, 3, timeout)
-  assert_eq(data.length(), 12) // 3 words * 4 bytes
+  @debug.assert_eq(data.length(), 12) // 3 words * 4 bytes
 }
 
 ///|
@@ -2465,7 +2498,7 @@ test "read_sii_bytes expands probe to eeprom size" {
   let nic = EepromMockNic::with_image(make_sii_image(512))
   let timeout = @hal.Duration(1000L)
   let data = @protocol.read_sii_bytes(nic, 0x1001U, 8, timeout)
-  assert_eq(data.length(), 512)
+  @debug.assert_eq(data.length(), 512)
 }
 
 ///|
@@ -2473,7 +2506,7 @@ test "read_sii_bytes_ap expands probe to eeprom size" {
   let nic = EepromMockNic::with_image(make_sii_image(512))
   let timeout = @hal.Duration(1000L)
   let data = @protocol.read_sii_bytes_ap(nic, 0U, 8, timeout)
-  assert_eq(data.length(), 512)
+  @debug.assert_eq(data.length(), 512)
 }
 
 // ========== ESM Extensions Tests ==========
@@ -2484,7 +2517,7 @@ test "read_device_emulation via mock" {
   let timeout = @hal.Duration(1000L)
   // MockNic echoes zero data → bit 7 = 0 → no device emulation
   let is_emu = @protocol.read_device_emulation(nic, 0x1001U, timeout)
-  assert_eq(is_emu, false)
+  @debug.assert_eq(is_emu, false)
 }
 
 ///|
@@ -2586,16 +2619,16 @@ test "dc_read_receive_time via mock returns zero" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let t = @protocol.dc_read_receive_time(nic, 0x1001U, timeout)
-  assert_eq(t, 0U)
+  @debug.assert_eq(t, 0U)
 }
 
 ///|
 test "watchdog register constants match ETG1000.4 addresses" {
-  assert_eq(@protocol.reg_watchdog_divider, 0x0400U)
-  assert_eq(@protocol.reg_watchdog_time_pdi, 0x0410U)
-  assert_eq(@protocol.reg_watchdog_time_pdata, 0x0420U)
-  assert_eq(@protocol.reg_watchdog_status_pdata, 0x0440U)
-  assert_eq(@protocol.reg_watchdog_counter_pdata, 0x0442U)
+  @debug.assert_eq(@protocol.reg_watchdog_divider, 0x0400U)
+  @debug.assert_eq(@protocol.reg_watchdog_time_pdi, 0x0410U)
+  @debug.assert_eq(@protocol.reg_watchdog_time_pdata, 0x0420U)
+  @debug.assert_eq(@protocol.reg_watchdog_status_pdata, 0x0440U)
+  @debug.assert_eq(@protocol.reg_watchdog_counter_pdata, 0x0442U)
 }
 
 ///|
@@ -2614,7 +2647,7 @@ test "SmWatchdogConfig struct equality and derive Show" {
     pdata_status: true,
     pdata_counter: 5U,
   }
-  assert_eq(a, b)
+  @debug.assert_eq(a, b)
   // Show derive produces non-empty string
   assert_true(a.to_string().length() > 0)
 }
@@ -2644,22 +2677,22 @@ test "read_sm_watchdog_config via mock returns zeroed defaults" {
   let timeout = @hal.Duration(1000L)
   let config = @protocol.read_sm_watchdog_config(nic, 0x1001U, timeout)
   // MockNic loopback echoes frame with zero-filled data area for FPRD
-  assert_eq(config.divider, 0U)
-  assert_eq(config.pdi_time, 0U)
-  assert_eq(config.pdata_time, 0U)
-  assert_eq(config.pdata_status, false)
-  assert_eq(config.pdata_counter, 0U)
+  @debug.assert_eq(config.divider, 0U)
+  @debug.assert_eq(config.pdi_time, 0U)
+  @debug.assert_eq(config.pdata_time, 0U)
+  @debug.assert_eq(config.pdata_status, false)
+  @debug.assert_eq(config.pdata_counter, 0U)
 }
 
 ///|
 test "esm_timeout_policy_from_sii_timeouts returns defaults when None" {
   let policy = @protocol.esm_timeout_policy_from_sii_timeouts(None)
-  assert_eq(policy, @protocol.default_esm_timeout_policy())
-  assert_eq(policy.init, None)
-  assert_eq(policy.preop, None)
-  assert_eq(policy.safeop, None)
-  assert_eq(policy.op, None)
-  assert_eq(policy.boot, None)
+  @debug.assert_eq(policy, @protocol.default_esm_timeout_policy())
+  @debug.assert_eq(policy.init, None)
+  @debug.assert_eq(policy.preop, None)
+  @debug.assert_eq(policy.safeop, None)
+  @debug.assert_eq(policy.op, None)
+  @debug.assert_eq(policy.boot, None)
 }
 
 ///|
@@ -2674,15 +2707,15 @@ test "esm_timeout_policy_from_sii_timeouts maps SII fields correctly" {
   }
   let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
   // preop_timeout_ms → preop
-  assert_eq(policy.preop, Some(@hal.Duration(2_000_000_000L)))
+  @debug.assert_eq(policy.preop, Some(@hal.Duration(2_000_000_000L)))
   // safeop_op_timeout_ms → op
-  assert_eq(policy.op, Some(@hal.Duration(5_000_000_000L)))
+  @debug.assert_eq(policy.op, Some(@hal.Duration(5_000_000_000L)))
   // back_to_init_timeout_ms → init
-  assert_eq(policy.init, Some(@hal.Duration(1_000_000_000L)))
+  @debug.assert_eq(policy.init, Some(@hal.Duration(1_000_000_000L)))
   // back_to_safeop_timeout_ms → safeop
-  assert_eq(policy.safeop, Some(@hal.Duration(3_000_000_000L)))
+  @debug.assert_eq(policy.safeop, Some(@hal.Duration(3_000_000_000L)))
   // boot is always None
-  assert_eq(policy.boot, None)
+  @debug.assert_eq(policy.boot, None)
 }
 
 ///|
@@ -2696,7 +2729,7 @@ test "esm_timeout_policy_from_sii_timeouts zero fields remain None" {
     mailbox_response_timeout_ms: 0U,
   }
   let policy = @protocol.esm_timeout_policy_from_sii_timeouts(Some(timeouts))
-  assert_eq(policy, @protocol.default_esm_timeout_policy())
+  @debug.assert_eq(policy, @protocol.default_esm_timeout_policy())
 }
 
 ///|
@@ -2704,7 +2737,7 @@ test "dc_read_sync_window via mock returns zero" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let w = @protocol.dc_read_sync_window(nic, 0x1001U, timeout)
-  assert_eq(w, 0U)
+  @debug.assert_eq(w, 0U)
 }
 
 ///|
@@ -2740,13 +2773,13 @@ test "read_dl_error_counters via mock returns all zeros" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let counters = @protocol.read_dl_error_counters(nic, 0x1001U, timeout)
-  assert_eq(counters.ecat_pu_errors, 0U)
-  assert_eq(counters.pdi_errors, 0U)
+  @debug.assert_eq(counters.ecat_pu_errors, 0U)
+  @debug.assert_eq(counters.pdi_errors, 0U)
   for i = 0; i < counters.ports.length(); i = i + 1 {
-    assert_eq(counters.ports[i].frame_errors, 0U)
-    assert_eq(counters.ports[i].physical_errors, 0U)
-    assert_eq(counters.ports[i].forwarded_rx_errors, 0U)
-    assert_eq(counters.ports[i].lost_link_count, 0U)
+    @debug.assert_eq(counters.ports[i].frame_errors, 0U)
+    @debug.assert_eq(counters.ports[i].physical_errors, 0U)
+    @debug.assert_eq(counters.ports[i].forwarded_rx_errors, 0U)
+    @debug.assert_eq(counters.ports[i].lost_link_count, 0U)
   }
 }
 
@@ -2755,9 +2788,9 @@ test "read_dl_error_counters_ap via mock returns all zeros" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let counters = @protocol.read_dl_error_counters_ap(nic, 0U, timeout)
-  assert_eq(counters.ecat_pu_errors, 0U)
-  assert_eq(counters.pdi_errors, 0U)
-  assert_eq(counters.ports.length(), 4)
+  @debug.assert_eq(counters.ecat_pu_errors, 0U)
+  @debug.assert_eq(counters.pdi_errors, 0U)
+  @debug.assert_eq(counters.ports.length(), 4)
 }
 
 ///|
@@ -2773,9 +2806,9 @@ test "DlErrorCounters struct has expected port count" {
     ecat_pu_errors: 5U,
     pdi_errors: 3U,
   }
-  assert_eq(counters.ports.length(), 4)
-  assert_eq(counters.ecat_pu_errors, 5U)
-  assert_eq(counters.pdi_errors, 3U)
+  @debug.assert_eq(counters.ports.length(), 4)
+  @debug.assert_eq(counters.ecat_pu_errors, 5U)
+  @debug.assert_eq(counters.pdi_errors, 3U)
 }
 
 ///|
@@ -2792,8 +2825,8 @@ test "dc_configure_linear returns reference station" {
   assert_true(result is Some(_))
   match result {
     Some(info) => {
-      assert_eq(info.reference_station, 0x1001U)
-      assert_eq(info.configured_count, 2)
+      @debug.assert_eq(info.reference_station, 0x1001U)
+      @debug.assert_eq(info.configured_count, 2)
     }
     None => assert_true(false)
   }
@@ -2836,7 +2869,7 @@ test "pdo_exchange via mock loopback" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
-  assert_eq(wkc, 0U) // MockNic echoes, WKC=0
+  @debug.assert_eq(wkc, 0U) // MockNic echoes, WKC=0
 }
 
 ///|
@@ -2851,7 +2884,7 @@ test "pdo_read via mock loopback" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_read(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -2866,7 +2899,7 @@ test "pdo_write via mock loopback" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_write(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -2875,7 +2908,7 @@ test "pdo_exchange with empty context" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
-  assert_eq(wkc, 0U) // no data to exchange
+  @debug.assert_eq(wkc, 0U) // no data to exchange
 }
 
 // ============================================================
@@ -2891,19 +2924,19 @@ test "encode_lrw_frame_into produces valid EtherCAT frame" {
     data, 0, 4,
   )
   // Minimum: 14 (eth) + 2 (ecat) + 10 (pdu hdr) + 4 (data) + 2 (wkc) = 32
-  assert_eq(len, 32)
+  @debug.assert_eq(len, 32)
   // EtherType should be 0x88A4
-  assert_eq(buf[12], b'\x88')
-  assert_eq(buf[13], b'\xA4')
+  @debug.assert_eq(buf[12], b'\x88')
+  @debug.assert_eq(buf[13], b'\xA4')
   // Command should be LRW (0x0C)
-  assert_eq(buf[16], b'\x0C')
+  @debug.assert_eq(buf[16], b'\x0C')
   // Index should be 0x01
-  assert_eq(buf[17], b'\x01')
+  @debug.assert_eq(buf[17], b'\x01')
   // Data payload
-  assert_eq(buf[26], b'\xAA')
-  assert_eq(buf[27], b'\xBB')
-  assert_eq(buf[28], b'\xCC')
-  assert_eq(buf[29], b'\xDD')
+  @debug.assert_eq(buf[26], b'\xAA')
+  @debug.assert_eq(buf[27], b'\xBB')
+  @debug.assert_eq(buf[28], b'\xCC')
+  @debug.assert_eq(buf[29], b'\xDD')
 }
 
 ///|
@@ -2921,10 +2954,10 @@ test "encode_pdu_frame_into produces valid frame for any command" {
     0,
     2,
   )
-  assert_eq(len, 30) // 14 + 2 + 10 + 2 + 2
+  @debug.assert_eq(len, 30) // 14 + 2 + 10 + 2 + 2
   // Command byte for FPRD = 0x04
-  assert_eq(buf[16], b'\x04')
-  assert_eq(buf[17], b'\x05') // index
+  @debug.assert_eq(buf[16], b'\x04')
+  @debug.assert_eq(buf[17], b'\x05') // index
 }
 
 ///|
@@ -2939,10 +2972,10 @@ test "encode_zero_data_frame_into fills data with zeros" {
     0U,
     8,
   )
-  assert_eq(len, 36) // 14 + 2 + 10 + 8 + 2
+  @debug.assert_eq(len, 36) // 14 + 2 + 10 + 8 + 2
   // Data region (bytes 26..33) should be all zeros
   for i in 26..<34 {
-    assert_eq(buf[i], b'\x00')
+    @debug.assert_eq(buf[i], b'\x00')
   }
 }
 
@@ -2963,11 +2996,11 @@ test "encode/decode_pdu_response roundtrip" {
   let (wkc, _irq) = @protocol.decode_pdu_response_from(
     tx_buf, len, target, 0, 4,
   )
-  assert_eq(wkc, 3U)
-  assert_eq(target[0], b'\x01')
-  assert_eq(target[1], b'\x02')
-  assert_eq(target[2], b'\x03')
-  assert_eq(target[3], b'\x04')
+  @debug.assert_eq(wkc, 3U)
+  @debug.assert_eq(target[0], b'\x01')
+  @debug.assert_eq(target[1], b'\x02')
+  @debug.assert_eq(target[2], b'\x03')
+  @debug.assert_eq(target[3], b'\x04')
 }
 
 ///|
@@ -2987,9 +3020,9 @@ test "decode_pdu_response_slice skips output echo" {
     buf, len, 4, // skip
      target, 0, 2,
   )
-  assert_eq(wkc, 0U)
-  assert_eq(target[0], b'\xB1')
-  assert_eq(target[1], b'\xB2')
+  @debug.assert_eq(wkc, 0U)
+  @debug.assert_eq(target[0], b'\xB1')
+  @debug.assert_eq(target[1], b'\xB2')
 }
 
 ///|
@@ -3011,7 +3044,7 @@ test "decode_pdu_wkc_only extracts WKC" {
   buf[len - 2] = b'\x05'
   buf[len - 1] = b'\x00'
   let wkc = @protocol.decode_pdu_wkc_only(buf, len)
-  assert_eq(wkc, 5U)
+  @debug.assert_eq(wkc, 5U)
 }
 
 ///|
@@ -3261,37 +3294,40 @@ test "EcFrame::decode rejects PDU data truncated" {
 
 ///|
 test "al_status_code_description known codes" {
-  assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
-  assert_eq(
+  @debug.assert_eq(@protocol.al_status_code_description(0x0000U), "No error")
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0016U),
     "Invalid mailbox configuration (SafeOp)",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001DU),
     "Invalid output configuration",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001EU),
     "Invalid input configuration",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0070U),
     "Detected module ident list does not match",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0030U),
     "Invalid DC SYNC configuration",
   )
-  assert_eq(@protocol.al_status_code_description(0x0050U), "EEPROM no access")
-  assert_eq(
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0050U),
+    "EEPROM no access",
+  )
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0060U),
     "Slave restarted locally",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0080U),
     "Supply voltage too low",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0083U),
     "Temperature too high",
   )
@@ -3316,23 +3352,23 @@ test "EsmState::from_byte invalid byte raises" {
 ///|
 test "EsmState::can_transition invalid paths" {
   // These must all be false
-  assert_eq(
+  @debug.assert_eq(
     @protocol.EsmState::Init.can_transition(@protocol.EsmState::SafeOp),
     false,
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.EsmState::PreOp.can_transition(@protocol.EsmState::Op),
     false,
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.EsmState::Boot.can_transition(@protocol.EsmState::PreOp),
     false,
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.EsmState::Op.can_transition(@protocol.EsmState::Boot),
     false,
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.EsmState::PreOp.can_transition(@protocol.EsmState::Boot),
     false,
   )
@@ -3342,7 +3378,7 @@ test "EsmState::can_transition invalid paths" {
 
 ///|
 test "read_command Broadcast returns BRD" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.read_command(@protocol.AddressType::Broadcast),
     @protocol.EcCommand::BRD,
   )
@@ -3350,7 +3386,7 @@ test "read_command Broadcast returns BRD" {
 
 ///|
 test "readwrite_command AutoIncrement returns APRW" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.readwrite_command(@protocol.AddressType::AutoIncrement),
     @protocol.EcCommand::APRW,
   )
@@ -3376,23 +3412,23 @@ test "encode_lrw_frame_into produces valid frame layout" {
   // PDU header: 10 bytes
   // Data: 4 bytes
   // WKC: 2 bytes
-  assert_eq(len, 14 + 2 + 10 + 4 + 2)
+  @debug.assert_eq(len, 14 + 2 + 10 + 4 + 2)
   // dst MAC
-  assert_eq(buf[0], b'\xFF')
+  @debug.assert_eq(buf[0], b'\xFF')
   // src MAC
-  assert_eq(buf[6], b'\xAA')
+  @debug.assert_eq(buf[6], b'\xAA')
   // EtherType 0x88A4
-  assert_eq(buf[12], b'\x88')
-  assert_eq(buf[13], b'\xA4')
+  @debug.assert_eq(buf[12], b'\x88')
+  @debug.assert_eq(buf[13], b'\xA4')
   // PDU command: LRW = 0x0C
-  assert_eq(buf[16], b'\x0C')
+  @debug.assert_eq(buf[16], b'\x0C')
   // PDU index
-  assert_eq(buf[17], b'\x07')
+  @debug.assert_eq(buf[17], b'\x07')
   // Data at offset 26
-  assert_eq(buf[26], b'\xDE')
-  assert_eq(buf[27], b'\xAD')
-  assert_eq(buf[28], b'\xBE')
-  assert_eq(buf[29], b'\xEF')
+  @debug.assert_eq(buf[26], b'\xDE')
+  @debug.assert_eq(buf[27], b'\xAD')
+  @debug.assert_eq(buf[28], b'\xBE')
+  @debug.assert_eq(buf[29], b'\xEF')
 }
 
 // ===== Coverage: encode_pdu_frame_into =====
@@ -3414,14 +3450,14 @@ test "encode_pdu_frame_into with FPWR command" {
     0,
     2,
   )
-  assert_eq(len, 14 + 2 + 10 + 2 + 2)
+  @debug.assert_eq(len, 14 + 2 + 10 + 2 + 2)
   // Command: FPWR = 0x05
-  assert_eq(buf[16], b'\x05')
+  @debug.assert_eq(buf[16], b'\x05')
   // Index
-  assert_eq(buf[17], b'\x01')
+  @debug.assert_eq(buf[17], b'\x01')
   // Data at offset 26
-  assert_eq(buf[26], b'\x42')
-  assert_eq(buf[27], b'\x42')
+  @debug.assert_eq(buf[26], b'\x42')
+  @debug.assert_eq(buf[27], b'\x42')
 }
 
 // ===== Coverage: encode_zero_data_frame_into =====
@@ -3440,13 +3476,13 @@ test "encode_zero_data_frame_into fills zeros" {
     0U,
     8,
   )
-  assert_eq(len, 14 + 2 + 10 + 8 + 2)
+  @debug.assert_eq(len, 14 + 2 + 10 + 8 + 2)
   // Data region should be zeros
   for i = 26; i < 34; i = i + 1 {
-    assert_eq(buf[i], b'\x00')
+    @debug.assert_eq(buf[i], b'\x00')
   }
   // Command: LRD = 0x0A
-  assert_eq(buf[16], b'\x0A')
+  @debug.assert_eq(buf[16], b'\x0A')
 }
 
 ///|
@@ -3469,19 +3505,19 @@ test "MutablePdoContext build and set/get slave data" {
     input_bytes: 2,
   }
   let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
-  assert_eq(ctx.image.output_size, 4)
-  assert_eq(ctx.image.input_size, 2)
+  @debug.assert_eq(ctx.image.output_size, 4)
+  @debug.assert_eq(ctx.image.input_size, 2)
   // Set outputs
   let out_data : FixedArray[Byte] = [b'\x11', b'\x22', b'\x33', b'\x44']
   ctx.set_slave_outputs(0x1001U, out_data)
-  assert_eq(ctx.image.outputs[0], b'\x11')
-  assert_eq(ctx.image.outputs[3], b'\x44')
+  @debug.assert_eq(ctx.image.outputs[0], b'\x11')
+  @debug.assert_eq(ctx.image.outputs[3], b'\x44')
   // Simulate input data
   ctx.image.inputs[0] = b'\xAA'
   ctx.image.inputs[1] = b'\xBB'
   let inputs = ctx.get_slave_inputs(0x1001U)
-  assert_eq(inputs[0], b'\xAA')
-  assert_eq(inputs[1], b'\xBB')
+  @debug.assert_eq(inputs[0], b'\xAA')
+  @debug.assert_eq(inputs[1], b'\xBB')
 }
 
 ///|
@@ -3519,8 +3555,8 @@ test "pdo_exchange_zero_copy with empty context" {
   let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
   let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
-  assert_eq(result.wkc, 0U)
-  assert_eq(result.irq, 0U)
+  @debug.assert_eq(result.wkc, 0U)
+  @debug.assert_eq(result.irq, 0U)
 }
 
 ///|
@@ -3541,7 +3577,7 @@ test "pdo_exchange_zero_copy via MockZeroCopyNic loopback" {
   // Exchange - MockZeroCopyNic loops back TX to RX
   let result = @protocol.pdo_exchange_zero_copy(nic, ctx, timeout)
   // WKC is 0 because loopback doesn't modify WKC
-  assert_eq(result.wkc, 0U)
+  @debug.assert_eq(result.wkc, 0U)
 }
 
 ///|
@@ -3557,7 +3593,7 @@ test "pdo_read_zero_copy via MockZeroCopyNic" {
   let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -3577,7 +3613,7 @@ test "pdo_write_zero_copy via MockZeroCopyNic" {
     ctx.image.outputs[i] = (i + 1).to_byte()
   }
   let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -3593,7 +3629,7 @@ test "pdo_read_zero_copy with empty inputs returns 0" {
   let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_read_zero_copy(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -3603,19 +3639,22 @@ test "pdo_write_zero_copy with empty outputs returns 0" {
   let nic = @mock.MockZeroCopyNic::open_("mock", pool)
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_write_zero_copy(nic, ctx, timeout)
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 // ===== Coverage: protocol/esm.mbt — uncovered al_status_code_description arms =====
 
 ///|
 test "al_status_code_description covers 0x0001 Unspecified error" {
-  assert_eq(@protocol.al_status_code_description(0x0001U), "Unspecified error")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0001U),
+    "Unspecified error",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0012 Unknown requested state" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0012U),
     "Unknown requested state",
   )
@@ -3623,7 +3662,7 @@ test "al_status_code_description covers 0x0012 Unknown requested state" {
 
 ///|
 test "al_status_code_description covers 0x0017 Invalid sync manager configuration" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0017U),
     "Invalid sync manager configuration",
   )
@@ -3631,7 +3670,7 @@ test "al_status_code_description covers 0x0017 Invalid sync manager configuratio
 
 ///|
 test "al_status_code_description covers 0x001F Invalid watchdog configuration" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001FU),
     "Invalid watchdog configuration",
   )
@@ -3641,12 +3680,12 @@ test "al_status_code_description covers 0x001F Invalid watchdog configuration" {
 
 ///|
 test "al_status_code_description covers 0x0002 No memory" {
-  assert_eq(@protocol.al_status_code_description(0x0002U), "No memory")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0002U), "No memory")
 }
 
 ///|
 test "al_status_code_description covers 0x0003 Invalid device setup" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0003U),
     "Invalid device setup",
   )
@@ -3654,12 +3693,15 @@ test "al_status_code_description covers 0x0003 Invalid device setup" {
 
 ///|
 test "al_status_code_description covers 0x0004 Invalid revision" {
-  assert_eq(@protocol.al_status_code_description(0x0004U), "Invalid revision")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0004U),
+    "Invalid revision",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0006 SII EEPROM mismatch" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0006U),
     "SII/EEPROM information does not match firmware",
   )
@@ -3667,7 +3709,7 @@ test "al_status_code_description covers 0x0006 SII EEPROM mismatch" {
 
 ///|
 test "al_status_code_description covers 0x0007 Firmware update failed" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0007U),
     "Firmware update not successful, old firmware still running",
   )
@@ -3675,12 +3717,15 @@ test "al_status_code_description covers 0x0007 Firmware update failed" {
 
 ///|
 test "al_status_code_description covers 0x000E License error" {
-  assert_eq(@protocol.al_status_code_description(0x000EU), "License error")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x000EU),
+    "License error",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0011 Invalid requested state change" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0011U),
     "Invalid requested state change",
   )
@@ -3688,7 +3733,7 @@ test "al_status_code_description covers 0x0011 Invalid requested state change" {
 
 ///|
 test "al_status_code_description covers 0x0013 Bootstrap not supported" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0013U),
     "Bootstrap not supported",
   )
@@ -3696,12 +3741,15 @@ test "al_status_code_description covers 0x0013 Bootstrap not supported" {
 
 ///|
 test "al_status_code_description covers 0x0014 No valid firmware" {
-  assert_eq(@protocol.al_status_code_description(0x0014U), "No valid firmware")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0014U),
+    "No valid firmware",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0015 Invalid mailbox PreOp" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0015U),
     "Invalid mailbox configuration (PreOp)",
   )
@@ -3709,7 +3757,7 @@ test "al_status_code_description covers 0x0015 Invalid mailbox PreOp" {
 
 ///|
 test "al_status_code_description covers 0x0018 No valid inputs available" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0018U),
     "No valid inputs available",
   )
@@ -3717,12 +3765,15 @@ test "al_status_code_description covers 0x0018 No valid inputs available" {
 
 ///|
 test "al_status_code_description covers 0x0019 No valid outputs" {
-  assert_eq(@protocol.al_status_code_description(0x0019U), "No valid outputs")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0019U),
+    "No valid outputs",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x001A Synchronization error" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001AU),
     "Synchronization error",
   )
@@ -3730,7 +3781,7 @@ test "al_status_code_description covers 0x001A Synchronization error" {
 
 ///|
 test "al_status_code_description covers 0x001B Sync manager watchdog" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001BU),
     "Sync manager watchdog",
   )
@@ -3738,7 +3789,7 @@ test "al_status_code_description covers 0x001B Sync manager watchdog" {
 
 ///|
 test "al_status_code_description covers 0x001C Invalid sync manager types" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x001CU),
     "Invalid sync manager types",
   )
@@ -3746,7 +3797,7 @@ test "al_status_code_description covers 0x001C Invalid sync manager types" {
 
 ///|
 test "al_status_code_description covers 0x0020 Slave needs cold start" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0020U),
     "Slave needs cold start",
   )
@@ -3754,22 +3805,31 @@ test "al_status_code_description covers 0x0020 Slave needs cold start" {
 
 ///|
 test "al_status_code_description covers 0x0021 Slave needs INIT" {
-  assert_eq(@protocol.al_status_code_description(0x0021U), "Slave needs INIT")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0021U),
+    "Slave needs INIT",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0022 Slave needs PREOP" {
-  assert_eq(@protocol.al_status_code_description(0x0022U), "Slave needs PREOP")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0022U),
+    "Slave needs PREOP",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0023 Slave needs SAFEOP" {
-  assert_eq(@protocol.al_status_code_description(0x0023U), "Slave needs SAFEOP")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0023U),
+    "Slave needs SAFEOP",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x0024 Invalid input mapping" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0024U),
     "Invalid input mapping",
   )
@@ -3777,7 +3837,7 @@ test "al_status_code_description covers 0x0024 Invalid input mapping" {
 
 ///|
 test "al_status_code_description covers 0x0025 Invalid output mapping" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0025U),
     "Invalid output mapping",
   )
@@ -3785,7 +3845,7 @@ test "al_status_code_description covers 0x0025 Invalid output mapping" {
 
 ///|
 test "al_status_code_description covers 0x0026 Inconsistent settings" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0026U),
     "Inconsistent settings",
   )
@@ -3793,7 +3853,7 @@ test "al_status_code_description covers 0x0026 Inconsistent settings" {
 
 ///|
 test "al_status_code_description covers 0x0027 Freerun not supported" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0027U),
     "Freerun not supported",
   )
@@ -3801,7 +3861,7 @@ test "al_status_code_description covers 0x0027 Freerun not supported" {
 
 ///|
 test "al_status_code_description covers 0x0028 Syncronisation not supported" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0028U),
     "Synchronisation not supported",
   )
@@ -3809,7 +3869,7 @@ test "al_status_code_description covers 0x0028 Syncronisation not supported" {
 
 ///|
 test "al_status_code_description covers 0x0029 Freerun needs 3-buffer" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0029U),
     "Freerun needs 3-buffer mode",
   )
@@ -3817,7 +3877,7 @@ test "al_status_code_description covers 0x0029 Freerun needs 3-buffer" {
 
 ///|
 test "al_status_code_description covers 0x002A Background watchdog" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x002AU),
     "Background watchdog",
   )
@@ -3825,7 +3885,7 @@ test "al_status_code_description covers 0x002A Background watchdog" {
 
 ///|
 test "al_status_code_description covers 0x002B No valid inputs and outputs" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x002BU),
     "No valid inputs and outputs",
   )
@@ -3855,10 +3915,10 @@ test "decode_pdu_response_from copies only target_len when target smaller than P
   // target is only 3 bytes → should copy only 3 bytes from 8-byte PDU data
   let target : FixedArray[Byte] = FixedArray::make(3, b'\x00')
   let (wkc, _irq) = @protocol.decode_pdu_response_from(buf, len, target, 0, 3)
-  assert_eq(wkc, 1U)
-  assert_eq(target[0], b'\x01')
-  assert_eq(target[1], b'\x02')
-  assert_eq(target[2], b'\x03')
+  @debug.assert_eq(wkc, 1U)
+  @debug.assert_eq(target[0], b'\x01')
+  @debug.assert_eq(target[1], b'\x02')
+  @debug.assert_eq(target[2], b'\x03')
 }
 
 // ===== PDO: set_slave_outputs preserves other slave data =====
@@ -3903,26 +3963,32 @@ test "PdoContext set_slave_outputs preserves other slave data" {
   // Set outputs for slave 0x1001 only (first 2 bytes)
   ctx.set_slave_outputs(0x1001U, Bytes::from_array([b'\x11', b'\x22']))
   // Slave 0x1001 data should be updated
-  assert_eq(ctx.image.outputs[0], b'\x11')
-  assert_eq(ctx.image.outputs[1], b'\x22')
+  @debug.assert_eq(ctx.image.outputs[0], b'\x11')
+  @debug.assert_eq(ctx.image.outputs[1], b'\x22')
   // Slave 0x1002 data should be preserved
-  assert_eq(ctx.image.outputs[2], b'\xCC')
-  assert_eq(ctx.image.outputs[3], b'\xDD')
+  @debug.assert_eq(ctx.image.outputs[2], b'\xCC')
+  @debug.assert_eq(ctx.image.outputs[3], b'\xDD')
 }
 
 ///|
 test "al_status_code_description covers 0x002C Fatal sync error" {
-  assert_eq(@protocol.al_status_code_description(0x002CU), "Fatal sync error")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x002CU),
+    "Fatal sync error",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x002D No sync error" {
-  assert_eq(@protocol.al_status_code_description(0x002DU), "No sync error")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x002DU),
+    "No sync error",
+  )
 }
 
 ///|
 test "al_status_code_description covers 0x002E Invalid input FMMU" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x002EU),
     "Invalid input FMMU configuration",
   )
@@ -3930,7 +3996,7 @@ test "al_status_code_description covers 0x002E Invalid input FMMU" {
 
 ///|
 test "al_status_code_description covers 0x0031 Invalid DC latch" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0031U),
     "Invalid DC latch configuration",
   )
@@ -3938,21 +4004,24 @@ test "al_status_code_description covers 0x0031 Invalid DC latch" {
 
 ///|
 test "al_status_code_description covers 0x0032-0x0037 DC errors" {
-  assert_eq(@protocol.al_status_code_description(0x0032U), "PLL error")
-  assert_eq(@protocol.al_status_code_description(0x0033U), "DC sync IO error")
-  assert_eq(
+  @debug.assert_eq(@protocol.al_status_code_description(0x0032U), "PLL error")
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0033U),
+    "DC sync IO error",
+  )
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0034U),
     "DC sync timeout error",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0035U),
     "DC invalid sync cycle time",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0036U),
     "DC invalid sync0 cycle time",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0037U),
     "DC invalid sync1 cycle time",
   )
@@ -3960,22 +4029,25 @@ test "al_status_code_description covers 0x0032-0x0037 DC errors" {
 
 ///|
 test "al_status_code_description covers 0x0041-0x004F MBX codes" {
-  assert_eq(@protocol.al_status_code_description(0x0041U), "MBX_AOE")
-  assert_eq(@protocol.al_status_code_description(0x0042U), "MBX_EOE")
-  assert_eq(@protocol.al_status_code_description(0x0043U), "MBX_COE")
-  assert_eq(@protocol.al_status_code_description(0x0044U), "MBX_FOE")
-  assert_eq(@protocol.al_status_code_description(0x0045U), "MBX_SOE")
-  assert_eq(@protocol.al_status_code_description(0x004FU), "MBX_VOE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0041U), "MBX_AOE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0042U), "MBX_EOE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0043U), "MBX_COE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0044U), "MBX_FOE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x0045U), "MBX_SOE")
+  @debug.assert_eq(@protocol.al_status_code_description(0x004FU), "MBX_VOE")
 }
 
 ///|
 test "al_status_code_description covers 0x0051-0x0061 misc codes" {
-  assert_eq(@protocol.al_status_code_description(0x0051U), "EEPROM error")
-  assert_eq(
+  @debug.assert_eq(
+    @protocol.al_status_code_description(0x0051U),
+    "EEPROM error",
+  )
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0052U),
     "External hardware not ready",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0061U),
     "Device identification value updated",
   )
@@ -3983,11 +4055,11 @@ test "al_status_code_description covers 0x0051-0x0061 misc codes" {
 
 ///|
 test "al_status_code_description covers 0x0081-0x0082 voltage temperature" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0081U),
     "Supply voltage too high",
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.al_status_code_description(0x0082U),
     "Temperature too low",
   )
@@ -3997,7 +4069,7 @@ test "al_status_code_description covers 0x0081-0x0082 voltage temperature" {
 
 ///|
 test "read_command Configured returns FPRD" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.read_command(@protocol.AddressType::Configured),
     @protocol.EcCommand::FPRD,
   )
@@ -4005,7 +4077,7 @@ test "read_command Configured returns FPRD" {
 
 ///|
 test "write_command AutoIncrement returns APWR" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.write_command(@protocol.AddressType::AutoIncrement),
     @protocol.EcCommand::APWR,
   )
@@ -4013,7 +4085,7 @@ test "write_command AutoIncrement returns APWR" {
 
 ///|
 test "write_command Broadcast returns BWR" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.write_command(@protocol.AddressType::Broadcast),
     @protocol.EcCommand::BWR,
   )
@@ -4021,7 +4093,7 @@ test "write_command Broadcast returns BWR" {
 
 ///|
 test "readwrite_command Configured returns FPRW" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.readwrite_command(@protocol.AddressType::Configured),
     @protocol.EcCommand::FPRW,
   )
@@ -4032,23 +4104,25 @@ test "readwrite_command Configured returns FPRW" {
 
 ///|
 test "build_transition_path all states" {
-  assert_eq(@protocol.build_transition_path(@protocol.Init), [@protocol.Init])
-  assert_eq(@protocol.build_transition_path(@protocol.PreOp), [
+  @debug.assert_eq(@protocol.build_transition_path(@protocol.Init), [
+    @protocol.Init,
+  ])
+  @debug.assert_eq(@protocol.build_transition_path(@protocol.PreOp), [
     @protocol.Init,
     @protocol.PreOp,
   ])
-  assert_eq(@protocol.build_transition_path(@protocol.SafeOp), [
+  @debug.assert_eq(@protocol.build_transition_path(@protocol.SafeOp), [
     @protocol.Init,
     @protocol.PreOp,
     @protocol.SafeOp,
   ])
-  assert_eq(@protocol.build_transition_path(@protocol.Op), [
+  @debug.assert_eq(@protocol.build_transition_path(@protocol.Op), [
     @protocol.Init,
     @protocol.PreOp,
     @protocol.SafeOp,
     @protocol.Op,
   ])
-  assert_eq(@protocol.build_transition_path(@protocol.Boot), [
+  @debug.assert_eq(@protocol.build_transition_path(@protocol.Boot), [
     @protocol.Init,
     @protocol.Boot,
   ])
@@ -4056,23 +4130,25 @@ test "build_transition_path all states" {
 
 ///|
 test "build_shutdown_path all states" {
-  assert_eq(@protocol.build_shutdown_path(@protocol.Init), [@protocol.Init])
-  assert_eq(@protocol.build_shutdown_path(@protocol.PreOp), [
+  @debug.assert_eq(@protocol.build_shutdown_path(@protocol.Init), [
+    @protocol.Init,
+  ])
+  @debug.assert_eq(@protocol.build_shutdown_path(@protocol.PreOp), [
     @protocol.PreOp,
     @protocol.Init,
   ])
-  assert_eq(@protocol.build_shutdown_path(@protocol.SafeOp), [
+  @debug.assert_eq(@protocol.build_shutdown_path(@protocol.SafeOp), [
     @protocol.SafeOp,
     @protocol.PreOp,
     @protocol.Init,
   ])
-  assert_eq(@protocol.build_shutdown_path(@protocol.Op), [
+  @debug.assert_eq(@protocol.build_shutdown_path(@protocol.Op), [
     @protocol.Op,
     @protocol.SafeOp,
     @protocol.PreOp,
     @protocol.Init,
   ])
-  assert_eq(@protocol.build_shutdown_path(@protocol.Boot), [
+  @debug.assert_eq(@protocol.build_shutdown_path(@protocol.Boot), [
     @protocol.Boot,
     @protocol.Init,
   ])
@@ -4080,14 +4156,15 @@ test "build_shutdown_path all states" {
 
 ///|
 test "build_transition_route same state" {
-  assert_eq(@protocol.build_transition_route(@protocol.Op, @protocol.Op), [
-    @protocol.Op,
-  ])
+  @debug.assert_eq(
+    @protocol.build_transition_route(@protocol.Op, @protocol.Op),
+    [@protocol.Op],
+  )
 }
 
 ///|
 test "build_transition_route to Init" {
-  assert_eq(
+  @debug.assert_eq(
     @protocol.build_transition_route(@protocol.SafeOp, @protocol.Init),
     [@protocol.SafeOp, @protocol.PreOp, @protocol.Init],
   )
@@ -4095,21 +4172,19 @@ test "build_transition_route to Init" {
 
 ///|
 test "build_transition_route from Init" {
-  assert_eq(@protocol.build_transition_route(@protocol.Init, @protocol.Op), [
-    @protocol.Init,
-    @protocol.PreOp,
-    @protocol.SafeOp,
-    @protocol.Op,
-  ])
+  @debug.assert_eq(
+    @protocol.build_transition_route(@protocol.Init, @protocol.Op),
+    [@protocol.Init, @protocol.PreOp, @protocol.SafeOp, @protocol.Op],
+  )
 }
 
 ///|
 test "build_transition_route direct transition" {
   // SafeOp → Op is a valid direct transition
-  assert_eq(@protocol.build_transition_route(@protocol.SafeOp, @protocol.Op), [
-    @protocol.SafeOp,
-    @protocol.Op,
-  ])
+  @debug.assert_eq(
+    @protocol.build_transition_route(@protocol.SafeOp, @protocol.Op),
+    [@protocol.SafeOp, @protocol.Op],
+  )
 }
 
 ///|
@@ -4117,8 +4192,8 @@ test "build_transition_route indirect through Init" {
   // Op → Boot: need shutdown from Op then startup to Boot
   let route = @protocol.build_transition_route(@protocol.Op, @protocol.Boot)
   // Should go Op→SafeOp→PreOp→Init→Boot
-  assert_eq(route[0], @protocol.Op)
-  assert_eq(route[route.length() - 1], @protocol.Boot)
+  @debug.assert_eq(route[0], @protocol.Op)
+  @debug.assert_eq(route[route.length() - 1], @protocol.Boot)
   assert_true(route.length() >= 3)
 }
 
@@ -4132,7 +4207,7 @@ test "build_strict_transition_route delegates to build_transition_route" {
     @protocol.PreOp,
     @protocol.SafeOp,
   )
-  assert_eq(strict, normal)
+  @debug.assert_eq(strict, normal)
 }
 
 ///|
@@ -4142,11 +4217,11 @@ test "esm_default_timeout all states" {
   let safeop_t = @protocol.esm_default_timeout(@protocol.SafeOp)
   let op_t = @protocol.esm_default_timeout(@protocol.Op)
   let boot_t = @protocol.esm_default_timeout(@protocol.Boot)
-  assert_eq(init_t, @hal.Duration(5_000_000_000L))
-  assert_eq(preop_t, @hal.Duration(3_000_000_000L))
-  assert_eq(safeop_t, @hal.Duration(10_000_000_000L))
-  assert_eq(op_t, @hal.Duration(10_000_000_000L))
-  assert_eq(boot_t, @hal.Duration(5_000_000_000L))
+  @debug.assert_eq(init_t, @hal.Duration(5_000_000_000L))
+  @debug.assert_eq(preop_t, @hal.Duration(3_000_000_000L))
+  @debug.assert_eq(safeop_t, @hal.Duration(10_000_000_000L))
+  @debug.assert_eq(op_t, @hal.Duration(10_000_000_000L))
+  @debug.assert_eq(boot_t, @hal.Duration(5_000_000_000L))
 }
 
 ///|
@@ -4168,25 +4243,25 @@ test "esm_timeout_for uses override when present" {
     op: None,
     boot: None,
   }
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.Init, policy),
     @hal.Duration(999L),
   )
   // PreOp has no override — uses default
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.PreOp, policy),
     @hal.Duration(3_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.SafeOp, policy),
     @hal.Duration(42L),
   )
   // Op / Boot fall back to defaults
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.Op, policy),
     @hal.Duration(10_000_000_000L),
   )
-  assert_eq(
+  @debug.assert_eq(
     @protocol.esm_timeout_for(@protocol.Boot, policy),
     @hal.Duration(5_000_000_000L),
   )
@@ -4213,11 +4288,11 @@ test "FrameBuilder add exceeds capacity" {
 ///|
 test "PdoContext build empty mappings" {
   let ctx = @protocol.PdoContext::build([], 0x1000U)
-  assert_eq(ctx.mappings.length(), 0)
-  assert_eq(ctx.image.output_size, 0)
-  assert_eq(ctx.image.input_size, 0)
-  assert_eq(ctx.logical_size, 0)
-  assert_eq(ctx.block_lrw, false)
+  @debug.assert_eq(ctx.mappings.length(), 0)
+  @debug.assert_eq(ctx.image.output_size, 0)
+  @debug.assert_eq(ctx.image.input_size, 0)
+  @debug.assert_eq(ctx.logical_size, 0)
+  @debug.assert_eq(ctx.block_lrw, false)
 }
 
 ///|
@@ -4229,12 +4304,12 @@ test "PdoContext build computes logical addresses correctly" {
     input_bytes: 6,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
-  assert_eq(ctx.mappings.length(), 1)
-  assert_eq(ctx.mappings[0].output_offset, 0)
-  assert_eq(ctx.mappings[0].output_length, 4)
-  assert_eq(ctx.mappings[0].input_offset, 0)
-  assert_eq(ctx.mappings[0].input_length, 6)
-  assert_eq(ctx.logical_size, 10)
+  @debug.assert_eq(ctx.mappings.length(), 1)
+  @debug.assert_eq(ctx.mappings[0].output_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].output_length, 4)
+  @debug.assert_eq(ctx.mappings[0].input_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].input_length, 6)
+  @debug.assert_eq(ctx.logical_size, 10)
 }
 
 ///|
@@ -4247,11 +4322,11 @@ test "PdoContext set_slave_outputs and get_slave_inputs" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   ctx.set_slave_outputs(0x1001U, Bytes::from_array([b'\xAA', b'\xBB', b'\xCC']))
-  assert_eq(ctx.image.outputs[0], b'\xAA')
+  @debug.assert_eq(ctx.image.outputs[0], b'\xAA')
   // get_slave_inputs should return zeros initially
   let inputs = ctx.get_slave_inputs(0x1001U)
-  assert_eq(inputs.length(), 3)
-  assert_eq(inputs[0], b'\x00')
+  @debug.assert_eq(inputs.length(), 3)
+  @debug.assert_eq(inputs[0], b'\x00')
 }
 
 ///|
@@ -4297,7 +4372,7 @@ test "dc_read_receive_time via VirtualNic returns 0 initially" {
   let bus = @mock.VirtualBus::new([slave])
   let nic = @mock.VirtualNic::new(bus)
   let time = @protocol.dc_read_receive_time(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(time, 0U) // registers are initially zero
+  @debug.assert_eq(time, 0U) // registers are initially zero
 }
 
 ///|
@@ -4312,10 +4387,10 @@ test "dc_read_port_times via VirtualNic returns zeros" {
   let bus = @mock.VirtualBus::new([slave])
   let nic = @mock.VirtualNic::new(bus)
   let times = @protocol.dc_read_port_times(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(times.port0, 0U)
-  assert_eq(times.port1, 0U)
-  assert_eq(times.port2, 0U)
-  assert_eq(times.port3, 0U)
+  @debug.assert_eq(times.port0, 0U)
+  @debug.assert_eq(times.port1, 0U)
+  @debug.assert_eq(times.port2, 0U)
+  @debug.assert_eq(times.port3, 0U)
 }
 
 // ===== Batch 21: ESM extensions via VirtualNic =====
@@ -4333,7 +4408,7 @@ test "read_device_emulation default type register" {
   let nic = @mock.VirtualNic::new(bus)
   // Default type register = 0x02 (bit 7 is 0) → Device Emulation = false
   let de = @protocol.read_device_emulation(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(de, false)
+  @debug.assert_eq(de, false)
 }
 
 ///|
@@ -4350,7 +4425,7 @@ test "set_sm_enable via VirtualNic writes activate register" {
   @protocol.set_sm_enable(nic, 0U, 2, true, @hal.Duration(50_000_000L))
   // SM2 activate register = 0x0800 + 2*8 + 6 = 0x0816
   let reg = slave.read_reg(0x0816, 1)
-  assert_eq(reg[0], b'\x01')
+  @debug.assert_eq(reg[0], b'\x01')
 }
 
 ///|
@@ -4366,7 +4441,7 @@ test "set_sm_enable disable writes zero" {
   let nic = @mock.VirtualNic::new(bus)
   @protocol.set_sm_enable(nic, 0U, 0, false, @hal.Duration(50_000_000L))
   let reg = slave.read_reg(0x0806, 1)
-  assert_eq(reg[0], b'\x00')
+  @debug.assert_eq(reg[0], b'\x00')
 }
 
 ///|
@@ -4391,7 +4466,7 @@ test "apply_op_only_policy no-op when op_only is false" {
     @hal.Duration(50_000_000L),
   )
   // Not op_only → register should remain unchanged
-  assert_eq(slave.registers[0x0816], b'\xFF')
+  @debug.assert_eq(slave.registers[0x0816], b'\xFF')
 }
 
 ///|
@@ -4415,7 +4490,7 @@ test "apply_op_only_policy disables SM for non-Op target" {
     @hal.Duration(50_000_000L),
   )
   // SafeOp + op_only → should disable SM2 (write 0x00)
-  assert_eq(slave.registers[0x0816], b'\x00')
+  @debug.assert_eq(slave.registers[0x0816], b'\x00')
 }
 
 ///|
@@ -4438,7 +4513,7 @@ test "apply_op_only_policy enables SM for Op target" {
     @hal.Duration(50_000_000L),
   )
   // Op + op_only → should enable SM2 (write 0x01)
-  assert_eq(slave.registers[0x0816], b'\x01')
+  @debug.assert_eq(slave.registers[0x0816], b'\x01')
 }
 
 // ===== Batch 21: pdo_exchange with zero logical_size =====
@@ -4449,7 +4524,7 @@ test "pdo_exchange with zero logical size returns 0 WKC" {
   let nic = @mock.VirtualNic::new(bus)
   let ctx = @protocol.PdoContext::build([], 0x0000U)
   let wkc = @protocol.pdo_exchange(nic, ctx, @hal.Duration(50_000_000L))
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -4464,7 +4539,7 @@ test "pdo_read with zero input size returns 0 WKC" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   let wkc = @protocol.pdo_read(nic, ctx, @hal.Duration(50_000_000L))
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 ///|
@@ -4479,7 +4554,7 @@ test "pdo_write with zero output size returns 0 WKC" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   let wkc = @protocol.pdo_write(nic, ctx, @hal.Duration(50_000_000L))
-  assert_eq(wkc, 0U)
+  @debug.assert_eq(wkc, 0U)
 }
 
 // ===== Batch 22: PdoContext data operations =====
@@ -4518,18 +4593,18 @@ test "PdoContext build multi-slave computes offsets" {
     [(sm1, 0x1001U), (sm2, 0x1002U)],
     0x0000U,
   )
-  assert_eq(ctx.mappings.length(), 2)
-  assert_eq(ctx.mappings[0].output_offset, 0)
-  assert_eq(ctx.mappings[0].output_length, 2)
-  assert_eq(ctx.mappings[0].input_offset, 0)
-  assert_eq(ctx.mappings[0].input_length, 3)
-  assert_eq(ctx.mappings[1].output_offset, 2)
-  assert_eq(ctx.mappings[1].output_length, 4)
-  assert_eq(ctx.mappings[1].input_offset, 3)
-  assert_eq(ctx.mappings[1].input_length, 1)
-  assert_eq(ctx.logical_size, 10)
-  assert_eq(ctx.image.output_size, 6)
-  assert_eq(ctx.image.input_size, 4)
+  @debug.assert_eq(ctx.mappings.length(), 2)
+  @debug.assert_eq(ctx.mappings[0].output_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].output_length, 2)
+  @debug.assert_eq(ctx.mappings[0].input_offset, 0)
+  @debug.assert_eq(ctx.mappings[0].input_length, 3)
+  @debug.assert_eq(ctx.mappings[1].output_offset, 2)
+  @debug.assert_eq(ctx.mappings[1].output_length, 4)
+  @debug.assert_eq(ctx.mappings[1].input_offset, 3)
+  @debug.assert_eq(ctx.mappings[1].input_length, 1)
+  @debug.assert_eq(ctx.logical_size, 10)
+  @debug.assert_eq(ctx.image.output_size, 6)
+  @debug.assert_eq(ctx.image.input_size, 4)
 }
 
 // ===== Batch 22: MutablePdoContext =====
@@ -4537,8 +4612,8 @@ test "PdoContext build multi-slave computes offsets" {
 ///|
 test "MutablePdoContext build empty" {
   let ctx = @protocol.MutablePdoContext::build([], 0x1000U)
-  assert_eq(ctx.mappings.length(), 0)
-  assert_eq(ctx.logical_size, 0)
+  @debug.assert_eq(ctx.mappings.length(), 0)
+  @debug.assert_eq(ctx.logical_size, 0)
 }
 
 ///|
@@ -4551,11 +4626,11 @@ test "MutablePdoContext set_slave_outputs and get_slave_inputs" {
   }
   let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0x0000U)
   ctx.set_slave_outputs(0x1001U, [b'\xAA', b'\xBB', b'\xCC'])
-  assert_eq(ctx.image.outputs[0], b'\xAA')
-  assert_eq(ctx.image.outputs[1], b'\xBB')
-  assert_eq(ctx.image.outputs[2], b'\xCC')
+  @debug.assert_eq(ctx.image.outputs[0], b'\xAA')
+  @debug.assert_eq(ctx.image.outputs[1], b'\xBB')
+  @debug.assert_eq(ctx.image.outputs[2], b'\xCC')
   let inputs = ctx.get_slave_inputs(0x1001U)
-  assert_eq(inputs.length(), 2)
+  @debug.assert_eq(inputs.length(), 2)
 }
 
 ///|
@@ -4606,11 +4681,11 @@ test "read_sm_watchdog_config via VirtualNic returns defaults" {
     @hal.Duration(50_000_000L),
   )
   // All registers default to zero
-  assert_eq(config.divider, 0U)
-  assert_eq(config.pdi_time, 0U)
-  assert_eq(config.pdata_time, 0U)
-  assert_eq(config.pdata_status, false)
-  assert_eq(config.pdata_counter, 0U)
+  @debug.assert_eq(config.divider, 0U)
+  @debug.assert_eq(config.pdi_time, 0U)
+  @debug.assert_eq(config.pdata_time, 0U)
+  @debug.assert_eq(config.pdata_status, false)
+  @debug.assert_eq(config.pdata_counter, 0U)
 }
 
 ///|
@@ -4634,14 +4709,14 @@ test "write_sm_watchdog_config via VirtualNic writes registers" {
   )
   // Verify registers were written (little-endian)
   // Divider at 0x0400
-  assert_eq(slave.registers[0x0400], b'\xC2')
-  assert_eq(slave.registers[0x0401], b'\x09')
+  @debug.assert_eq(slave.registers[0x0400], b'\xC2')
+  @debug.assert_eq(slave.registers[0x0401], b'\x09')
   // PDI time at 0x0410
-  assert_eq(slave.registers[0x0410], b'\xE8')
-  assert_eq(slave.registers[0x0411], b'\x03')
+  @debug.assert_eq(slave.registers[0x0410], b'\xE8')
+  @debug.assert_eq(slave.registers[0x0411], b'\x03')
   // PData time at 0x0420
-  assert_eq(slave.registers[0x0420], b'\x00')
-  assert_eq(slave.registers[0x0421], b'\x01')
+  @debug.assert_eq(slave.registers[0x0420], b'\x00')
+  @debug.assert_eq(slave.registers[0x0421], b'\x01')
 }
 
 ///|
@@ -4658,7 +4733,7 @@ test "read_device_emulation with bit 7 set returns true" {
   let bus = @mock.VirtualBus::new([slave])
   let nic = @mock.VirtualNic::new(bus)
   let de = @protocol.read_device_emulation(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(de, true)
+  @debug.assert_eq(de, true)
 }
 
 // ===== Batch 22: pdo_exchange block_lrw mode =====
@@ -4713,7 +4788,7 @@ test "dc_check_support via VirtualNic" {
   let nic = @mock.VirtualNic::new(bus)
   // Default registers are zero → bit 2 of DL Info is 0 → no DC support
   let supports = @protocol.dc_check_support(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(supports, false)
+  @debug.assert_eq(supports, false)
 }
 
 ///|
@@ -4730,5 +4805,5 @@ test "dc_check_support with DC bit set" {
   let bus = @mock.VirtualBus::new([slave])
   let nic = @mock.VirtualNic::new(bus)
   let supports = @protocol.dc_check_support(nic, 0U, @hal.Duration(50_000_000L))
-  assert_eq(supports, true)
+  @debug.assert_eq(supports, true)
 }

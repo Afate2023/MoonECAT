@@ -19,13 +19,13 @@ fn MailboxMockNic::new(responses : Array[Bytes]) -> MailboxMockNic {
 }
 
 ///|
-pub impl @hal.Nic for MailboxMockNic with open_(name) {
+pub impl @hal.Nic for MailboxMockNic with fn open_(name) {
   ignore(name)
   MailboxMockNic::new([])
 }
 
 ///|
-pub impl @hal.Nic for MailboxMockNic with send(self, data) {
+pub impl @hal.Nic for MailboxMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -85,7 +85,7 @@ pub impl @hal.Nic for MailboxMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for MailboxMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for MailboxMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -94,7 +94,7 @@ pub impl @hal.Nic for MailboxMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for MailboxMockNic with close(self) {
+pub impl @hal.Nic for MailboxMockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -120,13 +120,13 @@ fn ApMailboxFullMockNic::new(responses : Array[Bytes]) -> ApMailboxFullMockNic {
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxFullMockNic with open_(name) {
+pub impl @hal.Nic for ApMailboxFullMockNic with fn open_(name) {
   ignore(name)
   ApMailboxFullMockNic::new([])
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxFullMockNic with send(self, data) {
+pub impl @hal.Nic for ApMailboxFullMockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -189,7 +189,7 @@ pub impl @hal.Nic for ApMailboxFullMockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxFullMockNic with recv(self, timeout~) {
+pub impl @hal.Nic for ApMailboxFullMockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -198,7 +198,7 @@ pub impl @hal.Nic for ApMailboxFullMockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ApMailboxFullMockNic with close(self) {
+pub impl @hal.Nic for ApMailboxFullMockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -584,7 +584,7 @@ test "integration/sdo_download expedited via FP mock" {
     test_timeout,
   )
   // If we get here without error, the download succeeded
-  assert_eq(nic.response_index, 1)
+  @debug.assert_eq(nic.response_index, 1)
 }
 
 // ========== SDO Segmented Download ==========
@@ -614,7 +614,7 @@ test "integration/sdo_download segmented 8 bytes via FP mock" {
     data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 3)
+  @debug.assert_eq(nic.response_index, 3)
 }
 
 // ========== SDO Expedited Upload ==========
@@ -637,7 +637,7 @@ test "integration/sdo_upload expedited via FP mock" {
     b'\x01',
     test_timeout,
   )
-  assert_eq(result, expected)
+  @debug.assert_eq(result, expected)
 }
 
 ///|
@@ -661,8 +661,8 @@ test "integration/sdo_upload discards stale counter mismatch frame" {
     b'\x01',
     test_timeout,
   )
-  assert_eq(result, expected)
-  assert_eq(nic.response_index, 2)
+  @debug.assert_eq(result, expected)
+  @debug.assert_eq(nic.response_index, 2)
 }
 
 // ========== SDO Segmented Upload ==========
@@ -699,8 +699,8 @@ test "integration/sdo_upload segmented 10 bytes via FP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result.length(), 10)
-  assert_eq(
+  @debug.assert_eq(result.length(), 10)
+  @debug.assert_eq(
     result,
     Bytes::from_array([
       b'\x01', b'\x02', b'\x03', b'\x04', b'\x05', b'\x06', b'\x07', b'\x08', b'\x09',
@@ -730,7 +730,7 @@ test "integration/sdo_upload_ap expedited via AP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result, expected)
+  @debug.assert_eq(result, expected)
 }
 
 // ========== SDO Complete Access Download ==========
@@ -752,7 +752,7 @@ test "integration/sdo_download_complete_access expedited via FP mock" {
     data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 1)
+  @debug.assert_eq(nic.response_index, 1)
 }
 
 // ========== SDO Complete Access Download Segmented ==========
@@ -779,7 +779,7 @@ test "integration/sdo_download_complete_access segmented via FP mock" {
     data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 3)
+  @debug.assert_eq(nic.response_index, 3)
 }
 
 // ========== SDO Complete Access Upload ==========
@@ -802,7 +802,7 @@ test "integration/sdo_upload_complete_access expedited via FP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result, expected)
+  @debug.assert_eq(result, expected)
 }
 
 // ========== SDO Complete Access Upload Segmented ==========
@@ -838,7 +838,7 @@ test "integration/sdo_upload_complete_access segmented via FP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result.length(), 10)
+  @debug.assert_eq(result.length(), 10)
 }
 
 // ========== SDO Download Retry ==========
@@ -864,7 +864,7 @@ test "integration/sdo_download_retry succeeds after timeout" {
     data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 1)
+  @debug.assert_eq(nic.response_index, 1)
 }
 
 // ========== SDO Upload Retry ==========
@@ -887,7 +887,7 @@ test "integration/sdo_upload_retry succeeds first try via FP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result, expected)
+  @debug.assert_eq(result, expected)
 }
 
 // ========== SDO Upload Retry AP ==========
@@ -911,7 +911,7 @@ test "integration/sdo_upload_retry_ap succeeds first try via AP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(result, expected)
+  @debug.assert_eq(result, expected)
 }
 
 // ========== SDO Upload Retry AP timeout ==========
@@ -957,7 +957,7 @@ test "integration/foe_download via FP mock" {
     file_data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 2)
+  @debug.assert_eq(nic.response_index, 2)
 }
 
 // ========== FoE Upload (FP) ==========
@@ -981,7 +981,7 @@ test "integration/foe_upload via FP mock" {
     0U,
     test_timeout,
   )
-  assert_eq(result, file_content)
+  @debug.assert_eq(result, file_content)
 }
 
 // ========== FoE Download Error ==========
@@ -1026,7 +1026,7 @@ test "integration/foe_download_ap via AP mock" {
     file_data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 2)
+  @debug.assert_eq(nic.response_index, 2)
 }
 
 // ========== FoE Upload AP ==========
@@ -1047,7 +1047,7 @@ test "integration/foe_upload_ap via AP mock" {
     0U,
     test_timeout,
   )
-  assert_eq(result, file_content)
+  @debug.assert_eq(result, file_content)
 }
 
 // ========== FoE Upload Error ==========
@@ -1094,7 +1094,7 @@ test "integration/foe_download busy then ack via FP mock" {
     file_data,
     test_timeout,
   )
-  assert_eq(nic.response_index, 3)
+  @debug.assert_eq(nic.response_index, 3)
 }
 
 // ========== SDO Info Get OD List ==========
@@ -1122,10 +1122,10 @@ test "integration/sdo_info_get_od_list via FP mock" {
     1U,
     test_timeout,
   )
-  assert_eq(indices.length(), 3)
-  assert_eq(indices[0], 0x1000U)
-  assert_eq(indices[1], 0x1018U)
-  assert_eq(indices[2], 0x6000U)
+  @debug.assert_eq(indices.length(), 3)
+  @debug.assert_eq(indices[0], 0x1000U)
+  @debug.assert_eq(indices[1], 0x1018U)
+  @debug.assert_eq(indices[2], 0x6000U)
 }
 
 // ========== SDO Info Get OD Description ==========
@@ -1152,8 +1152,8 @@ test "integration/sdo_info_get_od_description via FP mock" {
     0x1018U,
     test_timeout,
   )
-  assert_eq(desc.index, 0x1018U)
-  assert_eq(desc.max_subindex, b'\x04')
+  @debug.assert_eq(desc.index, 0x1018U)
+  @debug.assert_eq(desc.max_subindex, b'\x04')
 }
 
 // ========== SDO Info Get OE Description ==========
@@ -1185,9 +1185,9 @@ test "integration/sdo_info_get_oe_description via FP mock" {
     b'\x00',
     test_timeout,
   )
-  assert_eq(entry.index, 0x1018U)
-  assert_eq(entry.subindex, b'\x01')
-  assert_eq(entry.bit_length, 32U)
+  @debug.assert_eq(entry.index, 0x1018U)
+  @debug.assert_eq(entry.subindex, b'\x01')
+  @debug.assert_eq(entry.bit_length, 32U)
 }
 
 // ========== SDO Info Multi-Fragment ==========
@@ -1219,10 +1219,10 @@ test "integration/sdo_info_get_od_list multi-fragment via FP mock" {
     1U,
     test_timeout,
   )
-  assert_eq(indices.length(), 3)
-  assert_eq(indices[0], 0x1000U)
-  assert_eq(indices[1], 0x1018U)
-  assert_eq(indices[2], 0x6000U)
+  @debug.assert_eq(indices.length(), 3)
+  @debug.assert_eq(indices[0], 0x1000U)
+  @debug.assert_eq(indices[1], 0x1018U)
+  @debug.assert_eq(indices[2], 0x6000U)
 }
 
 // ========== SDO Abort ==========
