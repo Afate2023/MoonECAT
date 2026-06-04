@@ -56,7 +56,9 @@ fn foe_raise_error(
   text : String,
 ) -> Unit raise @hal.EcError {
   let suffix = if text.length() > 0 { " - " + text } else { "" }
-  raise @hal.EcError::MailboxProtocol("FoE error: " + @debug.to_string(code) + suffix)
+  raise @hal.EcError::MailboxProtocol(
+    "FoE error: " + @debug.to_string(code) + suffix,
+  )
 }
 
 ///|

@@ -8,7 +8,18 @@
       "Bash(tee /tmp/full_check.txt)",
       "Bash(moon fmt *)",
       "Bash(moon info *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(sed -E 's/:[0-9]+$//')",
+      "Bash(grep -oE \"MoonECAT\\\\\\\\\\\\\\\\[A-Za-z0-9_\\\\\\\\\\\\\\\\]+\\\\.mbt\")",
+      "WebFetch(domain:github.com)",
+      "Bash(sed -i '29s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;572s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1373s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1417s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1434s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1507s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1533s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;1562s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;2662s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;2685s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4051s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4075s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4083s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4090s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4098s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4109s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;4135s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/' protocol_test.mbt)",
+      "Bash(sed -i '208s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;216s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/;224s/\\\\\\(assert_eq\\\\|assert_not_eq\\\\|inspect\\\\\\)\\(/@debug.\\\\1\\(/' protocol_wbtest.mbt)",
+      "Bash(find / -path '*/moonbitlang/core/debug/*.mbti' 2>/dev/null | head; echo \"---\"; find / -path '*core/debug*' -name '*.mbt' 2>/dev/null | grep -v Reference_Project | head)",
+      "Read(//c//**)",
+      "Bash(grep -oE \"MoonECAT.[A-Za-z0-9_\\\\\\\\\\\\\\\\/]+\\\\.mbt\" /tmp/mc2.txt)",
+      "Bash(grep -oE \"MoonECAT.[A-Za-z0-9_\\\\\\\\\\\\\\\\]+\\\\.mbt\")",
+      "Bash(grep -oE 'MoonECAT\\\\\\\\[A-Za-z0-9_\\\\\\\\]+\\\\.mbt' /tmp/mc2.txt)",
+      "Bash(awk '-F\\\\\\\\' '{print $NF}')"
     ],
     "additionalDirectories": [
       "\\tmp"

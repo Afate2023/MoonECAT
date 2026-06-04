@@ -293,7 +293,9 @@ pub fn ValidateReport::format(self : ValidateReport) -> String {
   buf.write_string(
     "Expected Source: " + @debug.to_string(self.expected_source) + "\n",
   )
-  buf.write_string("Actual Source:   " + @debug.to_string(self.actual_source) + "\n")
+  buf.write_string(
+    "Actual Source:   " + @debug.to_string(self.actual_source) + "\n",
+  )
   buf.write_string("Expected: " + self.total_expected.to_string() + " slaves\n")
   buf.write_string("Found:    " + self.total_found.to_string() + " slaves\n")
   buf.write_string("Status:   " + validate_grade_label(self.grade) + "\n\n")

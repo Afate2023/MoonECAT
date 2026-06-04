@@ -1,18 +1,18 @@
 import {
   "afate/MoonECAT" @lib,
   "afate/MoonECAT/hal",
-  "afate/MoonECAT/hal/native" @native,
-  "afate/MoonECAT/hal/mock" @mock,
+  "afate/MoonECAT/hal/native",
+  "afate/MoonECAT/hal/mock",
   "afate/MoonECAT/mailbox",
   "afate/MoonECAT/protocol",
   "afate/MoonECAT/runtime",
-  "afate/MoonECAT/runtime/analysis" @analysis,
+  "afate/MoonECAT/runtime/analysis",
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
-  "moonbitlang/x/fs" @fs,
+  "moonbitlang/x/fs",
 }
 
 supported_targets = "+native"

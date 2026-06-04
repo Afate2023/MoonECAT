@@ -24,13 +24,16 @@ pub fn[N] RecordingNicAdapter::get_log(
 }
 
 ///|
-pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with open_(name) {
+pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with fn open_(name) {
   let inner = N::open_(name)
   RecordingNicAdapter::wrap(inner)
 }
 
 ///|
-pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with send(self, data) {
+pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with fn send(
+  self,
+  data,
+) {
   let result : Result[Int, @hal.EcError] = Ok(N::send(self.inner, data)) catch {
     e => Err(e)
   }
@@ -47,7 +50,7 @@ pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with send(self, data)
 }
 
 ///|
-pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with recv(
+pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with fn recv(
   self,
   timeout~,
 ) {
@@ -79,6 +82,6 @@ pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with recv(
 }
 
 ///|
-pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with close(self) {
+pub impl[N : @hal.Nic] @hal.Nic for RecordingNicAdapter[N] with fn close(self) {
   N::close(self.inner)
 }

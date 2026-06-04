@@ -36,7 +36,10 @@ test "NullCycleHook on_fault returns Continue" {
     dc_state: @hil.Disabled,
     recovery_pending: true,
   }
-  @debug.assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
+  @debug.assert_eq(
+    hook.on_fault(snap, @hal.EcError::RecvTimeout),
+    @hil.Continue,
+  )
 }
 
 ///|
@@ -527,7 +530,10 @@ test "HilCycleHook on_fault returns Continue" {
     dc_state: @hil.Disabled,
     recovery_pending: false,
   }
-  @debug.assert_eq(hook.on_fault(snap, @hal.EcError::RecvTimeout), @hil.Continue)
+  @debug.assert_eq(
+    hook.on_fault(snap, @hal.EcError::RecvTimeout),
+    @hil.Continue,
+  )
 }
 
 ///|

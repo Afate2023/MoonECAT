@@ -112,7 +112,8 @@ fn[N : @hal.Nic] sdo_download_once(
   let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
-      "SDO download: expected DownloadResponse, got " + @debug.to_string(resp.command),
+      "SDO download: expected DownloadResponse, got " +
+      @debug.to_string(resp.command),
     )
   }
   if resp.index != index || resp.subindex != subindex {
@@ -140,7 +141,8 @@ fn[N : @hal.Nic] sdo_upload_once(
   let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
-      "SDO upload: expected UploadResponse, got " + @debug.to_string(resp.command),
+      "SDO upload: expected UploadResponse, got " +
+      @debug.to_string(resp.command),
     )
   }
   if resp.index != index || resp.subindex != subindex {
@@ -176,7 +178,8 @@ fn[N : @hal.Nic] sdo_upload_ap_once(
   let resp = recv_sdo_validated_ap(nic, position, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
-      "SDO upload: expected UploadResponse, got " + @debug.to_string(resp.command),
+      "SDO upload: expected UploadResponse, got " +
+      @debug.to_string(resp.command),
     )
   }
   if resp.index != index || resp.subindex != subindex {
@@ -411,7 +414,8 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
   let resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if resp.command != @mailbox.SdoCommand::UploadResponse {
     raise @hal.EcError::MailboxProtocol(
-      "SDO CA upload: expected UploadResponse, got " + @debug.to_string(resp.command),
+      "SDO CA upload: expected UploadResponse, got " +
+      @debug.to_string(resp.command),
     )
   }
   if !resp.segmented {

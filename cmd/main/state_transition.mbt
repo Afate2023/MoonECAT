@@ -621,7 +621,8 @@ fn state_transition_report_text(report : StateTransitionReport) -> String {
     None => ()
   }
   match report.current {
-    Some(state) => buf.write_string("Current: " + @debug.to_string(state) + "\n")
+    Some(state) =>
+      buf.write_string("Current: " + @debug.to_string(state) + "\n")
     None => ()
   }
   match report.final_state {

@@ -417,7 +417,9 @@ fn scenario_result_text(result : @mock.ScenarioResult) -> String {
   buf.write_string(
     "Result: " + (if result.passed { "PASS" } else { "FAIL" }) + "\n",
   )
-  buf.write_string("Final Verdict: " + @debug.to_string(result.final_verdict) + "\n")
+  buf.write_string(
+    "Final Verdict: " + @debug.to_string(result.final_verdict) + "\n",
+  )
   buf.write_string("Total Cycles: " + result.total_cycles.to_string() + "\n")
   buf.write_string("Stop Reason: " + result.stop_reason + "\n")
   buf.to_string()

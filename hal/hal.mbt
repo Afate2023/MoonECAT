@@ -29,30 +29,30 @@ pub let ethercat_ethertype : Int = 0x88A4
 /// All platform backends must implement this trait.
 pub(open) trait Nic {
   /// Open a network interface by name.
-  open_(String) -> Self raise EcError
+  fn open_(String) -> Self raise EcError
   /// Send a raw Ethernet frame. Returns bytes sent.
-  send(Self, Bytes) -> Int raise EcError
+  fn send(Self, Bytes) -> Int raise EcError
   /// Receive a raw Ethernet frame.
   /// Returns the received frame bytes.
-  recv(Self, timeout~ : Duration) -> Bytes raise EcError
+  fn recv(Self, timeout~ : Duration) -> Bytes raise EcError
   /// Close the network interface and release resources.
-  close(Self) -> Unit
+  fn close(Self) -> Unit
 }
 
 ///|
 /// Clock provides monotonic timing primitives.
 pub(open) trait Clock {
   /// Return the current monotonic timestamp in nanoseconds.
-  now(Self) -> Timestamp
+  fn now(Self) -> Timestamp
   /// Sleep for the specified duration.
-  sleep(Self, Duration) -> Unit
+  fn sleep(Self, Duration) -> Unit
 }
 
 ///|
 /// FileAccess provides basic file I/O for configuration and diagnostics.
 pub(open) trait FileAccess {
   /// Read the entire contents of a file as Bytes.
-  read_file(Self, String) -> Bytes raise EcError
+  fn read_file(Self, String) -> Bytes raise EcError
   /// Write Bytes to a file, creating or overwriting it.
-  write_file(Self, String, Bytes) -> Unit raise EcError
+  fn write_file(Self, String, Bytes) -> Unit raise EcError
 }

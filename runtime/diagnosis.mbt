@@ -1195,7 +1195,9 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
     }
     if resp.command != @mailbox.SdoCommand::UploadResponse {
       raise @hal.EcError::MailboxProtocol(
-        stage + ": expected UploadResponse, got " + @debug.to_string(resp.command),
+        stage +
+        ": expected UploadResponse, got " +
+        @debug.to_string(resp.command),
       )
     }
     if resp.index != index || resp.subindex != subindex {

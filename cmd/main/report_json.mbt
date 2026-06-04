@@ -366,7 +366,7 @@ struct CliTextRunProgressSink {
 }
 
 ///|
-pub impl @runtime.RunProgressSink for CliTextRunProgressSink with emit(
+pub impl @runtime.RunProgressSink for CliTextRunProgressSink with fn emit(
   self,
   progress,
 ) {
@@ -380,7 +380,7 @@ struct CliNdjsonRunProgressSink {
 }
 
 ///|
-pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink with emit(
+pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink with fn emit(
   self,
   progress,
 ) {

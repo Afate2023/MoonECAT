@@ -1,7 +1,10 @@
 ///|
 test "EcError variants display correctly" {
   @debug.debug_inspect(@hal.EcError::LinkDown, content="LinkDown")
-  @debug.debug_inspect(@hal.EcError::SendFailed("test"), content="SendFailed(\"test\")")
+  @debug.debug_inspect(
+    @hal.EcError::SendFailed("test"),
+    content="SendFailed(\"test\")",
+  )
   @debug.debug_inspect(@hal.EcError::RecvTimeout, content="RecvTimeout")
 }
 

@@ -35,7 +35,7 @@ struct TerminatingAdapter {
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for TerminatingAdapter with init_(
+pub impl @simulation.CoSimAdapter for TerminatingAdapter with fn init_(
   self,
   _config,
 ) {
@@ -43,7 +43,7 @@ pub impl @simulation.CoSimAdapter for TerminatingAdapter with init_(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for TerminatingAdapter with write_outputs(
+pub impl @simulation.CoSimAdapter for TerminatingAdapter with fn write_outputs(
   self,
   _image,
   _slice,
@@ -52,7 +52,7 @@ pub impl @simulation.CoSimAdapter for TerminatingAdapter with write_outputs(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for TerminatingAdapter with step(
+pub impl @simulation.CoSimAdapter for TerminatingAdapter with fn step(
   self,
   current,
   dt,
@@ -66,7 +66,7 @@ pub impl @simulation.CoSimAdapter for TerminatingAdapter with step(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for TerminatingAdapter with read_inputs(
+pub impl @simulation.CoSimAdapter for TerminatingAdapter with fn read_inputs(
   self,
   _image,
   _slice,
@@ -75,7 +75,7 @@ pub impl @simulation.CoSimAdapter for TerminatingAdapter with read_inputs(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for TerminatingAdapter with shutdown(self) {
+pub impl @simulation.CoSimAdapter for TerminatingAdapter with fn shutdown(self) {
   ignore(self)
 }
 
@@ -115,12 +115,12 @@ struct ErrorAdapter {
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for ErrorAdapter with init_(self, _config) {
+pub impl @simulation.CoSimAdapter for ErrorAdapter with fn init_(self, _config) {
   ignore(self)
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for ErrorAdapter with write_outputs(
+pub impl @simulation.CoSimAdapter for ErrorAdapter with fn write_outputs(
   self,
   _image,
   _slice,
@@ -129,7 +129,11 @@ pub impl @simulation.CoSimAdapter for ErrorAdapter with write_outputs(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for ErrorAdapter with step(self, current, dt) {
+pub impl @simulation.CoSimAdapter for ErrorAdapter with fn step(
+  self,
+  current,
+  dt,
+) {
   self.call_count += 1
   if self.call_count >= self.error_at {
     @simulation.SimStepResult::Error("solver diverged")
@@ -139,7 +143,7 @@ pub impl @simulation.CoSimAdapter for ErrorAdapter with step(self, current, dt) 
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for ErrorAdapter with read_inputs(
+pub impl @simulation.CoSimAdapter for ErrorAdapter with fn read_inputs(
   self,
   _image,
   _slice,
@@ -148,7 +152,7 @@ pub impl @simulation.CoSimAdapter for ErrorAdapter with read_inputs(
 }
 
 ///|
-pub impl @simulation.CoSimAdapter for ErrorAdapter with shutdown(self) {
+pub impl @simulation.CoSimAdapter for ErrorAdapter with fn shutdown(self) {
   ignore(self)
 }
 

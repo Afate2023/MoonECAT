@@ -37,10 +37,7 @@ test "format helpers physical_port_name covers reserved port" {
 ///|
 test "cli show bridge renders backend and progress output as readable text" {
   @debug.assert_eq(@debug.to_string(NativeAuto), "NativeAuto")
-  @debug.assert_eq(
-    @debug.to_string(NativeWindowsNpcap),
-    "NativeWindowsNpcap",
-  )
+  @debug.assert_eq(@debug.to_string(NativeWindowsNpcap), "NativeWindowsNpcap")
   @debug.assert_eq(@debug.to_string(Ndjson), "Ndjson")
   let buf = StringBuilder(size_hint=16)
   buf.write_string(@debug.to_string(Mock))

@@ -152,7 +152,9 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
       match broadcast_result {
         Ok(wkc) => notes.push("broadcast-init wkc=" + wkc.to_string())
         Err(broadcast_err) =>
-          notes.push("broadcast-init failed: " + @debug.to_string(broadcast_err))
+          notes.push(
+            "broadcast-init failed: " + @debug.to_string(broadcast_err),
+          )
       }
     }
   }
@@ -750,7 +752,9 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match mailbox_write_result {
       Ok(_) => ()
       Err(err) => {
-        transition_error = Some("mailbox write failed: " + @debug.to_string(err))
+        transition_error = Some(
+          "mailbox write failed: " + @debug.to_string(err),
+        )
         return {
           station,
           source,
@@ -779,7 +783,9 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match preop_result {
       Ok(value) => phase_state = Some(value)
       Err(err) => {
-        transition_error = Some("preop request failed: " + @debug.to_string(err))
+        transition_error = Some(
+          "preop request failed: " + @debug.to_string(err),
+        )
         return {
           station,
           source,
@@ -874,7 +880,9 @@ fn[N : @hal.Nic] build_startup_trace_report(
     match safeop_result {
       Ok(value) => phase_state = Some(value)
       Err(err) =>
-        transition_error = Some("safeop request failed: " + @debug.to_string(err))
+        transition_error = Some(
+          "safeop request failed: " + @debug.to_string(err),
+        )
     }
   }
   {

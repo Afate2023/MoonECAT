@@ -18,13 +18,13 @@ pub fn RecordingNic::get_log(self : RecordingNic) -> NicEventLog {
 }
 
 ///|
-pub impl @hal.Nic for RecordingNic with open_(name) {
+pub impl @hal.Nic for RecordingNic with fn open_(name) {
   ignore(name)
   RecordingNic::wrap(VirtualNic::new(VirtualBus::new([])))
 }
 
 ///|
-pub impl @hal.Nic for RecordingNic with send(self, data) {
+pub impl @hal.Nic for RecordingNic with fn send(self, data) {
   let result : Result[Int, @hal.EcError] = Ok(self.inner.send(data)) catch {
     e => Err(e)
   }
@@ -41,7 +41,7 @@ pub impl @hal.Nic for RecordingNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for RecordingNic with recv(self, timeout~) {
+pub impl @hal.Nic for RecordingNic with fn recv(self, timeout~) {
   let result : Result[Bytes, @hal.EcError] = Ok(self.inner.recv(timeout~)) catch {
     e => Err(e)
   }
@@ -70,6 +70,6 @@ pub impl @hal.Nic for RecordingNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for RecordingNic with close(self) {
+pub impl @hal.Nic for RecordingNic with fn close(self) {
   self.inner.close()
 }
