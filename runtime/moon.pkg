@@ -1,8 +1,8 @@
 import {
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/protocol",
-  "afate/MoonECAT/mailbox",
-  "afate/MoonECAT/runtime/hil",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/mailbox",
+  "mokomoking2501/MoonECAT/runtime/hil",
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
@@ -10,8 +10,8 @@ import {
 }
 
 import {
-  "afate/MoonECAT/hal/mock",
-  "afate/MoonECAT/runtime/analysis",
-  "afate/MoonECAT/runtime/simulation",
+  "mokomoking2501/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/runtime/analysis",
+  "mokomoking2501/MoonECAT/runtime/simulation",
   "moonbitlang/core/debug",
 } for "test"

@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "afate/MoonECAT/hal"
+package "mokomoking2501/MoonECAT/hal"
 
 import {
   "moonbitlang/core/debug",

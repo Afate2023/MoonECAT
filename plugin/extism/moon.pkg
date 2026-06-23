@@ -1,8 +1,8 @@
 import {
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/hal/mock" @mock,
-  "afate/MoonECAT/protocol",
-  "afate/MoonECAT/runtime",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/runtime",
   "moonbitlang/core/debug",
   "moonbitlang/core/json",
 }

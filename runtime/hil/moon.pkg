@@ -1,6 +1,6 @@
 import {
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/protocol",
-  "afate/MoonECAT/runtime/simulation" @simulation,
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/runtime/simulation",
   "moonbitlang/core/debug",
 }

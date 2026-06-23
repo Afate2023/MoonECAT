@@ -61,7 +61,7 @@ Windows Npcap SDK：
 
 ### `hal/native/moon.pkg`
 
-- 导入 `afate/MoonECAT/hal`
+- 导入 `mokomoking2501/MoonECAT/hal`
 - 配置 `native-stub`
 - 用 `targets` 把 `ffi_native.mbt`、`windows_npcap_ffi.mbt`、`linux_raw_socket_ffi.mbt` 限定在 native
 

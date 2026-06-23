@@ -1,4 +1,4 @@
-name = "afate/MoonECAT"
+name = "mokomoking2501/MoonECAT"
 
 version = "0.1.0"
 

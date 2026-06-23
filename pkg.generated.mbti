@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "afate/MoonECAT"
+package "mokomoking2501/MoonECAT"
 
 // Values
 pub let version : String

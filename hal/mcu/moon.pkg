@@ -1,9 +1,9 @@
 import {
-  "afate/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal",
   "moonbitlang/core/debug",
 }
 
 import {
-  "afate/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal",
   "moonbitlang/core/debug",
 } for "test"

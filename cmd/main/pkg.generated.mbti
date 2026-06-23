@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "afate/MoonECAT/cmd/main"
+package "mokomoking2501/MoonECAT/cmd/main"
 
 import {
-  "afate/MoonECAT/runtime",
+  "mokomoking2501/MoonECAT/runtime",
   "moonbitlang/core/debug",
 }
 

@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "afate/MoonECAT/plugin/extism"
+package "mokomoking2501/MoonECAT/plugin/extism"
 
 import {
-  "afate/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal",
   "moonbitlang/core/debug",
 }
 

@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "afate/MoonECAT/hal/mock"
+package "mokomoking2501/MoonECAT/hal/mock"
 
 import {
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/mailbox",
-  "afate/MoonECAT/runtime",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/mailbox",
+  "mokomoking2501/MoonECAT/runtime",
   "moonbitlang/core/debug",
 }
 

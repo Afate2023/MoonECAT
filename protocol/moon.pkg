@@ -1,14 +1,14 @@
 import {
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/mailbox",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/mailbox",
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
 }
 
 import {
-  "afate/MoonECAT/fixtures",
-  "afate/MoonECAT/hal",
-  "afate/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/fixtures",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal/mock",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
 } for "test"

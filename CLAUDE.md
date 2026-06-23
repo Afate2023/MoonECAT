@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-MoonECAT is a modular **EtherCAT master library written in [MoonBit](https://docs.moonbitlang.com)**, targeting ETG.1500 Class B. The build tool is `moon`; module name is `afate/MoonECAT` (`moon.mod.json`).
+MoonECAT is a modular **EtherCAT master library written in [MoonBit](https://docs.moonbitlang.com)**, targeting ETG.1500 Class B. The build tool is `moon`; module name is `mokomoking2501/MoonECAT` (`moon.mod.json`).
 
 ## Commands
 
@@ -10,7 +10,7 @@ MoonECAT is a modular **EtherCAT master library written in [MoonBit](https://doc
 moon check                      # Type-check all packages (this is also the pre-commit hook)
 moon test                       # Run all tests
 moon test runtime               # Run one package's tests (path relative to module root)
-moon test -p afate/MoonECAT/runtime -f runtime_test.mbt   # Single file
+moon test -p mokomoking2501/MoonECAT/runtime -f runtime_test.mbt   # Single file
 moon test --update              # Refresh snapshot tests after intended output changes
 moon fmt                        # Format all source
 moon info                       # Regenerate .mbti interface files
@@ -45,7 +45,7 @@ protocol/                    Frame · PDU · addressing · ESM · DC · PDO · z
 hal/  + mock/ native/ mcu/   Nic / ZeroCopyNic / Clock / FileAccess traits · FramePool
 ```
 
-The repository root is itself the library package `afate/MoonECAT` (`MoonECAT.mbt`, imported as `@lib`). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the authoritative deep reference: per-package API inventory, data-flow diagrams (startup, PDO hot path, diagnosis, HIL), the testing matrix, and a per-package maturity assessment (L1–L4).
+The repository root is itself the library package `mokomoking2501/MoonECAT` (`MoonECAT.mbt`, imported as `@lib`). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the authoritative deep reference: per-package API inventory, data-flow diagrams (startup, PDO hot path, diagnosis, HIL), the testing matrix, and a per-package maturity assessment (L1–L4).
 
 ### HAL backends
 

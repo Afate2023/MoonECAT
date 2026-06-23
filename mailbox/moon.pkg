@@ -1,12 +1,12 @@
 import {
-  "afate/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal",
   "moonbitlang/core/buffer",
   "moonbitlang/core/debug",
   "moonbitlang/core/encoding/utf8",
 }
 
 import {
-  "afate/MoonECAT/fixtures",
+  "mokomoking2501/MoonECAT/fixtures",
   "moonbitlang/core/bench",
   "moonbitlang/core/debug",
 } for "test"
