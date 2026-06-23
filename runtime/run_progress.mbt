@@ -14,7 +14,7 @@ pub(all) struct RunProgress {
 ///|
 /// RunProgressSink receives structured run-loop progress events.
 pub(open) trait RunProgressSink {
-  emit(Self, RunProgress) -> Unit
+  fn emit(Self, RunProgress) -> Unit
 }
 
 ///|
@@ -29,7 +29,7 @@ pub fn NullRunProgressSink::new() -> NullRunProgressSink {
 }
 
 ///|
-pub impl RunProgressSink for NullRunProgressSink with emit(self, progress) {
+pub impl RunProgressSink for NullRunProgressSink with fn emit(self, progress) {
   ignore(self)
   ignore(progress)
 }

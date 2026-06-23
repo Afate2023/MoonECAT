@@ -18,12 +18,12 @@
 pub(open) trait EoeEndpoint {
   /// Read an Ethernet frame from the host network stack.
   /// Returns None if no frame is available (non-blocking).
-  read_frame(Self) -> Bytes?
+  fn read_frame(Self) -> Bytes?
   /// Write an Ethernet frame to the host network stack.
   /// Returns true on success.
-  write_frame(Self, Bytes) -> Bool
+  fn write_frame(Self, Bytes) -> Bool
   /// Whether the endpoint is connected and operational.
-  is_up(Self) -> Bool
+  fn is_up(Self) -> Bool
 }
 
 ///|

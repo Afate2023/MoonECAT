@@ -904,7 +904,9 @@ test "Runtime run_cycle propagates LinkDown on broken NIC" {
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let nic = TimeoutNic::new()
   nic.close()
-  let result = try? rt.run_cycle(nic, @hal.Duration(1000L))
+  let result = Result::Ok(rt.run_cycle(nic, @hal.Duration(1000L))) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::LinkDown))
 }
 
@@ -1893,9 +1895,11 @@ test "configuration_from_eni_json raises parse error for invalid shape" {
     #|    }
     #|  ]
     #|}
-  let result : Result[@runtime.ConfigurationModel, Error] = try? @runtime.configuration_from_eni_json(
-    json,
-  )
+  let result : Result[@runtime.ConfigurationModel, Error] = Result::Ok(
+    @runtime.configuration_from_eni_json(json),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::EsiParseFailed(message)) else {
     fail("expected invalid ENI JSON shape to raise EsiParseFailed")
   }
@@ -2930,7 +2934,9 @@ test "diagnosis parser: error register" {
 
 ///|
 test "diagnosis parser: error register rejects empty payload" {
-  let result = try? @runtime.parse_error_register_payload(Bytes::new(0))
+  let result = Result::Ok(@runtime.parse_error_register_payload(Bytes::new(0))) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -2942,7 +2948,9 @@ test "diagnosis parser: u32 little-endian" {
 
 ///|
 test "diagnosis parser: u32 rejects short payload" {
-  let result = try? @runtime.parse_u32_payload(b"\x01\x02\x03")
+  let result = Result::Ok(@runtime.parse_u32_payload(b"\x01\x02\x03")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -2973,13 +2981,17 @@ test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
     in_size: 64U,
     in_sm_index: 1,
   }
-  let mailbox_result = try? @protocol.mailbox_send(
-    nic,
-    0x1001U,
-    bad_cfg,
-    Bytes::new(16),
-    @hal.Duration(1000L),
-  )
+  let mailbox_result = Result::Ok(
+    @protocol.mailbox_send(
+      nic,
+      0x1001U,
+      bad_cfg,
+      Bytes::new(16),
+      @hal.Duration(1000L),
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   // Mailbox path is expected to fail immediately; critical check is that PDO
   // loop remains usable afterwards.
   assert_true(mailbox_result is Err(@hal.EcError::MailboxProtocol(_)))
@@ -4105,7 +4117,11 @@ test "parse_error_register_payload valid" {
 
 ///|
 test "parse_error_register_payload empty rejects" {
-  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(b"")
+  let result : Result[Byte, _] = Result::Ok(
+    @runtime.parse_error_register_payload(b""),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4117,7 +4133,11 @@ test "parse_u32_payload valid" {
 
 ///|
 test "parse_u32_payload too short rejects" {
-  let result : Result[UInt, _] = try? @runtime.parse_u32_payload(b"\x01\x02")
+  let result : Result[UInt, _] = Result::Ok(
+    @runtime.parse_u32_payload(b"\x01\x02"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5400,13 +5420,17 @@ test "diagnostic_surface_from_run with RuntimeRecoveryRequired" {
 
 ///|
 test "configuration_from_eni_json with malformed json" {
-  let result = try? @runtime.configuration_from_eni_json("not json")
+  let result = Result::Ok(@runtime.configuration_from_eni_json("not json")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "configuration_from_eni_json with missing slaves" {
-  let result = try? @runtime.configuration_from_eni_json("{}")
+  let result = Result::Ok(@runtime.configuration_from_eni_json("{}")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5414,7 +5438,9 @@ test "configuration_from_eni_json with missing slaves" {
 test "configuration_from_eni_json with invalid slave entry" {
   let json =
     #|{"slaves": ["invalid"]}
-  let result = try? @runtime.configuration_from_eni_json(json)
+  let result = Result::Ok(@runtime.configuration_from_eni_json(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5953,9 +5979,11 @@ test "parse_error_register_payload valid v2" {
 
 ///|
 test "parse_error_register_payload too short v2" {
-  let result : Result[Byte, _] = try? @runtime.parse_error_register_payload(
-    Bytes::new(0),
-  )
+  let result : Result[Byte, _] = Result::Ok(
+    @runtime.parse_error_register_payload(Bytes::new(0)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5970,7 +5998,9 @@ test "parse_u32_payload valid v2" {
 ///|
 test "parse_u32_payload too short v2" {
   let payload = Bytes::from_array([b'\x01', b'\x02'])
-  let result : Result[UInt, _] = try? @runtime.parse_u32_payload(payload)
+  let result : Result[UInt, _] = Result::Ok(@runtime.parse_u32_payload(payload)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -7715,12 +7745,11 @@ test "EoeSwitch send_frame unknown station raises" {
   let nic = @mock.VirtualNic::new(bus)
   let frame = b"\x01\x02\x03\x04"
   // station 0x9999U not registered → should raise MailboxProtocol
-  let result : Result[Int, _] = try? sw.send_frame(
-    nic,
-    0x9999U,
-    frame,
-    @hal.Duration(50_000_000L),
-  )
+  let result : Result[Int, _] = Result::Ok(
+    sw.send_frame(nic, 0x9999U, frame, @hal.Duration(50_000_000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -7748,12 +7777,11 @@ test "EoeSwitch send_frame mailbox too small raises" {
   ])
   let nic = @mock.VirtualNic::new(bus)
   let frame = b"\x01\x02\x03\x04"
-  let result : Result[Int, _] = try? sw.send_frame(
-    nic,
-    0x1001U,
-    frame,
-    @hal.Duration(50_000_000L),
-  )
+  let result : Result[Int, _] = Result::Ok(
+    sw.send_frame(nic, 0x1001U, frame, @hal.Duration(50_000_000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

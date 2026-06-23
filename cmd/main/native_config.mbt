@@ -98,14 +98,18 @@ fn probe_native_cli_config(
   config : @native.NativeNicConfig,
   timeout : @hal.Duration,
 ) -> Result[Int, Error] {
-  let open_result : Result[@native.NativeNic, Error] = try? @native.NativeNic::open_with_config(
-    config,
-  )
+  let open_result : Result[@native.NativeNic, Error] = Result::Ok(
+    @native.NativeNic::open_with_config(config),
+  ) catch {
+    err => Result::Err(err)
+  }
   match open_result {
     Ok(nic) => {
-      let probe_result : Result[Int, Error] = try? @protocol.count_slaves(
-        nic, timeout,
-      )
+      let probe_result : Result[Int, Error] = Result::Ok(
+        @protocol.count_slaves(nic, timeout),
+      ) catch {
+        err => Result::Err(err)
+      }
       nic.close()
       probe_result
     }

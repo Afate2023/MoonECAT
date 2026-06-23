@@ -2594,12 +2594,11 @@ test "runtime mailbox mapping reports immediate readback mismatch" {
     output_bytes: 0,
     input_bytes: 0,
   }
-  let result = try? write_mailbox_mapping(
-    nic,
-    0x1001U,
-    mapping,
-    @hal.Duration(1000L),
-  )
+  let result = Result::Ok(
+    write_mailbox_mapping(nic, 0x1001U, mapping, @hal.Duration(1000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   match result {
     Err(@hal.EcError::MailboxProtocol(message)) => {
       assert_true(message.contains("readback mismatch"))
@@ -5292,7 +5291,9 @@ test "intern_sii_string too many strings raises" {
   for i = 0; i < 255; i = i + 1 {
     strings.push("s" + i.to_string())
   }
-  let result = try? intern_sii_string(strings, "one_more")
+  let result = Result::Ok(intern_sii_string(strings, "one_more")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5464,42 +5465,54 @@ test "plan_scan_station_addresses_preserve_existing_unique_non_zero reassigns ze
 ///|
 test "decode_esi_json_string with non-string raises EsiParseFailed" {
   let json = @json.parse("42"[:]) catch { _ => panic() }
-  let result : Result[String, _] = try? decode_esi_json_string(json)
+  let result : Result[String, _] = Result::Ok(decode_esi_json_string(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_esi_json_uint with non-number raises EsiParseFailed" {
   let json = @json.parse("\"hello\""[:]) catch { _ => panic() }
-  let result : Result[UInt, _] = try? decode_esi_json_uint(json)
+  let result : Result[UInt, _] = Result::Ok(decode_esi_json_uint(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_esi_json_int with non-number raises EsiParseFailed" {
   let json = @json.parse("true"[:]) catch { _ => panic() }
-  let result : Result[Int, _] = try? decode_esi_json_int(json)
+  let result : Result[Int, _] = Result::Ok(decode_esi_json_int(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_esi_json_bool with non-bool raises EsiParseFailed" {
   let json = @json.parse("1"[:]) catch { _ => panic() }
-  let result : Result[Bool, _] = try? decode_esi_json_bool(json)
+  let result : Result[Bool, _] = Result::Ok(decode_esi_json_bool(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_esi_json_byte with value out of range raises" {
   let json = @json.parse("300"[:]) catch { _ => panic() }
-  let result : Result[Byte, _] = try? decode_esi_json_byte(json)
+  let result : Result[Byte, _] = Result::Ok(decode_esi_json_byte(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_esi_json_byte with negative value raises" {
   let json = @json.parse("-1"[:]) catch { _ => panic() }
-  let result : Result[Byte, _] = try? decode_esi_json_byte(json)
+  let result : Result[Byte, _] = Result::Ok(decode_esi_json_byte(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -5530,37 +5543,51 @@ test "decode_esi_json_bytes with array fallback" {
 ///|
 test "decode_esi_json_bytes with non-array raises" {
   let json = @json.parse("true"[:]) catch { _ => panic() }
-  let result : Result[Bytes, _] = try? decode_esi_json_bytes(json)
+  let result : Result[Bytes, _] = Result::Ok(decode_esi_json_bytes(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "parse_esi_json_pdo with malformed json raises" {
   let json = @json.parse("{\"invalid\": \"data\"}"[:]) catch { _ => panic() }
-  let result : Result[EsiJsonPdo, _] = try? parse_esi_json_pdo(json)
+  let result : Result[EsiJsonPdo, _] = Result::Ok(parse_esi_json_pdo(json)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "parse_esi_json_pdo_entry with malformed json raises" {
   let json = @json.parse("{\"missing\": \"fields\"}"[:]) catch { _ => panic() }
-  let result : Result[EsiJsonPdoEntry, _] = try? parse_esi_json_pdo_entry(json)
+  let result : Result[EsiJsonPdoEntry, _] = Result::Ok(
+    parse_esi_json_pdo_entry(json),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "parse_esi_json_dc_mode with malformed json raises" {
   let json = @json.parse("\"bad\""[:]) catch { _ => panic() }
-  let result : Result[EsiJsonDcMode, _] = try? parse_esi_json_dc_mode(json)
+  let result : Result[EsiJsonDcMode, _] = Result::Ok(
+    parse_esi_json_dc_mode(json),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "parse_esi_json_selected_module with malformed json raises" {
   let json = @json.parse("42"[:]) catch { _ => panic() }
-  let result : Result[EsiJsonSelectedModule, _] = try? parse_esi_json_selected_module(
-    json,
-  )
+  let result : Result[EsiJsonSelectedModule, _] = Result::Ok(
+    parse_esi_json_selected_module(json),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

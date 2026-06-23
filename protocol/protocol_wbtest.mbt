@@ -263,13 +263,19 @@ test "should_rollback_al_error_to_init false for None" {
 
 ///|
 test "foe_raise_error with text" {
-  let result = try? foe_raise_error(@mailbox.FoeErrorCode::NotDefined, "detail")
+  let result = Result::Ok(
+    foe_raise_error(@mailbox.FoeErrorCode::NotDefined, "detail"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "foe_raise_error without text" {
-  let result = try? foe_raise_error(@mailbox.FoeErrorCode::NotFound, "")
+  let result = Result::Ok(foe_raise_error(@mailbox.FoeErrorCode::NotFound, "")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -376,7 +382,9 @@ test "validate_input_mailbox_sm_window short window returns early" {
 test "read_sm_window_activate_byte short window raises" {
   // window.length() <= sm_activate_offset(6) → raises error
   let window = Bytes::make(5, b'\x00')
-  let result = try? read_sm_window_activate_byte(window)
+  let result = Result::Ok(read_sm_window_activate_byte(window)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -384,7 +392,9 @@ test "read_sm_window_activate_byte short window raises" {
 test "read_sm_window_pdi_control_byte short window raises" {
   // window.length() <= sm_pdi_control_offset(7) → raises error
   let window = Bytes::make(6, b'\x00')
-  let result = try? read_sm_window_pdi_control_byte(window)
+  let result = Result::Ok(read_sm_window_pdi_control_byte(window)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -405,7 +415,9 @@ test "validate_input_mailbox_sm_window deactivated SM raises" {
      b'\x00', // status (byte 5)
      b'\x00', b'\x01', // activate/pdi: control_word = 0x0100 (deactivated)
   ])
-  let result = try? validate_input_mailbox_sm_window(window)
+  let result = Result::Ok(validate_input_mailbox_sm_window(window)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -419,7 +431,9 @@ test "validate_input_mailbox_sm_window repeat_request with zero start+length rai
      b'\x00', // status
      b'\x02', b'\x00', // control_word = 0x0002 (repeat_request)
   ])
-  let result = try? validate_input_mailbox_sm_window(window)
+  let result = Result::Ok(validate_input_mailbox_sm_window(window)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

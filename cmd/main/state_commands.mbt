@@ -8,9 +8,13 @@ fn[N : @hal.Nic] run_state_command(
   let target = require_esm_state_flag(args, "--state")
   let station = optional_uint_flag(args, "--station")
   let use_path = has_flag(args, "--path")
-  let report_result : Result[StateTransitionReport, @hal.EcError] = try? compute_state_transition_report(
-    nic, args, target, station, use_path, timeout,
-  )
+  let report_result : Result[StateTransitionReport, @hal.EcError] = Result::Ok(
+    compute_state_transition_report(
+      nic, args, target, station, use_path, timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   nic.close()
   let report = match report_result {
     Ok(value) => value

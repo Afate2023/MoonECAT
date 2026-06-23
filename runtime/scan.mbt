@@ -257,17 +257,23 @@ fn[N : @hal.Nic] read_best_identity(
   station : UInt,
   timeout : @hal.Duration,
 ) -> @hal.SlaveIdentity {
-  let ap_sii = try? read_identity_from_sii_ap(nic, position, timeout)
+  let ap_sii = Result::Ok(read_identity_from_sii_ap(nic, position, timeout)) catch {
+    err => Result::Err(err)
+  }
   match ap_sii {
     Ok(identity) if !identity_is_zero(identity) => identity
     _ => {
-      let fp_sii = try? read_identity_from_sii(nic, station, timeout)
+      let fp_sii = Result::Ok(read_identity_from_sii(nic, station, timeout)) catch {
+        err => Result::Err(err)
+      }
       match fp_sii {
         Ok(identity) if !identity_is_zero(identity) => identity
         _ => {
-          let ap_regs = try? read_identity_from_registers_ap(
-            nic, position, timeout,
-          )
+          let ap_regs = Result::Ok(
+            read_identity_from_registers_ap(nic, position, timeout),
+          ) catch {
+            err => Result::Err(err)
+          }
           match ap_regs {
             Ok(identity) if !identity_is_zero(identity) => identity
             _ =>

@@ -15,7 +15,9 @@ pub fn[N : @hal.Nic] transact(
   let mut ignored = 0
   for ;; {
     let response = nic.recv(timeout~)
-    let decoded = try? EcFrame::decode(response)
+    let decoded = Result::Ok(EcFrame::decode(response)) catch {
+      err => Result::Err(err)
+    }
     match decoded {
       Ok(value) => return value
       Err(err) if should_ignore_rx_decode_error(err) => {
@@ -77,7 +79,9 @@ pub fn[N : @hal.Nic] transact_pdu_retry(
 ) -> Pdu raise @hal.EcError {
   let mut last_err : @hal.EcError = @hal.EcError::RecvTimeout
   for i = 0; i <= max_retries; i = i + 1 {
-    let result = try? transact_pdu(nic, command, address, data, timeout)
+    let result = Result::Ok(transact_pdu(nic, command, address, data, timeout)) catch {
+      err => Result::Err(err)
+    }
     match result {
       Ok(pdu) => return pdu
       Err(e) =>

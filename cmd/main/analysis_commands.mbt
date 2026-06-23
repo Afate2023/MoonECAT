@@ -1,9 +1,11 @@
 ///|
 /// Load a trace file (NDJSON) from disk.
 fn load_trace_file(path : String) -> String raise @hal.EcError {
-  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
-    path,
-  )
+  let content_result : Result[String, Error] = Result::Ok(
+    @fs.read_file_to_string(path),
+  ) catch {
+    err => Result::Err(err)
+  }
   match content_result {
     Ok(content) => content
     Err(err) =>
@@ -122,9 +124,11 @@ fn resolve_replay_scan_report(
     None => {
       let probe_log = @mock.NicEventLog::from_ndjson(ndjson_text)
       let probe_nic = @mock.ReplayNic::from_log(probe_log)
-      let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
-        probe_nic, timeout,
-      )
+      let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = Result::Ok(
+        @runtime.scan(probe_nic, timeout),
+      ) catch {
+        err => Result::Err(err)
+      }
       probe_nic.close()
       match scan_report_result {
         Ok(report) => report

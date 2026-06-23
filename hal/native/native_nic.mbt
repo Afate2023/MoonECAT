@@ -249,12 +249,12 @@ pub fn NativeNic::open_with_config(
 }
 
 ///|
-pub impl @hal.Nic for NativeNic with open_(name) {
+pub impl @hal.Nic for NativeNic with fn open_(name) {
   NativeNic::open_with_config(default_native_config(name))
 }
 
 ///|
-pub impl @hal.Nic for NativeNic with send(self, data) {
+pub impl @hal.Nic for NativeNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -267,7 +267,7 @@ pub impl @hal.Nic for NativeNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for NativeNic with recv(self, timeout~) {
+pub impl @hal.Nic for NativeNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -287,7 +287,7 @@ pub impl @hal.Nic for NativeNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for NativeNic with close(self) {
+pub impl @hal.Nic for NativeNic with fn close(self) {
   if self.is_open {
     match self.config.backend {
       WindowsNpcap => windows_npcap_close(self.handle_id)

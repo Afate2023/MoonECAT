@@ -46,17 +46,17 @@ pub(all) struct DomainTimestamp {
 /// Virtual implementations advance from an explicit schedule.
 pub(open) trait Timebase {
   /// Return the clock domain identifier.
-  domain(Self) -> ClockDomain
+  fn domain(Self) -> ClockDomain
 
   /// Read the current time in this domain.
-  now_ns(Self) -> Int64
+  fn now_ns(Self) -> Int64
 
   /// Return the timer resolution in nanoseconds.
   /// MCU: typically 1-10 ns. Linux: typically 1000 ns.
-  resolution_ns(Self) -> Int64
+  fn resolution_ns(Self) -> Int64
 
   /// Monotonicity guarantee: returns true if this timebase never goes backward.
-  is_monotonic(Self) -> Bool
+  fn is_monotonic(Self) -> Bool
 }
 
 ///|
@@ -157,24 +157,24 @@ pub fn VirtualTimebase::advance(
 }
 
 ///|
-pub impl Timebase for VirtualTimebase with domain(self) {
+pub impl Timebase for VirtualTimebase with fn domain(self) {
   ignore(self)
   Virtual
 }
 
 ///|
-pub impl Timebase for VirtualTimebase with now_ns(self) {
+pub impl Timebase for VirtualTimebase with fn now_ns(self) {
   self.current_ns
 }
 
 ///|
-pub impl Timebase for VirtualTimebase with resolution_ns(self) {
+pub impl Timebase for VirtualTimebase with fn resolution_ns(self) {
   ignore(self)
   1L
 }
 
 ///|
-pub impl Timebase for VirtualTimebase with is_monotonic(self) {
+pub impl Timebase for VirtualTimebase with fn is_monotonic(self) {
   ignore(self)
   true
 }

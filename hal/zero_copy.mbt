@@ -11,23 +11,23 @@
 /// - Embedded MCU: FramePool mapped to DMA descriptor ring in .DMA_SRAM
 pub(open) trait ZeroCopyNic {
   /// Open a network interface by name, with an associated frame pool.
-  open_(String, FramePool) -> Self raise EcError
+  fn open_(String, FramePool) -> Self raise EcError
   /// Acquire a TX frame slot from the pool (zero allocation).
-  acquire_tx(Self) -> FrameRef raise EcError
+  fn acquire_tx(Self) -> FrameRef raise EcError
   /// Get the writable buffer for a TX frame slot.
-  tx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  fn tx_buffer(Self, FrameRef) -> FixedArray[Byte]
   /// Submit a filled frame for sending. The frame is consumed.
-  submit(Self, FrameRef, length~ : Int) -> Unit raise EcError
+  fn submit(Self, FrameRef, length~ : Int) -> Unit raise EcError
   /// Receive a frame into a pre-allocated RX slot (zero allocation).
-  recv(Self, timeout~ : Duration) -> FrameRef raise EcError
+  fn recv(Self, timeout~ : Duration) -> FrameRef raise EcError
   /// Get the read buffer for a received frame.
-  rx_buffer(Self, FrameRef) -> FixedArray[Byte]
+  fn rx_buffer(Self, FrameRef) -> FixedArray[Byte]
   /// Get the data length of a received frame.
-  rx_length(Self, FrameRef) -> Int
+  fn rx_length(Self, FrameRef) -> Int
   /// Release a frame slot back to the pool.
-  release(Self, FrameRef) -> Unit
+  fn release(Self, FrameRef) -> Unit
   /// Close the network interface and release all resources.
-  close(Self) -> Unit
+  fn close(Self) -> Unit
 }
 
 ///|

@@ -150,7 +150,9 @@ test "parse_sii_header decodes vendor info and esc config area b" {
 ///|
 test "parse_sii_header rejects short data" {
   let short = Bytes::new(10)
-  let result = try? @mailbox.parse_sii_header(short)
+  let result = Result::Ok(@mailbox.parse_sii_header(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -931,7 +933,9 @@ test "parse_sii_categories empty EEPROM returns empty" {
 ///|
 test "parse_sii_general rejects short data" {
   let short = Bytes::new(4)
-  let result = try? @mailbox.parse_sii_general(short)
+  let result = Result::Ok(@mailbox.parse_sii_general(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1106,7 +1110,9 @@ test "MailboxRepeatState applies request without disturbing other bits" {
 ///|
 test "MailboxHeader::from_bytes rejects short data" {
   let short = Bytes::new(3)
-  let result = try? @mailbox.MailboxHeader::from_bytes(short)
+  let result = Result::Ok(@mailbox.MailboxHeader::from_bytes(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1325,7 +1331,9 @@ test "decode_sdo_response detects abort" {
       b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_response(frame)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::SdoAbort(_)))
 }
 
@@ -1339,14 +1347,18 @@ test "decode_sdo_response rejects non-CoE mailbox" {
       b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_response(frame)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "decode_sdo_response rejects short frame" {
   let short = Bytes::new(10)
-  let result = try? @mailbox.decode_sdo_response(short)
+  let result = Result::Ok(@mailbox.decode_sdo_response(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1420,9 +1432,13 @@ test "build_sdo_download_segment_request encodes segment header" {
 
 ///|
 test "build_sdo_download_segment_request rejects payload over 7 bytes" {
-  let result = try? @mailbox.build_sdo_download_segment_request(
-    b'\x01', 0x1001U, false, false, b"\x00\x01\x02\x03\x04\x05\x06\x07",
-  )
+  let result = Result::Ok(
+    @mailbox.build_sdo_download_segment_request(
+      b'\x01', 0x1001U, false, false, b"\x00\x01\x02\x03\x04\x05\x06\x07",
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1664,7 +1680,9 @@ test "Rmsm begin_transaction transitions to WaitingForResponse" {
 test "Rmsm begin_transaction fails when not Idle" {
   let rmsm = @mailbox.Rmsm::new()
   let _ = rmsm.begin_transaction()
-  let result = try? rmsm.begin_transaction()
+  let result = Result::Ok(rmsm.begin_transaction()) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1751,7 +1769,9 @@ test "Rmsm observe_repeat_ack completes when toggle matches" {
 ///|
 test "Rmsm begin_read_repeat rejects idle state" {
   let rmsm = @mailbox.Rmsm::new()
-  let result = try? rmsm.begin_read_repeat(b'\x00')
+  let result = Result::Ok(rmsm.begin_read_repeat(b'\x00')) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -1802,7 +1822,9 @@ test "decode_emergency parses valid payload" {
 ///|
 test "decode_emergency rejects short payload" {
   let short = Bytes::new(5)
-  let result = try? @mailbox.decode_emergency(short)
+  let result = Result::Ok(@mailbox.decode_emergency(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1852,7 +1874,9 @@ test "decode_emergency_frame rejects non-CoE" {
       b'\x00'
     }
   })
-  let result = try? @mailbox.decode_emergency_frame(frame)
+  let result = Result::Ok(@mailbox.decode_emergency_frame(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1877,7 +1901,9 @@ test "decode_emergency_frame rejects wrong CoE service type" {
       b'\x00'
     }
   })
-  let result = try? @mailbox.decode_emergency_frame(frame)
+  let result = Result::Ok(@mailbox.decode_emergency_frame(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2207,9 +2233,13 @@ test "FoeOpCode roundtrip byte conversion" {
 
 ///|
 test "FoeOpCode from_byte invalid raises error" {
-  let result = try? @mailbox.FoeOpCode::from_byte(b'\x00')
+  let result = Result::Ok(@mailbox.FoeOpCode::from_byte(b'\x00')) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
-  let result2 = try? @mailbox.FoeOpCode::from_byte(b'\xFF')
+  let result2 = Result::Ok(@mailbox.FoeOpCode::from_byte(b'\xFF')) catch {
+    err => Result::Err(err)
+  }
   assert_true(result2 is Err(_))
 }
 
@@ -2235,9 +2265,13 @@ test "SoeOpCode roundtrip uint conversion" {
 
 ///|
 test "SoeOpCode from_uint invalid raises error" {
-  let result = try? @mailbox.SoeOpCode::from_uint(0U)
+  let result = Result::Ok(@mailbox.SoeOpCode::from_uint(0U)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
-  let result2 = try? @mailbox.SoeOpCode::from_uint(7U)
+  let result2 = Result::Ok(@mailbox.SoeOpCode::from_uint(7U)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result2 is Err(_))
 }
 
@@ -2406,7 +2440,9 @@ test "decode_soe_response incomplete flag" {
 ///|
 test "decode_soe_response frame too short" {
   let short = Bytes::from_array([b'\x00', b'\x00', b'\x00'])
-  let result = try? @mailbox.decode_soe_response(short)
+  let result = Result::Ok(@mailbox.decode_soe_response(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2417,7 +2453,9 @@ test "decode_soe_response wrong mailbox type" {
     b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x13', // type=CoE(3), counter=1 鈫?byte5=0x13
      b'\x02', b'\x40', b'\x15', b'\x00',
   ])
-  let result = try? @mailbox.decode_soe_response(frame)
+  let result = Result::Ok(@mailbox.decode_soe_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2428,7 +2466,9 @@ test "decode_soe_response unexpected opcode (ReadReq in response)" {
      b'\x01', // byte0: opCode=ReadReq(1) 鈥?unexpected in response
      b'\x40', b'\x15', b'\x00',
   ])
-  let result = try? @mailbox.decode_soe_response(frame)
+  let result = Result::Ok(@mailbox.decode_soe_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2458,7 +2498,9 @@ test "EoeFrameType roundtrip uint conversion" {
 
 ///|
 test "EoeFrameType from_uint invalid raises error" {
-  let result = try? @mailbox.EoeFrameType::from_uint(10U)
+  let result = Result::Ok(@mailbox.EoeFrameType::from_uint(10U)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2579,7 +2621,9 @@ test "decode_eoe_response GetIpResp with data" {
 ///|
 test "decode_eoe_response frame too short" {
   let short = Bytes::from_array([b'\x00', b'\x01'])
-  let result = try? @mailbox.decode_eoe_response(short)
+  let result = Result::Ok(@mailbox.decode_eoe_response(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2589,7 +2633,9 @@ test "decode_eoe_response wrong mailbox type" {
     b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x13', // type=CoE(3), counter=1 鈫?byte5=0x13
      b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  let result = try? @mailbox.decode_eoe_response(frame)
+  let result = Result::Ok(@mailbox.decode_eoe_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2758,7 +2804,9 @@ test "decode_foe_response Ack frame" {
 ///|
 test "decode_foe_response too short frame" {
   let short = Bytes::from_array([b'\x00', b'\x01', b'\x02'])
-  let result = try? @mailbox.decode_foe_response(short)
+  let result = Result::Ok(@mailbox.decode_foe_response(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2774,7 +2822,9 @@ test "decode_foe_response wrong mailbox type" {
       _ => b'\x00'
     }
   })
-  let result = try? @mailbox.decode_foe_response(buf)
+  let result = Result::Ok(@mailbox.decode_foe_response(buf)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2796,7 +2846,9 @@ test "MailboxHeader from_bytes unknown type raises" {
   let frame = Bytes::from_array([
     b'\x04', b'\x00', b'\x00', b'\x00', b'\x00', b'\x1E', // type=0x0E (invalid), counter=1
   ])
-  let result = try? @mailbox.MailboxHeader::from_bytes(frame)
+  let result = Result::Ok(@mailbox.MailboxHeader::from_bytes(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2864,7 +2916,9 @@ test "decode_sdo_response with invalid CoE service raises" {
      b'\x00', b'\xA0', b'\x60', // SDO cmd
      b'\x01', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  let result = try? @mailbox.decode_sdo_response(frame)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2892,7 +2946,9 @@ test "decode_sdo_response AbortTransfer command" {
      b'\x01', b'\x10', b'\x00', // index=0x1001, subindex=0
      b'\x00', b'\x00', b'\x02', b'\x06', // abort code = 0x06020000
   ])
-  let result = try? @mailbox.decode_sdo_response(frame)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
   // Should raise SdoAbort
   assert_true(result is Err(_))
 }
@@ -2907,7 +2963,9 @@ test "decode_foe_response payload too short" {
      b'\x00', b'\x00', b'\x00', b'\x14', // type=FoE(4), counter=1
      b'\x03', // Data opcode
   ])
-  let result = try? @mailbox.decode_foe_response(frame)
+  let result = Result::Ok(@mailbox.decode_foe_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2920,7 +2978,9 @@ test "decode_foe_response Data frame too short" {
      b'\x03', b'\x00', // opcode=Data(3), reserved
      b'\x01', b'\x00', // partial packet number
   ])
-  let result = try? @mailbox.decode_foe_response(frame)
+  let result = Result::Ok(@mailbox.decode_foe_response(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2967,7 +3027,9 @@ test "decode_emergency_frame too short" {
      b'\x00', b'\x10', // CoE header: emergency(1)
      b'\x00', b'\x00', b'\x01', b'\x00', // only 4 bytes of emergency data
   ])
-  let result = try? @mailbox.decode_emergency_frame(frame)
+  let result = Result::Ok(@mailbox.decode_emergency_frame(frame)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2986,7 +3048,9 @@ test "SiiCategoryClass StandardUnknown label" {
 ///|
 test "parse_sii_preamble too short" {
   let short = Bytes::new(4)
-  let result = try? @mailbox.parse_sii_preamble(short)
+  let result = Result::Ok(@mailbox.parse_sii_preamble(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -2998,7 +3062,9 @@ test "Rmsm begin_retry_transaction in wrong state" {
   // First get into WaitingForResponse state
   let _cnt = rmsm.begin_transaction()
   // Now trying begin_retry should fail since we're in WaitingForResponse
-  let result = try? rmsm.begin_retry_transaction()
+  let result = Result::Ok(rmsm.begin_retry_transaction()) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3073,9 +3139,11 @@ test "parse_sii_full_info with pdo fixture" {
 ///|
 test "parse_sii_full_info short data raises" {
   let data = Bytes::make(10, 0)
-  let result : Result[@mailbox.SiiFullInfo, Error] = try? @mailbox.parse_sii_full_info(
-    data,
-  )
+  let result : Result[@mailbox.SiiFullInfo, Error] = Result::Ok(
+    @mailbox.parse_sii_full_info(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3167,7 +3235,9 @@ test "sdo_abort_code_description object dictionary dynamic fail" {
 test "decode_sdo_response frame too short" {
   // Need at least mailbox_header(6) + coe_header(2) + 1 = 9 bytes
   let data = Bytes::make(8, 0)
-  let result = try? @mailbox.decode_sdo_response(data)
+  let result = Result::Ok(@mailbox.decode_sdo_response(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3182,7 +3252,9 @@ test "decode_sdo_response non-CoE mailbox type rejected" {
       _ => b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_response(buf)
+  let result = Result::Ok(@mailbox.decode_sdo_response(buf)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3202,7 +3274,9 @@ test "decode_sdo_response abort transfer" {
       _ => b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_response(buf)
+  let result = Result::Ok(@mailbox.decode_sdo_response(buf)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3211,7 +3285,9 @@ test "decode_sdo_response abort transfer" {
 ///|
 test "decode_sdo_info_od_description_payload too short" {
   let data = Bytes::make(5, 0)
-  let result = try? @mailbox.decode_sdo_info_od_description_payload(data)
+  let result = Result::Ok(@mailbox.decode_sdo_info_od_description_payload(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3224,7 +3300,9 @@ test "decode_sdo_info_od_description_payload no name" {
       _ => b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_info_od_description_payload(data)
+  let result = Result::Ok(@mailbox.decode_sdo_info_od_description_payload(data)) catch {
+    err => Result::Err(err)
+  }
   guard result is Ok(desc) else { panic() }
   @debug.assert_eq(desc.name, "")
 }
@@ -3232,7 +3310,9 @@ test "decode_sdo_info_od_description_payload no name" {
 ///|
 test "decode_sdo_info_oe_description_payload too short" {
   let data = Bytes::make(9, 0)
-  let result = try? @mailbox.decode_sdo_info_oe_description_payload(data)
+  let result = Result::Ok(@mailbox.decode_sdo_info_oe_description_payload(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3246,7 +3326,9 @@ test "decode_sdo_info_oe_description_payload no name" {
       _ => b'\x00'
     }
   })
-  let result = try? @mailbox.decode_sdo_info_oe_description_payload(data)
+  let result = Result::Ok(@mailbox.decode_sdo_info_oe_description_payload(data)) catch {
+    err => Result::Err(err)
+  }
   guard result is Ok(desc) else { panic() }
   @debug.assert_eq(desc.name, "")
 }
@@ -3402,9 +3484,11 @@ test "decode_sdo_response abort with short payload" {
     buf.write_byte(b'\x00')
   }
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoResponse), Error] = try? @mailbox.decode_sdo_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3478,9 +3562,11 @@ test "decode_sdo_response header too short" {
   buf.write_byte(b'\x60')
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoResponse), Error] = try? @mailbox.decode_sdo_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3527,9 +3613,11 @@ test "decode_sdo_response non-expedited upload with extra data" {
 ///|
 test "decode_sdo_info_response frame too short" {
   let data = Bytes::make(5, 0)
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3548,9 +3636,11 @@ test "decode_sdo_info_response payload too short" {
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3569,9 +3659,11 @@ test "decode_sdo_info_response truncated data" {
     buf.write_byte(b'\x00')
   }
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3594,9 +3686,11 @@ test "decode_sdo_info_response wrong mailbox type" {
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3619,9 +3713,11 @@ test "decode_sdo_info_response wrong service field" {
   buf.write_byte(b'\x00')
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3661,9 +3757,11 @@ test "decode_foe_response payload too short for opcode" {
   buf.write_byte(b'\x04') // type=FoE
   buf.write_byte(b'\x03') // opcode placeholder
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.FoeResponse), Error] = try? @mailbox.decode_foe_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.FoeResponse), Error] = Result::Ok(
+    @mailbox.decode_foe_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3772,9 +3870,11 @@ test "decode_foe_response unexpected opcode" {
   buf.write_byte(b'\x01') // opcode=Read
   buf.write_byte(b'\x00')
   let data = buf.to_bytes()
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.FoeResponse), Error] = try? @mailbox.decode_foe_response(
-    data,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.FoeResponse), Error] = Result::Ok(
+    @mailbox.decode_foe_response(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3900,9 +4000,11 @@ test "parse_sii_strings string extends past end" {
 ///|
 test "parse_sii_dc too short" {
   let data = Bytes::make(10, 0) // < 24 bytes
-  let result : Result[@mailbox.SiiDcClock, Error] = try? @mailbox.parse_sii_dc(
-    data,
-  )
+  let result : Result[@mailbox.SiiDcClock, Error] = Result::Ok(
+    @mailbox.parse_sii_dc(data),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4121,9 +4223,11 @@ test "decode_sdo_info_response payload too short for info header" {
       _ => b'\x00'
     }
   })
-  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = try? @mailbox.decode_sdo_info_response(
-    frame,
-  )
+  let result : Result[(@mailbox.MailboxHeader, @mailbox.SdoInfoResponse), Error] = Result::Ok(
+    @mailbox.decode_sdo_info_response(frame),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4131,9 +4235,11 @@ test "decode_sdo_info_response payload too short for info header" {
 test "decode_sdo_info_od_description_payload invalid UTF-8 name" {
   // 6 bytes header + invalid UTF-8 bytes for name
   let payload = Bytes::makei(8, fn(i) { if i >= 6 { b'\xFF' } else { b'\x00' } })
-  let result : Result[@mailbox.SdoInfoObjectDescription, Error] = try? @mailbox.decode_sdo_info_od_description_payload(
-    payload,
-  )
+  let result : Result[@mailbox.SdoInfoObjectDescription, Error] = Result::Ok(
+    @mailbox.decode_sdo_info_od_description_payload(payload),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4147,9 +4253,11 @@ test "decode_sdo_info_oe_description_payload invalid UTF-8 name" {
       b'\x00'
     }
   })
-  let result : Result[@mailbox.SdoInfoEntryDescription, Error] = try? @mailbox.decode_sdo_info_oe_description_payload(
-    payload,
-  )
+  let result : Result[@mailbox.SdoInfoEntryDescription, Error] = Result::Ok(
+    @mailbox.decode_sdo_info_oe_description_payload(payload),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4250,7 +4358,11 @@ test "decode_foe_response payload_len less than 2 raises" {
   // Mailbox header: length=1 (LE), address=0, ch/pri=0, type=FoE(0x04)
   // Total frame: 8 bytes (>= mbox_hdr + 2), but payload_len=1 < 2
   let frame = b"\x01\x00\x00\x00\x00\x04\x00\x00"
-  let result : Result[(_, _), _] = try? @mailbox.decode_foe_response(frame)
+  let result : Result[(_, _), _] = Result::Ok(
+    @mailbox.decode_foe_response(frame),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

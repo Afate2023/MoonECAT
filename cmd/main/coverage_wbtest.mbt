@@ -48,9 +48,11 @@ test "cli show bridge renders backend and progress output as readable text" {
 
 ///|
 test "cli parse_backend rejects unknown backend identifier" {
-  let result : Result[CliBackend, Error] = try? parse_backend([
-    "moonecat", "scan", "--backend", "unsupported-backend",
-  ])
+  let result : Result[CliBackend, Error] = Result::Ok(
+    parse_backend(["moonecat", "scan", "--backend", "unsupported-backend"]),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected unsupported backend to fail")
   }
@@ -165,10 +167,14 @@ test "cli mailbox_readback_report_text reports clean run when no mismatches" {
 
 ///|
 test "cli run_esi_sii_command rejects deprecated --xml flag" {
-  let result : Result[Unit, Error] = try? run_esi_sii_command(
-    ["moonecat", "esi-sii", "--xml", "sample.esi.xml"],
-    false,
-  )
+  let result : Result[Unit, Error] = Result::Ok(
+    run_esi_sii_command(
+      ["moonecat", "esi-sii", "--xml", "sample.esi.xml"],
+      false,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected --xml flag to be rejected")
   }
@@ -177,11 +183,11 @@ test "cli run_esi_sii_command rejects deprecated --xml flag" {
 
 ///|
 test "cli require_cli_file_flag requires the flag to be present" {
-  let result : Result[String, Error] = try? require_cli_file_flag(
-    ["moonecat", "esi-sii"],
-    "--esi-json",
-    "ESI JSON",
-  )
+  let result : Result[String, Error] = Result::Ok(
+    require_cli_file_flag(["moonecat", "esi-sii"], "--esi-json", "ESI JSON"),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected missing flag to be reported")
   }
@@ -191,9 +197,11 @@ test "cli require_cli_file_flag requires the flag to be present" {
 
 ///|
 test "cli read_cli_text_file surfaces filesystem errors with context" {
-  let result : Result[String, Error] = try? read_cli_text_file(
-    "definitely-missing-file-cli-coverage.json", "ESI JSON",
-  )
+  let result : Result[String, Error] = Result::Ok(
+    read_cli_text_file("definitely-missing-file-cli-coverage.json", "ESI JSON"),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected missing file to surface as ConfigMismatch")
   }
@@ -223,9 +231,11 @@ test "cli require_station_flag enforces explicit station value" {
     require_station_flag(["moonecat", "esc-regs", "--station", "4097"]),
     4097U,
   )
-  let missing : Result[UInt, Error] = try? require_station_flag([
-    "moonecat", "esc-regs",
-  ])
+  let missing : Result[UInt, Error] = Result::Ok(
+    require_station_flag(["moonecat", "esc-regs"]),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard missing is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected missing station to fail")
   }

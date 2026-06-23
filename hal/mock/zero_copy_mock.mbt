@@ -30,7 +30,7 @@ pub fn MockZeroCopyNic::new(pool : @hal.FramePool) -> MockZeroCopyNic {
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with open_(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn open_(
   _name : String,
   pool : @hal.FramePool,
 ) -> MockZeroCopyNic raise @hal.EcError {
@@ -38,14 +38,14 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with open_(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with acquire_tx(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn acquire_tx(
   self : MockZeroCopyNic,
 ) -> @hal.FrameRef raise @hal.EcError {
   self.pool.acquire()
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with tx_buffer(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn tx_buffer(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
@@ -53,7 +53,7 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with tx_buffer(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn submit(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
   length~ : Int,
@@ -78,7 +78,7 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with submit(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with recv(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn recv(
   self : MockZeroCopyNic,
   timeout~ : @hal.Duration,
 ) -> @hal.FrameRef raise @hal.EcError {
@@ -99,7 +99,7 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with recv(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_buffer(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn rx_buffer(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
@@ -107,7 +107,7 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_buffer(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_length(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn rx_length(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> Int {
@@ -115,7 +115,7 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with rx_length(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with release(
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn release(
   self : MockZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> Unit {
@@ -123,7 +123,9 @@ pub impl @hal.ZeroCopyNic for MockZeroCopyNic with release(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for MockZeroCopyNic with close(self : MockZeroCopyNic) -> Unit {
+pub impl @hal.ZeroCopyNic for MockZeroCopyNic with fn close(
+  self : MockZeroCopyNic,
+) -> Unit {
   self.is_open = false
   self.pool.reset()
 }

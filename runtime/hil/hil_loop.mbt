@@ -68,7 +68,7 @@ pub fn[A] HilCycleHook::new(
 }
 
 ///|
-pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre_cycle(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with fn on_pre_cycle(
   self,
   snap,
   ctx,
@@ -86,7 +86,7 @@ pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_pre
 }
 
 ///|
-pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_post_cycle(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with fn on_post_cycle(
   self,
   _snap,
   ctx,
@@ -124,7 +124,7 @@ pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_pos
 }
 
 ///|
-pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with on_fault(
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A] with fn on_fault(
   self,
   _snap,
   _err,

@@ -25,7 +25,9 @@ test "EcCommand roundtrip byte conversion" {
 
 ///|
 test "EcCommand from_byte invalid raises error" {
-  let result = try? @protocol.EcCommand::from_byte(b'\xFF')
+  let result = Result::Ok(@protocol.EcCommand::from_byte(b'\xFF')) catch {
+    err => Result::Err(err)
+  }
   @debug.debug_inspect(
     result,
     content="Err(InvalidPdu(\"unknown command byte: 255\"))",
@@ -192,7 +194,9 @@ test "EcFrame decode fixture minimal_nop_frame" {
 ///|
 test "EcFrame decode rejects short frame" {
   let short = Bytes::from_array([b'\x00', b'\x01'])
-  let result = try? @protocol.EcFrame::decode(short)
+  let result = Result::Ok(@protocol.EcFrame::decode(short)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -205,7 +209,9 @@ test "EcFrame decode rejects wrong ethertype" {
      b'\x0C', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
     b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  let result = try? @protocol.EcFrame::decode(bad)
+  let result = Result::Ok(@protocol.EcFrame::decode(bad)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -706,7 +712,11 @@ test "discovery - assign_station_address via mock" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   // MockNic echoes with wkc=0 so this will raise SendFailed
-  let result = try? @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
+  let result = Result::Ok(
+    @protocol.assign_station_address(nic, 0U, 0x1001U, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -780,7 +790,11 @@ test "discovery - read_station_alias via mock" {
 test "discovery - enable_alias_addressing via mock returns error" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.enable_alias_addressing(nic, 0x1001U, timeout)
+  let result = Result::Ok(
+    @protocol.enable_alias_addressing(nic, 0x1001U, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1535,12 +1549,16 @@ test "request_state_with_process_data_snapshot captures AL error window" {
 test "transition_to_target_strict rejects pending AL error indication" {
   let nic = EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
   let timeout = @hal.Duration(1000L)
-  let result : Result[@protocol.EsmState, Error] = try? @protocol.transition_to_target_strict(
-    nic,
-    0x1001U,
-    @protocol.EsmState::Op,
-    timeout,
-  )
+  let result : Result[@protocol.EsmState, Error] = Result::Ok(
+    @protocol.transition_to_target_strict(
+      nic,
+      0x1001U,
+      @protocol.EsmState::Op,
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::EsmStateError(message)) else {
     fail("expected strict transition to reject pending AL error indication")
   }
@@ -1602,7 +1620,11 @@ test "recover_al_error_for_transition rolls configuration error back to init" {
 test "transition_through with empty path raises error" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
-  let result = try? @protocol.transition_through(nic, 0x1001U, [], timeout)
+  let result = Result::Ok(
+    @protocol.transition_through(nic, 0x1001U, [], timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1620,7 +1642,9 @@ test "read_al_status via mock" {
   let timeout = @hal.Duration(1000L)
   // MockNic echoes the sent frame (which has zero-initialized data)
   // EsmState::from_byte(0) will fail because 0 isn't a valid ESM state
-  let result = try? @protocol.read_al_status(nic, 0x1001U, timeout)
+  let result = Result::Ok(@protocol.read_al_status(nic, 0x1001U, timeout)) catch {
+    err => Result::Err(err)
+  }
   // We expect either a valid state or an error from the mock
   match result {
     Ok(state) => assert_true(state is Init)
@@ -1754,7 +1778,9 @@ test "PdoContext set_slave_outputs rejects wrong length" {
     input_bytes: 0,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let result = try? ctx.set_slave_outputs(0x1001U, Bytes::new(2))
+  let result = Result::Ok(ctx.set_slave_outputs(0x1001U, Bytes::new(2))) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1767,7 +1793,9 @@ test "PdoContext set_slave_outputs rejects unknown station" {
     input_bytes: 0,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let result = try? ctx.set_slave_outputs(0x9999U, Bytes::new(4))
+  let result = Result::Ok(ctx.set_slave_outputs(0x9999U, Bytes::new(4))) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1804,7 +1832,9 @@ test "mailbox_poll reports deactivated mailbox sync manager" {
     in_size: 64U,
     in_sm_index: 1,
   }
-  let result = try? @protocol.mailbox_poll(nic, 0x1001U, cfg, timeout)
+  let result = Result::Ok(@protocol.mailbox_poll(nic, 0x1001U, cfg, timeout)) catch {
+    err => Result::Err(err)
+  }
   match result {
     Err(@hal.EcError::MailboxProtocol(message)) => {
       assert_true(message.contains("deactivated/reset"))
@@ -1842,13 +1872,17 @@ test "mailbox_send rejects oversized data" {
     in_size: 16U,
     in_sm_index: 1,
   }
-  let result = try? @protocol.mailbox_send(
-    nic,
-    0x1001U,
-    cfg,
-    Bytes::new(32), // larger than out_size
-    timeout,
-  )
+  let result = Result::Ok(
+    @protocol.mailbox_send(
+      nic,
+      0x1001U,
+      cfg,
+      Bytes::new(32), // larger than out_size
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -1865,13 +1899,11 @@ test "mailbox_recv times out when poll never succeeds" {
     in_sm_index: 1,
   }
   // MockNic echoes zero data → poll always returns false → should timeout
-  let result = try? @protocol.mailbox_recv(
-    nic,
-    0x1001U,
-    cfg,
-    timeout,
-    max_polls=3,
-  )
+  let result = Result::Ok(
+    @protocol.mailbox_recv(nic, 0x1001U, cfg, timeout, max_polls=3),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }
 
@@ -2281,9 +2313,13 @@ test "sdo_upload_retry stops after retry budget is exhausted" {
     in_sm_index: 1,
   }
   let rmsm = @mailbox.Rmsm::new(max_retries=1)
-  let result : Result[Bytes, Error] = try? @protocol.sdo_upload_retry(
-    nic, 0x1001U, cfg, rmsm, 0x1001U, b'\x00', timeout,
-  )
+  let result : Result[Bytes, Error] = Result::Ok(
+    @protocol.sdo_upload_retry(
+      nic, 0x1001U, cfg, rmsm, 0x1001U, b'\x00', timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }
 
@@ -2525,12 +2561,16 @@ test "request_state_aware without device_emulation same as request_state" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)
   // MockNic echoes zeros → read_al_status gets 0x00 → EsmStateError
-  let result = try? @protocol.request_state_aware(
-    nic,
-    0x1001U,
-    @protocol.EsmState::Init,
-    timeout,
-  )
+  let result = Result::Ok(
+    @protocol.request_state_aware(
+      nic,
+      0x1001U,
+      @protocol.EsmState::Init,
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::EsmStateError(_)))
 }
 
@@ -2540,13 +2580,17 @@ test "request_state_aware with device_emulation" {
   let timeout = @hal.Duration(1000L)
   // With device_emulation flag, should check error indication first,
   // then proceed to request_state (which also gets EsmStateError from mock)
-  let result = try? @protocol.request_state_aware(
-    nic,
-    0x1001U,
-    @protocol.EsmState::Init,
-    device_emulation=true,
-    timeout,
-  )
+  let result = Result::Ok(
+    @protocol.request_state_aware(
+      nic,
+      0x1001U,
+      @protocol.EsmState::Init,
+      device_emulation=true,
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::EsmStateError(_)))
 }
 
@@ -2853,7 +2897,9 @@ test "PdoContext get_slave_inputs rejects unknown station" {
     input_bytes: 4,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let result = try? ctx.get_slave_inputs(0x9999U)
+  let result = Result::Ok(ctx.get_slave_inputs(0x9999U)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3051,7 +3097,11 @@ test "decode_pdu_wkc_only extracts WKC" {
 test "decode_pdu_response_from rejects short frame" {
   let buf : FixedArray[Byte] = FixedArray::make(10, b'\x00')
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_from(buf, 10, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 10, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3065,7 +3115,11 @@ test "decode_pdu_response_from rejects wrong ethertype (0x0800)" {
   buf[12] = b'\x08'
   buf[13] = b'\x00'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 64, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3079,7 +3133,11 @@ test "decode_pdu_response_from rejects wrong ecat type" {
   buf[14] = b'\x00'
   buf[15] = b'\x20'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 64, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3094,7 +3152,11 @@ test "decode_pdu_response_from rejects PDU header truncated" {
   buf[15] = b'\x10'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
   // buf_len=20 means only 4 bytes after EtherCAT header, not enough for 10-byte PDU header
-  let result = try? @protocol.decode_pdu_response_from(buf, 20, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 20, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3111,7 +3173,11 @@ test "decode_pdu_response_from rejects PDU data truncated" {
   buf[22] = b'\xC8' // 200 & 0xFF
   buf[23] = b'\x00'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_from(buf, 30, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 30, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3120,7 +3186,9 @@ test "decode_pdu_wkc_only rejects wrong ethertype" {
   let buf : FixedArray[Byte] = FixedArray::make(64, b'\x00')
   buf[12] = b'\x08'
   buf[13] = b'\x00'
-  let result = try? @protocol.decode_pdu_wkc_only(buf, 64)
+  let result = Result::Ok(@protocol.decode_pdu_wkc_only(buf, 64)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3131,7 +3199,9 @@ test "decode_pdu_wkc_only rejects wrong ecat type" {
   buf[13] = b'\xA4'
   buf[14] = b'\x00'
   buf[15] = b'\x20' // type=2
-  let result = try? @protocol.decode_pdu_wkc_only(buf, 64)
+  let result = Result::Ok(@protocol.decode_pdu_wkc_only(buf, 64)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3142,7 +3212,9 @@ test "decode_pdu_wkc_only rejects PDU header truncated" {
   buf[13] = b'\xA4'
   buf[14] = b'\x64'
   buf[15] = b'\x10'
-  let result = try? @protocol.decode_pdu_wkc_only(buf, 20)
+  let result = Result::Ok(@protocol.decode_pdu_wkc_only(buf, 20)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3155,7 +3227,9 @@ test "decode_pdu_wkc_only rejects PDU data truncated" {
   buf[15] = b'\x10'
   buf[22] = b'\xC8'
   buf[23] = b'\x00'
-  let result = try? @protocol.decode_pdu_wkc_only(buf, 30)
+  let result = Result::Ok(@protocol.decode_pdu_wkc_only(buf, 30)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3163,9 +3237,11 @@ test "decode_pdu_wkc_only rejects PDU data truncated" {
 test "decode_pdu_response_slice rejects short frame" {
   let buf : FixedArray[Byte] = FixedArray::make(10, b'\x00')
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_slice(
-    buf, 10, 0, target, 0, 4,
-  )
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_slice(buf, 10, 0, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3175,9 +3251,11 @@ test "decode_pdu_response_slice rejects wrong ethertype" {
   buf[12] = b'\x08'
   buf[13] = b'\x00'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_slice(
-    buf, 64, 0, target, 0, 4,
-  )
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_slice(buf, 64, 0, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3189,9 +3267,11 @@ test "decode_pdu_response_slice rejects wrong ecat type" {
   buf[14] = b'\x00'
   buf[15] = b'\x20'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_slice(
-    buf, 64, 0, target, 0, 4,
-  )
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_slice(buf, 64, 0, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3203,9 +3283,11 @@ test "decode_pdu_response_slice rejects PDU header truncated" {
   buf[14] = b'\x64'
   buf[15] = b'\x10'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_slice(
-    buf, 20, 0, target, 0, 4,
-  )
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_slice(buf, 20, 0, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3219,9 +3301,11 @@ test "decode_pdu_response_slice rejects PDU data truncated" {
   buf[22] = b'\xC8'
   buf[23] = b'\x00'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_slice(
-    buf, 30, 0, target, 0, 4,
-  )
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_slice(buf, 30, 0, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3230,7 +3314,9 @@ test "decode_pdu_response_slice rejects PDU data truncated" {
 ///|
 test "EcFrame::decode rejects short frame" {
   let data = Bytes::new(10)
-  let result = try? @protocol.EcFrame::decode(data)
+  let result = Result::Ok(@protocol.EcFrame::decode(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3242,7 +3328,9 @@ test "EcFrame::decode rejects wrong ethertype" {
      b'\x08', b'\x00', // IP ethertype
      b'\x00', b'\x10', // ecat hdr
   ])
-  let result = try? @protocol.EcFrame::decode(data)
+  let result = Result::Ok(@protocol.EcFrame::decode(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3254,7 +3342,9 @@ test "EcFrame::decode rejects wrong ecat frame type" {
      b'\x88', b'\xA4', // correct ethertype
      b'\x00', b'\x20', // ecat type = 2 (wrong)
   ])
-  let result = try? @protocol.EcFrame::decode(data)
+  let result = Result::Ok(@protocol.EcFrame::decode(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3267,7 +3357,9 @@ test "EcFrame::decode rejects PDU header truncated" {
      b'\x64', b'\x10', // ecat type=1 len=100 → claims 100 bytes of PDU
      b'\x00', b'\x00', // only 2 bytes of PDU data (not enough for 10-byte header)
   ])
-  let result = try? @protocol.EcFrame::decode(data)
+  let result = Result::Ok(@protocol.EcFrame::decode(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3286,7 +3378,9 @@ test "EcFrame::decode rejects PDU data truncated" {
      b'\x00', b'\x00', // irq
     // No data payload follows — will truncate
   ])
-  let result = try? @protocol.EcFrame::decode(data)
+  let result = Result::Ok(@protocol.EcFrame::decode(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3343,7 +3437,9 @@ test "al_status_code_description unknown code" {
 
 ///|
 test "EsmState::from_byte invalid byte raises" {
-  let result = try? @protocol.EsmState::from_byte(b'\x0F')
+  let result = Result::Ok(@protocol.EsmState::from_byte(b'\x0F')) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3492,7 +3588,11 @@ test "decode_pdu_response_from rejects wrong ethertype" {
   buf[12] = b'\x08'
   buf[13] = b'\x00'
   let target : FixedArray[Byte] = FixedArray::make(4, b'\x00')
-  let result = try? @protocol.decode_pdu_response_from(buf, 64, target, 0, 4)
+  let result = Result::Ok(
+    @protocol.decode_pdu_response_from(buf, 64, target, 0, 4),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3530,7 +3630,9 @@ test "MutablePdoContext set_slave_outputs rejects wrong length" {
   }
   let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
   let bad_data : FixedArray[Byte] = [b'\x01', b'\x02']
-  let result = try? ctx.set_slave_outputs(0x1001U, bad_data)
+  let result = Result::Ok(ctx.set_slave_outputs(0x1001U, bad_data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -3544,7 +3646,9 @@ test "MutablePdoContext set_slave_outputs unknown station" {
   }
   let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0U)
   let data : FixedArray[Byte] = [b'\x00', b'\x00']
-  let result = try? ctx.set_slave_outputs(0x9999U, data)
+  let result = Result::Ok(ctx.set_slave_outputs(0x9999U, data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4275,11 +4379,11 @@ test "FrameBuilder add exceeds capacity" {
     fb.add(@protocol.EcCommand::NOP, 0U, Bytes::new(1)) |> ignore
   }
   // 16th should fail
-  let result : Result[Byte, Error] = try? fb.add(
-    @protocol.EcCommand::NOP,
-    0U,
-    Bytes::new(1),
-  )
+  let result : Result[Byte, Error] = Result::Ok(
+    fb.add(@protocol.EcCommand::NOP, 0U, Bytes::new(1)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4332,14 +4436,20 @@ test "PdoContext set_slave_outputs and get_slave_inputs" {
 ///|
 test "PdoContext set_slave_outputs unknown station raises" {
   let ctx = @protocol.PdoContext::build([], 0x0000U)
-  let result : Result[Unit, _] = try? ctx.set_slave_outputs(0xFFFFU, b"\x00")
+  let result : Result[Unit, _] = Result::Ok(
+    ctx.set_slave_outputs(0xFFFFU, b"\x00"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "PdoContext get_slave_inputs unknown station raises" {
   let ctx = @protocol.PdoContext::build([], 0x0000U)
-  let result : Result[Bytes, _] = try? ctx.get_slave_inputs(0xFFFFU)
+  let result : Result[Bytes, _] = Result::Ok(ctx.get_slave_inputs(0xFFFFU)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4569,9 +4679,11 @@ test "PdoContext set_slave_outputs length mismatch raises" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   // Provide 2 bytes but mapping expects 4
-  let result : Result[Unit, _] = try? ctx.set_slave_outputs(
-    0x1001U, b"\x00\x00",
-  )
+  let result : Result[Unit, _] = Result::Ok(
+    ctx.set_slave_outputs(0x1001U, b"\x00\x00"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4642,23 +4754,33 @@ test "MutablePdoContext set_slave_outputs length mismatch raises" {
     input_bytes: 0,
   }
   let ctx = @protocol.MutablePdoContext::build([(sm, 0x1001U)], 0x0000U)
-  let result : Result[Unit, _] = try? ctx.set_slave_outputs(0x1001U, [
-    b'\x00', b'\x00',
-  ])
+  let result : Result[Unit, _] = Result::Ok(
+    ctx.set_slave_outputs(0x1001U, [b'\x00', b'\x00']),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "MutablePdoContext set_slave_outputs unknown station raises" {
   let ctx = @protocol.MutablePdoContext::build([], 0x0000U)
-  let result : Result[Unit, _] = try? ctx.set_slave_outputs(0xFFFFU, [b'\x00'])
+  let result : Result[Unit, _] = Result::Ok(
+    ctx.set_slave_outputs(0xFFFFU, [b'\x00']),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
 ///|
 test "MutablePdoContext get_slave_inputs unknown station raises" {
   let ctx = @protocol.MutablePdoContext::build([], 0x0000U)
-  let result : Result[FixedArray[Byte], _] = try? ctx.get_slave_inputs(0xFFFFU)
+  let result : Result[FixedArray[Byte], _] = Result::Ok(
+    ctx.get_slave_inputs(0xFFFFU),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -4751,11 +4873,11 @@ test "pdo_exchange_result with block_lrw via VirtualNic" {
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   ctx.block_lrw = true
   // Will fail at transact level (no slaves), but exercises the split path
-  let result : Result[@protocol.PdoExchangeResult, _] = try? @protocol.pdo_exchange_result(
-    nic,
-    ctx,
-    @hal.Duration(50_000_000L),
-  )
+  let result : Result[@protocol.PdoExchangeResult, _] = Result::Ok(
+    @protocol.pdo_exchange_result(nic, ctx, @hal.Duration(50_000_000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   // VirtualNic with no slaves returns WKC 0 for logical addressing
   assert_true(result is Ok(_))
 }

@@ -264,9 +264,11 @@ pub fn[N : @hal.Nic] sdo_download_retry(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   // First attempt
-  let result = try? sdo_download(
-    nic, station, mb_config, rmsm, index, subindex, data, timeout,
-  )
+  let result = Result::Ok(
+    sdo_download(nic, station, mb_config, rmsm, index, subindex, data, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match result {
     Ok(_) => return
     Err(@hal.EcError::MailboxTimeout) => ()
@@ -278,9 +280,13 @@ pub fn[N : @hal.Nic] sdo_download_retry(
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
-    let result = try? sdo_download_once(
-      nic, station, mb_config, rmsm, index, subindex, data, timeout, true,
-    )
+    let result = Result::Ok(
+      sdo_download_once(
+        nic, station, mb_config, rmsm, index, subindex, data, timeout, true,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match result {
       Ok(_) => return
       Err(@hal.EcError::MailboxTimeout) => continue
@@ -302,9 +308,11 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
   // First attempt
-  let result = try? sdo_upload(
-    nic, station, mb_config, rmsm, index, subindex, timeout,
-  )
+  let result = Result::Ok(
+    sdo_upload(nic, station, mb_config, rmsm, index, subindex, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match result {
     Ok(data) => return data
     Err(@hal.EcError::MailboxTimeout) => ()
@@ -316,9 +324,13 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
-    let result = try? sdo_upload_once(
-      nic, station, mb_config, rmsm, index, subindex, timeout, true,
-    )
+    let result = Result::Ok(
+      sdo_upload_once(
+        nic, station, mb_config, rmsm, index, subindex, timeout, true,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match result {
       Ok(data) => return data
       Err(@hal.EcError::MailboxTimeout) => continue
@@ -339,9 +351,13 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
   subindex : Byte,
   timeout : @hal.Duration,
 ) -> Bytes raise @hal.EcError {
-  let result = try? sdo_upload_ap(
-    nic, position, station, mb_config, rmsm, index, subindex, timeout,
-  )
+  let result = Result::Ok(
+    sdo_upload_ap(
+      nic, position, station, mb_config, rmsm, index, subindex, timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   match result {
     Ok(data) => return data
     Err(@hal.EcError::MailboxTimeout) => ()
@@ -352,9 +368,13 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
       raise @hal.EcError::MailboxTimeout
     }
     rmsm.reset_for_retry()
-    let retry = try? sdo_upload_ap_once(
-      nic, position, station, mb_config, rmsm, index, subindex, timeout, true,
-    )
+    let retry = Result::Ok(
+      sdo_upload_ap_once(
+        nic, position, station, mb_config, rmsm, index, subindex, timeout, true,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match retry {
       Ok(data) => return data
       Err(@hal.EcError::MailboxTimeout) => continue

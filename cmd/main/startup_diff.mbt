@@ -43,9 +43,11 @@ fn[N : @hal.Nic] build_startup_diff_report(
     station,
     offline.mapping,
   )
-  let actual_esc_result : Result[EscRegisterReport, @hal.EcError] = try? read_esc_register_report(
-    nic, station, timeout,
-  )
+  let actual_esc_result : Result[EscRegisterReport, @hal.EcError] = Result::Ok(
+    read_esc_register_report(nic, station, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   let actual_esc = match actual_esc_result {
     Ok(report) => Some(report)
     Err(_) => None
@@ -57,14 +59,18 @@ fn[N : @hal.Nic] build_startup_diff_report(
   let online_refined_result : Result[
     @runtime.SlaveStartupPreparation,
     @hal.EcError,
-  ] = try? ({
-    let online_initial = prepare_station_startup(
-      nic, station, pdo_logical_base, timeout,
-    )
-    @runtime.refine_startup_preparation_in_preop(
-      nic, station, pdo_logical_base, online_initial, timeout,
-    )
-  })
+  ] = Result::Ok(
+    {
+      let online_initial = prepare_station_startup(
+        nic, station, pdo_logical_base, timeout,
+      )
+      @runtime.refine_startup_preparation_in_preop(
+        nic, station, pdo_logical_base, online_initial, timeout,
+      )
+    },
+  ) catch {
+    err => Result::Err(err)
+  }
   let online_expected = match online_refined_result {
     Ok(preparation) =>
       Some(

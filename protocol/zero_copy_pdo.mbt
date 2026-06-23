@@ -139,14 +139,18 @@ pub fn[N : @hal.ZeroCopyNic] pdo_exchange_zero_copy(
   let rx_buf = nic.rx_buffer(rx_ref)
   let rx_len = nic.rx_length(rx_ref)
   // 5. Decode response: skip output echo, copy inputs directly into image
-  let result = try? decode_pdu_response_slice(
-    rx_buf,
-    rx_len,
-    ctx.image.output_size, // skip output echo bytes
-    ctx.image.inputs,
-    0,
-    ctx.image.input_size,
-  )
+  let result = Result::Ok(
+    decode_pdu_response_slice(
+      rx_buf,
+      rx_len,
+      ctx.image.output_size, // skip output echo bytes
+      ctx.image.inputs,
+      0,
+      ctx.image.input_size,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   // 6. Release RX slot
   nic.release(rx_ref)
   match result {
@@ -243,13 +247,17 @@ pub fn[N : @hal.ZeroCopyNic] pdo_read_zero_copy(
   let rx_ref = nic.recv(timeout~)
   let rx_buf = nic.rx_buffer(rx_ref)
   let rx_len = nic.rx_length(rx_ref)
-  let result = try? decode_pdu_response_from(
-    rx_buf,
-    rx_len,
-    ctx.image.inputs,
-    0,
-    ctx.image.input_size,
-  )
+  let result = Result::Ok(
+    decode_pdu_response_from(
+      rx_buf,
+      rx_len,
+      ctx.image.inputs,
+      0,
+      ctx.image.input_size,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   nic.release(rx_ref)
   match result {
     Ok((wkc, _irq)) => wkc
@@ -285,7 +293,9 @@ pub fn[N : @hal.ZeroCopyNic] pdo_write_zero_copy(
   let rx_buf = nic.rx_buffer(rx_ref)
   let rx_len = nic.rx_length(rx_ref)
   // For LWR we only need WKC, discard response data in-place
-  let result = try? decode_pdu_wkc_only(rx_buf, rx_len)
+  let result = Result::Ok(decode_pdu_wkc_only(rx_buf, rx_len)) catch {
+    err => Result::Err(err)
+  }
   nic.release(rx_ref)
   match result {
     Ok(wkc) => wkc

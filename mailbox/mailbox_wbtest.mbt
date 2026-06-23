@@ -66,7 +66,9 @@ test "read_sii_dword_at_byte combines two words" {
 ///|
 test "parse_sii_header short data raises error" {
   let data = Bytes::make(50, 0)
-  let result : Result[SiiData, Error] = try? parse_sii_header(data)
+  let result : Result[SiiData, Error] = Result::Ok(parse_sii_header(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -380,7 +382,9 @@ test "parse_sii_strings returns parsed strings" {
 test "parse_sii_general Err on short data" {
   // General data too short to parse (< 16 bytes) → raises
   let data = Bytes::make(4, 0)
-  let result : Result[SiiGeneral, Error] = try? parse_sii_general(data)
+  let result : Result[SiiGeneral, Error] = Result::Ok(parse_sii_general(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -388,7 +392,9 @@ test "parse_sii_general Err on short data" {
 test "parse_sii_timeouts with valid data" {
   // Timeouts category needs 16 bytes
   let data = Bytes::make(16, 0)
-  let result : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(data)
+  let result : Result[SiiTimeouts, Error] = Result::Ok(parse_sii_timeouts(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Ok(_))
 }
 
@@ -396,7 +402,9 @@ test "parse_sii_timeouts with valid data" {
 test "parse_sii_timeouts Err on short data" {
   // Data too short (< 16) → raises
   let data = Bytes::make(4, 0)
-  let result : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(data)
+  let result : Result[SiiTimeouts, Error] = Result::Ok(parse_sii_timeouts(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -404,7 +412,9 @@ test "parse_sii_timeouts Err on short data" {
 test "parse_sii_dc Err on short data" {
   // Data too short (< 24) → raises
   let data = Bytes::make(4, 0)
-  let result : Result[SiiDcClock, Error] = try? parse_sii_dc(data)
+  let result : Result[SiiDcClock, Error] = Result::Ok(parse_sii_dc(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -451,7 +461,9 @@ test "parse_sii_pdo with TxPdo data" {
 test "parse_sii_dc with valid dc data" {
   // DC category needs 24 bytes
   let data = Bytes::make(24, 0)
-  let result : Result[SiiDcClock, Error] = try? parse_sii_dc(data)
+  let result : Result[SiiDcClock, Error] = Result::Ok(parse_sii_dc(data)) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Ok(_))
 }
 

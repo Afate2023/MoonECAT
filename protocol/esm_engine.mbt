@@ -642,7 +642,9 @@ pub fn[N : @hal.Nic] transition_through(
     let confirmed = request_state(nic, station, target, timeout) catch {
       err => {
         // Attempt rollback to previous state
-        let _ = try? request_state(nic, station, current, timeout)
+        let _ = Result::Ok(request_state(nic, station, current, timeout)) catch {
+          err => Result::Err(err)
+        }
         raise err
       }
     }
@@ -678,7 +680,11 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
     let rollback_timeout = esm_timeout_for(current, policy)
     let confirmed = request_state(nic, station, target, step_timeout) catch {
       err => {
-        let _ = try? request_state(nic, station, current, rollback_timeout)
+        let _ = Result::Ok(
+          request_state(nic, station, current, rollback_timeout),
+        ) catch {
+          err => Result::Err(err)
+        }
         raise err
       }
     }
@@ -710,7 +716,9 @@ pub fn[N : @hal.Nic] transition_through_observe(
     }
     let observed = request_state_observe(nic, station, target, timeout) catch {
       err => {
-        let _ = try? request_state(nic, station, current, timeout)
+        let _ = Result::Ok(request_state(nic, station, current, timeout)) catch {
+          err => Result::Err(err)
+        }
         raise err
       }
     }
@@ -746,7 +754,11 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(
     let rollback_timeout = esm_timeout_for(current, policy)
     let observed = request_state_observe(nic, station, target, step_timeout) catch {
       err => {
-        let _ = try? request_state(nic, station, current, rollback_timeout)
+        let _ = Result::Ok(
+          request_state(nic, station, current, rollback_timeout),
+        ) catch {
+          err => Result::Err(err)
+        }
         raise err
       }
     }
@@ -777,7 +789,9 @@ pub fn[N : @hal.Nic] transition_through_ap(
     }
     let confirmed = request_state_ap(nic, position, target, timeout) catch {
       err => {
-        let _ = try? request_state_ap(nic, position, current, timeout)
+        let _ = Result::Ok(request_state_ap(nic, position, current, timeout)) catch {
+          err => Result::Err(err)
+        }
         raise err
       }
     }

@@ -12,13 +12,13 @@ pub fn MockNic::new() -> MockNic {
 }
 
 ///|
-pub impl @hal.Nic for MockNic with open_(name) {
+pub impl @hal.Nic for MockNic with fn open_(name) {
   ignore(name)
   MockNic::new()
 }
 
 ///|
-pub impl @hal.Nic for MockNic with send(self, data) {
+pub impl @hal.Nic for MockNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -27,7 +27,7 @@ pub impl @hal.Nic for MockNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for MockNic with recv(self, timeout~) {
+pub impl @hal.Nic for MockNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -39,7 +39,7 @@ pub impl @hal.Nic for MockNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for MockNic with close(self) {
+pub impl @hal.Nic for MockNic with fn close(self) {
   self.is_open = false
 }
 
@@ -60,12 +60,12 @@ pub fn MockClock::advance(self : MockClock, ns : Int64) -> Unit {
 }
 
 ///|
-pub impl @hal.Clock for MockClock with now(self) {
+pub impl @hal.Clock for MockClock with fn now(self) {
   @hal.Timestamp(self.current_ns)
 }
 
 ///|
-pub impl @hal.Clock for MockClock with sleep(self, duration) {
+pub impl @hal.Clock for MockClock with fn sleep(self, duration) {
   let @hal.Duration(ns) = duration
   self.current_ns = self.current_ns + ns
 }

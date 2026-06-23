@@ -23,13 +23,13 @@ pub fn ReplayNic::is_exhausted(self : ReplayNic) -> Bool {
 }
 
 ///|
-pub impl @hal.Nic for ReplayNic with open_(name) {
+pub impl @hal.Nic for ReplayNic with fn open_(name) {
   ignore(name)
   ReplayNic::from_log(NicEventLog::new())
 }
 
 ///|
-pub impl @hal.Nic for ReplayNic with send(self, data) {
+pub impl @hal.Nic for ReplayNic with fn send(self, data) {
   if self.cursor >= self.log.len() {
     raise @hal.EcError::SendFailed("replay log exhausted")
   }
@@ -60,7 +60,7 @@ pub impl @hal.Nic for ReplayNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for ReplayNic with recv(self, timeout~) {
+pub impl @hal.Nic for ReplayNic with fn recv(self, timeout~) {
   ignore(timeout)
   if self.cursor >= self.log.len() {
     raise @hal.EcError::RecvTimeout
@@ -90,6 +90,6 @@ pub impl @hal.Nic for ReplayNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for ReplayNic with close(self) {
+pub impl @hal.Nic for ReplayNic with fn close(self) {
   self.cursor = self.log.len()
 }

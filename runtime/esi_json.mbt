@@ -540,10 +540,14 @@ fn decode_esi_json_byte(json : Json) -> Byte raise @hal.EcError {
 
 ///|
 fn decode_esi_json_bytes(json : Json) -> Bytes raise @hal.EcError {
-  let direct_result : Result[Bytes, Error] = try? ({
-    let decoded : Bytes = @json.from_json(json)
-    decoded
-  })
+  let direct_result : Result[Bytes, Error] = Result::Ok(
+    {
+      let decoded : Bytes = @json.from_json(json)
+      decoded
+    },
+  ) catch {
+    err => Result::Err(err)
+  }
   match direct_result {
     Ok(decoded) => return decoded
     Err(_) => ()

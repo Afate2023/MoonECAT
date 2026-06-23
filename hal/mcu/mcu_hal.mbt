@@ -70,7 +70,7 @@ pub fn McuNic::new(config : McuNicConfig) -> McuNic {
 /// Nic trait implementation for McuNic.
 /// In actual deployment, each method calls extern "c" functions.
 /// This stub version raises NotSupported to indicate unlinked FFI.
-pub impl @hal.Nic for McuNic with open_(name) {
+pub impl @hal.Nic for McuNic with fn open_(name) {
   let _ = name
   raise @hal.EcError::NotSupported(
     "McuNic::open_ requires platform-specific C FFI linkage",
@@ -78,19 +78,19 @@ pub impl @hal.Nic for McuNic with open_(name) {
 }
 
 ///|
-pub impl @hal.Nic for McuNic with send(self, data) {
+pub impl @hal.Nic for McuNic with fn send(self, data) {
   let _ = (self, data)
   raise @hal.EcError::NotSupported("McuNic::send requires C FFI linkage")
 }
 
 ///|
-pub impl @hal.Nic for McuNic with recv(self, timeout~) {
+pub impl @hal.Nic for McuNic with fn recv(self, timeout~) {
   let _ = (self, timeout)
   raise @hal.EcError::NotSupported("McuNic::recv requires C FFI linkage")
 }
 
 ///|
-pub impl @hal.Nic for McuNic with close(self) {
+pub impl @hal.Nic for McuNic with fn close(self) {
   self.opened = false
 }
 
@@ -111,14 +111,14 @@ pub fn McuClock::new(platform : McuPlatform, timer_freq_hz : Int64) -> McuClock 
 }
 
 ///|
-pub impl @hal.Clock for McuClock with now(self) {
+pub impl @hal.Clock for McuClock with fn now(self) {
   let _ = self
   // Stub: actual implementation reads hardware timer via FFI
   @hal.Timestamp(0L)
 }
 
 ///|
-pub impl @hal.Clock for McuClock with sleep(self, dur) {
+pub impl @hal.Clock for McuClock with fn sleep(self, dur) {
   let _ = (self, dur)
   // Stub: actual implementation busy-waits or uses timer interrupt
 }
@@ -139,7 +139,7 @@ pub fn McuZeroCopyNic::new(config : McuNicConfig) -> McuZeroCopyNic {
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with open_(name, pool) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn open_(name, pool) {
   let _ = (name, pool)
   raise @hal.EcError::NotSupported(
     "McuZeroCopyNic::open_ requires platform-specific C FFI linkage",
@@ -147,19 +147,19 @@ pub impl @hal.ZeroCopyNic for McuZeroCopyNic with open_(name, pool) {
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with acquire_tx(self) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn acquire_tx(self) {
   let _ = self
   raise @hal.EcError::NotSupported("McuZeroCopyNic requires C FFI linkage")
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with tx_buffer(self, frame_ref) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn tx_buffer(self, frame_ref) {
   let _ = (self, frame_ref)
   FixedArray::make(0, b'\x00')
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with submit(
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn submit(
   self,
   frame_ref,
   length~,
@@ -169,29 +169,29 @@ pub impl @hal.ZeroCopyNic for McuZeroCopyNic with submit(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with recv(self, timeout~) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn recv(self, timeout~) {
   let _ = (self, timeout)
   raise @hal.EcError::NotSupported("McuZeroCopyNic requires C FFI linkage")
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with rx_buffer(self, frame_ref) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn rx_buffer(self, frame_ref) {
   let _ = (self, frame_ref)
   FixedArray::make(0, b'\x00')
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with rx_length(self, frame_ref) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn rx_length(self, frame_ref) {
   let _ = (self, frame_ref)
   0
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with release(self, frame_ref) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn release(self, frame_ref) {
   let _ = (self, frame_ref)
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for McuZeroCopyNic with close(self) {
+pub impl @hal.ZeroCopyNic for McuZeroCopyNic with fn close(self) {
   self.opened = false
 }

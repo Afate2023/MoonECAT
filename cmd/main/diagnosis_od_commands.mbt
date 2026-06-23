@@ -6,7 +6,9 @@ fn[N : @hal.Nic] run_diagnosis_command(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let scan_report = diagnosis_stage(
-    try? @runtime.scan(nic, timeout),
+    Result::Ok(@runtime.scan(nic, timeout)) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.scan",
   )
   let target_slave = resolve_cli_slave(
@@ -16,19 +18,27 @@ fn[N : @hal.Nic] run_diagnosis_command(
   let station = target_slave.station_address
   let position = target_slave.position.reinterpret_as_uint()
   let diagnosis_session = diagnosis_stage(
-    try? @runtime.prepare_slave_diagnosis_ap(nic, position, station, timeout),
+    Result::Ok(
+      @runtime.prepare_slave_diagnosis_ap(nic, position, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.prepare",
   )
   let diagnosis_rmsm = @mailbox.Rmsm::new(max_retries=0)
   let report = diagnosis_stage(
-    try? @runtime.read_slave_diagnosis_ap(
-      nic,
-      position,
-      station,
-      diagnosis_session.mailbox_config,
-      diagnosis_rmsm,
-      timeout,
-    ),
+    Result::Ok(
+      @runtime.read_slave_diagnosis_ap(
+        nic,
+        position,
+        station,
+        diagnosis_session.mailbox_config,
+        diagnosis_rmsm,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.read_slave_diagnosis_ap",
   )
   let report = {
@@ -49,12 +59,16 @@ fn[N : @hal.Nic] run_diagnosis_command(
   if diagnosis_session.original_state != @protocol.PreOp {
     ignore(
       diagnosis_stage(
-        try? @runtime.restore_slave_diagnosis_state(
-          nic,
-          station,
-          diagnosis_session.original_state,
-          timeout,
-        ),
+        Result::Ok(
+          @runtime.restore_slave_diagnosis_state(
+            nic,
+            station,
+            diagnosis_session.original_state,
+            timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
         "diagnosis.restore",
       ) catch {
         _ => @protocol.PreOp
@@ -125,9 +139,11 @@ fn[N : @hal.Nic] run_od_command(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   let query = resolve_od_query(args)
-  let report_result : Result[OdBrowseReport, @hal.EcError] = try? compute_od_report(
-    nic, args, query, timeout,
-  )
+  let report_result : Result[OdBrowseReport, @hal.EcError] = Result::Ok(
+    compute_od_report(nic, args, query, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   nic.close()
   let report = match report_result {
     Ok(value) => value
@@ -148,7 +164,12 @@ fn[N : @hal.Nic] compute_od_report(
   query : OdBrowseQuery,
   timeout : @hal.Duration,
 ) -> OdBrowseReport raise @hal.EcError {
-  let scan_report = od_stage(try? @runtime.scan(nic, timeout), "od.scan")
+  let scan_report = od_stage(
+    Result::Ok(@runtime.scan(nic, timeout)) catch {
+      err => Result::Err(err)
+    },
+    "od.scan",
+  )
   let target_slave = resolve_cli_slave(
     scan_report,
     optional_uint_flag(args, "--station"),
@@ -156,21 +177,29 @@ fn[N : @hal.Nic] compute_od_report(
   let station = target_slave.station_address
   let position = target_slave.position.reinterpret_as_uint()
   let mailbox_session = od_stage(
-    try? @runtime.prepare_slave_mailbox_ap(nic, position, station, timeout),
+    Result::Ok(
+      @runtime.prepare_slave_mailbox_ap(nic, position, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    },
     "od.prepare",
   )
   let browse_rmsm = @mailbox.Rmsm::new(max_retries=0)
   let report = match (query.index, query.subindex) {
     (None, _) => {
       let indices = od_stage(
-        try? @protocol.sdo_info_get_od_list(
-          nic,
-          station,
-          mailbox_session.mailbox_config,
-          browse_rmsm,
-          query.list_type,
-          timeout,
-        ),
+        Result::Ok(
+          @protocol.sdo_info_get_od_list(
+            nic,
+            station,
+            mailbox_session.mailbox_config,
+            browse_rmsm,
+            query.list_type,
+            timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
         "od.get_od_list",
       )
       {
@@ -191,14 +220,18 @@ fn[N : @hal.Nic] compute_od_report(
     }
     (Some(index), None) => {
       let description = od_stage(
-        try? @protocol.sdo_info_get_od_description(
-          nic,
-          station,
-          mailbox_session.mailbox_config,
-          browse_rmsm,
-          index,
-          timeout,
-        ),
+        Result::Ok(
+          @protocol.sdo_info_get_od_description(
+            nic,
+            station,
+            mailbox_session.mailbox_config,
+            browse_rmsm,
+            index,
+            timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
         "od.get_od_description",
       )
       {
@@ -220,15 +253,19 @@ fn[N : @hal.Nic] compute_od_report(
     (Some(index), Some(subindex)) =>
       if query.read_value {
         let payload = od_stage(
-          try? @protocol.sdo_upload_retry(
-            nic,
-            station,
-            mailbox_session.mailbox_config,
-            browse_rmsm,
-            index,
-            subindex,
-            timeout,
-          ),
+          Result::Ok(
+            @protocol.sdo_upload_retry(
+              nic,
+              station,
+              mailbox_session.mailbox_config,
+              browse_rmsm,
+              index,
+              subindex,
+              timeout,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
           "od.sdo_upload",
         )
         {
@@ -248,16 +285,20 @@ fn[N : @hal.Nic] compute_od_report(
         }
       } else {
         let description = od_stage(
-          try? @protocol.sdo_info_get_oe_description(
-            nic,
-            station,
-            mailbox_session.mailbox_config,
-            browse_rmsm,
-            index,
-            subindex,
-            0xFF,
-            timeout,
-          ),
+          Result::Ok(
+            @protocol.sdo_info_get_oe_description(
+              nic,
+              station,
+              mailbox_session.mailbox_config,
+              browse_rmsm,
+              index,
+              subindex,
+              0xFF,
+              timeout,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
           "od.get_oe_description",
         )
         {
@@ -280,12 +321,16 @@ fn[N : @hal.Nic] compute_od_report(
   if mailbox_session.original_state != @protocol.PreOp {
     ignore(
       od_stage(
-        try? @runtime.restore_slave_mailbox_state(
-          nic,
-          station,
-          mailbox_session.original_state,
-          timeout,
-        ),
+        Result::Ok(
+          @runtime.restore_slave_mailbox_state(
+            nic,
+            station,
+            mailbox_session.original_state,
+            timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
         "od.restore",
       ) catch {
         _ => @protocol.PreOp

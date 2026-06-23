@@ -38,7 +38,7 @@ pub fn NativeZeroCopyNic::open_with_config(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn open_(
   name : String,
   pool : @hal.FramePool,
 ) -> NativeZeroCopyNic raise @hal.EcError {
@@ -47,14 +47,14 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with open_(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with acquire_tx(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn acquire_tx(
   self : NativeZeroCopyNic,
 ) -> @hal.FrameRef raise @hal.EcError {
   self.pool.acquire()
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with tx_buffer(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn tx_buffer(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
@@ -62,7 +62,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with tx_buffer(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with submit(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn submit(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
   length~ : Int,
@@ -82,7 +82,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with submit(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with recv(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn recv(
   self : NativeZeroCopyNic,
   timeout~ : @hal.Duration,
 ) -> @hal.FrameRef raise @hal.EcError {
@@ -99,7 +99,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with recv(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_buffer(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn rx_buffer(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> FixedArray[Byte] {
@@ -107,7 +107,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_buffer(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_length(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn rx_length(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> Int {
@@ -115,7 +115,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with rx_length(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with release(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn release(
   self : NativeZeroCopyNic,
   fref : @hal.FrameRef,
 ) -> Unit {
@@ -123,7 +123,7 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with release(
 }
 
 ///|
-pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with close(
+pub impl @hal.ZeroCopyNic for NativeZeroCopyNic with fn close(
   self : NativeZeroCopyNic,
 ) -> Unit {
   if self.is_open {

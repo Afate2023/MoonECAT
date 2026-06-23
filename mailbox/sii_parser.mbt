@@ -439,18 +439,22 @@ pub fn parse_sii_full_info(data : Bytes) -> SiiFullInfo raise @hal.EcError {
     match category.category {
       Strings => strings = parse_sii_strings(category.data)
       General => {
-        let parsed : Result[SiiGeneral, Error] = try? parse_sii_general(
-          category.data,
-        )
+        let parsed : Result[SiiGeneral, Error] = Result::Ok(
+          parse_sii_general(category.data),
+        ) catch {
+          err => Result::Err(err)
+        }
         match parsed {
           Ok(g) => general = Some(g)
           Err(_) => ()
         }
       }
       Timeouts => {
-        let parsed : Result[SiiTimeouts, Error] = try? parse_sii_timeouts(
-          category.data,
-        )
+        let parsed : Result[SiiTimeouts, Error] = Result::Ok(
+          parse_sii_timeouts(category.data),
+        ) catch {
+          err => Result::Err(err)
+        }
         match parsed {
           Ok(t) => timeouts = Some(t)
           Err(_) => ()
@@ -469,9 +473,11 @@ pub fn parse_sii_full_info(data : Bytes) -> SiiFullInfo raise @hal.EcError {
           rx_pdo.push(pdo)
         }
       Dc => {
-        let parsed : Result[SiiDcClock, Error] = try? parse_sii_dc(
-          category.data,
-        )
+        let parsed : Result[SiiDcClock, Error] = Result::Ok(
+          parse_sii_dc(category.data),
+        ) catch {
+          err => Result::Err(err)
+        }
         match parsed {
           Ok(clock) => dc_clocks.push(clock)
           Err(_) => ()
@@ -728,7 +734,9 @@ pub fn parse_sii_strings(data : BytesView) -> Array[String] {
     }
     let slice = data[offset:offset + str_len]
     let bytes = slice.to_owned()
-    let decoded : Result[String, Error] = try? @utf8.decode(bytes)
+    let decoded : Result[String, Error] = Result::Ok(@utf8.decode(bytes)) catch {
+      err => Result::Err(err)
+    }
     match decoded {
       Ok(text) => result.push(text)
       Err(_) => result.push(bytes.to_unchecked_string())

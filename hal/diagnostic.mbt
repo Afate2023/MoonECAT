@@ -30,5 +30,5 @@ pub fn DiagnosticEvent::new(
 /// DiagnosticSink receives diagnostic events from the stack.
 pub(open) trait DiagnosticSink {
   /// Emit a diagnostic event.
-  emit(Self, DiagnosticEvent) -> Unit
+  fn emit(Self, DiagnosticEvent) -> Unit
 }

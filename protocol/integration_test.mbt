@@ -920,16 +920,20 @@ test "integration/sdo_upload_retry_ap succeeds first try via AP mock" {
 test "integration/sdo_upload_retry_ap exhausts retries" {
   let nic = TimeoutMailboxMockNic::new()
   let rmsm = @mailbox.Rmsm::new(max_retries=1)
-  let result : Result[Bytes, Error] = try? @protocol.sdo_upload_retry_ap(
-    nic,
-    0U,
-    test_station,
-    test_mb_config(),
-    rmsm,
-    0x6041U,
-    b'\x00',
-    test_timeout,
-  )
+  let result : Result[Bytes, Error] = Result::Ok(
+    @protocol.sdo_upload_retry_ap(
+      nic,
+      0U,
+      test_station,
+      test_mb_config(),
+      rmsm,
+      0x6041U,
+      b'\x00',
+      test_timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxTimeout))
 }
 
@@ -993,16 +997,20 @@ test "integration/foe_download error response raises" {
   ])
   let rmsm = @mailbox.Rmsm::new()
   let data = Bytes::from_array([b'\x01'])
-  let result = try? @protocol.foe_download(
-    nic,
-    test_station,
-    test_mb_config(),
-    rmsm,
-    "missing.bin",
-    0U,
-    data,
-    test_timeout,
-  )
+  let result = Result::Ok(
+    @protocol.foe_download(
+      nic,
+      test_station,
+      test_mb_config(),
+      rmsm,
+      "missing.bin",
+      0U,
+      data,
+      test_timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -1058,15 +1066,19 @@ test "integration/foe_upload error response raises" {
     build_foe_error_resp(b'\x01', test_station, 0x8002U, "access denied"),
   ])
   let rmsm = @mailbox.Rmsm::new()
-  let result = try? @protocol.foe_upload(
-    nic,
-    test_station,
-    test_mb_config(),
-    rmsm,
-    "secret.bin",
-    0U,
-    test_timeout,
-  )
+  let result = Result::Ok(
+    @protocol.foe_upload(
+      nic,
+      test_station,
+      test_mb_config(),
+      rmsm,
+      "secret.bin",
+      0U,
+      test_timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
@@ -1254,14 +1266,18 @@ test "integration/sdo_upload abort response raises SdoAbort" {
   )
   let nic = MailboxMockNic::new([abort_frame])
   let rmsm = @mailbox.Rmsm::new()
-  let result = try? @protocol.sdo_upload(
-    nic,
-    test_station,
-    test_mb_config(),
-    rmsm,
-    0x1018U,
-    b'\x01',
-    test_timeout,
-  )
+  let result = Result::Ok(
+    @protocol.sdo_upload(
+      nic,
+      test_station,
+      test_mb_config(),
+      rmsm,
+      0x1018U,
+      b'\x01',
+      test_timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::SdoAbort(_)))
 }

@@ -17,11 +17,29 @@ test "native scaffold exposes stub runtime and availability" {
 
 ///|
 test "native scaffold exposes interface listing entry" {
-  let _ : Result[String, Error] = try? windows_npcap_list_interfaces_text()
-  let _ : Result[String, Error] = try? windows_npcap_list_interfaces_json()
-  let _ : Result[String, Error] = try? linux_raw_socket_list_interfaces_text()
-  let _ : Result[String, Error] = try? linux_raw_socket_list_interfaces_json()
-  let _ : Result[String, Error] = try? native_list_interfaces_json(Auto)
+  let _ : Result[String, Error] = Result::Ok(
+    windows_npcap_list_interfaces_text(),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let _ : Result[String, Error] = Result::Ok(
+    windows_npcap_list_interfaces_json(),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let _ : Result[String, Error] = Result::Ok(
+    linux_raw_socket_list_interfaces_text(),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let _ : Result[String, Error] = Result::Ok(
+    linux_raw_socket_list_interfaces_json(),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let _ : Result[String, Error] = Result::Ok(native_list_interfaces_json(Auto)) catch {
+    err => Result::Err(err)
+  }
 }
 
 ///|
@@ -69,9 +87,11 @@ test "native scaffold keeps unavailable linux backend explicit" {
     assert_true(native_backend_available(LinuxRawSocket))
     return
   }
-  let result : Result[NativeNic, Error] = try? NativeNic::open_with_config(
-    default_linux_config("eth0"),
-  )
+  let result : Result[NativeNic, Error] = Result::Ok(
+    NativeNic::open_with_config(default_linux_config("eth0")),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::NotSupported(message)) else {
     fail("expected unavailable linux backend to raise NotSupported")
   }

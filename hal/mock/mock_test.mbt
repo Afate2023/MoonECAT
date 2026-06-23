@@ -11,7 +11,9 @@ test "MockNic send and recv roundtrip" {
 ///|
 test "MockNic recv on empty buffer raises RecvTimeout" {
   let nic = @mock.MockNic::new()
-  let result = try? nic.recv(timeout=@hal.Duration(1000L))
+  let result = Result::Ok(nic.recv(timeout=@hal.Duration(1000L))) catch {
+    err => Result::Err(err)
+  }
   @debug.debug_inspect(result, content="Err(RecvTimeout)")
 }
 
@@ -51,7 +53,9 @@ test "MockZeroCopyNic loopback: send then recv" {
 test "MockZeroCopyNic recv timeout when no data" {
   let pool = @hal.FramePool::new(capacity=4, frame_size=64)
   let nic = @mock.MockZeroCopyNic::new(pool)
-  let result = try? nic.recv(timeout=@hal.Duration(1_000_000L))
+  let result = Result::Ok(nic.recv(timeout=@hal.Duration(1_000_000L))) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

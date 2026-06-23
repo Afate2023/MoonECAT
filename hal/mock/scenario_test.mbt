@@ -676,7 +676,9 @@ test "MockNic open_ returns a new instance" {
 test "MockNic send when closed raises LinkDown" {
   let nic = @mock.MockNic::new()
   nic.close()
-  let result : Result[Int, _] = try? nic.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(nic.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -684,7 +686,11 @@ test "MockNic send when closed raises LinkDown" {
 test "MockNic recv when closed raises LinkDown" {
   let nic = @mock.MockNic::new()
   nic.close()
-  let result : Result[Bytes, _] = try? nic.recv(timeout=@hal.Duration(0L))
+  let result : Result[Bytes, _] = Result::Ok(
+    nic.recv(timeout=@hal.Duration(0L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -700,7 +706,11 @@ test "VirtualNic recv when no frames queued raises RecvTimeout" {
   let bus = @mock.VirtualBus::new([])
   let nic = @mock.VirtualNic::new(bus)
   // Don't send anything first
-  let result : Result[Bytes, _] = try? nic.recv(timeout=@hal.Duration(0L))
+  let result : Result[Bytes, _] = Result::Ok(
+    nic.recv(timeout=@hal.Duration(0L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -717,7 +727,9 @@ test "RecordingNic records send failure" {
   inner.close()
   let rec = @mock.RecordingNic::wrap(inner)
   // inner is closed → send raises LinkDown → recorded as SendFailed
-  let result : Result[Int, _] = try? rec.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(rec.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
   let log = rec.get_log()
   assert_true(log.len() > 0)
@@ -735,7 +747,9 @@ test "ReplayNic send type mismatch raises SendFailed" {
   log.append(@mock.NicEvent::RecvTimeout)
   let replay = @mock.ReplayNic::from_log(log)
   // Cursor points to RecvTimeout, but we call send → type mismatch
-  let result : Result[Int, _] = try? replay.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(replay.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -745,7 +759,11 @@ test "ReplayNic recv type mismatch raises RecvFailed" {
   log.append(@mock.NicEvent::Sent(b"\x01", 1))
   let replay = @mock.ReplayNic::from_log(log)
   // Cursor points to Sent, but we call recv → type mismatch
-  let result : Result[Bytes, _] = try? replay.recv(timeout=@hal.Duration(0L))
+  let result : Result[Bytes, _] = Result::Ok(
+    replay.recv(timeout=@hal.Duration(0L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -762,7 +780,9 @@ test "FaultNic close delegates to inner" {
   let nic = @mock.FaultNic::new(inner, @mock.FaultInjector::new())
   nic.close()
   // After close, send should fail
-  let result : Result[Int, _] = try? nic.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(nic.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -775,7 +795,9 @@ test "RecordingNic records send failure from closed inner" {
   let rec = @mock.RecordingNic::wrap(inner)
   // Close the inner NIC to cause send failures
   inner.close()
-  let result : Result[Int, _] = try? rec.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(rec.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
   // Log should have a SendFailed event
   let log = rec.get_log()
@@ -789,7 +811,11 @@ test "RecordingNic records recv timeout" {
   let inner = @mock.VirtualNic::new(bus)
   let rec = @mock.RecordingNic::wrap(inner)
   // No data to receive → timeout
-  let result : Result[Bytes, _] = try? rec.recv(timeout=@hal.Duration(1_000L))
+  let result : Result[Bytes, _] = Result::Ok(
+    rec.recv(timeout=@hal.Duration(1_000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
   let log = rec.get_log()
   assert_eq(log.len(), 1)
@@ -862,7 +888,9 @@ test "RecordingNic close delegates to inner" {
   let rec = @mock.RecordingNic::wrap(inner)
   rec.close()
   // After close, send should fail
-  let result : Result[Int, _] = try? rec.send(b"\x01")
+  let result : Result[Int, _] = Result::Ok(rec.send(b"\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -931,7 +959,11 @@ test "RecordingNic records LinkDown on recv" {
   let inner = @mock.VirtualNic::new(bus)
   inner.close()
   let rec = @mock.RecordingNic::wrap(inner)
-  let result : Result[Bytes, _] = try? rec.recv(timeout=@hal.Duration(1_000L))
+  let result : Result[Bytes, _] = Result::Ok(
+    rec.recv(timeout=@hal.Duration(1_000L)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
   let log = rec.get_log()
   assert_true(log.events.length() > 0)

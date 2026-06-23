@@ -46,9 +46,11 @@ fn read_cli_text_file(
   path : String,
   label : String,
 ) -> String raise @hal.EcError {
-  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
-    path,
-  )
+  let content_result : Result[String, Error] = Result::Ok(
+    @fs.read_file_to_string(path),
+  ) catch {
+    err => Result::Err(err)
+  }
   match content_result {
     Ok(content) => content
     Err(err) =>

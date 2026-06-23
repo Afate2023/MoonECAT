@@ -238,9 +238,13 @@ fn run_zc_native_command(
   if scan_report.slave_count > 0 {
     for station in stations {
       ignore(
-        try? @protocol.transition_to_target_strict(
-          setup_nic, station, startup_state, timeout,
-        ),
+        Result::Ok(
+          @protocol.transition_to_target_strict(
+            setup_nic, station, startup_state, timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
       )
     }
   }
@@ -274,9 +278,13 @@ fn run_zc_native_command(
       let shutdown_nic = @native.NativeNic::open_with_config(config)
       for station in stations {
         ignore(
-          try? @protocol.transition_to_target_strict(
-            shutdown_nic, station, target, timeout,
-          ),
+          Result::Ok(
+            @protocol.transition_to_target_strict(
+              shutdown_nic, station, target, timeout,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       }
       shutdown_nic.close()
@@ -546,7 +554,11 @@ fn write_recording_log(
     slave_count=scan_report.slave_count,
     fingerprint=@debug.to_string(fingerprint),
   )
-  let result : Result[Unit, Error] = try? @fs.write_string_to_file(path, ndjson)
+  let result : Result[Unit, Error] = Result::Ok(
+    @fs.write_string_to_file(path, ndjson),
+  ) catch {
+    err => Result::Err(err)
+  }
   match result {
     Ok(_) => ()
     Err(err) =>
@@ -558,9 +570,11 @@ fn write_recording_log(
 
 ///|
 fn load_esi_json_text(path : String) -> String raise @hal.EcError {
-  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
-    path,
-  )
+  let content_result : Result[String, Error] = Result::Ok(
+    @fs.read_file_to_string(path),
+  ) catch {
+    err => Result::Err(err)
+  }
   match content_result {
     Ok(content) => content
     Err(err) =>

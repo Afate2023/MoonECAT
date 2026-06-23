@@ -48,15 +48,15 @@ pub(all) enum CycleDirective {
 pub(open) trait CycleHook {
   /// Called before PDO exchange. Receives mutable access to ProcessImage
   /// outputs via the PdoContext. Return a directive controlling cycle execution.
-  on_pre_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  fn on_pre_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
 
   /// Called after PDO exchange with the cycle result. Receives the updated
   /// ProcessImage inputs via PdoContext. Return a directive for the next step.
-  on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  fn on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
 
   /// Called when the runtime encounters a fault condition (timeout, WKC error,
   /// DC drift). The hook may log, record, or override recovery behavior.
-  on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
+  fn on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
 }
 
 ///|
@@ -71,19 +71,19 @@ pub fn NullCycleHook::new() -> NullCycleHook {
 }
 
 ///|
-pub impl CycleHook for NullCycleHook with on_pre_cycle(self, _snap, _ctx) {
+pub impl CycleHook for NullCycleHook with fn on_pre_cycle(self, _snap, _ctx) {
   ignore(self)
   Continue
 }
 
 ///|
-pub impl CycleHook for NullCycleHook with on_post_cycle(self, _snap, _ctx) {
+pub impl CycleHook for NullCycleHook with fn on_post_cycle(self, _snap, _ctx) {
   ignore(self)
   Continue
 }
 
 ///|
-pub impl CycleHook for NullCycleHook with on_fault(self, _snap, _err) {
+pub impl CycleHook for NullCycleHook with fn on_fault(self, _snap, _err) {
   ignore(self)
   Continue
 }

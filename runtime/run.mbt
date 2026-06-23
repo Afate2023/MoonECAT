@@ -162,9 +162,11 @@ pub fn required_sii_read_word_count(
   initial_eeprom : Bytes,
   initial_word_count : Int,
 ) -> Int {
-  let metadata : Result[@mailbox.SiiStandardMetadata, Error] = try? @mailbox.parse_sii_standard_metadata(
-    initial_eeprom,
-  )
+  let metadata : Result[@mailbox.SiiStandardMetadata, Error] = Result::Ok(
+    @mailbox.parse_sii_standard_metadata(initial_eeprom),
+  ) catch {
+    err => Result::Err(err)
+  }
   match metadata {
     Ok(value) => {
       let required_word_count = ((value.eeprom_size_bytes() + 3U) / 4U).reinterpret_as_int()
@@ -524,9 +526,11 @@ fn[N : @hal.Nic] refine_run_startup_preparation_override_in_preop(
   let mut current_logical_base = logical_base
   for item in slave_preparations {
     let (station, preparation) = item
-    let snapshot_result : Result[@protocol.EsmStatusSnapshot, Error] = try? @protocol.read_al_status_snapshot(
-      nic, station, timeout,
-    )
+    let snapshot_result : Result[@protocol.EsmStatusSnapshot, Error] = Result::Ok(
+      @protocol.read_al_status_snapshot(nic, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     let refined = match snapshot_result {
       Ok(snapshot) if snapshot.state == @protocol.PreOp &&
         !snapshot.error_indication &&
@@ -806,18 +810,26 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
   if !preparation.prefer_live_pdo_state {
     return preparation
   }
-  let direct_lengths_result : Result[(Int?, Int?), Error] = try? active_process_data_lengths_in_preop(
-    nic,
-    station,
-    preparation.mailbox_config,
-    timeout,
-  )
+  let direct_lengths_result : Result[(Int?, Int?), Error] = Result::Ok(
+    active_process_data_lengths_in_preop(
+      nic,
+      station,
+      preparation.mailbox_config,
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   let lengths_result : Result[(Int?, Int?), Error] = if should_retry_process_data_lengths_after_mailbox_refresh(
       direct_lengths_result,
     ) {
-    try? active_process_data_lengths_after_mailbox_refresh(
-      nic, station, preparation, timeout,
-    )
+    Result::Ok(
+      active_process_data_lengths_after_mailbox_refresh(
+        nic, station, preparation, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
   } else {
     direct_lengths_result
   }
@@ -889,9 +901,11 @@ fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
     let initial = prepare_slave_startup(
       nic, station, current_logical_base, startup_eeprom_word_count, timeout,
     )
-    let snapshot_result : Result[@protocol.EsmStatusSnapshot, Error] = try? @protocol.read_al_status_snapshot(
-      nic, station, timeout,
-    )
+    let snapshot_result : Result[@protocol.EsmStatusSnapshot, Error] = Result::Ok(
+      @protocol.read_al_status_snapshot(nic, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     let refined = match snapshot_result {
       Ok(snapshot) if snapshot.state == @protocol.PreOp &&
         !snapshot.error_indication &&
@@ -1356,19 +1370,25 @@ fn[N : @hal.Nic] drain_startup_mailbox(
 ) -> Unit {
   let zero_timeout = @hal.Duration(0L)
   for _drain = 0; _drain < startup_mailbox_drain_limit; _drain = _drain + 1 {
-    let poll_result : Result[Bool, @hal.EcError] = try? @protocol.mailbox_poll(
-      nic, station, mailbox_config, zero_timeout,
-    )
+    let poll_result : Result[Bool, @hal.EcError] = Result::Ok(
+      @protocol.mailbox_poll(nic, station, mailbox_config, zero_timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     match poll_result {
       Ok(true) =>
         ignore(
-          try? @protocol.mailbox_recv(
-            nic,
-            station,
-            mailbox_config,
-            zero_timeout,
-            max_polls=1,
-          ),
+          Result::Ok(
+            @protocol.mailbox_recv(
+              nic,
+              station,
+              mailbox_config,
+              zero_timeout,
+              max_polls=1,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       _ => return
     }
@@ -2224,16 +2244,20 @@ fn[N : @hal.Nic] stabilize_failed_startup_station(
       match snapshot {
         Some(status) if status.error_indication =>
           ignore(
-            try? @protocol.recover_al_error_for_transition(
-              nic, station, timeout,
-            ),
+            Result::Ok(
+              @protocol.recover_al_error_for_transition(nic, station, timeout),
+            ) catch {
+              err => Result::Err(err)
+            },
           )
         _ => ()
       }
       ignore(
-        try? @protocol.transition_to_target_strict(
-          nic, station, target, timeout,
-        ),
+        Result::Ok(
+          @protocol.transition_to_target_strict(nic, station, target, timeout),
+        ) catch {
+          err => Result::Err(err)
+        },
       )
     }
     None => ()
@@ -2432,13 +2456,17 @@ fn[N : @hal.Nic] transition_stations_for_startup(
       TransitionToSafeOp => ()
       DcPreconfigure =>
         ignore(
-          try? @protocol.dc_configure_linear(
-            nic,
-            stations,
-            run_config.cycle_period_ns.to_int().reinterpret_as_uint(),
-            timeout,
-            static_sync_iterations=32,
-          ),
+          Result::Ok(
+            @protocol.dc_configure_linear(
+              nic,
+              stations,
+              run_config.cycle_period_ns.to_int().reinterpret_as_uint(),
+              timeout,
+              static_sync_iterations=32,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       WarmupProcessData => warmup_process_data_for_op(nic, pdo_ctx, timeout)
       ValidateSmWatchdog =>
@@ -2579,18 +2607,26 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_preparations(
         continue
       Some(status) if status.error_indication =>
         ignore(
-          try? @protocol.recover_al_error_for_transition(nic, station, timeout),
+          Result::Ok(
+            @protocol.recover_al_error_for_transition(nic, station, timeout),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       _ => ()
     }
-    let mailbox_result : Result[Unit, Error] = try? apply_startup_mailbox_commands(
-      nic,
-      station,
-      preparation.mailbox_config,
-      preparation.startup_mailbox_commands,
-      PreOpToSafeOp,
-      timeout,
-    )
+    let mailbox_result : Result[Unit, Error] = Result::Ok(
+      apply_startup_mailbox_commands(
+        nic,
+        station,
+        preparation.mailbox_config,
+        preparation.startup_mailbox_commands,
+        PreOpToSafeOp,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match mailbox_result {
       Ok(_) => ()
       Err(_) =>
@@ -2725,14 +2761,18 @@ fn[N : @hal.Nic] apply_station_startup_mailbox_plans(
   timeout : @hal.Duration,
 ) -> RunFault? {
   for plan in plans {
-    let result : Result[Unit, Error] = try? apply_startup_mailbox_commands(
-      nic,
-      plan.station,
-      plan.mailbox_config,
-      plan.commands,
-      transition,
-      timeout,
-    )
+    let result : Result[Unit, Error] = Result::Ok(
+      apply_startup_mailbox_commands(
+        nic,
+        plan.station,
+        plan.mailbox_config,
+        plan.commands,
+        transition,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     guard result is Err(_) else { continue }
     return Some(
       startup_mailbox_plan_failed_fault(nic, plan.station, transition, timeout),
@@ -2841,7 +2881,11 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_preparation(
       ) => return None
     Some(status) if status.error_indication =>
       ignore(
-        try? @protocol.recover_al_error_for_transition(nic, station, timeout),
+        Result::Ok(
+          @protocol.recover_al_error_for_transition(nic, station, timeout),
+        ) catch {
+          err => Result::Err(err)
+        },
       )
     _ => ()
   }
@@ -2860,7 +2904,11 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_preparation(
   match snapshot {
     Some(status) if status.error_indication =>
       ignore(
-        try? @protocol.recover_al_error_for_transition(nic, station, timeout),
+        Result::Ok(
+          @protocol.recover_al_error_for_transition(nic, station, timeout),
+        ) catch {
+          err => Result::Err(err)
+        },
       )
     _ => ()
   }
@@ -3008,7 +3056,11 @@ fn[N : @hal.Nic] warmup_process_data_for_op(
   timeout : @hal.Duration,
 ) -> Unit {
   if pdo_ctx.logical_size > 0 {
-    ignore(try? @protocol.pdo_exchange_result(nic, pdo_ctx, timeout))
+    ignore(
+      Result::Ok(@protocol.pdo_exchange_result(nic, pdo_ctx, timeout)) catch {
+        err => Result::Err(err)
+      },
+    )
   }
 }
 

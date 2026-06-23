@@ -108,9 +108,11 @@ fn[N : @hal.Nic] compute_station_transition_report(
     let final_observation = transition_station_to_safeop_with_process_mapping_observe(
       nic, station, current, preparation, timeout,
     )
-    let final_snapshot = try? @protocol.read_al_status_snapshot(
-      nic, station, timeout,
-    )
+    let final_snapshot = Result::Ok(
+      @protocol.read_al_status_snapshot(nic, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     return {
       mode: "station-path",
       target,
@@ -162,9 +164,11 @@ fn[N : @hal.Nic] compute_station_transition_report(
   } else {
     Some(@protocol.request_state_observe(nic, station, target, timeout))
   }
-  let final_snapshot = try? @protocol.read_al_status_snapshot(
-    nic, station, timeout,
-  )
+  let final_snapshot = Result::Ok(
+    @protocol.read_al_status_snapshot(nic, station, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   {
     mode: if use_path {
       "station-path"

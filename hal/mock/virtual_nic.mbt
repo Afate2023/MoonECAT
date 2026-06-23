@@ -16,13 +16,13 @@ pub fn VirtualNic::new(bus : VirtualBus) -> VirtualNic {
 }
 
 ///|
-pub impl @hal.Nic for VirtualNic with open_(name) {
+pub impl @hal.Nic for VirtualNic with fn open_(name) {
   ignore(name)
   VirtualNic::new(VirtualBus::new([]))
 }
 
 ///|
-pub impl @hal.Nic for VirtualNic with send(self, data) {
+pub impl @hal.Nic for VirtualNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
@@ -33,7 +33,7 @@ pub impl @hal.Nic for VirtualNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for VirtualNic with recv(self, timeout~) {
+pub impl @hal.Nic for VirtualNic with fn recv(self, timeout~) {
   ignore(timeout)
   if !self.is_open {
     raise @hal.EcError::LinkDown
@@ -45,7 +45,7 @@ pub impl @hal.Nic for VirtualNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for VirtualNic with close(self) {
+pub impl @hal.Nic for VirtualNic with fn close(self) {
   self.is_open = false
 }
 

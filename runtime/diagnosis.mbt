@@ -177,9 +177,13 @@ pub fn[N : @hal.Nic] read_error_register(
   timeout : @hal.Duration,
 ) -> Byte raise @hal.EcError {
   let payload = diagnosis_timeout_step(
-    try? @protocol.sdo_upload_retry(
-      nic, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
-    ),
+    Result::Ok(
+      @protocol.sdo_upload_retry(
+        nic, station, mb_config, rmsm, 0x1001U, b'\x00', timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "CoE 0x1001:0 upload",
   )
   parse_error_register_payload(payload)
@@ -196,9 +200,13 @@ pub fn[N : @hal.Nic] read_diagnosis_counter(
   timeout : @hal.Duration,
 ) -> UInt raise @hal.EcError {
   let payload = diagnosis_timeout_step(
-    try? @protocol.sdo_upload_retry(
-      nic, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
-    ),
+    Result::Ok(
+      @protocol.sdo_upload_retry(
+        nic, station, mb_config, rmsm, 0x10F3U, b'\x00', timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "CoE 0x10F3:0 upload",
   )
   parse_u32_payload(payload)
@@ -863,18 +871,28 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
   station : UInt,
   timeout : @hal.Duration,
 ) -> DiagnosisSession raise @hal.EcError {
-  let original_snapshot_result : Result[AlStatusSnapshot, Error] = try? diagnosis_timeout_step(
-    try? read_al_status_snapshot_fp(nic, station, timeout),
-    "diagnosis.prepare.read_al_status_fp",
-  )
+  let original_snapshot_result : Result[AlStatusSnapshot, Error] = Result::Ok(
+    diagnosis_timeout_step(
+      Result::Ok(read_al_status_snapshot_fp(nic, station, timeout)) catch {
+        err => Result::Err(err)
+      },
+      "diagnosis.prepare.read_al_status_fp",
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   let original_state = match original_snapshot_result {
     Ok(snapshot) => snapshot.state
     Err(_) => @protocol.Init
   }
   let eeprom = diagnosis_timeout_step(
-    try? read_sii_with_metadata_ap(
-      nic, position, diagnosis_sii_word_count, timeout,
-    ),
+    Result::Ok(
+      read_sii_with_metadata_ap(
+        nic, position, diagnosis_sii_word_count, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.prepare.eeprom_read_ap",
   )
   let sii = @mailbox.parse_sii_header(eeprom)
@@ -915,18 +933,28 @@ pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
   station : UInt,
   timeout : @hal.Duration,
 ) -> MailboxSession raise @hal.EcError {
-  let original_snapshot_result : Result[AlStatusSnapshot, Error] = try? diagnosis_timeout_step(
-    try? read_al_status_snapshot_fp(nic, station, timeout),
-    "mailbox.prepare.read_al_status_fp",
-  )
+  let original_snapshot_result : Result[AlStatusSnapshot, Error] = Result::Ok(
+    diagnosis_timeout_step(
+      Result::Ok(read_al_status_snapshot_fp(nic, station, timeout)) catch {
+        err => Result::Err(err)
+      },
+      "mailbox.prepare.read_al_status_fp",
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   let original_state = match original_snapshot_result {
     Ok(snapshot) => snapshot.state
     Err(_) => @protocol.Init
   }
   let eeprom = diagnosis_timeout_step(
-    try? read_sii_with_metadata_ap(
-      nic, position, diagnosis_sii_word_count, timeout,
-    ),
+    Result::Ok(
+      read_sii_with_metadata_ap(
+        nic, position, diagnosis_sii_word_count, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "mailbox.prepare.eeprom_read_ap",
   )
   let sii = @mailbox.parse_sii_header(eeprom)
@@ -952,7 +980,11 @@ pub fn[N : @hal.Nic] restore_slave_diagnosis_state(
 ) -> @protocol.EsmState raise @hal.EcError {
   let restore_path = diagnosis_restore_path(original_state)
   diagnosis_timeout_step(
-    try? @protocol.transition_through(nic, station, restore_path, timeout),
+    Result::Ok(
+      @protocol.transition_through(nic, station, restore_path, timeout),
+    ) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.restore_original_state_fp",
   )
 }
@@ -968,7 +1000,11 @@ pub fn[N : @hal.Nic] restore_slave_mailbox_state(
 ) -> @protocol.EsmState raise @hal.EcError {
   let restore_path = diagnosis_restore_path(original_state)
   diagnosis_timeout_step(
-    try? @protocol.transition_through(nic, station, restore_path, timeout),
+    Result::Ok(
+      @protocol.transition_through(nic, station, restore_path, timeout),
+    ) catch {
+      err => Result::Err(err)
+    },
     "mailbox.restore_original_state_fp",
   )
 }
@@ -1065,39 +1101,57 @@ fn[N : @hal.Nic] enter_diagnosis_preop(
   if original_state != @protocol.Init {
     ignore(
       diagnosis_timeout_step(
-        try? @protocol.transition_through(
-          nic,
-          station,
-          @protocol.build_shutdown_path(original_state),
-          timeout,
-        ),
+        Result::Ok(
+          @protocol.transition_through(
+            nic,
+            station,
+            @protocol.build_shutdown_path(original_state),
+            timeout,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
         "diagnosis.prepare.request_init_fp",
       ),
     )
   }
   let preop_snapshot = diagnosis_timeout_step(
-    try? @protocol.read_al_status_snapshot(nic, station, timeout),
+    Result::Ok(@protocol.read_al_status_snapshot(nic, station, timeout)) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.prepare.read_al_status_before_preop_fp",
   )
   if preop_snapshot.error_indication {
     ignore(
       diagnosis_timeout_step(
-        try? @protocol.recover_al_error_for_transition(nic, station, timeout),
+        Result::Ok(
+          @protocol.recover_al_error_for_transition(nic, station, timeout),
+        ) catch {
+          err => Result::Err(err)
+        },
         "diagnosis.prepare.clear_al_error_fp",
       ),
     )
   }
   let confirmed_preop = diagnosis_timeout_step(
-    try? @protocol.transition_to_target_strict(
-      nic,
-      station,
-      @protocol.PreOp,
-      timeout,
-    ),
+    Result::Ok(
+      @protocol.transition_to_target_strict(
+        nic,
+        station,
+        @protocol.PreOp,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
     "diagnosis.prepare.request_preop_fp",
   )
   if confirmed_preop != @protocol.PreOp {
-    let status_code = try? @protocol.read_al_status_code(nic, station, timeout)
+    let status_code = Result::Ok(
+      @protocol.read_al_status_code(nic, station, timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     let status_code_text = match status_code {
       Ok(code) => code.to_string()
       Err(err) => @debug.to_string(err)
@@ -1124,9 +1178,13 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap(
   stage : String,
 ) -> Bytes raise @hal.EcError {
   for attempt = 0; attempt < diagnosis_sdo_max_attempts; attempt = attempt + 1 {
-    let result = try? diagnosis_sdo_upload_ap_once(
-      nic, position, station, mb_config, rmsm, index, subindex, timeout, stage,
-    )
+    let result = Result::Ok(
+      diagnosis_sdo_upload_ap_once(
+        nic, position, station, mb_config, rmsm, index, subindex, timeout, stage,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match result {
       Ok(payload) => return payload
       Err(@hal.EcError::Internal(message)) =>
@@ -1164,14 +1222,18 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
 ) -> Bytes raise @hal.EcError {
   ignore(position)
   let counter = diagnosis_timeout_step(
-    try? rmsm.begin_transaction(),
+    Result::Ok(rmsm.begin_transaction()) catch {
+      err => Result::Err(err)
+    },
     stage + ".begin_transaction",
   )
   let txn = @mailbox.build_sdo_upload(counter, station, index, subindex)
   let frame = txn.encode()
   diagnosis_drain_mailbox_fp(nic, station, mb_config)
   let _ = diagnosis_timeout_step(
-    try? @protocol.mailbox_send(nic, station, mb_config, frame, timeout),
+    Result::Ok(@protocol.mailbox_send(nic, station, mb_config, frame, timeout)) catch {
+      err => Result::Err(err)
+    },
     stage + ".mailbox_send_fp",
   )
   for _stale_attempt = 0
@@ -1186,7 +1248,9 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
       stage + ".mailbox_recv_fp",
     )
     let decoded = diagnosis_timeout_step(
-      try? @mailbox.decode_sdo_response(response_raw),
+      Result::Ok(@mailbox.decode_sdo_response(response_raw)) catch {
+        err => Result::Err(err)
+      },
       stage + ".decode_sdo_response",
     )
     let (mbh, resp) = decoded
@@ -1224,37 +1288,53 @@ fn[N : @hal.Nic] diagnosis_mailbox_recv_fp(
   timeout : @hal.Duration,
   stage : String,
 ) -> Bytes raise @hal.EcError {
-  let recv_result = try? @protocol.mailbox_recv_rmsm(
-    nic,
-    station,
-    mb_config,
-    rmsm,
-    timeout,
-    max_polls=diagnosis_mailbox_max_polls,
-  )
+  let recv_result = Result::Ok(
+    @protocol.mailbox_recv_rmsm(
+      nic,
+      station,
+      mb_config,
+      rmsm,
+      timeout,
+      max_polls=diagnosis_mailbox_max_polls,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   match recv_result {
     Ok(frame) => return frame
     Err(@hal.EcError::MailboxTimeout) => ()
     Err(err) => raise err
   }
   let sm0_status = diagnosis_register_snapshot(
-    try? @protocol.read_register_fp(
-      nic, station, @protocol.reg_sm_base, diagnosis_sm_window_size, timeout,
-    ),
+    Result::Ok(
+      @protocol.read_register_fp(
+        nic, station, @protocol.reg_sm_base, diagnosis_sm_window_size, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
   )
   let sm1_status = diagnosis_register_snapshot(
-    try? @protocol.read_register_fp(
-      nic,
-      station,
-      @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint(),
-      diagnosis_sm_window_size,
-      timeout,
-    ),
+    Result::Ok(
+      @protocol.read_register_fp(
+        nic,
+        station,
+        @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint(),
+        diagnosis_sm_window_size,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
   )
   let al_status = diagnosis_register_snapshot(
-    try? @protocol.read_register_fp(
-      nic, station, @protocol.reg_al_status, 2, timeout,
-    ),
+    Result::Ok(
+      @protocol.read_register_fp(
+        nic, station, @protocol.reg_al_status, 2, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    },
   )
   raise @hal.EcError::Internal(
     "timeout at " +
@@ -1276,19 +1356,25 @@ fn[N : @hal.Nic] diagnosis_drain_mailbox_fp(
   mb_config : @mailbox.MailboxConfig,
 ) -> Unit {
   let zero_timeout = @hal.Duration(0L)
-  let poll_result = try? @protocol.mailbox_poll(
-    nic, station, mb_config, zero_timeout,
-  )
+  let poll_result = Result::Ok(
+    @protocol.mailbox_poll(nic, station, mb_config, zero_timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match poll_result {
     Ok(true) =>
       ignore(
-        try? @protocol.mailbox_recv(
-          nic,
-          station,
-          mb_config,
-          zero_timeout,
-          max_polls=1,
-        ),
+        Result::Ok(
+          @protocol.mailbox_recv(
+            nic,
+            station,
+            mb_config,
+            zero_timeout,
+            max_polls=1,
+          ),
+        ) catch {
+          err => Result::Err(err)
+        },
       )
     _ => ()
   }
@@ -1307,7 +1393,9 @@ fn diagnosis_accept_response_counter(
   rmsm : @mailbox.Rmsm,
   counter : Byte,
 ) -> Bool raise @hal.EcError {
-  let validation = try? rmsm.validate_response(counter)
+  let validation = Result::Ok(rmsm.validate_response(counter)) catch {
+    err => Result::Err(err)
+  }
   match validation {
     Ok(is_new) => is_new
     Err(@hal.EcError::MailboxProtocol(message)) =>

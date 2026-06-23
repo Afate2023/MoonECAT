@@ -244,9 +244,13 @@ test "VirtualNic: close prevents further send/recv" {
   let bus = make_three_slave_bus()
   let nic = @mock.VirtualNic::new(bus)
   nic.close()
-  let send_result = try? nic.send(Bytes::new(0))
+  let send_result = Result::Ok(nic.send(Bytes::new(0))) catch {
+    err => Result::Err(err)
+  }
   @debug.debug_inspect(send_result, content="Err(LinkDown)")
-  let recv_result = try? nic.recv(timeout=@hal.Duration(1000L))
+  let recv_result = Result::Ok(nic.recv(timeout=@hal.Duration(1000L))) catch {
+    err => Result::Err(err)
+  }
   @debug.debug_inspect(recv_result, content="Err(LinkDown)")
 }
 
@@ -1145,7 +1149,9 @@ test "FaultNic: close marks nic closed" {
   let nic = @mock.FaultNic::new(inner, @mock.FaultInjector::new())
   nic.close()
   // After close, inner is_open should be false
-  let result : Result[Int, _] = try? nic.send(b"\x00")
+  let result : Result[Int, _] = Result::Ok(nic.send(b"\x00")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 
@@ -1156,7 +1162,9 @@ test "FaultNic: send with SendFailure raises" {
   let injector = @mock.FaultInjector::new()
   let nic = @mock.FaultNic::new(inner, injector)
   injector.add(@mock.SendFailure("boom"), @mock.AtCycle(0))
-  let result : Result[Int, _] = try? nic.send(b"\x00\x01")
+  let result : Result[Int, _] = Result::Ok(nic.send(b"\x00\x01")) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

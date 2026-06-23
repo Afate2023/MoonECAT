@@ -471,12 +471,16 @@ fn[N : @hal.Nic] read_live_pdo_reports(
   )
   if mailbox_session.original_state != @protocol.PreOp {
     ignore(
-      try? @runtime.restore_slave_mailbox_state(
-        nic,
-        station,
-        mailbox_session.original_state,
-        timeout,
-      ),
+      Result::Ok(
+        @runtime.restore_slave_mailbox_state(
+          nic,
+          station,
+          mailbox_session.original_state,
+          timeout,
+        ),
+      ) catch {
+        err => Result::Err(err)
+      },
     )
   }
   (rx, tx)
@@ -496,7 +500,9 @@ fn[N : @hal.Nic] build_pdo_audit_report(
   let live_result : Result[
     (PdoDirectionReport, PdoDirectionReport),
     @hal.EcError,
-  ] = try? read_live_pdo_reports(nic, station, timeout)
+  ] = Result::Ok(read_live_pdo_reports(nic, station, timeout)) catch {
+    err => Result::Err(err)
+  }
   match live_result {
     Ok((live_rx, live_tx)) => {
       let mismatches = pdo_direction_mismatch_messages(configured_rx, live_rx)

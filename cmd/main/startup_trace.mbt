@@ -121,9 +121,11 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
   timeout : @hal.Duration,
 ) -> Array[String] {
   let notes : Array[String] = []
-  let recover_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = try? @protocol.recover_al_error_for_transition(
-    nic, station, timeout,
-  )
+  let recover_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = Result::Ok(
+    @protocol.recover_al_error_for_transition(nic, station, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match recover_result {
     Ok(snapshot) =>
       notes.push(
@@ -134,21 +136,20 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
       )
     Err(err) => notes.push("recover-al-error failed: " + @debug.to_string(err))
   }
-  let request_init_result : Result[@protocol.EsmState, @hal.EcError] = try? @protocol.request_state(
-    nic,
-    station,
-    @protocol.Init,
-    timeout,
-  )
+  let request_init_result : Result[@protocol.EsmState, @hal.EcError] = Result::Ok(
+    @protocol.request_state(nic, station, @protocol.Init, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match request_init_result {
     Ok(state) => notes.push("request-init confirmed=" + @debug.to_string(state))
     Err(err) => {
       notes.push("request-init failed: " + @debug.to_string(err))
-      let broadcast_result : Result[UInt, @hal.EcError] = try? @protocol.broadcast_state(
-        nic,
-        @protocol.Init,
-        timeout,
-      )
+      let broadcast_result : Result[UInt, @hal.EcError] = Result::Ok(
+        @protocol.broadcast_state(nic, @protocol.Init, timeout),
+      ) catch {
+        err => Result::Err(err)
+      }
       match broadcast_result {
         Ok(wkc) => notes.push("broadcast-init wkc=" + wkc.to_string())
         Err(broadcast_err) =>
@@ -158,9 +159,11 @@ fn[N : @hal.Nic] startup_trace_reset_notes(
       }
     }
   }
-  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
-    nic, timeout,
-  )
+  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = Result::Ok(
+    @runtime.scan(nic, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   match scan_result {
     Ok(report) => {
       let stations = report.slaves.map(fn(slave) {
@@ -404,15 +407,21 @@ fn[N : @hal.Nic] capture_startup_trace_phase(
   name : String,
   timeout : @hal.Duration,
 ) -> StartupTracePhase {
-  let al_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = try? @protocol.read_al_status_snapshot(
-    nic, station, timeout,
-  )
-  let sm_result : Result[Array[EscSyncManagerRegisterReport], @hal.EcError] = try? read_sync_manager_reports(
-    nic, station, 0, 3, timeout,
-  )
-  let fmmu_result : Result[Array[EscFmmuRegisterReport], @hal.EcError] = try? read_fmmu_reports(
-    nic, station, 0, 1, timeout,
-  )
+  let al_result : Result[@protocol.EsmStatusSnapshot, @hal.EcError] = Result::Ok(
+    @protocol.read_al_status_snapshot(nic, station, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let sm_result : Result[Array[EscSyncManagerRegisterReport], @hal.EcError] = Result::Ok(
+    read_sync_manager_reports(nic, station, 0, 3, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let fmmu_result : Result[Array[EscFmmuRegisterReport], @hal.EcError] = Result::Ok(
+    read_fmmu_reports(nic, station, 0, 1, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   let notes : Array[String] = []
   let (al_state, al_error_flag, al_status_code) = match al_result {
     Ok(snapshot) =>
@@ -462,19 +471,25 @@ fn[N : @hal.Nic] startup_trace_drain_mailbox(
   for _drain = 0
       _drain < startup_trace_mailbox_drain_limit
       _drain = _drain + 1 {
-    let poll_result : Result[Bool, @hal.EcError] = try? @protocol.mailbox_poll(
-      nic, station, mailbox_config, zero_timeout,
-    )
+    let poll_result : Result[Bool, @hal.EcError] = Result::Ok(
+      @protocol.mailbox_poll(nic, station, mailbox_config, zero_timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     match poll_result {
       Ok(true) =>
         ignore(
-          try? @protocol.mailbox_recv(
-            nic,
-            station,
-            mailbox_config,
-            zero_timeout,
-            max_polls=1,
-          ),
+          Result::Ok(
+            @protocol.mailbox_recv(
+              nic,
+              station,
+              mailbox_config,
+              zero_timeout,
+              max_polls=1,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       _ => return
     }
@@ -545,9 +560,13 @@ fn[N : @hal.Nic] startup_trace_sdo_upload(
   for _attempt = 0
       _attempt < startup_trace_sdo_max_attempts
       _attempt = _attempt + 1 {
-    let result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload_once(
-      nic, station, mailbox_config, index, subindex, timeout,
-    )
+    let result : Result[Bytes, @hal.EcError] = Result::Ok(
+      startup_trace_sdo_upload_once(
+        nic, station, mailbox_config, index, subindex, timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     match result {
       Ok(payload) => return payload
       Err(err) => {
@@ -574,9 +593,13 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
   index : UInt,
   timeout : @hal.Duration,
 ) -> StartupTraceOdObject {
-  let count_result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload(
-    nic, station, mailbox_config, index, b'\x00', timeout,
-  )
+  let count_result : Result[Bytes, @hal.EcError] = Result::Ok(
+    startup_trace_sdo_upload(
+      nic, station, mailbox_config, index, b'\x00', timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   match count_result {
     Err(err) =>
       {
@@ -598,9 +621,13 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
         Some(count) =>
           for i = 1; i <= count.reinterpret_as_int(); i = i + 1 {
             let subindex = i.to_byte()
-            let entry_result : Result[Bytes, @hal.EcError] = try? startup_trace_sdo_upload(
-              nic, station, mailbox_config, index, subindex, timeout,
-            )
+            let entry_result : Result[Bytes, @hal.EcError] = Result::Ok(
+              startup_trace_sdo_upload(
+                nic, station, mailbox_config, index, subindex, timeout,
+              ),
+            ) catch {
+              err => Result::Err(err)
+            }
             match entry_result {
               Ok(entry_payload) =>
                 entries.push(
@@ -623,9 +650,11 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
   station : UInt,
   timeout : @hal.Duration,
 ) -> Array[StartupTraceOdObject] {
-  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = try? @runtime.scan(
-    nic, timeout,
-  )
+  let scan_result : Result[@runtime.ScanReport, @hal.EcError] = Result::Ok(
+    @runtime.scan(nic, timeout),
+  ) catch {
+    err => Result::Err(err)
+  }
   let target_slave = match scan_result {
     Ok(scan_report) =>
       Some(resolve_cli_slave(scan_report, Some(station))) catch {
@@ -650,12 +679,16 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
     }
     return objects
   }
-  let mailbox_session_result : Result[@runtime.MailboxSession, @hal.EcError] = try? @runtime.prepare_slave_mailbox_ap(
-    nic,
-    slave.position.reinterpret_as_uint(),
-    station,
-    timeout,
-  )
+  let mailbox_session_result : Result[@runtime.MailboxSession, @hal.EcError] = Result::Ok(
+    @runtime.prepare_slave_mailbox_ap(
+      nic,
+      slave.position.reinterpret_as_uint(),
+      station,
+      timeout,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   match mailbox_session_result {
     Err(err) =>
       for index in startup_trace_od_indices() {
@@ -681,12 +714,16 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
       }
       if mailbox_session.original_state != @protocol.PreOp {
         ignore(
-          try? @runtime.restore_slave_mailbox_state(
-            nic,
-            station,
-            mailbox_session.original_state,
-            timeout,
-          ),
+          Result::Ok(
+            @runtime.restore_slave_mailbox_state(
+              nic,
+              station,
+              mailbox_session.original_state,
+              timeout,
+            ),
+          ) catch {
+            err => Result::Err(err)
+          },
         )
       }
     }
@@ -740,12 +777,11 @@ fn[N : @hal.Nic] build_startup_trace_report(
     _ => true
   }
   if needs_mailbox_path {
-    let mailbox_write_result : Result[Unit, @hal.EcError] = try? @runtime.write_mailbox_mapping(
-      nic,
-      station,
-      preparation.mapping,
-      timeout,
-    )
+    let mailbox_write_result : Result[Unit, @hal.EcError] = Result::Ok(
+      @runtime.write_mailbox_mapping(nic, station, preparation.mapping, timeout),
+    ) catch {
+      err => Result::Err(err)
+    }
     phases.push(
       capture_startup_trace_phase(nic, station, "after_mailbox_write", timeout),
     )
@@ -766,17 +802,21 @@ fn[N : @hal.Nic] build_startup_trace_report(
         }
       }
     }
-    let preop_result : Result[@protocol.EsmState, @hal.EcError] = try? (match
-      transition_station_with_startup_mailbox_route_observe(
-        nic,
-        station,
-        @protocol.PreOp,
-        preparation,
-        timeout,
-      ) {
-      Some(observed) => observed.state
-      None => @protocol.read_al_status_snapshot(nic, station, timeout).state
-    })
+    let preop_result : Result[@protocol.EsmState, @hal.EcError] = Result::Ok(
+      match
+        transition_station_with_startup_mailbox_route_observe(
+          nic,
+          station,
+          @protocol.PreOp,
+          preparation,
+          timeout,
+        ) {
+        Some(observed) => observed.state
+        None => @protocol.read_al_status_snapshot(nic, station, timeout).state
+      },
+    ) catch {
+      err => Result::Err(err)
+    }
     phases.push(
       startup_trace_phase_with_od(nic, station, "after_preop_request", timeout),
     )
@@ -806,13 +846,17 @@ fn[N : @hal.Nic] build_startup_trace_report(
     _ => true
   }
   if needs_process_path {
-    let presafeop_mailbox_result : Result[Unit, @hal.EcError] = try? @runtime.apply_presafeop_startup_mailbox_commands(
-      nic,
-      station,
-      preparation.mailbox_config,
-      preparation.startup_mailbox_commands,
-      timeout,
-    )
+    let presafeop_mailbox_result : Result[Unit, @hal.EcError] = Result::Ok(
+      @runtime.apply_presafeop_startup_mailbox_commands(
+        nic,
+        station,
+        preparation.mailbox_config,
+        preparation.startup_mailbox_commands,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     phases.push(
       startup_trace_phase_with_od(
         nic, station, "after_presafeop_mailbox_commands", timeout,
@@ -835,12 +879,16 @@ fn[N : @hal.Nic] build_startup_trace_report(
         }
       }
     }
-    let process_result : Result[Unit, @hal.EcError] = try? @runtime.write_process_data_mapping(
-      nic,
-      station,
-      preparation.mapping,
-      timeout,
-    )
+    let process_result : Result[Unit, @hal.EcError] = Result::Ok(
+      @runtime.write_process_data_mapping(
+        nic,
+        station,
+        preparation.mapping,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     phases.push(
       startup_trace_phase_with_od(
         nic, station, "after_process_mapping_write", timeout,
@@ -868,12 +916,16 @@ fn[N : @hal.Nic] build_startup_trace_report(
         nic, station, "before_safeop_request", timeout,
       ),
     )
-    let safeop_result : Result[@protocol.EsmState, @hal.EcError] = try? transition_station_to_target_strict_after_recovery(
-      nic,
-      station,
-      @protocol.SafeOp,
-      timeout,
-    )
+    let safeop_result : Result[@protocol.EsmState, @hal.EcError] = Result::Ok(
+      transition_station_to_target_strict_after_recovery(
+        nic,
+        station,
+        @protocol.SafeOp,
+        timeout,
+      ),
+    ) catch {
+      err => Result::Err(err)
+    }
     phases.push(
       startup_trace_phase_with_od(nic, station, "after_safeop_request", timeout),
     )

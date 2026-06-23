@@ -221,9 +221,11 @@ fn resolve_validate_expected_configuration(
 ) -> @runtime.ConfigurationModel raise @hal.EcError {
   match flag_value(args, "--eni-json") {
     Some(path) => {
-      let content_result : Result[String, Error] = try? @fs.read_file_to_string(
-        path,
-      )
+      let content_result : Result[String, Error] = Result::Ok(
+        @fs.read_file_to_string(path),
+      ) catch {
+        err => Result::Err(err)
+      }
       let json_content = match content_result {
         Ok(content) => content
         Err(err) =>

@@ -25,9 +25,11 @@ test "cli require_interface_name validates flag presence" {
     require_interface_name(["moonecat", "scan", "--if", "eth0"]),
     "eth0",
   )
-  let result : Result[String, Error] = try? require_interface_name([
-    "moonecat", "scan",
-  ])
+  let result : Result[String, Error] = Result::Ok(
+    require_interface_name(["moonecat", "scan"]),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -131,17 +133,20 @@ test "cli native auto select error keeps filtered and probe notes" {
     ],
   }
   let timeout = @hal.Duration(1_000_000L)
-  let result : Result[@native.NativeNicConfig, Error] = try? select_native_cli_config_from_listing(
-    listing,
-    timeout,
-    fn(config, _timeout) {
+  let result : Result[@native.NativeNicConfig, Error] = Result::Ok(
+    select_native_cli_config_from_listing(listing, timeout, fn(
+      config,
+      _timeout,
+    ) {
       match config.interface_name {
         "eth0" => Ok(0)
         "eth1" => Err(@hal.EcError::LinkDown)
         _ => Err(@hal.EcError::Internal("unexpected candidate"))
       }
-    },
-  )
+    }),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected native auto select to fail")
   }
@@ -186,8 +191,14 @@ test "cli numeric flag parsers accept valid integers" {
 
 ///|
 test "cli numeric flag parsers reject invalid integers" {
-  let bad_uint : Result[UInt, Error] = try? parse_uint_flag("--position", "1a")
-  let bad_int : Result[Int, Error] = try? parse_int_flag("--words", "")
+  let bad_uint : Result[UInt, Error] = Result::Ok(
+    parse_uint_flag("--position", "1a"),
+  ) catch {
+    err => Result::Err(err)
+  }
+  let bad_int : Result[Int, Error] = Result::Ok(parse_int_flag("--words", "")) catch {
+    err => Result::Err(err)
+  }
   assert_true(bad_uint is Err(@hal.EcError::ConfigMismatch(_)))
   assert_true(bad_int is Err(@hal.EcError::ConfigMismatch(_)))
 }
@@ -206,9 +217,11 @@ test "cli timeout flag defaults to 1ms and parses milliseconds" {
 
 ///|
 test "cli timeout flag rejects non-positive values" {
-  let zero : Result[@hal.Duration, Error] = try? resolve_timeout([
-    "moonecat", "diagnosis", "--timeout-ms", "0",
-  ])
+  let zero : Result[@hal.Duration, Error] = Result::Ok(
+    resolve_timeout(["moonecat", "diagnosis", "--timeout-ms", "0"]),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(zero is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -223,19 +236,24 @@ test "cli run cycles default and parse explicit values" {
 
 ///|
 test "cli run cycles rejects non-positive values" {
-  let zero : Result[Int, Error] = try? resolve_run_cycles(
-    ["moonecat", "run", "--cycles", "0"],
-    false,
-  )
+  let zero : Result[Int, Error] = Result::Ok(
+    resolve_run_cycles(["moonecat", "run", "--cycles", "0"], false),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(zero is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
 ///|
 test "cli until-fault mode rejects explicit cycles" {
-  let bad : Result[Int, Error] = try? resolve_run_cycles(
-    ["moonecat", "run", "--until-fault", "--cycles", "10"],
-    true,
-  )
+  let bad : Result[Int, Error] = Result::Ok(
+    resolve_run_cycles(
+      ["moonecat", "run", "--until-fault", "--cycles", "10"],
+      true,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(bad is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -259,12 +277,16 @@ test "cli run loop settings parse timing and timeout controls" {
 
 ///|
 test "cli run loop settings reject progress output with json" {
-  let result : Result[@runtime.RunLoopSettings, Error] = try? resolve_run_loop_settings(
-    ["moonecat", "run", "--output-period-ms", "1000"],
-    true,
-    false,
-    false,
-  )
+  let result : Result[@runtime.RunLoopSettings, Error] = Result::Ok(
+    resolve_run_loop_settings(
+      ["moonecat", "run", "--output-period-ms", "1000"],
+      true,
+      false,
+      false,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -285,12 +307,16 @@ test "cli run loop settings allow ndjson progress with json" {
 
 ///|
 test "cli run loop settings reject ndjson progress without output period" {
-  let result : Result[@runtime.RunLoopSettings, Error] = try? resolve_run_loop_settings(
-    ["moonecat", "run", "--json", "--progress-ndjson", "--until-fault"],
-    true,
-    true,
-    true,
-  )
+  let result : Result[@runtime.RunLoopSettings, Error] = Result::Ok(
+    resolve_run_loop_settings(
+      ["moonecat", "run", "--json", "--progress-ndjson", "--until-fault"],
+      true,
+      true,
+      true,
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -335,10 +361,13 @@ test "cli resolve validate expected configuration defaults to scan projection" {
 ///|
 test "cli resolve validate expected configuration rejects XML ENI input" {
   let scan_report : @runtime.ScanReport = { slave_count: 0, slaves: [] }
-  let result : Result[@runtime.ConfigurationModel, Error] = try? resolve_validate_expected_configuration(
-    scan_report,
-    ["moonecat", "validate", "--eni", "config.xml"],
-  )
+  let result : Result[@runtime.ConfigurationModel, Error] = Result::Ok(
+    resolve_validate_expected_configuration(scan_report, [
+      "moonecat", "validate", "--eni", "config.xml",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
     fail("expected XML ENI validation path to be rejected")
   }
@@ -356,9 +385,11 @@ test "cli esm state parser accepts canonical names" {
 
 ///|
 test "cli esm state parser rejects unknown names" {
-  let result : Result[@protocol.EsmState, Error] = try? parse_esm_state_flag(
-    "--state", "running",
-  )
+  let result : Result[@protocol.EsmState, Error] = Result::Ok(
+    parse_esm_state_flag("--state", "running"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -481,10 +512,11 @@ test "cli optional byte flag parses values and defaults" {
 
 ///|
 test "cli optional byte flag rejects out-of-range values" {
-  let result : Result[Byte?, Error] = try? optional_byte_flag(
-    ["moonecat", "od", "--subindex", "256"],
-    "--subindex",
-  )
+  let result : Result[Byte?, Error] = Result::Ok(
+    optional_byte_flag(["moonecat", "od", "--subindex", "256"], "--subindex"),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -518,9 +550,11 @@ test "cli resolve od query supports list object and entry modes" {
 
 ///|
 test "cli resolve od query rejects orphan subindex" {
-  let result : Result[OdBrowseQuery, Error] = try? resolve_od_query([
-    "moonecat", "od", "--subindex", "1",
-  ])
+  let result : Result[OdBrowseQuery, Error] = Result::Ok(
+    resolve_od_query(["moonecat", "od", "--subindex", "1"]),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -594,10 +628,11 @@ test "cli resolve diagnosis slave rejects missing explicit station" {
       },
     ],
   }
-  let result : Result[@runtime.SlaveReport, Error] = try? resolve_cli_slave(
-    scan_report,
-    Some(0x2000U),
-  )
+  let result : Result[@runtime.SlaveReport, Error] = Result::Ok(
+    resolve_cli_slave(scan_report, Some(0x2000U)),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -628,10 +663,11 @@ test "cli resolve diagnosis station rejects ambiguous scan" {
       },
     ],
   }
-  let result : Result[@runtime.SlaveReport, Error] = try? resolve_cli_slave(
-    scan_report,
-    None,
-  )
+  let result : Result[@runtime.SlaveReport, Error] = Result::Ok(
+    resolve_cli_slave(scan_report, None),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(@hal.EcError::ConfigMismatch(_)))
 }
 
@@ -1166,10 +1202,14 @@ test "cli esi-sii projection renders siitool-like text sections" {
 
 ///|
 test "cli od stage preserves mailbox protocol classification" {
-  let result : Result[Int, Error] = try? od_stage(
-    Err(@hal.EcError::MailboxProtocol("payload too short")),
-    "od.get_od_list",
-  )
+  let result : Result[Int, Error] = Result::Ok(
+    od_stage(
+      Err(@hal.EcError::MailboxProtocol("payload too short")),
+      "od.get_od_list",
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::MailboxProtocol(message)) else {
     fail("expected mailbox protocol error")
   }

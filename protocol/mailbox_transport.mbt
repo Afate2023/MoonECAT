@@ -365,7 +365,11 @@ pub fn[N : @hal.Nic] mailbox_recv_rmsm(
   timeout : @hal.Duration,
   max_polls? : Int = default_max_polls,
 ) -> Bytes raise @hal.EcError {
-  let initial = try? mailbox_recv(nic, station, mb_config, timeout, max_polls~)
+  let initial = Result::Ok(
+    mailbox_recv(nic, station, mb_config, timeout, max_polls~),
+  ) catch {
+    err => Result::Err(err)
+  }
   match initial {
     Ok(data) => data
     Err(@hal.EcError::MailboxTimeout) =>
@@ -421,13 +425,11 @@ pub fn[N : @hal.Nic] mailbox_recv_ap_rmsm(
   timeout : @hal.Duration,
   max_polls? : Int = default_max_polls,
 ) -> Bytes raise @hal.EcError {
-  let initial = try? mailbox_recv_ap(
-    nic,
-    position,
-    mb_config,
-    timeout,
-    max_polls~,
-  )
+  let initial = Result::Ok(
+    mailbox_recv_ap(nic, position, mb_config, timeout, max_polls~),
+  ) catch {
+    err => Result::Err(err)
+  }
   match initial {
     Ok(data) => data
     Err(@hal.EcError::MailboxTimeout) =>

@@ -18,13 +18,13 @@ pub fn FaultNic::wrap(inner : VirtualNic) -> FaultNic {
 }
 
 ///|
-pub impl @hal.Nic for FaultNic with open_(name) {
+pub impl @hal.Nic for FaultNic with fn open_(name) {
   ignore(name)
   FaultNic::wrap(VirtualNic::new(VirtualBus::new([])))
 }
 
 ///|
-pub impl @hal.Nic for FaultNic with send(self, data) {
+pub impl @hal.Nic for FaultNic with fn send(self, data) {
   // Check for send-phase faults
   match self.injector.check_send() {
     Some(SendFailure(msg)) => raise @hal.EcError::SendFailed(msg)
@@ -36,7 +36,7 @@ pub impl @hal.Nic for FaultNic with send(self, data) {
 }
 
 ///|
-pub impl @hal.Nic for FaultNic with recv(self, timeout~) {
+pub impl @hal.Nic for FaultNic with fn recv(self, timeout~) {
   // Check for recv-phase faults BEFORE attempting real recv
   match self.injector.check_recv() {
     Some(RecvTimeout) => raise @hal.EcError::RecvTimeout
@@ -61,6 +61,6 @@ pub impl @hal.Nic for FaultNic with recv(self, timeout~) {
 }
 
 ///|
-pub impl @hal.Nic for FaultNic with close(self) {
+pub impl @hal.Nic for FaultNic with fn close(self) {
   self.inner.close()
 }

@@ -77,7 +77,11 @@ test "eni-json converter rejects invalid XML numeric fields" {
     #|    </Slave>
     #|  </Config>
     #|</EtherCATConfig>
-  let result : Result[String, Error] = try? convert_eni_xml_to_json_string(xml)
+  let result : Result[String, Error] = Result::Ok(
+    convert_eni_xml_to_json_string(xml),
+  ) catch {
+    err => Result::Err(err)
+  }
   guard result is Err(@hal.EcError::EsiParseFailed(message)) else {
     fail("expected invalid ENI numeric field to raise EsiParseFailed")
   }
@@ -353,7 +357,11 @@ test "esi-xml projects module with TxPdo and module Name text" {
 ///|
 test "esi-xml malformed XML triggers parse error" {
   let xml = "<EtherCATInfo><Vendor><unclosed"
-  let result : Result[String, Error] = try? convert_esi_xml_to_json_string(xml)
+  let result : Result[String, Error] = Result::Ok(
+    convert_esi_xml_to_json_string(xml),
+  ) catch {
+    err => Result::Err(err)
+  }
   assert_true(result is Err(_))
 }
 

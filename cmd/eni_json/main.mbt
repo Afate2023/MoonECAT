@@ -57,9 +57,11 @@ fn optional_kind_flag(args : Array[String]) -> String {
 
 ///|
 fn read_text_file(path : String, label : String) -> String raise @hal.EcError {
-  let content_result : Result[String, Error] = try? @fs.read_file_to_string(
-    path,
-  )
+  let content_result : Result[String, Error] = Result::Ok(
+    @fs.read_file_to_string(path),
+  ) catch {
+    err => Result::Err(err)
+  }
   match content_result {
     Ok(content) => content
     Err(err) =>
@@ -75,9 +77,11 @@ fn write_text_file(
   content : String,
   label : String,
 ) -> Unit raise @hal.EcError {
-  let write_result : Result[Unit, Error] = try? @fs.write_string_to_file(
-    path, content,
-  )
+  let write_result : Result[Unit, Error] = Result::Ok(
+    @fs.write_string_to_file(path, content),
+  ) catch {
+    err => Result::Err(err)
+  }
   match write_result {
     Ok(_) => ()
     Err(err) =>

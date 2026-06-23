@@ -90,7 +90,7 @@ test "FramePool::acquire exhaustion raises error" {
   let pool = @hal.FramePool::new(capacity=2, frame_size=64)
   let _ = pool.acquire()
   let _ = pool.acquire()
-  let result = try? pool.acquire()
+  let result = Result::Ok(pool.acquire()) catch { err => Result::Err(err) }
   assert_true(result is Err(_))
 }
 
