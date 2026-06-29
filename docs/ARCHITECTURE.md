@@ -240,6 +240,13 @@ declared in each package's `moon.pkg` file.
   dictionaries. It exports `NodeModel` and `ObjectBinding` sections for the
   neutral evidence schema and deliberately avoids Isochronon `ObjectContract`,
   ObjectMonitor, live NIC, pcap/tshark, certification, or publishing claims.
+- **Runtime Envelope / Oracle Evidence**:
+  `runtime/medium_envelope_oracle_evidence` records MoonECAT-owned offline
+  evidence from `RunReport`/`DiagnosticSurface` and
+  `NicEventLog`/NDJSON/`ReplayNic`. It exports `RuntimeEnvelope` and
+  `OracleArtifact` sections for the neutral evidence schema; `pcap`/tshark,
+  live NIC, certification, and Isochronon `TraceLog` adapters remain external
+  gates.
 - **Topology**: `TopologyFingerprint`/`TopologyFingerprintMatch`,
   `topology_fingerprint`/`fingerprint_match`,
   `TopologyHealthAnalyzer`/`TopologyHealthReport`/

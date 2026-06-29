@@ -1,0 +1,101 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/medium_envelope_oracle_evidence"
+
+import {
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/runtime",
+  "mokomoking2501/MoonECAT/runtime/medium_evidence",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn diagnostic_level_label(@runtime.DiagnosticLevel) -> String
+
+pub fn offline_runtime_run_report() -> @runtime.RunReport
+
+pub fn oracle_artifact_evidence_from_log(@mock.NicEventLog, slave_count? : Int, fingerprint? : String, recorded_result? : Int, replay_result? : Int) -> OracleArtifactEvidence
+
+pub fn recorded_count_slaves_oracle() -> RecordedCountSlavesOracle raise @hal.EcError
+
+pub fn replay_log_to_exhaustion(@mock.NicEventLog) -> Bool
+
+pub fn run_fault_label(@runtime.RunFault?) -> String
+
+pub fn run_phase_label(@runtime.RunPhase) -> String
+
+pub fn runtime_envelope_evidence_from_run(@runtime.RunReport, runtime_run_completed? : Bool) -> RuntimeEnvelopeEvidence
+
+pub fn runtime_envelope_oracle_evidence_report() -> RuntimeEnvelopeOracleEvidenceReport
+
+// Errors
+
+// Types and methods
+pub(all) struct OracleArtifactEvidence {
+  artifact_kind : String
+  artifact_ref : String
+  event_count : Int
+  ndjson_line_count : Int
+  ndjson_has_header : Bool
+  roundtrip_event_count : Int
+  roundtrip_matches_recorded : Bool
+  replay_exhausted : Bool
+  recorded_result : Int?
+  replay_result : Int?
+  record_replay_result_match : Bool
+  live_claimed : Bool
+  external_tool_required : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+pub fn OracleArtifactEvidence::covers_required_oracle_artifact(Self) -> Bool
+
+pub(all) struct RecordedCountSlavesOracle {
+  recorded_count : Int
+  replay_count : Int
+  log : @mock.NicEventLog
+  replay_exhausted : Bool
+} derive(@debug.Debug)
+
+pub(all) struct RuntimeEnvelopeEvidence {
+  cycles_requested : Int
+  cycles_ok : Int
+  until_fault : Bool
+  cycle_period_ns : Int64
+  output_period_ns : Int64?
+  telemetry_cycles : Int64
+  telemetry_tx_frames : Int64
+  telemetry_rx_frames : Int64
+  telemetry_timeouts : Int64
+  telemetry_retries : Int64
+  telemetry_wkc_errors : Int64
+  telemetry_irq_events : Int64
+  telemetry_dc_delay_updates : Int64
+  telemetry_emergency_events : Int64
+  final_phase : @runtime.RunPhase
+  final_phase_label : String
+  fault_label : String
+  diagnostic_issue_count : Int
+  diagnostic_overall_level : @runtime.DiagnosticLevel
+  diagnostic_overall_level_label : String
+  metrics_match_diagnostic_surface : Bool
+  runtime_run_completed : Bool
+  live_claimed : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+pub fn RuntimeEnvelopeEvidence::covers_required_runtime_envelope(Self) -> Bool
+
+pub(all) struct RuntimeEnvelopeOracleEvidenceReport {
+  report_version : String
+  envelope : RuntimeEnvelopeEvidence
+  oracle : OracleArtifactEvidence
+  verification_markdown : String
+  verification_json : String
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+pub fn RuntimeEnvelopeOracleEvidenceReport::covers_required_mc1d(Self) -> Bool
+pub fn RuntimeEnvelopeOracleEvidenceReport::to_oracle_artifact_section(Self) -> @medium_evidence.MediumEvidenceSection
+pub fn RuntimeEnvelopeOracleEvidenceReport::to_runtime_envelope_section(Self) -> @medium_evidence.MediumEvidenceSection
+
+// Type aliases
+
+// Traits

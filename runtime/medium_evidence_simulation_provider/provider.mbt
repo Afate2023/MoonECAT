@@ -3,12 +3,7 @@
 
 ///|
 pub fn describe_medium_evidence() -> @medium_evidence.MediumEvidenceReport {
-  let timing = @simulation.cycle_timing_report(
-    1_000_000L,
-    0L,
-    1_000_100L,
-    @simulation.Virtual,
-  )
+  let envelope_oracle = @medium_envelope_oracle_evidence.runtime_envelope_oracle_evidence_report()
   @medium_evidence.MediumEvidenceReport::make(
     report_version="medium-sixpack-evidence-v1",
     provider_id="moonecat.runtime.simulation",
@@ -36,21 +31,8 @@ pub fn describe_medium_evidence() -> @medium_evidence.MediumEvidenceReport {
         summary="keeps index, subindex, channel, direction and process-image offsets as exportable evidence, not as Isochronon ObjectContract values",
         boundary=@medium_evidence.StaticSchema,
       ),
-      @medium_evidence.MediumEvidenceSection::make(
-        stage=@medium_evidence.RuntimeEnvelope,
-        title="Runtime envelope metrics",
-        source="RunReport + Telemetry + DiagnosticSurface",
-        summary="covers cycle counts, timeout/retry/WKC/DC/emergency counters and diagnostic verdict sources for offline/replay analysis; sample virtual jitter_ns=\{timing.jitter_ns}",
-        boundary=@medium_evidence.MockSimulation,
-      ),
-      @medium_evidence.MediumEvidenceSection::make(
-        stage=@medium_evidence.OracleArtifact,
-        title="Replayable NIC artifact",
-        source="hal/mock/NicEventLog + RecordingNic + ReplayNic",
-        summary="uses record/replay as the first oracle artifact path; pcap/tshark and certification evidence remain external gates",
-        boundary=@medium_evidence.Replay,
-        artifact_ref="NicEventLog::to_ndjson_with_header",
-      ),
+      envelope_oracle.to_runtime_envelope_section(),
+      envelope_oracle.to_oracle_artifact_section(),
       @medium_evidence.MediumEvidenceSection::make(
         stage=@medium_evidence.ProfileProtocol,
         title="ESM/CoE/DS402 profile sequence",

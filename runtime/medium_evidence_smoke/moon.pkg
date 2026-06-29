@@ -1,4 +1,5 @@
 import {
+  "mokomoking2501/MoonECAT/runtime/medium_envelope_oracle_evidence",
   "mokomoking2501/MoonECAT/runtime/medium_evidence",
   "mokomoking2501/MoonECAT/runtime/medium_evidence_simulation_vocab",
   "mokomoking2501/MoonECAT/runtime/medium_evidence_slot",
