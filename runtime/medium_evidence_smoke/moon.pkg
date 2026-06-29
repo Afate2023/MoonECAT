@@ -1,0 +1,12 @@
+import {
+  "mokomoking2501/MoonECAT/runtime/medium_evidence",
+  "mokomoking2501/MoonECAT/runtime/medium_evidence_simulation_vocab",
+  "mokomoking2501/MoonECAT/runtime/medium_evidence_slot",
+  "moonbitlang/core/debug",
+}
+
+options(
+  overrides: [
+    "mokomoking2501/MoonECAT/runtime/medium_evidence_simulation_provider",
+  ],
+)

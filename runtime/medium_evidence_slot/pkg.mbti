@@ -1,0 +1,8 @@
+package "mokomoking2501/MoonECAT/runtime/medium_evidence_slot"
+
+import {
+  "mokomoking2501/MoonECAT/runtime/medium_evidence",
+}
+
+// Values
+fn describe_medium_evidence() -> @medium_evidence.MediumEvidenceReport

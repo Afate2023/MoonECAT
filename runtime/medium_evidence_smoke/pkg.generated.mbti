@@ -1,0 +1,25 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/medium_evidence_smoke"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn run_medium_evidence_call_chain_smoke() -> MediumEvidenceCallChainReport
+
+// Errors
+
+// Types and methods
+pub(all) struct MediumEvidenceCallChainReport {
+  provider_id : String
+  provider_kind : String
+  section_count : Int
+  covers_sixpack : Bool
+  diagnostic_label : String
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

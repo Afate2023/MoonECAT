@@ -1,0 +1,64 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/medium_evidence"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn medium_evidence_boundary_label(MediumEvidenceBoundary) -> String
+
+pub fn medium_evidence_diagnostic_label(MediumEvidenceDiagnostic) -> String
+
+pub fn medium_evidence_stage_label(MediumEvidenceStage) -> String
+
+// Errors
+
+// Types and methods
+pub(all) enum MediumEvidenceBoundary {
+  StaticSchema
+  MockSimulation
+  Replay
+  NativeOffline
+  LiveHardware
+  ExternalTool
+} derive(Eq, @debug.Debug)
+
+pub(all) extenum MediumEvidenceDiagnostic {
+  CoreSchema
+}
+
+pub(all) struct MediumEvidenceReport {
+  report_version : String
+  provider_id : String
+  provider_kind : String
+  sections : Array[MediumEvidenceSection]
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+pub fn MediumEvidenceReport::covers_sixpack(Self) -> Bool
+pub fn MediumEvidenceReport::has_stage(Self, MediumEvidenceStage) -> Bool
+pub fn MediumEvidenceReport::make(report_version~ : String, provider_id~ : String, provider_kind~ : String, sections~ : Array[MediumEvidenceSection], live_claimed? : Bool) -> Self
+pub fn MediumEvidenceReport::section_count(Self) -> Int
+
+pub(all) struct MediumEvidenceSection {
+  stage : MediumEvidenceStage
+  title : String
+  source : String
+  summary : String
+  boundary : MediumEvidenceBoundary
+  artifact_ref : String?
+} derive(Eq, @debug.Debug)
+pub fn MediumEvidenceSection::make(stage~ : MediumEvidenceStage, title~ : String, source~ : String, summary~ : String, boundary~ : MediumEvidenceBoundary, artifact_ref? : String) -> Self
+
+pub(all) enum MediumEvidenceStage {
+  MediumTransport
+  NodeModel
+  ObjectBinding
+  RuntimeEnvelope
+  OracleArtifact
+  ProfileProtocol
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits

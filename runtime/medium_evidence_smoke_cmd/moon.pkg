@@ -1,0 +1,10 @@
+import {
+  "mokomoking2501/MoonECAT/runtime/medium_evidence_smoke",
+}
+
+options(
+  "is-main": true,
+  overrides: [
+    "mokomoking2501/MoonECAT/runtime/medium_evidence_simulation_provider",
+  ],
+)

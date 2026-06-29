@@ -220,6 +220,13 @@ declared in each package's `moon.pkg` file.
   `monitor_startup_state`/`monitor_wkc_errors`,
   `MonitorRegistry` (可注册自定义 monitor),
   `VerificationReport` (JSON/Markdown 输出)。
+- **Medium Evidence**: `runtime/medium_evidence` owns
+  `MediumEvidenceReport`/`MediumEvidenceSection` and the six neutral evidence
+  stages (Medium/Node/Object/Envelope/Oracle/Profile)。`runtime/medium_evidence_slot`
+  is a virtual package selected with `overrides`; simulation evidence is split
+  into a provider package (`runtime/medium_evidence_simulation_provider`) and
+  a companion vocabulary package (`runtime/medium_evidence_simulation_vocab`),
+  so core runtime packages do not import higher-level conformance frameworks.
 - **Topology**: `TopologyFingerprint`/`TopologyFingerprintMatch`,
   `topology_fingerprint`/`fingerprint_match`,
   `TopologyHealthAnalyzer`/`TopologyHealthReport`/
