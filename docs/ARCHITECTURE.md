@@ -234,6 +234,12 @@ declared in each package's `moon.pkg` file.
   boundaries. It exports a `MediumTransport` section for the neutral evidence
   schema and does not claim live NIC, WKC/DC, pcap/tshark, certification, or
   Isochronon conformance results.
+- **Node/Object Evidence**: `runtime/node_object_evidence` records
+  MoonECAT-owned node and object facts from ESI/SII PDOs, process-image
+  offsets, startup SDO commands, DS402 hints, and mock `VirtualMailbox` object
+  dictionaries. It exports `NodeModel` and `ObjectBinding` sections for the
+  neutral evidence schema and deliberately avoids Isochronon `ObjectContract`,
+  ObjectMonitor, live NIC, pcap/tshark, certification, or publishing claims.
 - **Topology**: `TopologyFingerprint`/`TopologyFingerprintMatch`,
   `topology_fingerprint`/`fingerprint_match`,
   `TopologyHealthAnalyzer`/`TopologyHealthReport`/

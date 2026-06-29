@@ -1,0 +1,121 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/node_object_evidence"
+
+import {
+  "mokomoking2501/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/mailbox",
+  "mokomoking2501/MoonECAT/runtime",
+  "mokomoking2501/MoonECAT/runtime/medium_evidence",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn ds402_object_hint(UInt) -> String?
+
+pub fn node_model_evidence_from_esi_device(@runtime.EsiJsonDevice, @mailbox.SlaveMapping) -> NodeModelEvidence
+
+pub fn node_model_evidence_from_virtual_slave_template(@mock.VirtualSlaveTemplate, device_name~ : String, type_name~ : String, profile_no~ : UInt?) -> NodeModelEvidence
+
+pub fn object_bindings_from_esi_device(@runtime.EsiJsonDevice) -> Array[ObjectBindingEvidence]
+
+pub fn object_bindings_from_sii_pdos(Array[@mailbox.SiiPdo], Array[@mailbox.SiiPdo]) -> Array[ObjectBindingEvidence]
+
+pub fn object_evidence_channel_label(ObjectEvidenceChannel) -> String
+
+pub fn od_access_label(@mock.OdAccess) -> String
+
+pub fn startup_object_commands_from_runtime(Array[@runtime.StartupMailboxCommand]) -> Array[StartupObjectCommandEvidence]
+
+pub fn startup_transition_label(@runtime.StartupCommandTransition) -> String
+
+pub fn virtual_od_evidence(@mock.VirtualMailbox) -> Array[VirtualObjectDictionaryEvidence]
+
+// Errors
+
+// Types and methods
+pub(all) struct NodeIdentityEvidence {
+  vendor_id : UInt
+  product_code : UInt
+  revision : UInt
+  serial : UInt
+} derive(Eq, @debug.Debug)
+
+pub(all) struct NodeModelEvidence {
+  identity : NodeIdentityEvidence
+  device_name : String
+  type_name : String
+  profile_no : UInt?
+  ds402_profile_hint : Bool
+  sii_word_count : Int
+  sii_eeprom_bytes : Int
+  sync_manager_count : Int
+  fmmu_count : Int
+  rx_pdo_count : Int
+  tx_pdo_count : Int
+  output_bytes : Int
+  input_bytes : Int
+  virtual_slave_template_available : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+pub fn NodeModelEvidence::make(identity~ : NodeIdentityEvidence, device_name~ : String, type_name~ : String, profile_no~ : UInt?, ds402_profile_hint~ : Bool, sii_word_count~ : Int, sii_eeprom_bytes~ : Int, sync_manager_count~ : Int, fmmu_count~ : Int, rx_pdo_count~ : Int, tx_pdo_count~ : Int, output_bytes~ : Int, input_bytes~ : Int, virtual_slave_template_available~ : Bool, source~ : String) -> Self
+
+pub(all) struct NodeObjectEvidenceReport {
+  report_version : String
+  node_model : NodeModelEvidence
+  object_bindings : Array[ObjectBindingEvidence]
+  startup_commands : Array[StartupObjectCommandEvidence]
+  virtual_od : Array[VirtualObjectDictionaryEvidence]
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+pub fn NodeObjectEvidenceReport::covers_required_node_object_evidence(Self) -> Bool
+pub fn NodeObjectEvidenceReport::has_profile_hint(Self, String) -> Bool
+pub fn NodeObjectEvidenceReport::make(node_model~ : NodeModelEvidence, object_bindings~ : Array[ObjectBindingEvidence], startup_commands~ : Array[StartupObjectCommandEvidence], virtual_od~ : Array[VirtualObjectDictionaryEvidence]) -> Self
+pub fn NodeObjectEvidenceReport::to_node_model_section(Self) -> @medium_evidence.MediumEvidenceSection
+pub fn NodeObjectEvidenceReport::to_object_binding_section(Self) -> @medium_evidence.MediumEvidenceSection
+
+pub(all) struct ObjectBindingEvidence {
+  object_index : UInt
+  subindex : Byte
+  bit_length : Int
+  byte_offset : Int
+  bit_offset : Int
+  channel : ObjectEvidenceChannel
+  source_path : String
+  object_name : String
+  data_type_name : String
+  profile_hint : String?
+} derive(Eq, @debug.Debug)
+
+pub(all) enum ObjectEvidenceChannel {
+  EsiRxPdo
+  EsiTxPdo
+  SiiRxPdo
+  SiiTxPdo
+  StartupSdo
+  VirtualOd
+} derive(Eq, @debug.Debug)
+
+pub(all) struct StartupObjectCommandEvidence {
+  transition : @runtime.StartupCommandTransition
+  transition_label : String
+  object_index : UInt
+  subindex : Byte
+  data_length : Int
+  channel : ObjectEvidenceChannel
+  profile_hint : String?
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct VirtualObjectDictionaryEvidence {
+  object_index : UInt
+  subindex : Byte
+  data_length : Int
+  access_label : String
+  channel : ObjectEvidenceChannel
+  profile_hint : String?
+  source : String
+} derive(Eq, @debug.Debug)
+
+// Type aliases
+
+// Traits
