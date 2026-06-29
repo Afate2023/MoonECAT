@@ -227,6 +227,13 @@ declared in each package's `moon.pkg` file.
   into a provider package (`runtime/medium_evidence_simulation_provider`) and
   a companion vocabulary package (`runtime/medium_evidence_simulation_vocab`),
   so core runtime packages do not import higher-level conformance frameworks.
+- **Medium Semantics Evidence**: `runtime/medium_semantics_evidence` records
+  EtherCAT-specific mock/offline medium facts: VirtualBus segment traversal,
+  `LRD`/`LWR`/`LRW` frame classification, WKC contribution, ESM transition
+  validity, DC evidence points, fault/HAL event classes, and lookahead
+  boundaries. It exports a `MediumTransport` section for the neutral evidence
+  schema and does not claim live NIC, WKC/DC, pcap/tshark, certification, or
+  Isochronon conformance results.
 - **Topology**: `TopologyFingerprint`/`TopologyFingerprintMatch`,
   `topology_fingerprint`/`fingerprint_match`,
   `TopologyHealthAnalyzer`/`TopologyHealthReport`/

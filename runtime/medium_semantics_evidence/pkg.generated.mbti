@@ -1,0 +1,153 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/medium_semantics_evidence"
+
+import {
+  "mokomoking2501/MoonECAT/hal/mock",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/runtime/medium_evidence",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn classify_medium_command(@protocol.EcCommand) -> MediumCommandEvidence
+
+pub fn classify_mock_fault(@mock.FaultType) -> MediumFaultEvidence
+
+pub fn classify_mock_nic_event(@mock.NicEvent) -> MediumHalEventEvidence
+
+pub fn command_label(@protocol.EcCommand) -> String
+
+pub fn dc_semantics_evidence() -> DcSemanticsEvidence
+
+pub fn esm_transition_evidence(@protocol.EsmState, @protocol.EsmState) -> EsmTransitionEvidence
+
+pub fn lookahead_boundary_evidence() -> LookaheadBoundaryEvidence
+
+pub fn medium_fault_class_label(MediumFaultClass) -> String
+
+pub fn medium_frame_kind_label(MediumFrameKind) -> String
+
+pub fn medium_hal_event_class_label(MediumHalEventClass) -> String
+
+pub fn medium_semantics_report() -> MediumSemanticsReport
+
+pub fn segment_traversal_evidence() -> SegmentTraversalEvidence
+
+// Errors
+
+// Types and methods
+pub(all) struct DcSemanticsEvidence {
+  latch_register : UInt
+  system_time_register : UInt
+  sync_window_register : UInt
+  check_source : String
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+
+pub(all) struct EsmTransitionEvidence {
+  from : @protocol.EsmState
+  target : @protocol.EsmState
+  valid : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct LookaheadBoundaryEvidence {
+  max_pdus_per_frame : Int
+  outstanding_frames : Int
+  supports_frame_internal_batching : Bool
+  supports_cross_cycle_pipeline : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MediumCommandEvidence {
+  command_label : String
+  command_byte : Byte
+  frame_kind : MediumFrameKind
+  uses_logical_fmmu : Bool
+  reads_process_data : Bool
+  writes_process_data : Bool
+  wkc_contribution : WkcContribution
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MediumFaultClass {
+  ReceiveTimeout
+  TransmitFailure
+  FrameLoss
+  FrameMutation
+  WorkingCounterMutation
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MediumFaultEvidence {
+  fault_class : MediumFaultClass
+  affects_send : Bool
+  affects_recv : Bool
+  can_change_wkc : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MediumFrameKind {
+  NoopFrame
+  PhysicalRead
+  PhysicalWrite
+  PhysicalReadWrite
+  BroadcastRead
+  BroadcastWrite
+  BroadcastReadWrite
+  LogicalRead
+  LogicalWrite
+  LogicalReadWrite
+  MultipleWrite
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MediumHalEventClass {
+  TxFrame
+  RxFrame
+  RxTimeout
+  RxFailure
+  LinkState
+  TxFailure
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MediumHalEventEvidence {
+  event_class : MediumHalEventClass
+  replayable : Bool
+  native_live_claimed : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) struct MediumSemanticsReport {
+  report_version : String
+  segment_traversal : SegmentTraversalEvidence
+  command_evidence : Array[MediumCommandEvidence]
+  esm_valid : EsmTransitionEvidence
+  esm_invalid : EsmTransitionEvidence
+  dc : DcSemanticsEvidence
+  fault_evidence : Array[MediumFaultEvidence]
+  hal_event_evidence : Array[MediumHalEventEvidence]
+  lookahead : LookaheadBoundaryEvidence
+  live_claimed : Bool
+} derive(Eq, @debug.Debug)
+pub fn MediumSemanticsReport::covers_required_medium_semantics(Self) -> Bool
+pub fn MediumSemanticsReport::has_logical_command(Self, MediumFrameKind) -> Bool
+pub fn MediumSemanticsReport::to_medium_evidence_section(Self) -> @medium_evidence.MediumEvidenceSection
+
+pub(all) struct SegmentTraversalEvidence {
+  traversal_model : String
+  visits_slaves_in_wire_order : Bool
+  swaps_response_mac : Bool
+  accumulates_pdu_wkc : Bool
+  source : String
+} derive(Eq, @debug.Debug)
+
+pub(all) enum WkcContribution {
+  NoWkc
+  ReadOnly
+  WriteOnly
+  ReadWrite
+} derive(Eq, @debug.Debug)
+pub fn WkcContribution::expected_single_match_increment(Self) -> UInt
+
+// Type aliases
+
+// Traits
