@@ -65,7 +65,7 @@ fn run_mock_command_with_fresh_nic(
 
 ///|
 fn run_native_command_with_fresh_nic(
-  config : @native.NativeNicConfig,
+  config : ExternalHarnessConfig,
   args : Array[String],
   as_json : Bool,
   startup_state : @protocol.EsmState,
@@ -75,89 +75,15 @@ fn run_native_command_with_fresh_nic(
   record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  let probe_nic = @native.NativeNic::open_with_config(config)
-  let scan_report = @runtime.scan(probe_nic, timeout)
-  let expected = expected_from_scan(scan_report)
-  probe_nic.close()
-  let run_nic = @native.NativeNic::open_with_config(config)
-  let startup_preparation_override = if target_requires_process_data_configuration(
-      startup_state,
-    ) {
-    resolve_run_startup_preparation_override(
-      run_nic, scan_report, args, timeout,
-    )
-  } else {
-    None
-  }
-  let preparation = match startup_preparation_override {
-    Some(prepared) => prepared
-    None =>
-      if target_requires_process_data_configuration(startup_state) {
-        @runtime.build_run_startup_preparation(
-          run_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count,
-          timeout,
-        )
-      } else {
-        {
-          pdo_ctx: @protocol.PdoContext::build([], 0U),
-          expected_wkc: 0U,
-          dc_cycle_period_ns: None,
-          startup_mailbox_plans: [],
-          esm_timeout_policies: [],
-          slave_preparations: None,
-        }
-      }
-  }
-  let run_config = @runtime.master_config_with_optional_dc(
-    preparation.dc_cycle_period_ns,
-  )
-  let run_report = match record_path {
-    None => {
-      let report = run_with_progress_output(
-        run_nic,
-        Some(scan_report),
-        run_config,
-        expected,
-        preparation.pdo_ctx,
-        preparation.expected_wkc,
-        settings,
-        startup_state,
-        shutdown_state,
-        startup_preparation_override,
-        progress_output,
-        timeout,
-      )
-      run_nic.close()
-      report
-    }
-    Some(path) => {
-      let recorder = @mock.RecordingNicAdapter::wrap(run_nic)
-      let report = run_with_progress_output(
-        recorder,
-        Some(scan_report),
-        run_config,
-        expected,
-        preparation.pdo_ctx,
-        preparation.expected_wkc,
-        settings,
-        startup_state,
-        shutdown_state,
-        startup_preparation_override,
-        progress_output,
-        timeout,
-      )
-      @hal.Nic::close(recorder)
-      write_recording_log(path, recorder.get_log(), scan_report)
-      report
-    }
-  }
-  if as_json && progress_output != Ndjson {
-    println(run_report_json(run_report).stringify(indent=2))
-  } else if as_json {
-    println(run_report_ndjson(run_report).stringify())
-  } else {
-    println(run_report.format())
-  }
+  ignore(args)
+  ignore(as_json)
+  ignore(startup_state)
+  ignore(shutdown_state)
+  ignore(settings)
+  ignore(progress_output)
+  ignore(record_path)
+  ignore(timeout)
+  raise_native_harness_pending("run", config)
 }
 
 ///|
@@ -200,127 +126,19 @@ fn run_zc_mock_command(
 ///|
 /// run-zc native backend: scan with Nic, transition states, then zero-copy PDO hot loop.
 fn run_zc_native_command(
-  config : @native.NativeNicConfig,
+  config : ExternalHarnessConfig,
   args : Array[String],
   cycles : Int,
   pool_capacity : Int,
   as_json : Bool,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  // Phase 1: probe/scan using standard Nic
-  let probe_nic = @native.NativeNic::open_with_config(config)
-  let scan_report = @runtime.scan(probe_nic, timeout)
-  probe_nic.close()
-  // Phase 2: state transitions using standard Nic
-  let setup_nic = @native.NativeNic::open_with_config(config)
-  let startup_state = optional_esm_state_flag(
-    args,
-    "--startup-state",
-    @protocol.Op,
-  )
-  let shutdown_state = optional_shutdown_state_flag(args, "--shutdown-state")
-  let stations = scan_report.slaves.map(fn(s) { s.station_address })
-  let preparation = if target_requires_process_data_configuration(startup_state) {
-    @runtime.build_run_startup_preparation(
-      setup_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count, timeout,
-    )
-  } else {
-    {
-      pdo_ctx: @protocol.PdoContext::build([], 0U),
-      expected_wkc: 0U,
-      dc_cycle_period_ns: None,
-      startup_mailbox_plans: [],
-      esm_timeout_policies: [],
-      slave_preparations: None,
-    }
-  }
-  // Transition to target state
-  if scan_report.slave_count > 0 {
-    for station in stations {
-      ignore(
-        Result::Ok(
-          @protocol.transition_to_target_strict(
-            setup_nic, station, startup_state, timeout,
-          ),
-        ) catch {
-          err => Result::Err(err)
-        },
-      )
-    }
-  }
-  setup_nic.close()
-  // Phase 3: zero-copy hot loop using NativeZeroCopyNic
-  let pool = @hal.FramePool::new(capacity=pool_capacity)
-  let zc_nic = @native.NativeZeroCopyNic::open_with_config(config, pool)
-  // Build MutablePdoContext from the same slave mappings
-  let zc_ctx = build_mutable_pdo_context_from_preparation(preparation)
-  let mut ok_count = 0
-  let mut timeout_count = 0L
-  let mut wkc_errors = 0L
-  for _i = 0; _i < cycles; _i = _i + 1 {
-    let result = @protocol.pdo_exchange_zero_copy(zc_nic, zc_ctx, timeout) catch {
-      @hal.EcError::RecvTimeout => {
-        timeout_count = timeout_count + 1L
-        continue
-      }
-      err => raise err
-    }
-    if result.wkc >= preparation.expected_wkc {
-      ok_count = ok_count + 1
-    } else {
-      wkc_errors = wkc_errors + 1L
-    }
-  }
-  zc_nic.close()
-  // Phase 4: shutdown using standard Nic
-  match shutdown_state {
-    Some(target) => {
-      let shutdown_nic = @native.NativeNic::open_with_config(config)
-      for station in stations {
-        ignore(
-          Result::Ok(
-            @protocol.transition_to_target_strict(
-              shutdown_nic, station, target, timeout,
-            ),
-          ) catch {
-            err => Result::Err(err)
-          },
-        )
-      }
-      shutdown_nic.close()
-    }
-    None => ()
-  }
-  let report = zc_run_report(cycles, ok_count, timeout_count, wkc_errors)
-  if as_json {
-    println(report.stringify(indent=2))
-  } else {
-    println(zc_run_report_text(cycles, ok_count, timeout_count, wkc_errors))
-  }
-}
-
-///|
-/// Build MutablePdoContext from a RunStartupPreparation (reuses slave mappings).
-fn build_mutable_pdo_context_from_preparation(
-  preparation : @runtime.RunStartupPreparation,
-) -> @protocol.MutablePdoContext {
-  // Mirror the slave mappings from PdoContext into MutablePdoContext
-  let pdo_ctx = preparation.pdo_ctx
-  let slave_mappings : Array[(@mailbox.SlaveMapping, UInt)] = []
-  for m in pdo_ctx.mappings {
-    slave_mappings.push(
-      (
-        {
-          sm_configs: [],
-          fmmu_configs: [],
-          output_bytes: m.output_length,
-          input_bytes: m.input_length,
-        },
-        m.station,
-      ),
-    )
-  }
-  @protocol.MutablePdoContext::build(slave_mappings, pdo_ctx.logical_base)
+  ignore(args)
+  ignore(cycles)
+  ignore(pool_capacity)
+  ignore(as_json)
+  ignore(timeout)
+  raise_native_harness_pending("run-zc", config)
 }
 
 ///|

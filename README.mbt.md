@@ -8,7 +8,7 @@ A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B
 |---------|-------|-------------|
 | `hal/` | Platform HAL | Network send/recv, timing, scheduling traits; FramePool/ZeroCopyNic |
 | `hal/mock/` | Platform HAL | Mock loopback, VirtualBus, RecordingNic, ReplayNic, FaultNic |
-| `hal/native/` | Platform HAL | Windows Npcap + Linux Raw Socket native backends |
+| `hal/native/` | Legacy Platform HAL | Deprecated native backend retained for migration history; live NIC access is moving to provider-owned Lockwire session harnesses |
 | `hal/mcu/` | Platform HAL | MCU bare-metal HAL stubs (RZ/N2L, HPM6E00) |
 | `protocol/` | Protocol Core | Frame/PDU codec, ESM, PDO, zero-copy codec, addressing |
 | `mailbox/` | Mailbox & Config | CoE/SDO, SII/ESI parsing, FMMU/SM, RMSM, Emergency |

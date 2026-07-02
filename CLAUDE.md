@@ -23,7 +23,7 @@ Finishing-touches for any change: run `moon info && moon fmt`, then inspect the 
 ### CLI gotchas (read before running `cmd/main`)
 
 - **MoonBit flags belong to `moon`, MoonECAT flags go after `--`.** Without the `--` separator, flags like `--backend` and `--if` are swallowed by `moon run` itself. Example: `moon run cmd/main scan -- --backend native --if eth0 --json`.
-- **The CLI and `hal/native` only build on the native target** (`cmd/main` declares `supported_targets = "+native"`). Always pass `--target native`. The default module target is also `native` (`preferred-target` in `moon.mod.json`).
+- **The CLI still builds only on the native target** (`cmd/main` declares `supported_targets = "+native"`), but live NIC access has moved out of this package. Native backend flags now produce provider-harness pending output/errors; use the Isochronon `fieldbus_core/moonecat_master_harness` delivery path for Lockwire-backed live sessions.
 - `--backend native` resolves to Windows Npcap when available, else Linux Raw Socket; use `native-windows-npcap` / `native-linux-raw` to force one. `--backend mock` needs no hardware and is what tests use.
 
 See [README.mbt.md](README.mbt.md) for the full CLI surface (scan/validate/run/run-zc/diagnosis/od/state/replay/scenario/analysis subcommands) and parameter table.
@@ -49,11 +49,11 @@ The repository root is itself the library package `mokomoking2501/MoonECAT` (`Mo
 
 ### HAL backends
 
-`hal/` defines the traits; `hal/mock/` is the test/verification backend (VirtualBus, fault injection, record→replay, fuzzing, scenarios) used by nearly all tests; `hal/native/` is the real Windows Npcap + Linux Raw Socket implementation; `hal/mcu/` is a bare-metal skeleton. When the hot path matters, there is a parallel zero-copy lane: `ZeroCopyNic` + `FramePool` + `MutableProcessImage`, and `pdo_exchange_zero_copy` in `protocol/`.
+`hal/` defines the traits; `hal/mock/` is the test/verification backend (VirtualBus, fault injection, record→replay, fuzzing, scenarios) used by nearly all tests; `hal/native/` is deprecated migration history for the old Windows Npcap + Linux Raw Socket implementation; `hal/mcu/` is a bare-metal skeleton. When the hot path matters, there is a parallel zero-copy lane: `ZeroCopyNic` + `FramePool` + `MutableProcessImage`, and `pdo_exchange_zero_copy` in `protocol/`. New live NIC work belongs in provider-owned Lockwire session harnesses, not in MoonECAT protocol packages.
 
 ### Native FFI target gating
 
-`hal/native/moon.pkg` is the model to copy when touching native code. FFI files are gated per-target via the `targets:` table — e.g. `windows_npcap_ffi.mbt` builds only on `native`, with a `*_fallback.mbt` twin compiled on every other target so the package still type-checks under wasm-gc. C glue is listed under `"native-stub"`. If you add a native `*_ffi.mbt`, add its non-native fallback and register both in `targets:`. FFI handle-lifetime and sanitizer rules live in [docs/NATIVE_FFI_SAFETY.md](docs/NATIVE_FFI_SAFETY.md).
+Do not add new native C stubs in MoonECAT. The old `hal/native/moon.pkg` target-gating pattern is retained only until migration cleanup deletes or archives that package; Lockwire owns the NIC/session C ABI surface.
 
 ## MoonBit conventions (project-specific)
 

@@ -115,17 +115,18 @@ fn try_handle_analysis_cli_command(
 }
 
 ///|
-fn open_native_cli_nic(
+fn reject_native_cli_command(
   command : String,
   args : Array[String],
   backend : CliBackend,
   timeout : @hal.Duration,
-) -> @native.NativeNic raise @hal.EcError {
+) -> Unit raise @hal.EcError {
   match backend {
     Mock =>
       raise @hal.EcError::NotSupported(command + " requires a native backend")
     _ =>
-      @native.NativeNic::open_with_config(
+      raise_native_harness_pending(
+        command,
         resolve_native_cli_config(args, backend, timeout),
       )
   }
@@ -140,56 +141,56 @@ fn try_handle_native_cli_command(
   timeout : @hal.Duration,
 ) -> Bool raise @hal.EcError {
   if command == "read-sii" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_read_sii_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "diagnosis" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_diagnosis_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "od" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_od_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "esc-regs" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_esc_register_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "expected-regs" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_expected_register_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "startup-diff" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_startup_diff_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "mailbox-readback" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_mailbox_readback_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "startup-trace" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_startup_trace_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
   if command == "state" {
-    let nic = open_native_cli_nic(command, args, backend, timeout)
-    run_state_command(nic, args, as_json, timeout)
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
     return true
   }
 
@@ -310,10 +311,8 @@ fn run_default_cli_command(
         timeout,
       )
     _ => {
-      let nic = @native.NativeNic::open_with_config(
-        resolve_native_cli_config(args, backend, timeout),
-      )
-      run_command_with_nic(command, nic, args, as_json, timeout)
+      ignore(as_json)
+      reject_native_cli_command(command, args, backend, timeout)
     }
   }
 }

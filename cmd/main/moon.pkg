@@ -1,7 +1,6 @@
 import {
   "mokomoking2501/MoonECAT" @lib,
   "mokomoking2501/MoonECAT/hal",
-  "mokomoking2501/MoonECAT/hal/native",
   "mokomoking2501/MoonECAT/hal/mock",
   "mokomoking2501/MoonECAT/mailbox",
   "mokomoking2501/MoonECAT/protocol",

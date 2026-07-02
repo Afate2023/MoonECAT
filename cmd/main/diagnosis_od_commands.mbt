@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] run_diagnosis_command(
+pub fn[N : @hal.Nic] run_diagnosis_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -132,7 +132,7 @@ fn resolve_od_query(args : Array[String]) -> OdBrowseQuery raise @hal.EcError {
 }
 
 ///|
-fn[N : @hal.Nic] run_od_command(
+pub fn[N : @hal.Nic] run_od_command(
   nic : N,
   args : Array[String],
   as_json : Bool,

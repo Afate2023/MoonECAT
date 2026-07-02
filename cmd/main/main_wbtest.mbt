@@ -34,153 +34,36 @@ test "cli require_interface_name validates flag presence" {
 }
 
 ///|
-test "cli native config helper maps explicit backends" {
-  @debug.assert_eq(
-    native_config_for_backend(@native.WindowsNpcap, "npcap0").backend,
-    @native.WindowsNpcap,
-  )
-  @debug.assert_eq(
-    native_config_for_backend(@native.LinuxRawSocket, "eth0").backend,
-    @native.LinuxRawSocket,
-  )
-  @debug.assert_eq(
-    native_config_for_backend(@native.Auto, "eth0").backend,
-    @native.Auto,
-  )
+test "cli native config helper maps explicit harness backends" {
+  let win = native_config_for_backend(NativeWindowsNpcap, "npcap0")
+  @debug.assert_eq(win.backend_label, "native-windows-npcap")
+  @debug.assert_eq(win.driver_id, "moonecat.windows_npcap.raw_frame")
+  @debug.assert_eq(win.session_id, "native.link-session.npcap")
+  let linux = native_config_for_backend(NativeLinuxRaw, "eth0")
+  @debug.assert_eq(linux.backend_label, "native-linux-raw")
+  @debug.assert_eq(linux.driver_id, "moonecat.linux_raw_socket.raw_frame")
+  @debug.assert_eq(linux.session_id, "native.link-session.raw-socket")
+  let auto = native_config_for_backend(NativeAuto, "eth0")
+  @debug.assert_eq(auto.backend_label, "native")
+  assert_true(auto.session_id.contains("native.link-session"))
 }
 
 ///|
-test "cli native auto select picks first probing candidate with slaves" {
-  let listing : @native.NativeInterfaceListing = {
-    backend: @native.WindowsNpcap,
-    interfaces: [
-      {
-        name: "wifi0",
-        description: "Wi-Fi",
-        loopback: false,
-        up: true,
-        connected: true,
-        wireless: true,
-        index: None,
-      },
-      {
-        name: "eth0",
-        description: "EtherCAT uplink",
-        loopback: false,
-        up: true,
-        connected: true,
-        wireless: false,
-        index: None,
-      },
-      {
-        name: "eth1",
-        description: "Secondary uplink",
-        loopback: false,
-        up: true,
-        connected: true,
-        wireless: false,
-        index: None,
-      },
-    ],
-  }
+test "cli native backend without interface is provider harness pending" {
   let timeout = @hal.Duration(1_000_000L)
-  let config = select_native_cli_config_from_listing(listing, timeout, fn(
-    config,
-    _timeout,
-  ) {
-    match config.interface_name {
-      "eth0" => Ok(0)
-      "eth1" => Ok(2)
-      _ => Err(@hal.EcError::Internal("unexpected candidate"))
-    }
-  })
-  @debug.assert_eq(config.backend, @native.WindowsNpcap)
-  @debug.assert_eq(config.interface_name, "eth1")
-}
-
-///|
-test "cli native auto select error keeps filtered and probe notes" {
-  let listing : @native.NativeInterfaceListing = {
-    backend: @native.LinuxRawSocket,
-    interfaces: [
-      {
-        name: "lo",
-        description: "Loopback",
-        loopback: true,
-        up: true,
-        connected: true,
-        wireless: false,
-        index: Some(1),
-      },
-      {
-        name: "eth0",
-        description: "Primary",
-        loopback: false,
-        up: true,
-        connected: true,
-        wireless: false,
-        index: Some(2),
-      },
-      {
-        name: "eth1",
-        description: "Secondary",
-        loopback: false,
-        up: true,
-        connected: true,
-        wireless: false,
-        index: Some(3),
-      },
-    ],
-  }
-  let timeout = @hal.Duration(1_000_000L)
-  let result : Result[@native.NativeNicConfig, Error] = Result::Ok(
-    select_native_cli_config_from_listing(listing, timeout, fn(
-      config,
-      _timeout,
-    ) {
-      match config.interface_name {
-        "eth0" => Ok(0)
-        "eth1" => Err(@hal.EcError::LinkDown)
-        _ => Err(@hal.EcError::Internal("unexpected candidate"))
-      }
-    }),
+  let result : Result[ExternalHarnessConfig, Error] = Result::Ok(
+    resolve_native_cli_config(
+      ["moonecat", "scan", "--backend", "native-linux-raw"],
+      NativeLinuxRaw,
+      timeout,
+    ),
   ) catch {
     err => Result::Err(err)
   }
   guard result is Err(@hal.EcError::ConfigMismatch(message)) else {
-    fail("expected native auto select to fail")
+    fail("expected native auto selection to be moved out")
   }
-  assert_true(message.contains("lo(loopback)"))
-  assert_true(message.contains("eth0(no-response)"))
-  assert_true(message.contains("eth1(link-down)"))
-}
-
-///|
-test "cli skipped interface reason is stable" {
-  @debug.assert_eq(
-    skipped_native_interface_reason({
-      name: "loop",
-      description: "",
-      loopback: true,
-      up: true,
-      connected: true,
-      wireless: false,
-      index: None,
-    }),
-    "loopback",
-  )
-  @debug.assert_eq(
-    skipped_native_interface_reason({
-      name: "wifi",
-      description: "",
-      loopback: false,
-      up: true,
-      connected: true,
-      wireless: true,
-      index: None,
-    }),
-    "wireless",
-  )
+  assert_true(message.contains("provider harness"))
 }
 
 ///|
@@ -2378,15 +2261,20 @@ test "cli run progress text formats key counters" {
 }
 
 ///|
-test "cli native backend mapping stays stable" {
-  @debug.assert_eq(cli_backend_to_native_backend(NativeAuto), @native.Auto)
+test "cli native backend harness mapping stays stable" {
+  @debug.assert_eq(native_backend_label(NativeAuto), "native")
   @debug.assert_eq(
-    cli_backend_to_native_backend(NativeWindowsNpcap),
-    @native.WindowsNpcap,
+    native_backend_label(NativeWindowsNpcap),
+    "native-windows-npcap",
+  )
+  @debug.assert_eq(native_backend_label(NativeLinuxRaw), "native-linux-raw")
+  @debug.assert_eq(
+    native_session_id(NativeWindowsNpcap),
+    "native.link-session.npcap",
   )
   @debug.assert_eq(
-    cli_backend_to_native_backend(NativeLinuxRaw),
-    @native.LinuxRawSocket,
+    native_session_id(NativeLinuxRaw),
+    "native.link-session.raw-socket",
   )
 }
 

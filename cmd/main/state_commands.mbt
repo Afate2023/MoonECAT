@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] run_state_command(
+pub fn[N : @hal.Nic] run_state_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -28,7 +28,7 @@ fn[N : @hal.Nic] run_state_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_esc_register_command(
+pub fn[N : @hal.Nic] run_esc_register_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -45,7 +45,7 @@ fn[N : @hal.Nic] run_esc_register_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_expected_register_command(
+pub fn[N : @hal.Nic] run_expected_register_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -62,7 +62,7 @@ fn[N : @hal.Nic] run_expected_register_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_startup_diff_command(
+pub fn[N : @hal.Nic] run_startup_diff_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -79,7 +79,7 @@ fn[N : @hal.Nic] run_startup_diff_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_mailbox_readback_command(
+pub fn[N : @hal.Nic] run_mailbox_readback_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -96,7 +96,7 @@ fn[N : @hal.Nic] run_mailbox_readback_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_startup_trace_command(
+pub fn[N : @hal.Nic] run_startup_trace_command(
   nic : N,
   args : Array[String],
   as_json : Bool,

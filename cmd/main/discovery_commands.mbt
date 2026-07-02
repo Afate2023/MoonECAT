@@ -59,7 +59,7 @@ fn print_usage() -> Unit {
   println("Default backend: mock")
   println("Default timeout: 1 ms")
   println(
-    "Native commands auto-probe connected non-wireless interfaces with BRD when --if is omitted",
+    "Native live commands have moved to provider-owned Lockwire session harnesses",
   )
   println("Examples:")
   println("  moon run cmd/main list-if -- --backend native --json")
@@ -147,7 +147,7 @@ fn print_usage() -> Unit {
 }
 
 ///|
-fn[N : @hal.Nic] run_read_sii_command(
+pub fn[N : @hal.Nic] run_read_sii_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -187,30 +187,27 @@ fn print_interfaces(
         println("mock backend does not expose real interfaces")
       }
     NativeAuto | NativeWindowsNpcap | NativeLinuxRaw => {
-      let native_backend = cli_backend_to_native_backend(backend)
-      let listing = if as_json {
-        @native.native_list_interfaces_json(native_backend)
+      let config = native_config_for_backend(backend, "<provider-interface>")
+      if as_json {
+        println(
+          Json::object({
+            "backend": Json::string(config.backend_label),
+            "status": Json::string("moved-to-provider-harness"),
+            "harness_package": Json::string(config.harness_package),
+            "driver_id": Json::string(config.driver_id),
+            "session_id": Json::string(config.session_id),
+            "note": Json::string(config.pending_reason),
+          }).stringify(indent=2),
+        )
       } else {
-        @native.native_list_interfaces_text(native_backend)
-      }
-      if listing == "" {
-        println("no interfaces found")
-      } else {
-        println(listing)
+        println(
+          "native interface listing moved to provider harness " +
+          config.harness_package +
+          " for " +
+          config.backend_label,
+        )
       }
     }
-  }
-}
-
-///|
-fn cli_backend_to_native_backend(
-  backend : CliBackend,
-) -> @native.NativeBackendKind {
-  match backend {
-    Mock => @native.Auto
-    NativeAuto => @native.Auto
-    NativeWindowsNpcap => @native.WindowsNpcap
-    NativeLinuxRaw => @native.LinuxRawSocket
   }
 }
 

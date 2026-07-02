@@ -68,8 +68,10 @@ test "cli resolve_native_cli_config honors explicit interface flag" {
     NativeLinuxRaw,
     timeout,
   )
-  @debug.assert_eq(config.backend, @native.LinuxRawSocket)
+  @debug.assert_eq(config.backend, NativeLinuxRaw)
+  @debug.assert_eq(config.backend_label, "native-linux-raw")
   @debug.assert_eq(config.interface_name, "eth7")
+  @debug.assert_eq(config.driver_id, "moonecat.linux_raw_socket.raw_frame")
 }
 
 ///|
