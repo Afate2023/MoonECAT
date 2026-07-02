@@ -2,7 +2,7 @@
 /// RecordingNicAdapter wraps any concrete `@hal.Nic` implementation and records
 /// every send/recv outcome into a `NicEventLog`. Unlike `RecordingNic` which is
 /// hard-wired to `VirtualNic`, this adapter is generic and therefore usable as
-/// the recording boundary on top of `NativeNic` for real-device traces.
+/// the recording boundary on top of any provider-owned live Nic wrapper.
 ///
 /// The captured log can be exported via `to_ndjson` / `to_ndjson_with_header`
 /// and later replayed through `ReplayNic::from_log`.

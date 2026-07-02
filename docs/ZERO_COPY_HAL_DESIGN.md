@@ -1,6 +1,6 @@
 # 零拷贝 HAL 设计（C-6 ~ C-8）
 
-> **实现状态（2026-04-14）**：本设计已全面落地。`FramePool` + `FrameRef` + `FrameState` 状态机已实现于 `hal/`；`ZeroCopyNic` trait 已定义；`ZeroCopyMockNic` 测试双已实现；`zero_copy_codec.mbt` 和 `zero_copy_pdo.mbt` 已实现于 `protocol/`；Native 零拷贝后端已实现于 `hal/native/`。
+> **实现状态（2026-07-02）**：`FramePool` + `FrameRef` + `FrameState` 状态机已实现于 `hal/`；`ZeroCopyNic` trait 已定义；`ZeroCopyMockNic` 测试双已实现；`zero_copy_codec.mbt` 和 `zero_copy_pdo.mbt` 已实现于 `protocol/`。MoonECAT 已删除旧 `hal/native/` FFI 包；真实零拷贝 NIC 后端现在属于 Isochronon Lockwire/provider harness 交付边界。
 
 > 本文档定义 MoonECAT 零拷贝帧管理架构，目标是消除 PDO 周期热路径中的全部 `Bytes` 堆分配。
 
@@ -206,8 +206,8 @@ encode_into(tx_frame, image.outputs) → submit → recv → decode_into(rx_fram
 | C-6a | `FramePool` + `FrameRef` + `FrameState` 核心类型 | hal/ |
 | C-6b | `ZeroCopyNic` trait 定义 | hal/ |
 | C-6c | `MockZeroCopyNic` 测试后端 | hal/mock/ |
-| C-7a | Npcap 零拷贝 FFI stub | hal/native/ |
-| C-7b | Linux Raw Socket 零拷贝 FFI stub | hal/native/ |
+| C-7a | Npcap 零拷贝 FFI stub | moved to Isochronon Lockwire/provider harness |
+| C-7b | Linux Raw Socket 零拷贝 FFI stub | moved to Isochronon Lockwire/provider harness |
 | C-7c | AF_XDP / DPDK / 嵌入式占位设计 | docs/ |
 | C-8a | `MutableProcessImage` 类型 | protocol/ |
 | C-8b | `encode_into` / `decode_into` 就地编解码 | protocol/ |

@@ -8,7 +8,6 @@ A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B
 |---------|-------|-------------|
 | `hal/` | Platform HAL | Network send/recv, timing, scheduling traits; FramePool/ZeroCopyNic |
 | `hal/mock/` | Platform HAL | Mock loopback, VirtualBus, RecordingNic, ReplayNic, FaultNic |
-| `hal/native/` | Legacy Platform HAL | Deprecated native backend retained for migration history; live NIC access is moving to provider-owned Lockwire session harnesses |
 | `hal/mcu/` | Platform HAL | MCU bare-metal HAL stubs (RZ/N2L, HPM6E00) |
 | `protocol/` | Protocol Core | Frame/PDU codec, ESM, PDO, zero-copy codec, addressing |
 | `mailbox/` | Mailbox & Config | CoE/SDO, SII/ESI parsing, FMMU/SM, RMSM, Emergency |
@@ -26,6 +25,11 @@ moon test              # Run all tests
 moon test hal/mock     # Run mock HAL tests only
 moon build --target native  # Build native binary
 ```
+
+MoonECAT no longer ships a native FFI backend package. `--backend native*`
+commands now produce provider-harness pending output; live NIC access is owned
+by the Isochronon `fieldbus_core/moonecat_master_harness` delivery path on top
+of Lockwire native sessions.
 
 ## CLI Commands
 

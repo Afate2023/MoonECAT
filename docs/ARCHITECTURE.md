@@ -28,7 +28,7 @@ runtime hooks。
 ├─────────────────────────────────────────────────────────┤
 │           Platform HAL                                  │  hal/
 │  Nic · ZeroCopyNic · Clock · FileAccess · FramePool     │
-│  hal/mock/ · hal/native/ · hal/mcu/                     │
+│  hal/mock/ · hal/mcu/                                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -71,17 +71,14 @@ declared in each package's `moon.pkg` file.
 - `FuzzConfig` / `FuzzDriver`: 协议模糊测试支持。
 - `ZeroCopyMockNic`: 零拷贝路径的 mock 实现。
 
-### `hal/native/` — Native Platform Backend
+### Native provider harness boundary
 
-- **Windows Npcap**: `pcap_findalldevs` / `pcap_open_live` /
-  `pcap_next_ex` / `pcap_sendpacket` 封装，运行时动态加载。
-- **Linux Raw Socket**: `AF_PACKET` / `SOCK_RAW` / `ETH_P_ETHERCAT`，
-  BPF 过滤，errno 分类映射。
-- **零拷贝后端**: `NativeZeroCopyNic` 实现 `ZeroCopyNic` trait。
-- **FFI 安全**: 整数句柄 ID + C 侧所有权表模型，所有非 primitive 参数
-  `#borrow` 标注，接收帧复制后返回。
-- **平台隔离**: `moon.pkg` targets 限定 FFI 文件仅在 native 目标构建，
-  wasm-gc 下使用 fallback 文件。
+MoonECAT no longer owns a `hal/native/` package or native C stubs. Windows
+Npcap, Linux raw socket, UDP/socket, pcap artifact, and live session ownership
+belongs to the Isochronon Lockwire native layer and provider harness packages
+such as `fieldbus_core/moonecat_master_harness`. MoonECAT keeps only the
+protocol/runtime abstractions: `@hal.Nic`, `@hal.ZeroCopyNic`, `@hal.Clock`,
+mock/replay backends, and generic CLI runner functions that a harness can call.
 
 ### `hal/mcu/` — MCU Abstraction (骨架)
 
@@ -448,8 +445,7 @@ All tests run via `moon test` with zero external dependencies (Native 实机测�
 | Fault Injection | Drop/delay/corrupt/WKC mismatch injection | hal/mock/ |
 | Replay | Frame recording → deterministic replay | hal/mock/ |
 | Scenario | Scripted protocol deviation scenarios | hal/mock/ |
-| Native FFI | Error mapping, config objects, handle lifecycle | hal/native/ |
-| Native smoke | Windows Npcap / Linux Raw Socket 实机回归 | hal/native/ |
+| Native provider harness | Lockwire session binding descriptor, pending live handoff | fieldbus_core/moonecat_master_harness/ |
 | Extism | Envelope encode/decode, host contract validation | plugin/extism/ |
 
 ## Maturity Assessment
@@ -458,7 +454,6 @@ All tests run via `moon test` with zero external dependencies (Native 实机测�
 |---------|--------|------|
 | hal/ | **L3 Production** | Nic/ZeroCopyNic/Clock/FileAccess traits 稳定; FramePool 零拷贝架构完成; EcError 17 变体覆盖完整 |
 | hal/mock/ | **L4 Verification** | 虚拟总线/虚拟从站/故障注入/录制回放/模糊测试/场景执行器全部就绪 |
-| hal/native/ | **L3 Production** | Windows Npcap + Linux Raw Socket 实机闭环; 零拷贝后端; FFI 安全模型文档化 |
 | hal/mcu/ | **L1 Foundation** | MCU HAL 骨架和事件桥接，待 DMA 描述符环接入 |
 | protocol/ | **L3 Production** | Frame/PDU/ESM/DC/PDO 协议核心完整; 零拷贝编解码; mailbox transport + SDO/FoE/EEPROM 事务层完整; SM/FMMU/DL 操作 |
 | mailbox/ | **L3 Production** | SII 完整类别深读 (A/B/C 分层); CoE/SDO/FoE/EoE/SoE 编解码完整; RMSM 状态机; FMMU/SM 映射推导 |
@@ -493,9 +488,10 @@ Test fixtures live in `fixtures/fixtures.mbt` and provide
 
 ### Adding a new NIC backend
 
-1. Implement the `Nic` trait in a new package (e.g., `hal/linux/`).
-2. Provide `open_`, `send`, `recv`, `close` methods.
-3. Import your package in `runtime/moon.pkg`.
+1. Implement the Lockwire native/session side in the Isochronon provider
+   harness, not inside MoonECAT.
+2. Provide a wrapper that satisfies `@hal.Nic` or `@hal.ZeroCopyNic`.
+3. Call MoonECAT's generic runtime/CLI runner functions from that harness.
 
 ### Adding a new CoE service
 

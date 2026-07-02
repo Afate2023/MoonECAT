@@ -1,140 +1,46 @@
 # Native Backend Plan
 
-> **实现状态（2026-04-20）**：本设计已大部分落地。`hal/native/` 包含 20 个文件，Windows Npcap FFI + Linux Raw Socket FFI + 零拷贝后端 + platform_stub.c 均已实现。Windows Npcap 与 Linux Raw Socket 均已有单从站实机闭环证据（见 BACKEND_RELEASE_MATRIX.md）；Linux 侧已补 `list-if / scan / validate / diagnosis / state / read-sii / od / run / run --until-fault` 实测。
+> **迁移状态（2026-07-02）**：旧 MoonECAT `hal/native/` package 已删除。
+> Windows Npcap、Linux raw socket、native zero-copy 和 C stub ownership
+> 已迁出 MoonECAT，进入 Isochronon Lockwire native layer 与 provider harness
+> seam。本文件保留设计意图和新交付边界，不再描述 MoonECAT 内部包布局。
 
-本文件细化 MoonECAT Native 后端的目录、文件、FFI 约束与验证步骤。
-Windows 路径参考附带的 Npcap SDK，Linux 路径以 Raw Socket 为首个落点。
+## 目标
 
-## 1. 目标
+- MoonECAT 保持纯 EtherCAT protocol/runtime stack。
+- MoonECAT 不依赖 `afate/lockwire`，也不直接拥有 NIC/session C ABI。
+- Lockwire 不认识 EtherCAT 协议语义。
+- 组合发生在 `fieldbus_core/moonecat_master_harness` 或后续 companion
+  provider package：该层把 Lockwire native session wrapper 适配成 MoonECAT
+  `@hal.Nic` / `@hal.ZeroCopyNic` / `@hal.Clock`。
 
-- 在不污染 `protocol/`、`mailbox/`、`runtime/` 的前提下，为真实网卡提供 HAL 实现。
-- 先打通 Linux Raw Socket，再补 Windows Npcap；两条路径共用同一 HAL 语义与错误分类。
-- Native 路径可用于 CLI smoke 验证和后续真实性能/诊断回归。
+## 旧实现去向
 
-## 2. 参考依据
+| 旧职责 | 旧位置 | 新 owner |
+| --- | --- | --- |
+| Windows Npcap interface listing/open/send/recv/close | `hal/native/` | Lockwire native session / provider harness |
+| Linux raw socket listing/open/send/recv/close | `hal/native/` | Lockwire native session / provider harness |
+| native zero-copy NIC wrapper | `hal/native/` | Lockwire FramePool/session wrapper + provider harness |
+| C stubs and native target gating | `hal/native/moon.pkg` | Lockwire native packages |
+| MoonECAT scan/read-sii/run native CLI entry | `cmd/main` direct native backend | provider harness entry; MoonECAT CLI returns pending handoff |
 
-Windows Npcap SDK：
+## MoonECAT 保留面
 
-- 设备枚举：`pcap_findalldevs`
-- 设备打开：`pcap_open_live`
-- 接收：`pcap_next_ex`
-- 发送：`pcap_sendpacket`，见 `Examples-pcap/sendpack/sendpack.c`
-- 设备列表示例：`Examples-pcap/iflist/iflist.c`
+- `hal/` trait 和 zero-copy data model。
+- `hal/mock/` verification backend。
+- `protocol/` EtherCAT frame/PDU/ESM/DC/PDO/mailbox transport。
+- `mailbox/` SII/ESI/CoE/SDO/FoE/EoE/SoE/RMSM。
+- `runtime/` scan/validate/run/diagnosis/replay/monitor/report。
+- `cmd/main` mock/replay/virtual CLI and generic runner functions.
 
-当前 Npcap 示例给出的关键事实：
+## Provider harness 验收
 
-- Windows 使用 `LoadNpcapDlls()` 做 DLL 目录预设。
-- 设备名由 `pcap_findalldevs()` 返回，后续直接传给 `pcap_open_live()`。
-- 接收缓冲区由 `pcap_next_ex()` 管理，调用方若要持久化必须复制。
-- 发送可直接使用 `pcap_sendpacket()`。
+后续 harness 侧 live backend 必须证明：
 
-## 3. 建议包布局
-
-- `hal/native/`
-  - `moon.pkg`
-  - `native_types.mbt`
-  - `native_errors.mbt`
-  - `native_nic.mbt`
-  - `ffi_native.mbt` 仅 native
-  - `windows_npcap_ffi.mbt` 仅 native
-  - `linux_raw_socket_ffi.mbt` 仅 native
-  - `platform_stub.c`
-  - `native_test.mbt`
-
-说明：
-
-- `ffi_*.mbt` 只放原始 FFI 声明和最薄包装。
-- `native_nic.mbt` 放安全 MoonBit API 与 HAL trait 适配。
-- `platform_stub.c` 只提供公共桥接函数，不承载协议逻辑。
-
-## 4. MoonBit FFI 约束
-
-- 使用 `moon.pkg` 的 `native-stub` 和 `targets` 限定 native 文件。
-- 原始 `extern "c" fn` 保持私有，对外只暴露安全包装层。
-- 所有非 primitive 参数都必须显式标 `#borrow` 或 `#owned`。
-- 句柄类型按生命周期决定：
-  - 若 C 资源由 MoonBit GC 辅助释放，用 external object + finalizer。
-  - 若生命周期完全由 C API 手工控制，用 `#external type`。
-- 接收到的帧数据因 `pcap_next_ex()` 缓冲区非持久，必须复制到 MoonBit `Bytes` 后再返回。
-
-## 5. 文件级工作项
-
-### `hal/native/moon.pkg`
-
-- 导入 `mokomoking2501/MoonECAT/hal`
-- 配置 `native-stub`
-- 用 `targets` 把 `ffi_native.mbt`、`windows_npcap_ffi.mbt`、`linux_raw_socket_ffi.mbt` 限定在 native
-
-### `hal/native/native_types.mbt`
-
-- `NativeBackendKind`
-- `NativeNicConfig`
-- `NativeNic`
-- 可能的 handle wrapper 类型
-
-### `hal/native/native_errors.mbt`
-
-- 平台错误到 `EcError` 的集中映射
-- Npcap / Win32 / errno 文本归一化
-
-### `hal/native/ffi_native.mbt`
-
-- 公共 FFI 类型别名
-- 平台无关的 helper extern
-
-### `hal/native/windows_npcap_ffi.mbt`
-
-- `pcap_findalldevs` 路径包装
-- `pcap_open_live` 路径包装
-- `pcap_next_ex` 路径包装
-- `pcap_sendpacket` 路径包装
-- `pcap_close` 路径包装
-
-### `hal/native/linux_raw_socket_ffi.mbt`
-
-- socket open / bind / send / recv / close
-- 非阻塞与超时换算
-
-### `hal/native/platform_stub.c`
-
-- 包含 `moonbit.h`
-- 按平台桥接 Npcap / Raw Socket
-- 为 Native 后端提供统一 C 入口名
-
-### `hal/native/native_nic.mbt`
-
-- 对外安全构造器
-- `@hal.Nic` trait 适配
-- 后续可补 `Clock` / `FileAccess` 的本地实现接入点
-
-### `hal/native/native_test.mbt`
-
-- 先做非真实网卡单元测试：参数校验、错误码映射、配置对象
-- 真实设备 smoke test 保持显式、可选执行
-
-## 6. Npcap 专项注意事项
-
-- 接口名使用 Npcap 返回的设备名，例如 `\\Device\\NPF_{GUID}`。
-- 打开时优先 `pcap_open_live(name, snaplen, promisc, timeout_ms, errbuf)`。
-- 发送用 `pcap_sendpacket`，失败信息取 `pcap_geterr`。
-- 接收用 `pcap_next_ex`：
-  - `1` 为成功
-  - `0` 视为超时，映射 `RecvTimeout`
-  - 其他负值视为读取错误，映射 `RecvFailed(...)`
-- 首版只接受 `DLT_EN10MB`；其它 datalink 类型先映射 `NotSupported(...)`。
-
-## 7. 验收路径
-
-1. 包级：Native 包在非主路径下存在，默认不影响现有 Mock 测试。
-2. 编译级：`moon check --target native` 可通过。
-3. 行为级：真实 NIC 上至少能完成设备打开、发送、超时接收和关闭。
-4. 语义级：发送/接收/超时/链路异常均能映射为现有 `EcError`。
-5. CLI 级：后续可把 `cmd/main` 从 Mock 切换为可选 native backend。
-
-## 8. 建议提交拆分
-
-- `native ffi scaffold`
-- `native linux raw socket binding`
-- `native windows npcap binding`
-- `native error mapping and tests`
-- `native cli smoke integration`
+- driver/session id 来自 Lockwire native catalog。
+- 默认不打开 NIC；live open 需要显式 allow gate。
+- `list-if` / `scan` / `read-sii` / `run` / `run-zc` 的 live entry 不在
+  MoonECAT `cmd/main` 内直接执行。
+- MoonECAT `protocol` / `runtime` / `mailbox` 不 import Lockwire。
+- live evidence、pcap/tshark、设备互操作和认证结果独立记录，不能用 mock
+  或 replay 替代。

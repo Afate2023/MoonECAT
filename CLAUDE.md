@@ -49,11 +49,11 @@ The repository root is itself the library package `mokomoking2501/MoonECAT` (`Mo
 
 ### HAL backends
 
-`hal/` defines the traits; `hal/mock/` is the test/verification backend (VirtualBus, fault injection, record→replay, fuzzing, scenarios) used by nearly all tests; `hal/native/` is deprecated migration history for the old Windows Npcap + Linux Raw Socket implementation; `hal/mcu/` is a bare-metal skeleton. When the hot path matters, there is a parallel zero-copy lane: `ZeroCopyNic` + `FramePool` + `MutableProcessImage`, and `pdo_exchange_zero_copy` in `protocol/`. New live NIC work belongs in provider-owned Lockwire session harnesses, not in MoonECAT protocol packages.
+`hal/` defines the traits; `hal/mock/` is the test/verification backend (VirtualBus, fault injection, record→replay, fuzzing, scenarios) used by nearly all tests; `hal/mcu/` is a bare-metal skeleton. The old `hal/native/` package has been removed from MoonECAT; new live NIC work belongs in provider-owned Lockwire session harnesses, not in MoonECAT protocol packages. When the hot path matters, there is a parallel zero-copy lane: `ZeroCopyNic` + `FramePool` + `MutableProcessImage`, and `pdo_exchange_zero_copy` in `protocol/`.
 
 ### Native FFI target gating
 
-Do not add new native C stubs in MoonECAT. The old `hal/native/moon.pkg` target-gating pattern is retained only until migration cleanup deletes or archives that package; Lockwire owns the NIC/session C ABI surface.
+Do not add native C stubs in MoonECAT. Lockwire owns the NIC/session C ABI surface; MoonECAT stays a protocol/runtime stack that exposes HAL traits and generic runners for provider harnesses.
 
 ## MoonBit conventions (project-specific)
 
