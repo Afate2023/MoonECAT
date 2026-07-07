@@ -29,3 +29,4 @@ pub(all) struct MediumEvidenceCallChainReport {
 // Type aliases
 
 // Traits
+

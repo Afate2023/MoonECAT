@@ -20,3 +20,4 @@ pub(all) extenum @medium_evidence.MediumEvidenceDiagnostic += {
 // Type aliases
 
 // Traits
+
