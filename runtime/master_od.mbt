@@ -73,7 +73,7 @@ let moonecat_device_name : String = "MoonECAT"
 let moonecat_hw_version : String = "0.1"
 
 ///|
-let moonecat_sw_version : String = "0.1.0"
+let moonecat_sw_version : String = "0.2.0"
 
 ///|
 /// Build the full master OD from current runtime state.

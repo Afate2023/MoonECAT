@@ -8,7 +8,7 @@
 ## 目标
 
 - MoonECAT 保持纯 EtherCAT protocol/runtime stack。
-- MoonECAT 不依赖 `afate/lockwire`，也不直接拥有 NIC/session C ABI。
+- MoonECAT 不依赖 `mokomoking2501/lockwire`，也不直接拥有 NIC/session C ABI。
 - Lockwire 不认识 EtherCAT 协议语义。
 - 组合发生在 `fieldbus_core/moonecat_master_harness` 或后续 companion
   provider package：该层把 Lockwire native session wrapper 适配成 MoonECAT

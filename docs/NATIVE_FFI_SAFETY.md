@@ -35,5 +35,5 @@
   `hal/native` replacement package。
 - 如果 provider harness 需要 MoonECAT runner，应调用已经公开的泛型
   `@hal.Nic` / `@hal.ZeroCopyNic` runner，而不是让 MoonECAT import
-  `afate/lockwire`。
+  `mokomoking2501/lockwire`。
 - 若需要审计旧实现，可从 git history 查看删除前的 `hal/native/` 文件。
