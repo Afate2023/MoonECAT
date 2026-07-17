@@ -1,0 +1,219 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/simulation"
+
+import {
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/protocol",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn analyze_multi_rate(TaskSchedule) -> MultiRateAnalysis
+
+pub fn build_task_schedule(Int64, Array[TaskDescriptor]) -> TaskSchedule?
+
+pub fn cycle_timing_report(Int64, Int64, Int64, ClockDomain) -> CycleTimingReport
+
+pub fn decode_step_response(Bytes, Int) -> (Byte, Bytes)
+
+pub fn encode_step_request(Int64, Int64, Bytes, Int) -> Bytes
+
+pub fn partition_by_slave(@protocol.PdoContext) -> Array[(UInt, ProcessImageSlice)]
+
+pub fn read_slice_inputs(@protocol.ProcessImage, ProcessImageSlice) -> Bytes
+
+pub fn slice_from_mapping(@protocol.PdoMapping, @protocol.ProcessImage) -> ProcessImageSlice?
+
+pub fn slice_inputs_view(@hal.MutableProcessImage, ProcessImageSlice) -> (FixedArray[Byte], Int, Int)
+
+pub fn tasks_due_at_cycle(TaskSchedule, Int64) -> Array[TaskDescriptor]
+
+pub fn validate_multi_rate(TaskSchedule, max_hyperperiod? : Int, max_tasks_per_cycle? : Int, max_io_bytes_per_cycle? : Int) -> Array[String]
+
+pub fn write_slice_outputs(@protocol.ProcessImage, ProcessImageSlice, Bytes) -> Unit
+
+pub fn write_slice_outputs_inplace(@hal.MutableProcessImage, ProcessImageSlice, FixedArray[Byte], Int) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum BridgeState {
+  Disconnected
+  Connected
+  Terminated(String)
+  Error(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) enum BridgeTransport {
+  UnixSocket(String)
+  NamedPipe(String)
+  SharedMemory(name~ : String, size~ : Int)
+} derive(@debug.Debug)
+
+pub(all) enum ClockDomain {
+  Mcu
+  Linux
+  Fpga
+  Virtual
+} derive(Eq, @debug.Debug)
+
+pub(all) struct CoSimConfig {
+  cycle_period_ns : Int64
+  slave_count : Int
+  output_size : Int
+  input_size : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) struct CycleTimingReport {
+  nominal_period_ns : Int64
+  actual_period_ns : Int64
+  jitter_ns : Int64
+  domain : ClockDomain
+} derive(Eq, @debug.Debug)
+
+pub(all) struct DomainTimestamp {
+  domain : ClockDomain
+  ns : Int64
+} derive(Eq, @debug.Debug)
+
+pub(all) struct DriftCompensationGains {
+  kp_num : Int64
+  kp_den : Int64
+  ki_num : Int64
+  ki_den : Int64
+} derive(Eq, @debug.Debug)
+pub fn DriftCompensationGains::aggressive() -> Self
+pub fn DriftCompensationGains::conservative() -> Self
+pub fn DriftCompensationGains::default() -> Self
+
+pub(all) struct DriftCompensationReport {
+  update_count : Int64
+  last_error_ns : Int64
+  integral_error_ns : Int64
+  total_correction_ns : Int64
+  estimated_drift_ppb : Int64
+  converged : Bool
+} derive(@debug.Debug)
+
+pub(all) struct DriftCompensator {
+  gains : DriftCompensationGains
+  target_offset_ns : Int64
+  mut integral_error_ns : Int64
+  mut last_error_ns : Int64
+  mut total_correction_ns : Int64
+  mut update_count : Int64
+  max_integral_ns : Int64
+  mut active : Bool
+} derive(@debug.Debug)
+pub fn DriftCompensator::compensate(Self, TimebaseSync, Int64, Int64) -> Int64
+pub fn DriftCompensator::new(gains? : DriftCompensationGains, target_offset_ns? : Int64, max_integral_ns? : Int64) -> Self
+pub fn DriftCompensator::report(Self, TimebaseSync) -> DriftCompensationReport
+pub fn DriftCompensator::reset(Self) -> Unit
+
+pub(all) struct ExternalBridgeConfig {
+  transport : BridgeTransport
+  step_timeout_ns : Int64
+  auto_launch : Bool
+  launch_command : String
+  launch_cwd : String
+} derive(@debug.Debug)
+pub fn ExternalBridgeConfig::named_pipe(String) -> Self
+pub fn ExternalBridgeConfig::shared_memory(String, Int) -> Self
+pub fn ExternalBridgeConfig::unix_socket(String) -> Self
+
+pub(all) struct ExternalProcessBridge {
+  config : ExternalBridgeConfig
+  mut state : BridgeState
+  mut output_size : Int
+  mut input_size : Int
+  mut step_count : Int64
+  mut total_latency_ns : Int64
+} derive(@debug.Debug)
+pub fn ExternalProcessBridge::avg_latency_ns(Self) -> Int64
+pub fn ExternalProcessBridge::new(ExternalBridgeConfig) -> Self
+
+pub struct LoopbackCoSimAdapter {
+  mut sim_time : SimTime
+}
+pub fn LoopbackCoSimAdapter::new() -> Self
+pub impl CoSimAdapter for LoopbackCoSimAdapter
+
+pub(all) struct MultiRateAnalysis {
+  hyperperiod : Int
+  worst_case_tasks_per_cycle : Int
+  peak_cycles : Array[Int]
+  is_harmonic : Bool
+  worst_case_output_bytes : Int
+  worst_case_input_bytes : Int
+} derive(@debug.Debug)
+
+pub(all) struct ProcessImageSlice {
+  output_offset : Int
+  output_length : Int
+  input_offset : Int
+  input_length : Int
+} derive(Eq, @debug.Debug)
+
+pub(all) enum SimStepResult {
+  Ok(SimTime)
+  Terminated(String)
+  Error(String)
+} derive(Eq, @debug.Debug)
+
+pub(all) struct SimTime(Int64) derive(Compare, Eq, @debug.Debug)
+pub fn SimTime::advance(Self, Int64) -> Self
+pub fn SimTime::from_ns(Int64) -> Self
+pub fn SimTime::to_ns(Self) -> Int64
+pub fn SimTime::zero() -> Self
+
+pub(all) struct TaskDescriptor {
+  name : String
+  priority : Int
+  cycle_divisor : Int
+  slice : ProcessImageSlice
+} derive(Eq, @debug.Debug)
+
+pub(all) struct TaskSchedule {
+  base_period_ns : Int64
+  tasks : Array[TaskDescriptor]
+} derive(Eq, @debug.Debug)
+
+pub(all) struct TimebaseSync {
+  reference_domain : ClockDomain
+  local_domain : ClockDomain
+  mut offset_ns : Int64
+  mut drift_ppb : Int64
+  mut sync_count : Int64
+  mut last_sync_ns : Int64
+} derive(Eq, @debug.Debug)
+pub fn TimebaseSync::new(ClockDomain, ClockDomain) -> Self
+pub fn TimebaseSync::to_local(Self, Int64) -> Int64
+pub fn TimebaseSync::to_reference(Self, Int64) -> Int64
+pub fn TimebaseSync::update(Self, Int64, Int64) -> Unit
+
+pub struct VirtualTimebase {
+  mut current_ns : Int64
+}
+pub fn VirtualTimebase::advance(Self, Int64) -> Unit
+pub fn VirtualTimebase::new() -> Self
+pub fn VirtualTimebase::set(Self, Int64) -> Unit
+pub impl Timebase for VirtualTimebase
+
+// Type aliases
+
+// Traits
+pub(open) trait CoSimAdapter {
+  fn init_(Self, CoSimConfig) -> Unit
+  fn write_outputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  fn step(Self, SimTime, Int64) -> SimStepResult
+  fn read_inputs(Self, @protocol.ProcessImage, ProcessImageSlice) -> Unit
+  fn shutdown(Self) -> Unit
+}
+
+pub(open) trait Timebase {
+  fn domain(Self) -> ClockDomain
+  fn now_ns(Self) -> Int64
+  fn resolution_ns(Self) -> Int64
+  fn is_monotonic(Self) -> Bool
+}
+

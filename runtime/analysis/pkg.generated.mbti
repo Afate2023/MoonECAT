@@ -1,0 +1,300 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/analysis"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn average_probe(Array[ProbeResult]) -> ProbeResult
+
+pub fn compute_probe_result(UInt, Int64, Int64, Int64) -> ProbeResult
+
+pub fn compute_quality_score(Array[QualityDimension]) -> (Int, Array[(String, Int)])
+
+pub fn compute_sync_offsets(AutoTuneConfig, ProbeResult) -> SyncOffsetRecommendation
+
+pub fn estimate_cable_length(Int64) -> Double
+
+pub fn grade_from_score(Int) -> LinkGrade
+
+pub fn quality_grade_from_score(Int) -> QualityGrade
+
+pub fn score_dimension(QualityDimension) -> Int
+
+pub fn validate_recommendations(AutoTuneResult, Int64) -> Array[String]
+
+// Errors
+
+// Types and methods
+pub struct AutoTuneConfig {
+  probe_iterations : Int
+  probe_timeout_ns : Int64
+  strategy : TuningStrategy
+  cycle_time_ns : Int64
+  sync0_base_offset_ns : Int64
+  sync1_enabled : Bool
+  sync1_delta_ns : Int64
+  safety_margin_permille : Int
+}
+pub fn AutoTuneConfig::aggressive() -> Self
+pub fn AutoTuneConfig::conservative() -> Self
+pub fn AutoTuneConfig::default() -> Self
+
+pub struct AutoTuneResult {
+  recommendations : Array[SyncOffsetRecommendation]
+  probe_data : Array[ProbeResult]
+  reference_station : UInt
+  measurement_duration_ns : Int64
+  success : Bool
+  messages : Array[String]
+}
+pub fn AutoTuneResult::to_json(Self) -> String
+
+pub struct CommQualityScorer {
+  history : Array[Int]
+  mut history_pos : Int
+  history_size : Int
+  mut prev_window_avg : Int
+  mut sample_count : Int64
+}
+pub fn CommQualityScorer::new(history_size? : Int) -> Self
+pub fn CommQualityScorer::record_score(Self, Int) -> Unit
+pub fn CommQualityScorer::score_from_telemetry(Self, Int64, Int64, Int64, Int64, jitter_p99_abs_ns? : Int64, nominal_period_ns? : Int64) -> QualityScore
+pub fn CommQualityScorer::trend(Self) -> QualityTrend
+
+pub struct CyclePerfAnalyzer {
+  nominal_period_ns : Int64
+  deadline_tolerance_ns : Int64
+  histogram : JitterHistogram
+  mut total_cycles : Int64
+  mut min_ns : Int64
+  mut max_ns : Int64
+  mut sum_ns : Int64
+  mut sum_sq_ns : Int64
+  mut deadline_misses : Int64
+  mut total_tx : Int64
+  mut total_rx : Int64
+  mut last_ts : Int64
+  mut started : Bool
+  window : Array[Int64]
+  mut window_pos : Int
+  window_size : Int
+  mut prev_window_mean : Int64
+}
+pub fn CyclePerfAnalyzer::new(Int64, deadline_tolerance_ns? : Int64, window_size? : Int, histogram_bin_width? : Int64, histogram_bins? : Int) -> Self
+pub fn CyclePerfAnalyzer::record(Self, Int64, tx_frames? : Int, rx_frames? : Int) -> Unit
+pub fn CyclePerfAnalyzer::record_duration(Self, Int64) -> Unit
+pub fn CyclePerfAnalyzer::reset(Self) -> Unit
+pub fn CyclePerfAnalyzer::stats(Self) -> CyclePerfStats
+pub fn CyclePerfAnalyzer::trend(Self) -> PerfTrend
+
+pub(all) struct CyclePerfSample {
+  cycle : Int64
+  duration_ns : Int64
+  deadline_miss : Bool
+  tx_frames : Int
+  rx_frames : Int
+}
+
+pub(all) struct CyclePerfStats {
+  total_cycles : Int64
+  min_ns : Int64
+  max_ns : Int64
+  mean_ns : Int64
+  stddev_ns : Int64
+  deadline_misses : Int64
+  deadline_miss_rate_permille : Int
+  total_tx : Int64
+  total_rx : Int64
+  p50_ns : Int64
+  p95_ns : Int64
+  p99_ns : Int64
+}
+pub fn CyclePerfStats::to_json(Self) -> String
+
+pub struct DcJitterProfiler {
+  nominal_period_ns : Int64
+  histogram : JitterHistogram
+  recent_samples : Array[JitterSample]
+  mut write_pos : Int
+  mut count : Int64
+  mut min_dev : Int64
+  mut max_dev : Int64
+  mut sum_dev : Int64
+  mut sum_sq_dev : Int64
+  mut last_timestamp_ns : Int64
+  mut started : Bool
+}
+pub fn DcJitterProfiler::is_within_tolerance(Self, Int64, Int64) -> Bool
+pub fn DcJitterProfiler::new(Int64, bin_width? : Int64, num_bins? : Int, recent_capacity? : Int) -> Self
+pub fn DcJitterProfiler::record_timestamp(Self, Int64) -> Unit
+pub fn DcJitterProfiler::reset(Self) -> Unit
+pub fn DcJitterProfiler::stats(Self) -> JitterStats
+pub fn DcJitterProfiler::to_json(Self) -> String
+
+pub struct JitterHistogram {
+  bin_width : Int64
+  center_index : Int
+  counts : Array[Int64]
+  mut total : Int64
+  range_min_ns : Int64
+  range_max_ns : Int64
+}
+pub fn JitterHistogram::new(bin_width? : Int64, num_bins? : Int) -> Self
+pub fn JitterHistogram::percentile(Self, Int) -> Int64
+pub fn JitterHistogram::record(Self, Int64) -> Unit
+
+pub struct JitterSample {
+  cycle : Int64
+  actual_ns : Int64
+  deviation_ns : Int64
+}
+
+pub struct JitterStats {
+  count : Int64
+  min_ns : Int64
+  max_ns : Int64
+  sum_ns : Int64
+  sum_sq_ns : Int64
+  mean_ns : Int64
+  p50_ns : Int64
+  p95_ns : Int64
+  p99_ns : Int64
+  peak_to_peak_ns : Int64
+}
+
+pub enum LinkGrade {
+  Excellent
+  Good
+  Fair
+  Poor
+  Critical
+} derive(Eq, @debug.Debug)
+
+pub struct MultiChannelJitterProfiler {
+  channels : Array[(String, DcJitterProfiler)]
+}
+pub fn MultiChannelJitterProfiler::add_channel(Self, String, Int64, bin_width? : Int64) -> Unit
+pub fn MultiChannelJitterProfiler::new() -> Self
+pub fn MultiChannelJitterProfiler::record(Self, Int, Int64) -> Unit
+pub fn MultiChannelJitterProfiler::summary_json(Self) -> String
+
+pub struct PdoAutoTuner {
+  config : AutoTuneConfig
+  probe_history : Array[Array[ProbeResult]]
+  mut result : AutoTuneResult?
+}
+pub fn PdoAutoTuner::analyze(Self, Array[UInt], Array[Array[ProbeResult]]) -> AutoTuneResult
+pub fn PdoAutoTuner::new(config? : AutoTuneConfig) -> Self
+
+pub enum PerfTrend {
+  Stable
+  Improving
+  Degrading
+} derive(Eq, @debug.Debug)
+
+pub struct ProbeResult {
+  station : UInt
+  forward_delay_ns : Int64
+  reverse_delay_ns : Int64
+  round_trip_ns : Int64
+  recv_time_port0 : Int64
+  recv_time_port1 : Int64
+}
+
+pub(all) struct QualityDimension {
+  name : String
+  value : Int64
+  good_threshold : Int64
+  bad_threshold : Int64
+  weight : Int
+}
+
+pub enum QualityGrade {
+  Excellent
+  Good
+  Acceptable
+  Poor
+  Critical
+} derive(Eq, @debug.Debug)
+
+pub(all) struct QualityScore {
+  overall : Int
+  dimensions : Array[(String, Int)]
+  trend : QualityTrend
+  grade : QualityGrade
+}
+pub fn QualityScore::to_json(Self) -> String
+
+pub enum QualityTrend {
+  Improving
+  Stable
+  Degrading
+} derive(Eq, @debug.Debug)
+
+pub(all) struct SlaveHealthAccumulator {
+  station : UInt
+  position : Int
+  propagation_delay_ns : Int64
+  mut tx_frames : Int64
+  mut rx_frames : Int64
+  mut timeouts : Int64
+  mut wkc_errors : Int64
+}
+
+pub(all) struct SlaveHealthSnapshot {
+  station : UInt
+  position : Int
+  propagation_delay_ns : Int64
+  estimated_cable_length_m : Double
+  tx_frames : Int64
+  rx_frames : Int64
+  timeouts : Int64
+  wkc_errors : Int64
+  loss_rate_permille : Int
+  health_score : Int
+  grade : LinkGrade
+}
+
+pub struct SyncOffsetRecommendation {
+  station : UInt
+  sync0_offset_ns : Int64
+  sync1_offset_ns : Int64
+  sync0_cycle_ns : Int64
+  propagation_delay_ns : Int64
+}
+
+pub struct TopologyHealthAnalyzer {
+  slave_stats : Array[SlaveHealthAccumulator]
+  weight_loss : Int
+  weight_timeout : Int
+  weight_wkc : Int
+}
+pub fn TopologyHealthAnalyzer::add_slave(Self, UInt, Int, Int64) -> Unit
+pub fn TopologyHealthAnalyzer::analyze(Self) -> TopologyHealthReport
+pub fn TopologyHealthAnalyzer::ingest_telemetry(Self, Int, Int64, Int64, Int64, Int64) -> Unit
+pub fn TopologyHealthAnalyzer::new(weight_loss? : Int, weight_timeout? : Int, weight_wkc? : Int) -> Self
+pub fn TopologyHealthAnalyzer::record_cycle(Self, Int, Int64, Int64, Bool, Bool) -> Unit
+
+pub(all) struct TopologyHealthReport {
+  slaves : Array[SlaveHealthSnapshot]
+  bottleneck_index : Int?
+  system_health_score : Int
+  system_grade : LinkGrade
+  max_propagation_delay_ns : Int64
+  total_cable_length_m : Double
+  warnings : Array[String]
+}
+pub fn TopologyHealthReport::to_json(Self) -> String
+
+pub enum TuningStrategy {
+  Conservative
+  Balanced
+  Aggressive
+}
+
+// Type aliases
+
+// Traits
+

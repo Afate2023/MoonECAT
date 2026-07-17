@@ -1,0 +1,89 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/runtime/hil"
+
+import {
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/runtime/simulation",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn hil_session_summary(HilSession) -> HilSessionSummary
+
+pub fn hil_session_to_json(HilSession) -> String
+
+// Errors
+
+// Types and methods
+pub(all) enum CycleDirective {
+  Continue
+  SkipCycle
+  StopGraceful
+} derive(Eq, @debug.Debug)
+
+pub(all) struct CycleResult {
+  wkc : UInt
+  expected_wkc : UInt
+  ok : Bool
+} derive(Eq, @debug.Debug)
+
+pub(all) struct CycleSnapshot {
+  cycle : Int64
+  result : CycleResult?
+  dc_state : DcState
+  recovery_pending : Bool
+} derive(@debug.Debug)
+
+pub(all) enum DcState {
+  Disabled
+  Measuring
+  Locked
+  Drifting(Int64)
+} derive(@debug.Debug)
+
+pub(all) struct HilCycleHook[A] {
+  adapter : A
+  session : HilSession
+}
+pub fn[A] HilCycleHook::new(A, HilSession) -> Self[A]
+pub impl[A : @simulation.CoSimAdapter] CycleHook for HilCycleHook[A]
+
+pub(all) struct HilSession {
+  mut sim_time : @simulation.SimTime
+  cycle_period_ns : Int64
+  schedule : @simulation.TaskSchedule
+  step_log : Array[@simulation.SimStepResult]
+  mut terminated : Bool
+  mut termination_reason : String
+}
+pub fn HilSession::get_sim_time(Self) -> @simulation.SimTime
+pub fn HilSession::get_termination_reason(Self) -> String
+pub fn HilSession::is_terminated(Self) -> Bool
+pub fn HilSession::new(Int64, @simulation.TaskSchedule) -> Self
+pub fn HilSession::step_count(Self) -> Int
+
+pub(all) struct HilSessionSummary {
+  total_steps : Int
+  ok_steps : Int
+  error_steps : Int
+  terminated : Bool
+  termination_reason : String
+  final_sim_time_ns : Int64
+} derive(@debug.Debug)
+
+pub struct NullCycleHook {
+  _unused : Unit
+}
+pub fn NullCycleHook::new() -> Self
+pub impl CycleHook for NullCycleHook
+
+// Type aliases
+
+// Traits
+pub(open) trait CycleHook {
+  fn on_pre_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  fn on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
+  fn on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
+}
+
