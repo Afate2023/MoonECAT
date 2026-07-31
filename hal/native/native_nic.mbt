@@ -21,7 +21,15 @@ pub fn default_windows_npcap_config(interface_name : String) -> NativeNicConfig 
 
 ///|
 pub fn NativeNic::new(config : NativeNicConfig) -> NativeNic {
-  { config, handle_id: 0, is_open: false, last_sent: Bytes::new(0) }
+  {
+    config,
+    handle_id: 0,
+    is_open: false,
+    last_sent: Bytes::new(0),
+    next_datagram_index: 0,
+    protocol_datagram_indices: [],
+    wire_datagram_indices: [],
+  }
 }
 
 ///|
@@ -238,12 +246,28 @@ pub fn NativeNic::open_with_config(
     WindowsNpcap => {
       let resolved = { ..config, backend: WindowsNpcap }
       let handle_id = windows_npcap_open(resolved)
-      { config: resolved, handle_id, is_open: true, last_sent: Bytes::new(0) }
+      {
+        config: resolved,
+        handle_id,
+        is_open: true,
+        last_sent: Bytes::new(0),
+        next_datagram_index: 0,
+        protocol_datagram_indices: [],
+        wire_datagram_indices: [],
+      }
     }
     LinuxRawSocket => {
       let resolved = { ..config, backend: LinuxRawSocket }
       let handle_id = linux_raw_socket_open(resolved)
-      { config: resolved, handle_id, is_open: true, last_sent: Bytes::new(0) }
+      {
+        config: resolved,
+        handle_id,
+        is_open: true,
+        last_sent: Bytes::new(0),
+        next_datagram_index: 0,
+        protocol_datagram_indices: [],
+        wire_datagram_indices: [],
+      }
     }
   }
 }
@@ -254,15 +278,112 @@ pub impl @hal.Nic for NativeNic with fn open_(name) {
 }
 
 ///|
+/// Return the byte offsets of all EtherCAT datagram index fields.
+/// Invalid or non-EtherCAT frames return an empty list and pass through unchanged.
+fn native_datagram_index_offsets(data : Bytes) -> Array[Int] {
+  let offsets : Array[Int] = []
+  if data.length() < 16 || data[12] != b'\x88' || data[13] != b'\xA4' {
+    return offsets
+  }
+  let ecat_header = data[14].to_int() | (data[15].to_int() << 8)
+  let payload_length = ecat_header & 0x7FF
+  let payload_end = 16 + payload_length
+  if payload_length == 0 || payload_end > data.length() {
+    return offsets
+  }
+  let mut offset = 16
+  while offset < payload_end {
+    if offset + 10 > payload_end {
+      return []
+    }
+    let len_flags = data[offset + 6].to_int() | (data[offset + 7].to_int() << 8)
+    let data_length = len_flags & 0x7FF
+    let datagram_end = offset + 10 + data_length + 2
+    if datagram_end > payload_end {
+      return []
+    }
+    offsets.push(offset + 1)
+    offset = datagram_end
+    if (len_flags & 0x8000) == 0 {
+      break
+    }
+  }
+  offsets
+}
+
+///|
+/// Replace protocol-layer datagram indices with a NativeNic-local wire sequence.
+fn prepare_native_send(
+  data : Bytes,
+  next_index : Int,
+) -> (Bytes, Array[Byte], Array[Byte], Int) {
+  let offsets = native_datagram_index_offsets(data)
+  if offsets.is_empty() {
+    return (data, [], [], next_index)
+  }
+  let frame = FixedArray::make(data.length(), b'\x00')
+  for i in 0..<data.length() {
+    frame[i] = data[i]
+  }
+  let protocol_indices : Array[Byte] = []
+  let wire_indices : Array[Byte] = []
+  let mut current = next_index
+  for offset in offsets {
+    let protocol_index = data[offset]
+    let wire_index = (current & 0xFF).to_byte()
+    protocol_indices.push(protocol_index)
+    wire_indices.push(wire_index)
+    frame[offset] = wire_index
+    current = (current + 1) & 0xFF
+  }
+  (Bytes::from_array(frame), protocol_indices, wire_indices, current)
+}
+
+///|
+/// Restore wire indices before returning a response to the protocol layer.
+/// A frame with different indices is unrelated and remains unchanged.
+fn restore_native_response_indices(
+  data : Bytes,
+  protocol_indices : Array[Byte],
+  wire_indices : Array[Byte],
+) -> Bytes {
+  let offsets = native_datagram_index_offsets(data)
+  if offsets.length() != wire_indices.length() ||
+    protocol_indices.length() != wire_indices.length() {
+    return data
+  }
+  for i, offset in offsets {
+    if data[offset] != wire_indices[i] {
+      return data
+    }
+  }
+  let frame = FixedArray::make(data.length(), b'\x00')
+  for i in 0..<data.length() {
+    frame[i] = data[i]
+  }
+  for i, offset in offsets {
+    frame[offset] = protocol_indices[i]
+  }
+  Bytes::from_array(frame)
+}
+
+///|
 pub impl @hal.Nic for NativeNic with fn send(self, data) {
   if !self.is_open {
     raise @hal.EcError::LinkDown
   }
-  self.last_sent = data
+  let (wire_data, protocol_indices, wire_indices, next_index) = prepare_native_send(
+    data,
+    self.next_datagram_index,
+  )
+  self.last_sent = wire_data
+  self.protocol_datagram_indices = protocol_indices
+  self.wire_datagram_indices = wire_indices
+  self.next_datagram_index = next_index
   match self.config.backend {
-    WindowsNpcap => windows_npcap_send(self.handle_id, data)
+    WindowsNpcap => windows_npcap_send(self.handle_id, wire_data)
     Auto => raise native_not_supported("send")
-    LinuxRawSocket => linux_raw_socket_send(self.handle_id, data)
+    LinuxRawSocket => linux_raw_socket_send(self.handle_id, wire_data)
   }
 }
 
@@ -281,7 +402,11 @@ pub impl @hal.Nic for NativeNic with fn recv(self, timeout~) {
     if response == self.last_sent {
       continue
     }
-    return response
+    return restore_native_response_indices(
+      response,
+      self.protocol_datagram_indices,
+      self.wire_datagram_indices,
+    )
   }
   raise @hal.EcError::RecvTimeout
 }
@@ -298,4 +423,7 @@ pub impl @hal.Nic for NativeNic with fn close(self) {
   self.handle_id = 0
   self.is_open = false
   self.last_sent = Bytes::new(0)
+  self.next_datagram_index = 0
+  self.protocol_datagram_indices.clear()
+  self.wire_datagram_indices.clear()
 }

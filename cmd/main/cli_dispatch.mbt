@@ -132,13 +132,13 @@ fn open_native_cli_nic(
 }
 
 ///|
-fn try_handle_native_cli_command(
+async fn try_handle_native_cli_command(
   command : String,
   args : Array[String],
   backend : CliBackend,
   as_json : Bool,
   timeout : @hal.Duration,
-) -> Bool raise @hal.EcError {
+) -> Bool {
   if command == "read-sii" {
     let nic = open_native_cli_nic(command, args, backend, timeout)
     run_read_sii_command(nic, args, as_json, timeout)
@@ -154,6 +154,35 @@ fn try_handle_native_cli_command(
   if command == "od" {
     let nic = open_native_cli_nic(command, args, backend, timeout)
     run_od_command(nic, args, as_json, timeout)
+    return true
+  }
+
+  if command == "sdo-read" {
+    let settings = resolve_cyclic_sdo_read_settings(args)
+    let nic = open_native_cli_nic(command, args, backend, timeout)
+    match flag_value(args, "--record") {
+      None => run_cyclic_sdo_read_command(nic, args, settings, as_json, timeout)
+      Some(path) => {
+        let recorder = @mock.RecordingNicAdapter::wrap(nic)
+        run_cyclic_sdo_read_command(recorder, args, settings, as_json, timeout)
+        let log = recorder.get_log()
+        write_nic_event_log(path, log)
+        if !as_json {
+          let timeout_windows = nic_timeout_windows_text(log, 4)
+          if timeout_windows.length() > 0 {
+            println(timeout_windows)
+          }
+          println("Raw NIC trace saved to: " + path)
+        }
+      }
+    }
+    return true
+  }
+
+  if command == "sdo-write" {
+    let settings = resolve_cyclic_sdo_write_settings(args)
+    let nic = open_native_cli_nic(command, args, backend, timeout)
+    run_cyclic_sdo_write_command(nic, settings, as_json, timeout)
     return true
   }
 

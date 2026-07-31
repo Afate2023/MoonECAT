@@ -559,6 +559,151 @@ test "cli resolve od query rejects orphan subindex" {
 }
 
 ///|
+test "cli resolves cyclic sdo read settings" {
+  let settings = resolve_cyclic_sdo_read_settings([
+    "moonecat", "sdo-read", "--index", "8192", "--subindex", "1", "--cycles", "3",
+    "--cycle-period-ms", "25",
+  ])
+  @debug.assert_eq(settings.index, 0x2000U)
+  @debug.assert_eq(settings.subindex, b'\x01')
+  @debug.assert_eq(settings.cycles, 3)
+  @debug.assert_eq(settings.period_ms, 25)
+}
+
+///|
+test "cli cyclic sdo read requires index and positive timing" {
+  let missing_index : Result[CyclicSdoReadSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_read_settings(["moonecat", "sdo-read"]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(missing_index is Err(@hal.EcError::ConfigMismatch(_)))
+  let invalid_period : Result[CyclicSdoReadSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_read_settings([
+      "moonecat", "sdo-read", "--index", "8192", "--cycle-period-ms", "0",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(invalid_period is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli cyclic sdo read output preserves samples and errors" {
+  let report : CyclicSdoReadReport = {
+    station_address: 0x1001U,
+    index: 0x2000U,
+    subindex: b'\x01',
+    cycles_requested: 2,
+    period_ms: 25,
+    samples: [
+      {
+        cycle: 1,
+        value_hex: Some("0x2A00"),
+        value_u32: Some(42U),
+        error_category: None,
+        error_detail: None,
+        abort_code: None,
+      },
+      {
+        cycle: 2,
+        value_hex: None,
+        value_u32: None,
+        error_category: Some("protocol-failure"),
+        error_detail: Some("test abort"),
+        abort_code: Some(0x06020000U),
+      },
+    ],
+  }
+  let json = cyclic_sdo_read_report_json(report).stringify(indent=2)
+  assert_true(json.contains("\"command\": \"sdo-read\""))
+  assert_true(json.contains("\"success_count\": 1"))
+  assert_true(json.contains("\"failure_count\": 1"))
+  assert_true(json.contains("\"abort_code\": 100794368"))
+  let text = cyclic_sdo_read_report_text(report)
+  assert_true(text.contains("Periodic EtherCAT SDO Read"))
+  assert_true(text.contains("[1] 0x2A00 (u32 le: 42)"))
+  assert_true(text.contains("0x06020000"))
+  assert_true(text.contains("1 succeeded, 1 failed"))
+}
+
+///|
+test "cli resolves cyclic sdo write settings and hex payload" {
+  let settings = resolve_cyclic_sdo_write_settings([
+    "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--subindex",
+    "1", "--data-hex", "0x2A00", "--cycles", "3", "--cycle-period-ms", "25",
+  ])
+  @debug.assert_eq(settings.station, 0x1001U)
+  @debug.assert_eq(settings.index, 0x2000U)
+  @debug.assert_eq(settings.subindex, b'\x01')
+  @debug.assert_eq(settings.data, Bytes::from_array([b'\x2A', b'\x00']))
+  @debug.assert_eq(settings.cycles, 3)
+  @debug.assert_eq(settings.period_ms, 25)
+}
+
+///|
+test "cli cyclic sdo write requires target and valid data" {
+  let missing_station : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--index", "8192", "--data-hex", "2A",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(missing_station is Err(@hal.EcError::ConfigMismatch(_)))
+  let odd_data : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--data-hex",
+      "ABC",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(odd_data is Err(@hal.EcError::ConfigMismatch(_)))
+  let invalid_data : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--data-hex",
+      "GG",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(invalid_data is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli cyclic sdo write output preserves payload and errors" {
+  let report : CyclicSdoWriteReport = {
+    station_address: 0x1001U,
+    index: 0x2000U,
+    subindex: b'\x01',
+    data: Bytes::from_array([b'\x2A', b'\x00']),
+    cycles_requested: 2,
+    period_ms: 25,
+    samples: [
+      { cycle: 1, error_category: None, error_detail: None, abort_code: None },
+      {
+        cycle: 2,
+        error_category: Some("protocol-failure"),
+        error_detail: Some("test abort"),
+        abort_code: Some(0x06010002U),
+      },
+    ],
+  }
+  let json = cyclic_sdo_write_report_json(report).stringify(indent=2)
+  assert_true(json.contains("\"command\": \"sdo-write\""))
+  assert_true(json.contains("\"data_hex\": \"0x2A00\""))
+  assert_true(json.contains("\"success_count\": 1"))
+  assert_true(json.contains("\"failure_count\": 1"))
+  let text = cyclic_sdo_write_report_text(report)
+  assert_true(text.contains("Periodic EtherCAT SDO Write"))
+  assert_true(text.contains("Data: 0x2A00"))
+  assert_true(text.contains("[1] OK"))
+  assert_true(text.contains("0x06010002"))
+  assert_true(text.contains("1 succeeded, 1 failed"))
+}
+
+///|
 test "cli resolve diagnosis station uses explicit or single slave" {
   let scan_report : @runtime.ScanReport = {
     slave_count: 1,
@@ -1475,6 +1620,122 @@ fn single_virtual_station_nic() -> (@mock.VirtualNic, UInt, @hal.Duration) raise
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, station, timeout)
   (nic, station, timeout)
+}
+
+///|
+async test "cli cyclic sdo read repeats one prepared mailbox session" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  let mailbox_session = @runtime.prepare_slave_mailbox_ap(
+    nic, 0U, station, timeout,
+  )
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  @protocol.sdo_download_retry(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    rmsm,
+    0x2000U,
+    b'\x01',
+    Bytes::from_array([b'\x2A', b'\x00']),
+    timeout,
+  )
+  let report = compute_cyclic_sdo_read_report(
+    nic,
+    ["moonecat", "sdo-read", "--station", station.to_string()],
+    { index: 0x2000U, subindex: b'\x01', cycles: 3, period_ms: 1 },
+    timeout,
+  )
+  nic.close()
+  @debug.assert_eq(report.station_address, station)
+  @debug.assert_eq(report.samples.length(), 3)
+  for sample in report.samples {
+    @debug.assert_eq(sample.value_hex, Some("0x2A000000"))
+    @debug.assert_eq(sample.value_u32, Some(42U))
+    @debug.assert_eq(sample.error_category, None)
+  }
+}
+
+///|
+test "cli frame trace decodes FPRD around receive timeout" {
+  let builder = @protocol.FrameBuilder::new()
+  ignore(
+    builder.add(
+      @protocol.EcCommand::FPRD,
+      @protocol.configured_address(0x1001U, 0x080DU),
+      Bytes::new(8),
+    ),
+  )
+  let request = builder.build().encode()
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Sent(request, request.length()))
+  log.append(@mock.RecvTimeout)
+  log.append(@mock.Sent(request, request.length()))
+  log.append(@mock.Received(request))
+  let text = nic_timeout_windows_text(log, 2)
+  assert_true(text.contains("Frame Trace Around RecvTimeout"))
+  assert_true(text.contains("RX TIMEOUT"))
+  assert_true(text.contains("FPRD"))
+  assert_true(text.contains("adp=0x1001"))
+  assert_true(text.contains("ado=0x080D"))
+  assert_true(text.contains("data_len=8"))
+  assert_true(text.contains("raw="))
+}
+
+///|
+test "cli frame trace preserves malformed receive before timeout" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Received(b"\x01\x02\x03"))
+  log.append(@mock.RecvTimeout)
+  let text = nic_timeout_windows_text(log, 1)
+  assert_true(text.contains("RX raw_len=3"))
+  assert_true(text.contains("decode_error="))
+  assert_true(text.contains("raw=0x01 0x02 0x03"))
+}
+
+///|
+test "cli frame trace is empty without timeout" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Received(b"\x01\x02\x03"))
+  @debug.assert_eq(nic_timeout_windows_text(log, 4), "")
+}
+
+///|
+async test "cli cyclic sdo write repeats one prepared mailbox session" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  let mailbox_session = @runtime.prepare_slave_mailbox_ap(
+    nic, 0U, station, timeout,
+  )
+  let report = compute_cyclic_sdo_write_report(
+    nic,
+    {
+      station,
+      index: 0x2001U,
+      subindex: b'\x02',
+      data: Bytes::from_array([b'\x2A', b'\x00']),
+      cycles: 3,
+      period_ms: 1,
+    },
+    timeout,
+  )
+  @debug.assert_eq(report.station_address, station)
+  @debug.assert_eq(report.samples.length(), 3)
+  for sample in report.samples {
+    @debug.assert_eq(sample.error_category, None)
+  }
+  let payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    @mailbox.Rmsm::new(max_retries=0),
+    0x2001U,
+    b'\x02',
+    timeout,
+  )
+  nic.close()
+  @debug.assert_eq(
+    payload,
+    Bytes::from_array([b'\x2A', b'\x00', b'\x00', b'\x00']),
+  )
 }
 
 ///|

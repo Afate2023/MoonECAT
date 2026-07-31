@@ -640,23 +640,11 @@ fn[N : @hal.Nic] sdo_download_segmented(
   retry : Bool,
 ) -> Unit raise @hal.EcError {
   let total_len = data.length().reinterpret_as_uint()
-  let size_payload = Bytes::from_array([
-    (total_len & 0xFFU).to_byte(),
-    ((total_len >> 8) & 0xFFU).to_byte(),
-    ((total_len >> 16) & 0xFFU).to_byte(),
-    ((total_len >> 24) & 0xFFU).to_byte(),
-  ])
   let init_counter = rmsm_begin_transaction(rmsm, retry)
-  let init_txn = if complete_access {
-    @mailbox.build_sdo_download_ca(
-      init_counter, station, index, subindex, size_payload,
-    )
-  } else {
-    @mailbox.build_sdo_download(
-      init_counter, station, index, subindex, size_payload,
-    )
-  }
-  mailbox_send(nic, station, mb_config, init_txn.encode(), timeout)
+  let init_frame = @mailbox.build_sdo_download_segmented_init_request(
+    init_counter, station, index, subindex, total_len, complete_access,
+  )
+  mailbox_send(nic, station, mb_config, init_frame, timeout)
   let init_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if init_resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(

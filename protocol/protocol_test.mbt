@@ -480,6 +480,90 @@ test "transact ignores short noise frames before response" {
 }
 
 ///|
+test "transact retries receive without resending after one RecvTimeout" {
+  let identity : @hal.SlaveIdentity = {
+    vendor_id: 1U,
+    product_code: 2U,
+    revision: 3U,
+    serial: 4U,
+  }
+  let slave = @mock.VirtualSlave::new(0, identity, Bytes::new(256))
+  slave.write_reg(
+    0,
+    Bytes::from_array([
+      b'\x0A', b'\x00', b'\x00', b'\x00', b'\x00', b'\x13', b'\x00', b'\x30', b'\x43',
+      b'\x0E', b'\x20', b'\x11', b'\x00', b'\x10', b'\x00', b'\x00',
+    ]),
+  )
+  let injector = @mock.FaultInjector::new()
+  injector.add(@mock.RecvTimeout, @mock.Once)
+  let nic = @mock.RecordingNicAdapter::wrap(
+    @mock.FaultNic::new(
+      @mock.VirtualNic::new(@mock.VirtualBus::new([slave])),
+      injector,
+    ),
+  )
+  let timeout = @hal.Duration(1_000_000L)
+  let current = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::BRD,
+    @protocol.broadcast_address(0U),
+    Bytes::new(16),
+    timeout,
+  )
+  let decoded = @mailbox.decode_sdo_response(current.data)
+  let (_, response) = decoded
+  @debug.assert_eq(response.index, 0x200EU)
+  @debug.assert_eq(response.subindex, b'\x11')
+  let mut sent_count = 0
+  let mut timeout_count = 0
+  for event in nic.get_log().events {
+    match event {
+      @mock.Sent(_, _) => sent_count = sent_count + 1
+      @mock.RecvTimeout => timeout_count = timeout_count + 1
+      _ => ()
+    }
+  }
+  @debug.assert_eq(sent_count, 1)
+  @debug.assert_eq(timeout_count, 1)
+}
+
+///|
+test "transact stops after one receive-only timeout retry" {
+  let injector = @mock.FaultInjector::new()
+  injector.add(@mock.RecvTimeout, @mock.Always)
+  let nic = @mock.RecordingNicAdapter::wrap(
+    @mock.FaultNic::new(
+      @mock.VirtualNic::new(@mock.VirtualBus::new([])),
+      injector,
+    ),
+  )
+  let result : Result[@protocol.Pdu, @hal.EcError] = Result::Ok(
+    @protocol.transact_pdu(
+      nic,
+      @protocol.EcCommand::FPRD,
+      @protocol.configured_address(0x1001U, 0x0800U),
+      Bytes::new(8),
+      @hal.Duration(1_000_000L),
+    ),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(result is Err(@hal.EcError::RecvTimeout))
+  let mut sent_count = 0
+  let mut timeout_count = 0
+  for event in nic.get_log().events {
+    match event {
+      @mock.Sent(_, _) => sent_count = sent_count + 1
+      @mock.RecvTimeout => timeout_count = timeout_count + 1
+      _ => ()
+    }
+  }
+  @debug.assert_eq(sent_count, 1)
+  @debug.assert_eq(timeout_count, 2)
+}
+
+///|
 test "transact_pdu_retry - succeeds on first try" {
   let nic = @mock.MockNic::new()
   let timeout = @hal.Duration(1000L)

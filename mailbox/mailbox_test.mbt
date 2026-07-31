@@ -1149,6 +1149,25 @@ test "SdoTransaction encode produces correct frame size" {
 }
 
 ///|
+test "SdoTransaction encode marks 1-4 byte downloads as expedited" {
+  let data = [b"\x10", b"\x10\x00", b"\x10\x00\x20", b"\x10\x00\x20\x00"]
+  let expected_commands = [b'\x2F', b'\x2B', b'\x27', b'\x23']
+  for i = 0; i < data.length(); i = i + 1 {
+    let frame = @mailbox.build_sdo_download(
+      b'\x01',
+      0x1001U,
+      0x200EU,
+      b'\x11',
+      data[i],
+    ).encode()
+    @debug.assert_eq(frame[8], expected_commands[i])
+    for j = 0; j < data[i].length(); j = j + 1 {
+      @debug.assert_eq(frame[12 + j], data[i][j])
+    }
+  }
+}
+
+///|
 test "SdoTransaction encode mailbox header fields" {
   let txn = @mailbox.build_sdo_download(
     b'\x03', 0x2002U, 0x6040U, b'\x01', b"\xFF\x00\x00\x00",
@@ -1389,8 +1408,28 @@ test "SdoTransaction encode sets complete access bit for download" {
     b'\x02', 0x1001U, 0x1A00U, b'\x00', b"\x01\x02\x03\x04",
   )
   let frame = txn.encode()
-  @debug.assert_eq(frame[8], b'\x31') // 0x21 | bit4
+  @debug.assert_eq(frame[8], b'\x33') // 0x23 | bit4
   assert_true(txn.request.complete_access)
+}
+
+///|
+test "segmented SDO download initiate encodes size instead of data" {
+  let frame = @mailbox.build_sdo_download_segmented_init_request(
+    b'\x02', 0x1001U, 0x2000U, b'\x01', 0x1234U, false,
+  )
+  @debug.assert_eq(frame[8], b'\x21')
+  @debug.assert_eq(frame[12], b'\x34')
+  @debug.assert_eq(frame[13], b'\x12')
+  @debug.assert_eq(frame[14], b'\x00')
+  @debug.assert_eq(frame[15], b'\x00')
+}
+
+///|
+test "segmented SDO download initiate preserves complete access" {
+  let frame = @mailbox.build_sdo_download_segmented_init_request(
+    b'\x02', 0x1001U, 0x1A00U, b'\x00', 8U, true,
+  )
+  @debug.assert_eq(frame[8], b'\x31')
 }
 
 ///|

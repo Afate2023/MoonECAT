@@ -121,15 +121,15 @@ test "FaultInjector: FrameDrop causes RecvTimeout" {
   let slave = @mock.VirtualSlave::new(0, identity, b"")
   let nic = @mock.VirtualNic::with_slaves([slave])
   let fault_nic = @mock.FaultNic::wrap(nic)
-  fault_nic.injector.add(@mock.FrameDrop, @mock.Once)
-  // First call: frame dropped → RecvTimeout
+  fault_nic.injector.add(@mock.FrameDrop, @mock.CountDown(2))
+  // First call: both the initial receive and receive-only retry are dropped.
   let result : Result[Int, @hal.EcError] = Ok(
     @protocol.count_slaves(fault_nic, @hal.Duration(1_000_000L)),
   ) catch {
     e => Err(e)
   }
   assert_true(result is Err(@hal.EcError::RecvTimeout))
-  // Second call: fault was Once, should pass now
+  // Second call: the two-drop schedule is exhausted, so it passes.
   let count = @protocol.count_slaves(fault_nic, @hal.Duration(1_000_000L))
   assert_eq(count, 1)
 }
@@ -216,10 +216,10 @@ test "FaultNic: multi-slave FMMU RecvTimeout — frame reaches slaves" {
   fmmu[11] = b'\x02'
   fmmu[12] = b'\x01'
   slave.write_reg(0x0600, Bytes::makei(16, fn(i) { fmmu[i] }))
-  // Wrap in FaultNic + inject RecvTimeout on first recv
+  // Wrap in FaultNic + exhaust both the initial receive and receive-only retry.
   let nic = @mock.VirtualNic::new(bus)
   let fault_nic = @mock.FaultNic::wrap(nic)
-  fault_nic.injector.add(@mock.RecvTimeout, @mock.Once)
+  fault_nic.injector.add(@mock.RecvTimeout, @mock.CountDown(2))
   let timeout = @hal.Duration(50_000_000L)
   // LWR PDO — master fails but bus processed the frame
   let builder = @protocol.FrameBuilder::new()
@@ -341,10 +341,10 @@ test "FaultNic: multi-slave CountDown recv fault then PDO recovery" {
   fmmu[11] = b'\x02'
   fmmu[12] = b'\x01'
   slave.write_reg(0x0600, Bytes::makei(16, fn(i) { fmmu[i] }))
-  // Wrap in FaultNic with CountDown(3) RecvTimeout
+  // Two consecutive RecvTimeouts are needed to fail one transaction.
   let nic = @mock.VirtualNic::new(bus)
   let fault_nic = @mock.FaultNic::wrap(nic)
-  fault_nic.injector.add(@mock.RecvTimeout, @mock.CountDown(3))
+  fault_nic.injector.add(@mock.RecvTimeout, @mock.CountDown(6))
   let timeout = @hal.Duration(50_000_000L)
   // First 3 PDO attempts fail
   for _i = 0; _i < 3; _i = _i + 1 {
@@ -362,7 +362,7 @@ test "FaultNic: multi-slave CountDown recv fault then PDO recovery" {
     }
     assert_true(result is Err(@hal.EcError::RecvTimeout))
   }
-  assert_eq(fault_nic.injector.total_fired(), 3)
+  assert_eq(fault_nic.injector.total_fired(), 6)
   // 4th attempt succeeds (fault exhausted)
   let builder = @protocol.FrameBuilder::new()
   let pdo = Bytes::from_array([b'\xAA', b'\xBB', b'\xCC', b'\xDD'])

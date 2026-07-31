@@ -2,6 +2,11 @@
 let max_ignored_rx_frames : Int = 32
 
 ///|
+/// Retry one receive-only timeout before failing the transaction. This does not
+/// resend the EtherCAT datagram, so write commands cannot be duplicated.
+let max_recv_timeout_retries : Int = 1
+
+///|
 /// Perform a single EtherCAT transaction: build a frame with the given PDUs,
 /// send it via the NIC, receive the response, and decode it.
 /// Returns the decoded response frame.
@@ -13,13 +18,38 @@ pub fn[N : @hal.Nic] transact(
   let raw = frame.encode()
   let _sent = nic.send(raw)
   let mut ignored = 0
+  let mut recv_timeouts = 0
   for ;; {
-    let response = nic.recv(timeout~)
+    let response_result : Result[Bytes, @hal.EcError] = Result::Ok(
+      nic.recv(timeout~),
+    ) catch {
+      err => Result::Err(err)
+    }
+    let response = match response_result {
+      Ok(value) => value
+      Err(@hal.EcError::RecvTimeout) if recv_timeouts < max_recv_timeout_retries => {
+        recv_timeouts = recv_timeouts + 1
+        continue
+      }
+      Err(err) => raise err
+    }
     let decoded = Result::Ok(EcFrame::decode(response)) catch {
       err => Result::Err(err)
     }
     match decoded {
-      Ok(value) => return value
+      Ok(value) =>
+        if response_matches_request(frame, value) {
+          return value
+        } else {
+          ignored = ignored + 1
+          if ignored > max_ignored_rx_frames {
+            raise @hal.EcError::Internal(
+              "timeout at transact.recv: ignored " +
+              max_ignored_rx_frames.to_string() +
+              " unrelated EtherCAT frames",
+            )
+          }
+        }
       Err(err) if should_ignore_rx_decode_error(err) => {
         ignored = ignored + 1
         if ignored > max_ignored_rx_frames {
@@ -34,6 +64,39 @@ pub fn[N : @hal.Nic] transact(
       Err(err) => raise err
     }
   }
+}
+
+///|
+fn response_matches_request(request : EcFrame, response : EcFrame) -> Bool {
+  if response.pdus.length() != request.pdus.length() {
+    return false
+  }
+  for request_pdu in request.pdus {
+    guard find_pdu_by_index(response, request_pdu.header.index)
+      is Some(response_pdu) else {
+      return false
+    }
+    if response_pdu.header.command != request_pdu.header.command {
+      return false
+    }
+    match request_pdu.header.command {
+      EcCommand::APRD
+      | EcCommand::APRW
+      | EcCommand::FPRD
+      | EcCommand::FPRW
+      | EcCommand::BRD
+      | EcCommand::BRW
+      | EcCommand::LRD
+      | EcCommand::LRW
+      | EcCommand::ARMW
+      | EcCommand::FRMW =>
+        if response_pdu.data.length() != request_pdu.data.length() {
+          return false
+        }
+      _ => ()
+    }
+  }
+  true
 }
 
 ///|

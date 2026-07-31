@@ -21,8 +21,8 @@ let process_data_eeprom_word_count : Int = 128
 
 ///|
 /// MoonECAT CLI entry point.
-/// Commands: list-if, scan, validate, run, run-zc, run-virtual, read-sii, esi-sii, state, diagnosis, od, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
-fn main {
+/// Commands: list-if, scan, validate, run, run-zc, run-virtual, read-sii, esi-sii, state, diagnosis, od, sdo-read, sdo-write, master-od, esc-regs, expected-regs, startup-diff, mailbox-readback, startup-trace, replay, scenario, jitter-profile, auto-tune, topo-health, cycle-perf, comm-quality.
+async fn main {
   let _ = cli_main() catch {
     err => {
       println("moonecat error: " + @debug.to_string(err))
@@ -32,7 +32,7 @@ fn main {
 }
 
 ///|
-fn cli_main() -> Unit raise @hal.EcError {
+async fn cli_main() -> Unit {
   let args = @env.args()
   if args.length() < 2 {
     print_usage()

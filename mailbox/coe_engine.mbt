@@ -126,7 +126,7 @@ fn coe_service_from_uint(v : UInt) -> CoeService raise @hal.EcError {
 /// SDO command specifier byte encoding.
 fn SdoCommand::to_byte(self : SdoCommand) -> Byte {
   match self {
-    DownloadRequest => b'\x21' // initiate download, expedited, size=4
+    DownloadRequest => b'\x23' // initiate download, expedited, 4-byte data
     DownloadResponse => b'\x60'
     UploadRequest => b'\x40'
     UploadResponse => b'\x43' // initiate upload response, expedited, size=4
@@ -186,6 +186,14 @@ pub(all) struct SdoResponse {
 ///|
 /// Build a complete mailbox frame for an SDO request (expedited).
 pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
+  self.encode_with_download_mode(true)
+}
+
+///|
+fn SdoTransaction::encode_with_download_mode(
+  self : SdoTransaction,
+  expedited_download : Bool,
+) -> Bytes {
   let buf = Buffer(
     size_hint=mailbox_header_len + coe_header_len + sdo_header_len,
   )
@@ -210,6 +218,19 @@ pub fn SdoTransaction::encode(self : SdoTransaction) -> Bytes {
   buf.write_byte(((coe_word >> 8) & 0xFFU).to_byte())
   // SDO header
   let mut cmd = self.request.command.to_byte()
+  match self.request.command {
+    DownloadRequest =>
+      if expedited_download &&
+        self.request.data.length() > 0 &&
+        self.request.data.length() <= 4 {
+        let unused = 4 - self.request.data.length()
+        cmd = b'\x23' | (unused << 2).to_byte()
+      } else {
+        // Normal (segmented) initiate download: bytes 4-7 carry total size.
+        cmd = b'\x21'
+      }
+    _ => ()
+  }
   // Complete Access is bit4 in initiate upload/download command.
   if self.request.complete_access {
     cmd = cmd | b'\x10'
@@ -487,6 +508,39 @@ pub fn build_sdo_download_ca(
       complete_access: true,
     },
   }
+}
+
+///|
+/// Build the initiate frame for a segmented SDO Download.
+///
+/// Unlike `SdoTransaction::encode`, bytes 4-7 of the SDO payload carry the
+/// total transfer size, so the expedited bit must remain clear.
+pub fn build_sdo_download_segmented_init_request(
+  counter : Byte,
+  station : UInt,
+  index : UInt,
+  subindex : Byte,
+  total_size : UInt,
+  complete_access : Bool,
+) -> Bytes {
+  let size_payload = Bytes::from_array([
+    (total_size & 0xFFU).to_byte(),
+    ((total_size >> 8) & 0xFFU).to_byte(),
+    ((total_size >> 16) & 0xFFU).to_byte(),
+    ((total_size >> 24) & 0xFFU).to_byte(),
+  ])
+  let txn : SdoTransaction = {
+    counter,
+    station,
+    request: {
+      index,
+      subindex,
+      command: DownloadRequest,
+      data: size_payload,
+      complete_access,
+    },
+  }
+  txn.encode_with_download_mode(false)
 }
 
 ///|

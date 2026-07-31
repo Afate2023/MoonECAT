@@ -37,4 +37,7 @@ pub(all) struct NativeNic {
   mut handle_id : Int
   mut is_open : Bool
   mut last_sent : Bytes
+  mut next_datagram_index : Int
+  mut protocol_datagram_indices : Array[Byte]
+  mut wire_datagram_indices : Array[Byte]
 } derive(Eq, Debug)

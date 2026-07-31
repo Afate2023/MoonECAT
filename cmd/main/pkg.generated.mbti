@@ -19,6 +19,18 @@ pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
 type CliTextRunProgressSink
 pub impl @runtime.RunProgressSink for CliTextRunProgressSink
 
+type CyclicSdoReadReport
+
+type CyclicSdoReadSample
+
+type CyclicSdoReadSettings
+
+type CyclicSdoWriteReport
+
+type CyclicSdoWriteSample
+
+type CyclicSdoWriteSettings
+
 type EscFmmuRegisterReport
 
 type EscRegisterReport

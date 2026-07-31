@@ -2,21 +2,87 @@
 
 A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B.
 
-## Package Structure
+## Installation
 
-| Package | Layer | Description |
-|---------|-------|-------------|
-| `hal/` | Platform HAL | Network send/recv, timing, scheduling traits; FramePool/ZeroCopyNic |
-| `hal/mock/` | Platform HAL | Mock loopback, VirtualBus, RecordingNic, ReplayNic, FaultNic |
-| `hal/native/` | Platform HAL | Windows Npcap + Linux Raw Socket native backends |
-| `hal/mcu/` | Platform HAL | MCU bare-metal HAL stubs (RZ/N2L, HPM6E00) |
-| `protocol/` | Protocol Core | Frame/PDU codec, ESM, PDO, zero-copy codec, addressing |
-| `mailbox/` | Mailbox & Config | CoE/SDO, SII/ESI parsing, FMMU/SM, RMSM, Emergency |
-| `runtime/` | Runtime | Scheduler, PDO loop, telemetry, monitors, verdicts, analysis engine |
-| `cmd/main/` | CLI | `moonecat` command-line interface |
-| `cmd/eni_json/` | Tool | ENI/ESI XML→JSON converter |
-| `plugin/extism/` | Plugin | Extism Wasm plugin skeleton |
-| `fixtures/` | Test Data | Shared test fixtures and sample frames |
+When this package is available from your MoonBit package registry or mirror,
+run this in your MoonBit project root:
+
+```bash
+moon add mokomoking2501/MoonECAT@0.1.0
+```
+
+This project targets the native backend by default.
+
+## Packages
+
+MoonECAT provides the following MoonBit packages. To use a package from another
+MoonBit project, add it to the `import` field of `moon.pkg`.
+
+| Package | Purpose |
+|---------|---------|
+| `mokomoking2501/MoonECAT` | Root facade package and package metadata surface |
+| `mokomoking2501/MoonECAT/hal` | Platform-neutral HAL contracts, errors, diagnostics, frame pools, zero-copy traits |
+| `mokomoking2501/MoonECAT/hal/mock` | Mock loopback, VirtualBus, RecordingNic, ReplayNic, FaultNic, protocol deviation helpers |
+| `mokomoking2501/MoonECAT/hal/native` | Windows Npcap and Linux Raw Socket native NIC backends |
+| `mokomoking2501/MoonECAT/hal/mcu` | MCU-oriented HAL stubs and event bridge types |
+| `mokomoking2501/MoonECAT/protocol` | EtherCAT frame/PDU codec, addressing, discovery, ESM, EEPROM, PDO, DC, mailbox transport |
+| `mokomoking2501/MoonECAT/mailbox` | CoE/SDO, FoE, SoE, EoE frames, SII parsing, SM/FMMU mapping, Emergency, RMSM |
+| `mokomoking2501/MoonECAT/runtime` | Scan, validate, run, scheduler, telemetry, monitors, verdicts, diagnosis, ESI/ENI projection |
+| `mokomoking2501/MoonECAT/runtime/analysis` | DC jitter, PDO auto-tune, topology health, cycle performance, communication quality analysis |
+| `mokomoking2501/MoonECAT/runtime/hil` | HIL cycle hooks, loop export, and HIL task types |
+| `mokomoking2501/MoonECAT/runtime/simulation` | Co-simulation adapter, external bridge, drift compensation, multi-rate scheduler, task partitioning |
+| `mokomoking2501/MoonECAT/fixtures` | Shared test fixtures and sample frame data |
+
+Runnable and integration packages:
+
+| Package | Purpose |
+|---------|---------|
+| `cmd/main` | `moonecat` command-line interface |
+| `cmd/eni_json` | ENI/ESI XML to JSON converter |
+| `plugin/extism` | Extism Wasm plugin boundary and entrypoint skeleton |
+
+## Source Files
+
+Each directory containing a `moon.pkg` file is a MoonBit package. Source file
+names are organizational only; imports refer to package paths, not individual
+files.
+
+```text
+MoonECAT/
+├── moon.mod                  # module metadata, version, dependencies, readme
+├── moon.pkg                  # root package marker
+├── MoonECAT.mbt              # root facade documentation and exports
+├── MoonECAT_test.mbt         # root black-box tests
+├── MoonECAT_wbtest.mbt       # root white-box tests
+├── README.mbt.md             # package readme used by mooncakes-style pages
+├── hal/                      # HAL contracts and backend packages
+│   ├── hal.mbt
+│   ├── error.mbt
+│   ├── diagnostic.mbt
+│   ├── config.mbt
+│   ├── frame_pool.mbt
+│   ├── zero_copy.mbt
+│   ├── mock/                 # virtual and fault-injection backends
+│   ├── native/               # native FFI backends
+│   └── mcu/                  # MCU HAL/event bridge
+├── protocol/                 # EtherCAT wire protocol and state-machine core
+├── mailbox/                  # mailbox protocols, SII, SM/FMMU mapping
+├── runtime/                  # master runtime, diagnosis, verification, analysis
+│   ├── analysis/             # analysis engine subpackage
+│   ├── hil/                  # HIL integration subpackage
+│   └── simulation/           # co-simulation subpackage
+├── cmd/
+│   ├── main/                 # CLI package
+│   └── eni_json/             # XML to JSON converter package
+├── plugin/extism/            # Extism plugin package
+├── fixtures/                 # shared fixture package
+├── docs/                     # architecture, backend, safety, and design docs
+├── project_workflow/         # roadmap, milestones, backlog, release workflow
+├── src/                      # reference-stack callflow analysis notes
+├── scripts/                  # local regression and maintenance scripts
+├── References/               # local device/configuration references
+└── Reference_Project/        # vendored reference implementations for study
+```
 
 ## Quick Start
 
@@ -74,6 +140,9 @@ moon run cmd/main diagnosis -- --backend native --if <interface> --station 4097 
 moon run cmd/main od -- --backend native --if <interface> --station 4097 --json
 moon run cmd/main od -- --backend native --if <interface> --station 4097 --index 7187
 moon run cmd/main od -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1
+moon run cmd/main sdo-read -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --cycles 100 --cycle-period-ms 100 --json
+moon run cmd/main sdo-read -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --cycles 100 --cycle-period-ms 100 --record sdo-read-trace.ndjson
+moon run cmd/main sdo-write -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --data-hex 2A00 --cycles 100 --cycle-period-ms 100 --json
 
 # Master object dictionary
 moon run cmd/main master-od -- --backend native --if <interface> --json
@@ -84,6 +153,10 @@ moon run cmd/main esc-regs -- --backend native --if <interface> --station 4097 -
 # Expected vs actual register comparison
 moon run cmd/main expected-regs -- --backend native --if <interface> --station 4097 --json
 ```
+
+For `sdo-read --record <path>`, timeout diagnostics print a bounded TX/RX frame
+window around each `RecvTimeout`. The NDJSON file retains the complete raw NIC
+event stream for offline packet inspection.
 
 ### Operation
 
@@ -165,12 +238,15 @@ moon run cmd/eni_json -- --input References/sample.xml --kind esi --output sampl
 | `--timeout-ms <n>` | Command timeout in milliseconds | All |
 | `--station <addr>` | Target slave configured address | Per-slave commands |
 | `--position <n>` | Target slave link position (0-based) | `read-sii` |
-| `--cycles <n>` | PDO cycle count | `run`, `run-zc`, `scenario` |
+| `--cycles <n>` | Operation cycle count | `run`, `run-zc`, `scenario`, `sdo-read`, `sdo-write` |
 | `--until-fault` | Run until fault detected | `run` |
 | `--progress-ndjson` | Stream NDJSON progress events | `run` |
 | `--startup-state <s>` | Startup target ESM state | `run`, `run-zc`, `replay` |
 | `--shutdown-state <s>` | Shutdown target or `none` | `run`, `run-zc`, `replay` |
 | `--cycle-period-us <n>` | Override cycle period (microseconds) | `run` |
+| `--cycle-period-ms <n>` | SDO operation period (milliseconds) | `sdo-read`, `sdo-write` |
+| `--data-hex <hex>` | SDO write payload as hexadecimal bytes | `sdo-write` |
+| `--record <path>` | Save complete raw NIC events as NDJSON | `run`, `sdo-read` |
 | `--output-period-ms <n>` | NDJSON progress output interval | `run` |
 | `--pool-capacity <n>` | Zero-copy frame pool capacity | `run-zc` |
 | `--trace <path>` | NDJSON trace file path | `replay`, `jitter-profile`, `topo-health`, `cycle-perf`, `comm-quality` |

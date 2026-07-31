@@ -15,6 +15,8 @@ pub fn build_sdo_download_ca(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
 pub fn build_sdo_download_segment_request(Byte, UInt, Bool, Bool, Bytes) -> Bytes raise @hal.EcError
 
+pub fn build_sdo_download_segmented_init_request(Byte, UInt, UInt, Byte, UInt, Bool) -> Bytes
+
 pub fn build_sdo_info_get_od_list_request(Byte, UInt, UInt) -> Bytes
 
 pub fn build_sdo_info_get_od_request(Byte, UInt, UInt) -> Bytes

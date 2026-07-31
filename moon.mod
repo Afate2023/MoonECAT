@@ -5,7 +5,7 @@ version = "0.1.0"
 import {
   "Milky2018/xml@0.2.0",
   "moonbitlang/x@0.4.38",
-  "moonbitlang/async@0.16.8",
+  "moonbitlang/async@0.19.4",
 }
 
 readme = "README.mbt.md"
