@@ -55,7 +55,7 @@ fn resolve_cyclic_sdo_read_settings(
 }
 
 ///|
-async fn[N : @hal.Nic] run_cyclic_sdo_read_command(
+async fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_cyclic_sdo_read_command(
   nic : N,
   args : Array[String],
   settings : CyclicSdoReadSettings,
@@ -67,7 +67,7 @@ async fn[N : @hal.Nic] run_cyclic_sdo_read_command(
   ) catch {
     err => Result::Err(err)
   }
-  nic.close()
+  @hal.Nic::close(nic)
   let report = match report_result {
     Ok(value) => value
     Err(err) => raise err
@@ -80,7 +80,7 @@ async fn[N : @hal.Nic] run_cyclic_sdo_read_command(
 }
 
 ///|
-async fn[N : @hal.Nic] compute_cyclic_sdo_read_report(
+async fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_cyclic_sdo_read_report(
   nic : N,
   args : Array[String],
   settings : CyclicSdoReadSettings,
@@ -106,6 +106,10 @@ async fn[N : @hal.Nic] compute_cyclic_sdo_read_report(
     },
     "sdo-read.prepare",
   )
+  // Resilient Mailbox State Machine: per-SDO mailbox correlation/retry state,
+  // not the slave EtherCAT State Machine (ESM). reset() returns the local
+  // transaction to Idle while mailbox-counter and Datagram Index sequences
+  // continue.
   let rmsm = @mailbox.Rmsm::new(max_retries=0)
   let samples : Array[CyclicSdoReadSample] = []
   for cycle in 0..<settings.cycles {
@@ -418,7 +422,7 @@ fn resolve_cyclic_sdo_write_settings(
 }
 
 ///|
-async fn[N : @hal.Nic] run_cyclic_sdo_write_command(
+async fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_cyclic_sdo_write_command(
   nic : N,
   settings : CyclicSdoWriteSettings,
   as_json : Bool,
@@ -429,7 +433,7 @@ async fn[N : @hal.Nic] run_cyclic_sdo_write_command(
   ) catch {
     err => Result::Err(err)
   }
-  nic.close()
+  @hal.Nic::close(nic)
   let report = match report_result {
     Ok(value) => value
     Err(err) => raise err
@@ -442,7 +446,7 @@ async fn[N : @hal.Nic] run_cyclic_sdo_write_command(
 }
 
 ///|
-async fn[N : @hal.Nic] compute_cyclic_sdo_write_report(
+async fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_cyclic_sdo_write_report(
   nic : N,
   settings : CyclicSdoWriteSettings,
   timeout : @hal.Duration,
@@ -464,6 +468,10 @@ async fn[N : @hal.Nic] compute_cyclic_sdo_write_report(
     },
     "sdo-write.prepare",
   )
+  // Resilient Mailbox State Machine: per-SDO mailbox correlation/retry state,
+  // not the slave EtherCAT State Machine (ESM). reset() returns the local
+  // transaction to Idle while mailbox-counter and Datagram Index sequences
+  // continue.
   let rmsm = @mailbox.Rmsm::new(max_retries=0)
   let samples : Array[CyclicSdoWriteSample] = []
   for cycle in 0..<settings.cycles {

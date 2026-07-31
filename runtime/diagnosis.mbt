@@ -169,7 +169,7 @@ pub fn parse_u32_payload(payload : Bytes) -> UInt raise @hal.EcError {
 
 ///|
 /// Read Error Register (0x1001:0) from one slave.
-pub fn[N : @hal.Nic] read_error_register(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_error_register(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -192,7 +192,7 @@ pub fn[N : @hal.Nic] read_error_register(
 ///|
 /// Read diagnosis object counter (0x10F3:0) from one slave.
 /// Some slaves may not implement this object; callers can handle errors.
-pub fn[N : @hal.Nic] read_diagnosis_counter(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_diagnosis_counter(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -214,7 +214,7 @@ pub fn[N : @hal.Nic] read_diagnosis_counter(
 
 ///|
 /// Read Error Register (0x1001:0) from one slave via AP mailbox transport.
-pub fn[N : @hal.Nic] read_error_register_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_error_register_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -230,7 +230,7 @@ pub fn[N : @hal.Nic] read_error_register_ap(
 
 ///|
 /// Read diagnosis object counter (0x10F3:0) via AP mailbox transport.
-pub fn[N : @hal.Nic] read_diagnosis_counter_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_diagnosis_counter_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -247,7 +247,7 @@ pub fn[N : @hal.Nic] read_diagnosis_counter_ap(
 ///|
 /// Read a diagnosis snapshot for one slave.
 /// If 0x10F3 is unavailable, the counter is returned as None.
-pub fn[N : @hal.Nic] read_slave_diagnosis(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_slave_diagnosis(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -290,7 +290,7 @@ pub fn[N : @hal.Nic] read_slave_diagnosis(
 
 ///|
 /// Read a diagnosis snapshot for one slave via AP mailbox transport.
-pub fn[N : @hal.Nic] read_slave_diagnosis_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_slave_diagnosis_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -865,7 +865,7 @@ fn diagnostic_level_rank(level : DiagnosticLevel) -> Int {
 ///
 /// This flow is intentionally diagnosis-specific: it normalizes the slave back to
 /// Init before entering PreOp so mailbox SM programming happens from a known base state.
-pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_diagnosis_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -927,7 +927,7 @@ pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(
 /// Prepare one slave for generic mailbox-based access via AP discovery and FP state control.
 /// Unlike diagnosis-specific helpers, this only returns the mailbox configuration and
 /// original state needed for restoring the slave after read-only mailbox operations.
-pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_mailbox_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -972,7 +972,7 @@ pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(
 
 ///|
 /// Restore a slave after diagnosis using a legal path from PreOp back to the original state.
-pub fn[N : @hal.Nic] restore_slave_diagnosis_state(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] restore_slave_diagnosis_state(
   nic : N,
   station : UInt,
   original_state : @protocol.EsmState,
@@ -992,7 +992,7 @@ pub fn[N : @hal.Nic] restore_slave_diagnosis_state(
 ///|
 /// Restore a slave after generic mailbox-based access using the legal path from
 /// PreOp back to the original state.
-pub fn[N : @hal.Nic] restore_slave_mailbox_state(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] restore_slave_mailbox_state(
   nic : N,
   station : UInt,
   original_state : @protocol.EsmState,
@@ -1041,7 +1041,7 @@ fn[T] diagnosis_timeout_step(
 }
 
 ///|
-fn[N : @hal.Nic] read_al_status_snapshot_fp(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_al_status_snapshot_fp(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -1064,7 +1064,7 @@ fn[N : @hal.Nic] read_al_status_snapshot_fp(
 }
 
 ///|
-fn[N : @hal.Nic] configure_diagnosis_mailbox_sms(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] configure_diagnosis_mailbox_sms(
   nic : N,
   station : UInt,
   eeprom : Bytes,
@@ -1092,7 +1092,7 @@ fn[N : @hal.Nic] configure_diagnosis_mailbox_sms(
 }
 
 ///|
-fn[N : @hal.Nic] enter_diagnosis_preop(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] enter_diagnosis_preop(
   nic : N,
   station : UInt,
   original_state : @protocol.EsmState,
@@ -1166,7 +1166,7 @@ fn[N : @hal.Nic] enter_diagnosis_preop(
 }
 
 ///|
-fn[N : @hal.Nic] diagnosis_sdo_upload_ap(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] diagnosis_sdo_upload_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -1209,7 +1209,7 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap(
 }
 
 ///|
-fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] diagnosis_sdo_upload_ap_once(
   nic : N,
   position : UInt,
   station : UInt,
@@ -1280,7 +1280,7 @@ fn[N : @hal.Nic] diagnosis_sdo_upload_ap_once(
 }
 
 ///|
-fn[N : @hal.Nic] diagnosis_mailbox_recv_fp(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] diagnosis_mailbox_recv_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -1350,7 +1350,7 @@ fn[N : @hal.Nic] diagnosis_mailbox_recv_fp(
 }
 
 ///|
-fn[N : @hal.Nic] diagnosis_drain_mailbox_fp(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] diagnosis_drain_mailbox_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,

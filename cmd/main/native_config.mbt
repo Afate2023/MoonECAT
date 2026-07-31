@@ -105,12 +105,13 @@ fn probe_native_cli_config(
   }
   match open_result {
     Ok(nic) => {
+      let session = @protocol.DatagramSession::new(nic)
       let probe_result : Result[Int, Error] = Result::Ok(
-        @protocol.count_slaves(nic, timeout),
+        @protocol.count_slaves(session, timeout),
       ) catch {
         err => Result::Err(err)
       }
-      nic.close()
+      session.close()
       probe_result
     }
     Err(err) => Err(err)

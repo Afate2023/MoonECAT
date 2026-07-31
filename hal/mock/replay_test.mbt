@@ -9,12 +9,14 @@ test "record and replay count_slaves produces identical result" {
   let slave = @mock.VirtualSlave::new(0, identity, b"")
   let nic = @mock.VirtualNic::with_slaves([slave])
   let recording = @mock.RecordingNic::wrap(nic)
-  let count1 = @protocol.count_slaves(recording, @hal.Duration(1_000_000L))
+  let record_session = @protocol.DatagramSession::new(recording)
+  let count1 = @protocol.count_slaves(record_session, @hal.Duration(1_000_000L))
   let log = recording.get_log()
   assert_true(log.len() > 0)
   // Replay the recorded session
   let replay = @mock.ReplayNic::from_log(log)
-  let count2 = @protocol.count_slaves(replay, @hal.Duration(1_000_000L))
+  let replay_session = @protocol.DatagramSession::new(replay)
+  let count2 = @protocol.count_slaves(replay_session, @hal.Duration(1_000_000L))
   assert_eq(count1, count2)
   assert_true(replay.is_exhausted())
 }
@@ -39,11 +41,13 @@ test "record and replay multi-slave discovery" {
   ]
   let nic = @mock.VirtualNic::with_slaves(slaves)
   let recording = @mock.RecordingNic::wrap(nic)
-  let count1 = @protocol.count_slaves(recording, @hal.Duration(1_000_000L))
+  let record_session = @protocol.DatagramSession::new(recording)
+  let count1 = @protocol.count_slaves(record_session, @hal.Duration(1_000_000L))
   assert_eq(count1, 2)
   let log = recording.get_log()
   let replay = @mock.ReplayNic::from_log(log)
-  let count2 = @protocol.count_slaves(replay, @hal.Duration(1_000_000L))
+  let replay_session = @protocol.DatagramSession::new(replay)
+  let count2 = @protocol.count_slaves(replay_session, @hal.Duration(1_000_000L))
   assert_eq(count2, 2)
   assert_true(replay.is_exhausted())
 }
@@ -59,7 +63,8 @@ test "recorded log captures send+recv pairs" {
   let slave = @mock.VirtualSlave::new(0, identity, b"")
   let nic = @mock.VirtualNic::with_slaves([slave])
   let recording = @mock.RecordingNic::wrap(nic)
-  let _ = @protocol.count_slaves(recording, @hal.Duration(1_000_000L))
+  let session = @protocol.DatagramSession::new(recording)
+  let _ = @protocol.count_slaves(session, @hal.Duration(1_000_000L))
   let log = recording.get_log()
   // count_slaves does one BRD transact: send + recv = 2 events
   assert_eq(log.len(), 2)
@@ -156,16 +161,18 @@ test "record fault then replay reproduces fault" {
   let fault_nic = @mock.FaultNic::wrap(nic)
   fault_nic.injector.add(@mock.RecvTimeout, @mock.Always)
   let recording = @mock.RecordingNicAdapter::wrap(fault_nic)
+  let record_session = @protocol.DatagramSession::new(recording)
   let result1 : Result[Int, @hal.EcError] = Ok(
-    @protocol.count_slaves(recording, @hal.Duration(1_000_000L)),
+    @protocol.count_slaves(record_session, @hal.Duration(1_000_000L)),
   ) catch {
     e => Err(e)
   }
   assert_true(result1 is Err(@hal.EcError::RecvTimeout))
   let log = recording.get_log()
   let replay = @mock.ReplayNic::from_log(log)
+  let replay_session = @protocol.DatagramSession::new(replay)
   let result : Result[Int, @hal.EcError] = Ok(
-    @protocol.count_slaves(replay, @hal.Duration(1_000_000L)),
+    @protocol.count_slaves(replay_session, @hal.Duration(1_000_000L)),
   ) catch {
     e => Err(e)
   }

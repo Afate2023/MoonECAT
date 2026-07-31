@@ -217,7 +217,7 @@ pub(all) struct ScanResult {
 ///|
 /// Count the number of slaves on the bus by sending a BRD to register 0x0000.
 /// The working counter indicates how many slaves responded.
-pub fn[N : @hal.Nic] count_slaves(
+pub fn[N : @hal.Nic + DatagramIndexSource] count_slaves(
   nic : N,
   timeout : @hal.Duration,
 ) -> Int raise @hal.EcError {
@@ -233,7 +233,7 @@ pub fn[N : @hal.Nic] count_slaves(
 
 ///|
 /// Read a register from a slave using auto-increment addressing.
-pub fn[N : @hal.Nic] read_register_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_register_ap(
   nic : N,
   position : UInt,
   register : UInt,
@@ -246,7 +246,7 @@ pub fn[N : @hal.Nic] read_register_ap(
 
 ///|
 /// Write a register to a slave using auto-increment addressing.
-pub fn[N : @hal.Nic] write_register_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] write_register_ap(
   nic : N,
   position : UInt,
   register : UInt,
@@ -259,7 +259,7 @@ pub fn[N : @hal.Nic] write_register_ap(
 
 ///|
 /// Read a register from a slave using configured station addressing.
-pub fn[N : @hal.Nic] read_register_fp(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_register_fp(
   nic : N,
   station : UInt,
   register : UInt,
@@ -272,7 +272,7 @@ pub fn[N : @hal.Nic] read_register_fp(
 
 ///|
 /// Write a register to a slave using configured station addressing.
-pub fn[N : @hal.Nic] write_register_fp(
+pub fn[N : @hal.Nic + DatagramIndexSource] write_register_fp(
   nic : N,
   station : UInt,
   register : UInt,
@@ -285,7 +285,7 @@ pub fn[N : @hal.Nic] write_register_fp(
 
 ///|
 /// Assign a configured station address to a slave at the given position.
-pub fn[N : @hal.Nic] assign_station_address(
+pub fn[N : @hal.Nic + DatagramIndexSource] assign_station_address(
   nic : N,
   position : UInt,
   station_address : UInt,
@@ -313,7 +313,7 @@ pub fn[N : @hal.Nic] assign_station_address(
 
 ///|
 /// Read configured station address register (0x0010) using auto-increment addressing.
-pub fn[N : @hal.Nic] read_station_address_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_station_address_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -327,7 +327,7 @@ pub fn[N : @hal.Nic] read_station_address_ap(
 
 ///|
 /// Read station alias register (0x0012) using configured station addressing.
-pub fn[N : @hal.Nic] read_station_alias(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_station_alias(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -341,7 +341,7 @@ pub fn[N : @hal.Nic] read_station_alias(
 
 ///|
 /// Write station alias register (0x0012) using configured station addressing.
-pub fn[N : @hal.Nic] write_station_alias(
+pub fn[N : @hal.Nic + DatagramIndexSource] write_station_alias(
   nic : N,
   station : UInt,
   station_alias : UInt,
@@ -356,7 +356,7 @@ pub fn[N : @hal.Nic] write_station_alias(
 
 ///|
 /// Set DL Control Bit24 to enable alias addressing for one slave.
-pub fn[N : @hal.Nic] enable_alias_addressing(
+pub fn[N : @hal.Nic + DatagramIndexSource] enable_alias_addressing(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,

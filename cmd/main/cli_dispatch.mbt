@@ -115,7 +115,7 @@ fn try_handle_analysis_cli_command(
 }
 
 ///|
-fn open_native_cli_nic(
+fn open_native_cli_raw_nic(
   command : String,
   args : Array[String],
   backend : CliBackend,
@@ -129,6 +129,18 @@ fn open_native_cli_nic(
         resolve_native_cli_config(args, backend, timeout),
       )
   }
+}
+
+///|
+fn open_native_cli_nic(
+  command : String,
+  args : Array[String],
+  backend : CliBackend,
+  timeout : @hal.Duration,
+) -> @protocol.DatagramSession[@native.NativeNic] raise @hal.EcError {
+  @protocol.DatagramSession::new(
+    open_native_cli_raw_nic(command, args, backend, timeout),
+  )
 }
 
 ///|
@@ -159,12 +171,16 @@ async fn try_handle_native_cli_command(
 
   if command == "sdo-read" {
     let settings = resolve_cyclic_sdo_read_settings(args)
-    let nic = open_native_cli_nic(command, args, backend, timeout)
     match flag_value(args, "--record") {
-      None => run_cyclic_sdo_read_command(nic, args, settings, as_json, timeout)
+      None => {
+        let session = open_native_cli_nic(command, args, backend, timeout)
+        run_cyclic_sdo_read_command(session, args, settings, as_json, timeout)
+      }
       Some(path) => {
-        let recorder = @mock.RecordingNicAdapter::wrap(nic)
-        run_cyclic_sdo_read_command(recorder, args, settings, as_json, timeout)
+        let raw_nic = open_native_cli_raw_nic(command, args, backend, timeout)
+        let recorder = @mock.RecordingNicAdapter::wrap(raw_nic)
+        let session = @protocol.DatagramSession::new(recorder)
+        run_cyclic_sdo_read_command(session, args, settings, as_json, timeout)
         let log = recorder.get_log()
         write_nic_event_log(path, log)
         if !as_json {
@@ -333,7 +349,7 @@ fn run_default_cli_command(
     Mock =>
       run_command_with_nic(
         command,
-        @mock.MockNic::new(),
+        @protocol.DatagramSession::new(@mock.MockNic::new()),
         args,
         as_json,
         timeout,
@@ -342,7 +358,13 @@ fn run_default_cli_command(
       let nic = @native.NativeNic::open_with_config(
         resolve_native_cli_config(args, backend, timeout),
       )
-      run_command_with_nic(command, nic, args, as_json, timeout)
+      run_command_with_nic(
+        command,
+        @protocol.DatagramSession::new(nic),
+        args,
+        as_json,
+        timeout,
+      )
     }
   }
 }

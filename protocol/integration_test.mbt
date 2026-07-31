@@ -564,11 +564,27 @@ fn test_mb_config() -> @mailbox.MailboxConfig {
   }
 }
 
+///|
+fn mailbox_mock_session(
+  responses : Array[Bytes],
+) -> (MailboxMockNic, @protocol.DatagramSession[MailboxMockNic]) {
+  let raw_nic = MailboxMockNic::new(responses)
+  (raw_nic, @protocol.DatagramSession::new(raw_nic))
+}
+
+///|
+fn ap_mailbox_mock_session(
+  responses : Array[Bytes],
+) -> (ApMailboxFullMockNic, @protocol.DatagramSession[ApMailboxFullMockNic]) {
+  let raw_nic = ApMailboxFullMockNic::new(responses)
+  (raw_nic, @protocol.DatagramSession::new(raw_nic))
+}
+
 // ========== SDO Expedited Download ==========
 
 ///|
 test "integration/sdo_download expedited via FP mock" {
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_download_resp(b'\x01', test_station, 0x6040U, b'\x00'),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -584,7 +600,7 @@ test "integration/sdo_download expedited via FP mock" {
     test_timeout,
   )
   // If we get here without error, the download succeeded
-  @debug.assert_eq(nic.response_index, 1)
+  @debug.assert_eq(raw_nic.response_index, 1)
 }
 
 // ========== SDO Segmented Download ==========
@@ -595,7 +611,7 @@ test "integration/sdo_download segmented 8 bytes via FP mock" {
   // Flow: initiate download → DownloadResponse
   //       segment1 (7 bytes, toggle=false) → seg DownloadResponse
   //       segment2 (1 byte, toggle=true, last) → seg DownloadResponse
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_download_resp(b'\x01', test_station, 0x2000U, b'\x01'),
     build_sdo_download_segment_resp(b'\x02', test_station, false),
     build_sdo_download_segment_resp(b'\x03', test_station, true),
@@ -614,7 +630,7 @@ test "integration/sdo_download segmented 8 bytes via FP mock" {
     data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 3)
+  @debug.assert_eq(raw_nic.response_index, 3)
 }
 
 // ========== SDO Expedited Upload ==========
@@ -622,7 +638,7 @@ test "integration/sdo_download segmented 8 bytes via FP mock" {
 ///|
 test "integration/sdo_upload expedited via FP mock" {
   let expected = Bytes::from_array([b'\xDE', b'\xAD', b'\xBE', b'\xEF'])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x01', test_station, 0x1018U, b'\x01', expected,
     ),
@@ -643,7 +659,7 @@ test "integration/sdo_upload expedited via FP mock" {
 ///|
 test "integration/sdo_upload discards stale counter mismatch frame" {
   let expected = Bytes::from_array([b'\xDE', b'\xAD', b'\xBE', b'\xEF'])
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x05', test_station, 0x1018U, b'\x01', expected,
     ),
@@ -662,7 +678,7 @@ test "integration/sdo_upload discards stale counter mismatch frame" {
     test_timeout,
   )
   @debug.assert_eq(result, expected)
-  @debug.assert_eq(nic.response_index, 2)
+  @debug.assert_eq(raw_nic.response_index, 2)
 }
 
 // ========== SDO Segmented Upload ==========
@@ -670,7 +686,7 @@ test "integration/sdo_upload discards stale counter mismatch frame" {
 ///|
 test "integration/sdo_upload segmented 10 bytes via FP mock" {
   // 10 bytes total: initiate (size=10, no initial data), seg1 (7 bytes), seg2 (3 bytes, last)
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_upload_initiate_resp(b'\x01', test_station, 0x2001U, b'\x00', 10U),
     build_sdo_upload_segment_resp(
       b'\x02',
@@ -714,7 +730,7 @@ test "integration/sdo_upload segmented 10 bytes via FP mock" {
 ///|
 test "integration/sdo_upload_ap expedited via AP mock" {
   let expected = Bytes::from_array([b'\xCA', b'\xFE', b'\x00', b'\x00'])
-  let nic = ApMailboxFullMockNic::new([
+  let (_, nic) = ap_mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x01', test_station, 0x1001U, b'\x00', expected,
     ),
@@ -737,7 +753,7 @@ test "integration/sdo_upload_ap expedited via AP mock" {
 
 ///|
 test "integration/sdo_download_complete_access expedited via FP mock" {
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_download_resp(b'\x01', test_station, 0x1C12U, b'\x00'),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -752,7 +768,7 @@ test "integration/sdo_download_complete_access expedited via FP mock" {
     data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 1)
+  @debug.assert_eq(raw_nic.response_index, 1)
 }
 
 // ========== SDO Complete Access Download Segmented ==========
@@ -760,7 +776,7 @@ test "integration/sdo_download_complete_access expedited via FP mock" {
 ///|
 test "integration/sdo_download_complete_access segmented via FP mock" {
   // 8 bytes data > 4 → segmented with CA flag
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_download_resp(b'\x01', test_station, 0x1C12U, b'\x00'),
     build_sdo_download_segment_resp(b'\x02', test_station, false),
     build_sdo_download_segment_resp(b'\x03', test_station, true),
@@ -779,7 +795,7 @@ test "integration/sdo_download_complete_access segmented via FP mock" {
     data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 3)
+  @debug.assert_eq(raw_nic.response_index, 3)
 }
 
 // ========== SDO Complete Access Upload ==========
@@ -787,7 +803,7 @@ test "integration/sdo_download_complete_access segmented via FP mock" {
 ///|
 test "integration/sdo_upload_complete_access expedited via FP mock" {
   let expected = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04'])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x01', test_station, 0x1C13U, b'\x00', expected,
     ),
@@ -809,7 +825,7 @@ test "integration/sdo_upload_complete_access expedited via FP mock" {
 
 ///|
 test "integration/sdo_upload_complete_access segmented via FP mock" {
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_upload_initiate_resp(b'\x01', test_station, 0x1C13U, b'\x00', 10U),
     build_sdo_upload_segment_resp(
       b'\x02',
@@ -848,7 +864,7 @@ test "integration/sdo_download_retry succeeds after timeout" {
   // First attempt times out (SM1 never ready), second attempt succeeds.
   // We use a special NIC that returns not-ready for SM1 on first round,
   // then ready on second round.
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_download_resp(b'\x01', test_station, 0x6040U, b'\x00'),
   ])
   // With max_retries=1, the retry budget allows one retry.
@@ -864,7 +880,7 @@ test "integration/sdo_download_retry succeeds after timeout" {
     data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 1)
+  @debug.assert_eq(raw_nic.response_index, 1)
 }
 
 // ========== SDO Upload Retry ==========
@@ -872,7 +888,7 @@ test "integration/sdo_download_retry succeeds after timeout" {
 ///|
 test "integration/sdo_upload_retry succeeds first try via FP mock" {
   let expected = Bytes::from_array([b'\xAB', b'\xCD', b'\x00', b'\x00'])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x01', test_station, 0x6041U, b'\x00', expected,
     ),
@@ -895,7 +911,7 @@ test "integration/sdo_upload_retry succeeds first try via FP mock" {
 ///|
 test "integration/sdo_upload_retry_ap succeeds first try via AP mock" {
   let expected = Bytes::from_array([b'\x11', b'\x22', b'\x33', b'\x44'])
-  let nic = ApMailboxFullMockNic::new([
+  let (_, nic) = ap_mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x01', test_station, 0x6041U, b'\x00', expected,
     ),
@@ -918,7 +934,7 @@ test "integration/sdo_upload_retry_ap succeeds first try via AP mock" {
 
 ///|
 test "integration/sdo_upload_retry_ap exhausts retries" {
-  let nic = TimeoutMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(TimeoutMailboxMockNic::new())
   let rmsm = @mailbox.Rmsm::new(max_retries=1)
   let result : Result[Bytes, Error] = Result::Ok(
     @protocol.sdo_upload_retry_ap(
@@ -942,7 +958,7 @@ test "integration/sdo_upload_retry_ap exhausts retries" {
 ///|
 test "integration/foe_download via FP mock" {
   // Flow: Write → Ack(0), Data(1) → Ack(1)
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_foe_ack_resp(b'\x01', test_station, 0U),
     build_foe_ack_resp(b'\x02', test_station, 1U),
   ])
@@ -961,7 +977,7 @@ test "integration/foe_download via FP mock" {
     file_data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 2)
+  @debug.assert_eq(raw_nic.response_index, 2)
 }
 
 // ========== FoE Upload (FP) ==========
@@ -972,7 +988,7 @@ test "integration/foe_upload via FP mock" {
   let file_content = Bytes::from_array([
     b'\xAA', b'\xBB', b'\xCC', b'\xDD', b'\xEE',
   ])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_foe_data_resp(b'\x01', test_station, 1U, file_content),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -992,7 +1008,7 @@ test "integration/foe_upload via FP mock" {
 
 ///|
 test "integration/foe_download error response raises" {
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_foe_error_resp(b'\x01', test_station, 0x8001U, "not found"),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1018,7 +1034,7 @@ test "integration/foe_download error response raises" {
 
 ///|
 test "integration/foe_download_ap via AP mock" {
-  let nic = ApMailboxFullMockNic::new([
+  let (raw_nic, nic) = ap_mailbox_mock_session([
     build_foe_ack_resp(b'\x01', test_station, 0U),
     build_foe_ack_resp(b'\x02', test_station, 1U),
   ])
@@ -1034,7 +1050,7 @@ test "integration/foe_download_ap via AP mock" {
     file_data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 2)
+  @debug.assert_eq(raw_nic.response_index, 2)
 }
 
 // ========== FoE Upload AP ==========
@@ -1042,7 +1058,7 @@ test "integration/foe_download_ap via AP mock" {
 ///|
 test "integration/foe_upload_ap via AP mock" {
   let file_content = Bytes::from_array([b'\x10', b'\x20', b'\x30'])
-  let nic = ApMailboxFullMockNic::new([
+  let (_, nic) = ap_mailbox_mock_session([
     build_foe_data_resp(b'\x01', test_station, 1U, file_content),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1062,7 +1078,7 @@ test "integration/foe_upload_ap via AP mock" {
 
 ///|
 test "integration/foe_upload error response raises" {
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_foe_error_resp(b'\x01', test_station, 0x8002U, "access denied"),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1089,7 +1105,7 @@ test "integration/foe_download busy then ack via FP mock" {
   // First response to Write is Busy (counter=1), then retry re-sends with
   // new counter=2 (begin_retry_transaction), gets Ack(0) with counter=2.
   // Then data segment uses counter=3, gets Ack(1) with counter=3.
-  let nic = MailboxMockNic::new([
+  let (raw_nic, nic) = mailbox_mock_session([
     build_foe_busy_resp(b'\x01', test_station),
     build_foe_ack_resp(b'\x02', test_station, 0U),
     build_foe_ack_resp(b'\x03', test_station, 1U),
@@ -1106,7 +1122,7 @@ test "integration/foe_download busy then ack via FP mock" {
     file_data,
     test_timeout,
   )
-  @debug.assert_eq(nic.response_index, 3)
+  @debug.assert_eq(raw_nic.response_index, 3)
 }
 
 // ========== SDO Info Get OD List ==========
@@ -1122,7 +1138,7 @@ test "integration/sdo_info_get_od_list via FP mock" {
      b'\x18', b'\x10', // 0x1018
      b'\x00', b'\x60', // 0x6000
   ])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_info_resp(b'\x01', test_station, b'\x02', false, info_payload),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1152,7 +1168,7 @@ test "integration/sdo_info_get_od_description via FP mock" {
      b'\x09', // object_code = 9 (RECORD)
      b'\x49', b'\x44', // "ID" (name)
   ])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_info_resp(b'\x01', test_station, b'\x04', false, od_payload),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1183,7 +1199,7 @@ test "integration/sdo_info_get_oe_description via FP mock" {
      b'\x07', b'\x00', // access = 7 (RWR)
      b'\x56', b'\x49', // "VI" (name)
   ])
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_info_resp(b'\x01', test_station, b'\x06', false, oe_payload),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -1218,7 +1234,7 @@ test "integration/sdo_info_get_od_list multi-fragment via FP mock" {
   ])
   // Fragment 1 uses counter=1 from initial begin_transaction.
   // Fragment 2 uses counter=2 from continuation begin_transaction.
-  let nic = MailboxMockNic::new([
+  let (_, nic) = mailbox_mock_session([
     build_sdo_info_resp(b'\x01', test_station, b'\x02', true, frag1),
     build_sdo_info_resp(b'\x02', test_station, b'\x02', false, frag2),
   ])
@@ -1264,7 +1280,7 @@ test "integration/sdo_upload abort response raises SdoAbort" {
       }
     }),
   )
-  let nic = MailboxMockNic::new([abort_frame])
+  let (_, nic) = mailbox_mock_session([abort_frame])
   let rmsm = @mailbox.Rmsm::new()
   let result = Result::Ok(
     @protocol.sdo_upload(

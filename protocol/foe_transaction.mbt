@@ -10,7 +10,7 @@ let foe_max_busy_retries : Int = 100
 ///|
 /// Receive and validate a FoE response (FP addressing).
 /// Discards stale/repeat frames via RMSM counter validation.
-fn[N : @hal.Nic] recv_foe_validated_fp(
+fn[N : @hal.Nic + DatagramIndexSource] recv_foe_validated_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -30,7 +30,7 @@ fn[N : @hal.Nic] recv_foe_validated_fp(
 ///|
 /// Receive and validate a FoE response (AP addressing).
 /// Discards stale/repeat frames via RMSM counter validation.
-fn[N : @hal.Nic] recv_foe_validated_ap(
+fn[N : @hal.Nic + DatagramIndexSource] recv_foe_validated_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -78,7 +78,7 @@ fn patch_mailbox_counter(frame : Bytes, new_counter : Byte) -> Bytes {
 ///|
 /// Handle a FoE response that may be Busy, retrying the given resend closure.
 /// Returns the actual response (Data or Ack) when a non-Busy response arrives.
-fn[N : @hal.Nic] foe_handle_busy(
+fn[N : @hal.Nic + DatagramIndexSource] foe_handle_busy(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -101,7 +101,7 @@ fn[N : @hal.Nic] foe_handle_busy(
 
 ///|
 /// Handle a FoE response that may be Busy (AP addressing).
-fn[N : @hal.Nic] foe_handle_busy_ap(
+fn[N : @hal.Nic + DatagramIndexSource] foe_handle_busy_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -128,7 +128,7 @@ fn[N : @hal.Nic] foe_handle_busy_ap(
 /// EOF is indicated when the last Data segment is shorter than max_data_per_segment.
 /// If the data is an exact multiple of max_data_per_segment, an empty Data segment
 /// is sent to signal EOF.
-pub fn[N : @hal.Nic] foe_download(
+pub fn[N : @hal.Nic + DatagramIndexSource] foe_download(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -217,7 +217,7 @@ pub fn[N : @hal.Nic] foe_download(
 ///
 /// Flow: Read(filename) → Data(1) → Ack(1) → Data(2) → Ack(2) → ... → Data(N,short) → Ack(N)
 /// Returns the assembled file data.
-pub fn[N : @hal.Nic] foe_upload(
+pub fn[N : @hal.Nic + DatagramIndexSource] foe_upload(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -281,7 +281,7 @@ pub fn[N : @hal.Nic] foe_upload(
 
 ///|
 /// FoE Download (write file to slave) using AP addressing.
-pub fn[N : @hal.Nic] foe_download_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] foe_download_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -362,7 +362,7 @@ pub fn[N : @hal.Nic] foe_download_ap(
 ///|
 /// FoE Upload (read file from slave) using AP addressing.
 /// Returns the assembled file data.
-pub fn[N : @hal.Nic] foe_upload_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] foe_upload_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,

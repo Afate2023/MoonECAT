@@ -79,6 +79,49 @@ test "NicEventLog NDJSON with header" {
 }
 
 ///|
+test "NicEventLog DatagramSession header preserves replay seed" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.RecvTimeout)
+  let ndjson = log.to_ndjson_with_datagram_session_header(
+    slave_count=1,
+    fingerprint="session",
+    initial_datagram_index=b'\xFE',
+  )
+  inspect(ndjson.contains("\"version\":2"), content="true")
+  inspect(
+    ndjson.contains("\"datagram_index_mode\":\"incrementing\""),
+    content="true",
+  )
+  @debug.assert_eq(@mock.ndjson_initial_datagram_index(ndjson), Some(b'\xFE'))
+  @debug.assert_eq(@mock.ndjson_initial_datagram_index(log.to_ndjson()), None)
+  @debug.assert_eq(@mock.NicEventLog::from_ndjson(ndjson).len(), 1)
+}
+
+///|
+test "DatagramSession header parser accepts JSON whitespace and rejects invalid metadata" {
+  let spaced = "  { \"initial_datagram_index\" : 254, \"datagram_index_mode\" : \"incrementing\", \"version\" : 2, \"header\" : true }  \n{\"type\":\"recv_timeout\"}"
+  @debug.assert_eq(@mock.ndjson_initial_datagram_index(spaced), Some(b'\xFE'))
+  @debug.assert_eq(
+    @mock.ndjson_initial_datagram_index(
+      "{\"header\":true,\"version\":20,\"datagram_index_mode\":\"incrementing\",\"initial_datagram_index\":1}",
+    ),
+    None,
+  )
+  @debug.assert_eq(
+    @mock.ndjson_initial_datagram_index(
+      "{\"header\":true,\"version\":2,\"datagram_index_mode\":\"fixed\",\"initial_datagram_index\":1}",
+    ),
+    None,
+  )
+  @debug.assert_eq(
+    @mock.ndjson_initial_datagram_index(
+      "{\"header\":true,\"version\":2,\"datagram_index_mode\":\"incrementing\",\"initial_datagram_index\":256}",
+    ),
+    None,
+  )
+}
+
+///|
 test "VirtualMailbox SDO upload" {
   let mbx = @mock.VirtualMailbox::new()
   mbx.add_od(0x1018U, b'\x01', Bytes::make(4, b'\x42'))

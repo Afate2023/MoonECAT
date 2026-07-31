@@ -82,6 +82,8 @@ declared in each package's `moon.pkg` file.
   `#borrow` 标注，接收帧复制后返回。
 - **平台隔离**: `moon.pkg` targets 限定 FFI 文件仅在 native 目标构建，
   wasm-gc 下使用 fallback 文件。
+- **协议边界**: `NativeNic` 只原样收发 Ethernet 字节，不分配、改写或恢复
+  EtherCAT Datagram Index；Index 由上层 `protocol/DatagramSession` 持有。
 
 ### `hal/mcu/` — MCU Abstraction (骨架)
 
@@ -95,7 +97,13 @@ declared in each package's `moon.pkg` file.
 - **PDU**: `Pdu` struct, `find_pdu_by_index`, pipeline 多 PDU datagram。
 - **Addressing**: `auto_increment_address`, `configured_address`,
   `broadcast_address`, `logical_address`; `AddressType`/`AddressMode` enum。
+- **Transaction session**: `DatagramSession[N]` 持有串行主站会话的 Datagram
+  Index 游标；标准协议入口要求 `Nic + DatagramIndexSource`。同一业务会话应只包装
+  一次，并贯穿 scan、状态切换、mailbox/SDO 与周期交换。事务失败仍消耗已分配
+  Index；`transact` 内部的 receive-only 补收不重发，也不再分配新 Index。
 - **Transactions**: `transact` / `transact_pdu` / `transact_pdu_retry`;
+  `transact` 是调用者已提供 Index 的底层帧入口，其余标准协议事务从
+  `DatagramSession` 分配 Index；
   register read/write: `read_register_fp` / `read_register_ap` /
   `write_register_fp` / `write_register_ap`。
 - **Discovery**: `count_slaves`, `assign_station_address`,
@@ -122,7 +130,8 @@ declared in each package's `moon.pkg` file.
   `pdo_read`/`pdo_write` (LRD/LWR),
   `PdoExchangeResult` 含 WKC 结果。
 - **零拷贝 PDO**: `pdo_exchange_zero_copy`/`pdo_read_zero_copy`/
-  `pdo_write_zero_copy` — MutablePdoContext 路径零 GC 分配。
+  `pdo_write_zero_copy` — MutablePdoContext 路径零 GC 分配。该独立通道尚未接入
+  `DatagramSession` 游标，后续需要专用的 zero-copy Index allocator。
 - **Mailbox Transport**: `mailbox_send`/`mailbox_recv`/`mailbox_poll`/
   `mailbox_exchange` (AP/FP 变体), RMSM 重发支持
   (`mailbox_recv_rmsm`/`mailbox_recv_ap_rmsm`)。

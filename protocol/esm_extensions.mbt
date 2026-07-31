@@ -5,7 +5,7 @@
 ///|
 /// Read the Type register (0x0000) from a slave and check if
 /// the Device Emulation flag (bit 7 of byte 0) is set.
-pub fn[N : @hal.Nic] read_device_emulation(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_device_emulation(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -23,7 +23,7 @@ pub fn[N : @hal.Nic] read_device_emulation(
 ///   - Clear Error Indication in AL Control (bit 4) before transition.
 ///   - Write AL Control with Acknowledge bit when in error state.
 /// For normal slaves, behaves identically to request_state.
-pub fn[N : @hal.Nic] request_state_aware(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_aware(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -56,7 +56,7 @@ pub fn[N : @hal.Nic] request_state_aware(
 /// Used for OpOnly handling: disable output SM when not in Op state.
 ///
 /// SM activate register is at: SM_base + SM_index * 8 + 6
-pub fn[N : @hal.Nic] set_sm_enable(
+pub fn[N : @hal.Nic + DatagramIndexSource] set_sm_enable(
   nic : N,
   station : UInt,
   sm_index : Int,
@@ -80,7 +80,7 @@ pub fn[N : @hal.Nic] set_sm_enable(
 /// Apply OpOnly policy for a slave during ESM state transitions.
 /// When op_only is true and target state is not Op, disables the output
 /// process data SMs (typically SM2). When transitioning to Op, enables them.
-pub fn[N : @hal.Nic] apply_op_only_policy(
+pub fn[N : @hal.Nic + DatagramIndexSource] apply_op_only_policy(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -114,7 +114,7 @@ pub(all) struct SmWatchdogConfig {
 
 ///|
 /// Read SM Watchdog configuration from ESC registers.
-pub fn[N : @hal.Nic] read_sm_watchdog_config(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_sm_watchdog_config(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -164,7 +164,7 @@ pub fn[N : @hal.Nic] read_sm_watchdog_config(
 /// Write SM Watchdog configuration to ESC registers.
 /// Configures watchdog divider (0x0400), PDI watchdog time (0x0410),
 /// and process data watchdog time (0x0420).
-pub fn[N : @hal.Nic] write_sm_watchdog_config(
+pub fn[N : @hal.Nic + DatagramIndexSource] write_sm_watchdog_config(
   nic : N,
   station : UInt,
   divider : UInt,
@@ -223,7 +223,7 @@ pub(all) struct DlErrorCounters {
 /// Read DL/Physical layer error counters from ESC registers using configured station addressing.
 /// Reads registers 0x0300–0x030D (RX Error, Forwarded RX Error, EPU, PDI)
 /// and 0x0310–0x0313 (Lost Link).
-pub fn[N : @hal.Nic] read_dl_error_counters(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_dl_error_counters(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -243,7 +243,7 @@ pub fn[N : @hal.Nic] read_dl_error_counters(
 
 ///|
 /// Read DL/Physical layer error counters using auto-increment (AP) addressing.
-pub fn[N : @hal.Nic] read_dl_error_counters_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_dl_error_counters_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,

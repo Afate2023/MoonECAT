@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] run_command_with_nic(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_command_with_nic(
   command : String,
   nic : N,
   args : Array[String],
@@ -9,7 +9,7 @@ fn[N : @hal.Nic] run_command_with_nic(
   match command {
     "scan" => {
       let report = @runtime.scan(nic, timeout)
-      nic.close()
+      @hal.Nic::close(nic)
       if as_json {
         println(scan_report_json(report).stringify(indent=2))
       } else {
@@ -18,7 +18,7 @@ fn[N : @hal.Nic] run_command_with_nic(
     }
     "validate" => {
       let report = @runtime.scan(nic, timeout)
-      nic.close()
+      @hal.Nic::close(nic)
       let actual = @runtime.configuration_from_scan(report)
       let expected = resolve_validate_expected_configuration(report, args)
       let validate_report = @runtime.validate_configuration(actual, expected)
@@ -34,7 +34,7 @@ fn[N : @hal.Nic] run_command_with_nic(
       let scan_report : @runtime.ScanReport? = Some(@runtime.scan(nic, timeout)) catch {
         _ => None
       }
-      nic.close()
+      @hal.Nic::close(nic)
       let identity = @runtime.default_master_identity()
       let od = @runtime.build_master_od(identity, scan_report, None, None)
       if as_json {
@@ -153,7 +153,7 @@ fn print_usage() -> Unit {
 }
 
 ///|
-fn[N : @hal.Nic] run_read_sii_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_read_sii_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -166,7 +166,7 @@ fn[N : @hal.Nic] run_read_sii_command(
   )
   let word_count = eeprom.length() / 4
   let sii = @mailbox.parse_sii_full_info(eeprom)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(read_sii_json(position, word_count, sii).stringify(indent=2))
   } else {

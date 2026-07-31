@@ -1374,7 +1374,8 @@ test "cli transition path falls back through init when needed" {
 
 ///|
 test "cli state transition report uses broadcast when station is omitted" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let report = compute_state_transition_report(
     nic,
@@ -1514,7 +1515,7 @@ pub impl @hal.Nic for StrictTransitionNic with fn send(self, data) {
           }
         }
       }
-      build_esm_response_frame(request, strict_status_bytes(self), 1U)
+      build_esm_response_frame(request, pdu.data, 1U)
     }
     _ => build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
   }
@@ -1611,11 +1612,16 @@ fn virtual_bus_route_preparation(
 }
 
 ///|
-fn single_virtual_station_nic() -> (@mock.VirtualNic, UInt, @hal.Duration) raise @hal.EcError {
+fn single_virtual_station_nic() -> (
+  @protocol.DatagramSession[@mock.VirtualNic],
+  UInt,
+  @hal.Duration,
+) raise @hal.EcError {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, virtual_bus_identity(), virtual_bus_sii_eeprom()),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let station = 0x1001U
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, station, timeout)
@@ -1830,7 +1836,12 @@ test "cli station mailbox route applies op to safeop command on virtual bus" {
 
 ///|
 test "cli state path recovers configuration error to init" {
-  let nic = StrictTransitionNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
+  let raw_nic = StrictTransitionNic::new(
+    @protocol.EsmState::SafeOp,
+    true,
+    0x0016U,
+  )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let report = compute_station_transition_report(
     nic,
@@ -1847,13 +1858,13 @@ test "cli state path recovers configuration error to init" {
   @debug.assert_eq(report.status_code, None)
   @debug.assert_eq(report.raw_status_code, None)
   @debug.assert_eq(report.control_wkc, None)
-  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(raw_nic.control_writes.length(), 2)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
 }
@@ -3005,7 +3016,8 @@ test "VirtualBus from ESI JSON scans and discovers slaves" {
   let json_text = sample_esi_json_text()
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
   @debug.assert_eq(templates.length(), 1)
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(50_000_000L)
   let scan_report = @runtime.scan(nic, timeout)
   @debug.assert_eq(scan_report.slave_count, 1)
@@ -3019,7 +3031,8 @@ test "VirtualBus from ESI JSON scans and discovers slaves" {
 test "run-virtual builds RunStartupPreparation from templates" {
   let json_text = sample_esi_json_text()
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(50_000_000L)
   let scan_report = @runtime.scan(nic, timeout)
   let slave_preparations : Array[(UInt, @runtime.SlaveStartupPreparation)] = []
@@ -3034,4 +3047,77 @@ test "run-virtual builds RunStartupPreparation from templates" {
   )
   assert_true(preparation.expected_wkc > 0U)
   nic.close()
+}
+
+///|
+test "run-virtual recording continues Datagram Index after scan" {
+  let trace_path = "_build/run-virtual-datagram-session-\{@env.now()}.ndjson"
+  if @fs.path_exists(trace_path) {
+    @fs.remove_file(trace_path)
+  }
+  run_virtual_command(
+    sample_esi_json_text(),
+    true,
+    @protocol.PreOp,
+    None,
+    @runtime.RunLoopSettings::fixed_cycles(1),
+    Silent,
+    Some(trace_path),
+    @hal.Duration(50_000_000L),
+  )
+  let ndjson = @fs.read_file_to_string(trace_path)
+  @fs.remove_file(trace_path)
+  guard @mock.ndjson_initial_datagram_index(ndjson) is Some(seed) else {
+    fail("expected a version-2 DatagramSession trace header")
+  }
+  assert_true(seed != b'\x00')
+  let log = @mock.NicEventLog::from_ndjson(ndjson)
+  let mut first_sent_index : Byte? = None
+  for event in log.events {
+    match event {
+      @mock.Sent(data, _) => {
+        let frame = @protocol.EcFrame::decode(data)
+        guard frame.pdus is [first, ..] else {
+          fail("expected the first recorded frame to contain a datagram")
+        }
+        first_sent_index = Some(first.header.index)
+        break
+      }
+      _ => ()
+    }
+  }
+  @debug.assert_eq(first_sent_index, Some(seed))
+}
+
+///|
+test "v2 NDJSON replay honors a nonzero DatagramSession seed" {
+  let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+  let record_session = @protocol.DatagramSession::new(
+    recorder,
+    start_index=b'\xFE',
+  )
+  let timeout = @hal.Duration(1000L)
+  ignore(
+    @protocol.transact_pdu(
+      record_session,
+      @protocol.EcCommand::NOP,
+      0U,
+      Bytes::new(0),
+      timeout,
+    ),
+  )
+  let ndjson = recorder
+    .get_log()
+    .to_ndjson_with_datagram_session_header(initial_datagram_index=b'\xFE')
+  let replay = @mock.ReplayNic::from_log(@mock.NicEventLog::from_ndjson(ndjson))
+  let replay_session = replay_datagram_session(replay, ndjson)
+  let pdu = @protocol.transact_pdu(
+    replay_session,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  @debug.assert_eq(pdu.header.index, b'\xFE')
+  assert_true(replay.is_exhausted())
 }

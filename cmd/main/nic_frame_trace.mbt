@@ -124,7 +124,7 @@ fn write_nic_event_log(
   log : @mock.NicEventLog,
 ) -> Unit raise @hal.EcError {
   let result : Result[Unit, Error] = Result::Ok(
-    @fs.write_string_to_file(path, log.to_ndjson()),
+    @fs.write_string_to_file(path, log.to_ndjson_with_datagram_session_header()),
   ) catch {
     error => Result::Err(error)
   }

@@ -550,7 +550,8 @@ pub impl @hal.Nic for ActivePdoLengthsNic with fn close(self) {
 
 ///|
 test "active process data lengths in preop use object mapping lengths" {
-  let nic = ActivePdoLengthsNic::new()
+  let raw_nic = ActivePdoLengthsNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let mailbox_config : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
     out_size: 128U,
@@ -570,7 +571,8 @@ test "active process data lengths in preop use object mapping lengths" {
 
 ///|
 test "refine startup preparation in preop retries transient mailbox timeout" {
-  let nic = ActivePdoLengthsNic::new(send_timeout_transactions=1)
+  let raw_nic = ActivePdoLengthsNic::new(send_timeout_transactions=1)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -703,7 +705,8 @@ test "process data length refresh fallback only handles mailbox bootstrap failur
 
 ///|
 test "refine startup preparation in preop refreshes mailbox mapping before retry" {
-  let nic = ActivePdoLengthsNic::new(require_mailbox_mapping_refresh=true)
+  let raw_nic = ActivePdoLengthsNic::new(require_mailbox_mapping_refresh=true)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -797,7 +800,8 @@ test "refine startup preparation in preop refreshes mailbox mapping before retry
 
 ///|
 test "refine startup preparation in preop keeps live PDO layout and drops remap commands" {
-  let nic = ActivePdoLengthsNic::new()
+  let raw_nic = ActivePdoLengthsNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -920,7 +924,8 @@ test "refine startup preparation in preop keeps live PDO layout and drops remap 
 
 ///|
 test "refine startup preparation in preop respects forced configured PDO plan" {
-  let nic = ActivePdoLengthsNic::new()
+  let raw_nic = ActivePdoLengthsNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -1026,13 +1031,14 @@ test "refine startup preparation in preop respects forced configured PDO plan" {
 
 ///|
 test "refine startup preparation in preop keeps configured remap when only esc lengths are visible" {
-  let nic = ActivePdoLengthsNic::new(timeout_pdo_uploads=true)
-  nic.sm_windows[2] = [
+  let raw_nic = ActivePdoLengthsNic::new(timeout_pdo_uploads=true)
+  raw_nic.sm_windows[2] = [
     b'\x00', b'\x11', b'\x18', b'\x00', b'\x64', b'\x30', b'\x01', b'\x01',
   ]
-  nic.sm_windows[3] = [
+  raw_nic.sm_windows[3] = [
     b'\x00', b'\x14', b'\x18', b'\x00', b'\x20', b'\x30', b'\x01', b'\x01',
   ]
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -1156,13 +1162,14 @@ test "refine startup preparation in preop keeps configured remap when only esc l
 
 ///|
 test "refine startup preparation in preop trusts confirmed pdo lengths over esc lengths" {
-  let nic = ActivePdoLengthsNic::new()
-  nic.sm_windows[2] = [
+  let raw_nic = ActivePdoLengthsNic::new()
+  raw_nic.sm_windows[2] = [
     b'\x00', b'\x11', b'\x1A', b'\x00', b'\x64', b'\x30', b'\x01', b'\x01',
   ]
-  nic.sm_windows[3] = [
+  raw_nic.sm_windows[3] = [
     b'\x00', b'\x14', b'\x16', b'\x00', b'\x20', b'\x30', b'\x01', b'\x01',
   ]
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -1570,7 +1577,10 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn send(
           self.current_state = requested_state
         }
       }
-      build_esm_response_frame(request, ds402_op_status_bytes(self), 1U)
+      // EtherCAT write responses keep the request datagram length. Returning
+      // the two-byte AL status here made the test NIC emit an unrelated frame
+      // for mailbox-sized FPWR requests under strict response correlation.
+      build_esm_response_frame(request, pdu.data, 1U)
     }
     @protocol.LRW | @protocol.LWR => {
       if pdu.data.length() >= 6 &&
@@ -1610,11 +1620,12 @@ pub impl @hal.Nic for Ds402OpNeedsShutdownControlwordNic with fn close(self) {
 
 ///|
 test "runtime startup transition recovers SafeOp configuration error to init" {
-  let nic = StrictRunTransitionNic::new(
+  let raw_nic = StrictRunTransitionNic::new(
     @protocol.EsmState::SafeOp,
     true,
     0x0016U,
   )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let result = attempt_transition_slave_to_target(
     nic,
@@ -1625,24 +1636,25 @@ test "runtime startup transition recovers SafeOp configuration error to init" {
   )
   assert_true(result.reached_target)
   @debug.assert_eq(result.observation, None)
-  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(raw_nic.control_writes.length(), 2)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
 }
 
 ///|
 test "runtime startup transition rolls PreOp configuration error back to init" {
-  let nic = StrictRunTransitionNic::new(
+  let raw_nic = StrictRunTransitionNic::new(
     @protocol.EsmState::PreOp,
     true,
     0x001EU,
   )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let result = attempt_transition_slave_to_target(
     nic,
@@ -1656,17 +1668,17 @@ test "runtime startup transition rolls PreOp configuration error back to init" {
     result.observation.map(fn(value) { value.raw_status_code }),
     Some(Some(0U)),
   )
-  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(raw_nic.control_writes.length(), 3)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::PreOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
   @debug.assert_eq(
-    nic.control_writes[2] & b'\x0F',
+    raw_nic.control_writes[2] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
 }
@@ -1750,8 +1762,14 @@ test "runtime startup recovery retries unknown transient faults" {
 
 ///|
 test "runtime startup mailbox fault stage maps to safeop for presafeop transition" {
+  let raw_nic = StrictRunTransitionNic::new(
+    @protocol.EsmState::PreOp,
+    false,
+    0U,
+  )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let fault = startup_mailbox_plan_failed_fault(
-    StrictRunTransitionNic::new(@protocol.EsmState::PreOp, false, 0U),
+    nic,
     0x1001U,
     PreOpToSafeOp,
     @hal.Duration(1000L),
@@ -1768,8 +1786,14 @@ test "runtime startup mailbox fault stage maps to safeop for presafeop transitio
 
 ///|
 test "runtime startup mailbox fault stage maps to op for safeop-to-op transition" {
+  let raw_nic = StrictRunTransitionNic::new(
+    @protocol.EsmState::SafeOp,
+    false,
+    0U,
+  )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let fault = startup_mailbox_plan_failed_fault(
-    StrictRunTransitionNic::new(@protocol.EsmState::SafeOp, false, 0U),
+    nic,
     0x1001U,
     SafeOpToOp,
     @hal.Duration(1000L),
@@ -1909,7 +1933,8 @@ test "derive_startup_mailbox_commands emits ds402 safeop-to-op mode command" {
 
 ///|
 test "apply_startup_mailbox_commands writes ds402 mode through mailbox sdo" {
-  let nic = Ds402OpNeedsShutdownControlwordNic::new()
+  let raw_nic = Ds402OpNeedsShutdownControlwordNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   apply_startup_mailbox_commands(
     nic,
     0x1001U,
@@ -1932,12 +1957,13 @@ test "apply_startup_mailbox_commands writes ds402 mode through mailbox sdo" {
     SafeOpToOp,
     @hal.Duration(1000L),
   )
-  assert_true(nic.observed_mode_seed)
+  assert_true(raw_nic.observed_mode_seed)
 }
 
 ///|
 test "apply_startup_mailbox_commands drains stale mailbox frames before download" {
-  let nic = StartupMailboxDrainNic::new()
+  let raw_nic = StartupMailboxDrainNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   apply_startup_mailbox_commands(
     nic,
     0x1001U,
@@ -1960,8 +1986,8 @@ test "apply_startup_mailbox_commands drains stale mailbox frames before download
     PreOpToSafeOp,
     @hal.Duration(1000L),
   )
-  assert_true(nic.command_observed)
-  assert_true(!nic.stale_mailbox_pending)
+  assert_true(raw_nic.command_observed)
+  assert_true(!raw_nic.stale_mailbox_pending)
 }
 
 ///|
@@ -2027,7 +2053,8 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
   guard outputs is Some(seed) else { fail("expected DS402 startup outputs") }
   let pdo_ctx = @protocol.PdoContext::build([(mapping, 0x1001U)], 0x1000U)
   pdo_ctx.set_slave_outputs(0x1001U, seed)
-  let nic = Ds402OpNeedsShutdownControlwordNic::new()
+  let raw_nic = Ds402OpNeedsShutdownControlwordNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   apply_startup_mailbox_commands(
     nic,
     0x1001U,
@@ -2055,9 +2082,9 @@ test "runtime op transition reaches op when ds402 startup outputs are preseeded"
     @hal.Duration(1000L),
   )
   assert_true(fault is None)
-  assert_true(nic.observed_shutdown_seed)
-  assert_true(nic.observed_mode_seed)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
+  assert_true(raw_nic.observed_shutdown_seed)
+  assert_true(raw_nic.observed_mode_seed)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::Op.to_byte())
 }
 
 ///|
@@ -2198,7 +2225,8 @@ pub impl @hal.Nic for StartupMappingNic with fn close(self) {
 
 ///|
 test "runtime mailbox mapping writes only mailbox sync managers" {
-  let nic = StartupMappingNic::new()
+  let raw_nic = StartupMappingNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [
       {
@@ -2250,18 +2278,19 @@ test "runtime mailbox mapping writes only mailbox sync managers" {
     input_bytes: 16,
   }
   ignore(write_mailbox_mapping(nic, 0x1001U, mapping, @hal.Duration(1000L)))
-  @debug.assert_eq(nic.sm_write_offsets.length(), 2)
-  @debug.assert_eq(nic.sm_write_offsets[0], @protocol.reg_sm_base)
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 2)
+  @debug.assert_eq(raw_nic.sm_write_offsets[0], @protocol.reg_sm_base)
   @debug.assert_eq(
-    nic.sm_write_offsets[1],
+    raw_nic.sm_write_offsets[1],
     @protocol.reg_sm_base + @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  @debug.assert_eq(nic.fmmu_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.fmmu_write_offsets.length(), 0)
 }
 
 ///|
 test "runtime preop transition can use provided startup preparation" {
-  let nic = StartupMappingNic::new()
+  let raw_nic = StartupMappingNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -2309,14 +2338,15 @@ test "runtime preop transition can use provided startup preparation" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
-  @debug.assert_eq(nic.sm_write_offsets.length(), 2)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::PreOp.to_byte())
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 2)
 }
 
 ///|
 test "runtime preop transition skips mailbox rewrite when already in preop" {
-  let nic = StartupMappingNic::new()
-  nic.current_state = @protocol.EsmState::PreOp.to_byte()
+  let raw_nic = StartupMappingNic::new()
+  raw_nic.current_state = @protocol.EsmState::PreOp.to_byte()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -2364,14 +2394,15 @@ test "runtime preop transition skips mailbox rewrite when already in preop" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::PreOp.to_byte())
-  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::PreOp.to_byte())
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 0)
 }
 
 ///|
 test "runtime preop transition skips mailbox rewrite when already in safeop" {
-  let nic = StartupMappingNic::new()
-  nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let raw_nic = StartupMappingNic::new()
+  raw_nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -2419,14 +2450,15 @@ test "runtime preop transition skips mailbox rewrite when already in safeop" {
     @protocol.default_esm_timeout_policy(),
   )
   assert_true(fault is None)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 0)
 }
 
 ///|
 test "runtime override refinement skips safeop stations" {
-  let nic = StartupMappingNic::new()
-  nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let raw_nic = StartupMappingNic::new()
+  raw_nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -2480,14 +2512,15 @@ test "runtime override refinement skips safeop stations" {
     @hal.Duration(1000L),
   )
   assert_true(refined.slave_preparations is Some(_))
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 0)
 }
 
 ///|
 test "runtime safeop transition skips remap when already in safeop" {
-  let nic = StartupMappingNic::new()
-  nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let raw_nic = StartupMappingNic::new()
+  raw_nic.current_state = @protocol.EsmState::SafeOp.to_byte()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let preparation : SlaveStartupPreparation = {
     mapping: {
       sm_configs: [
@@ -2562,15 +2595,16 @@ test "runtime safeop transition skips remap when already in safeop" {
     [],
   )
   assert_true(fault is None)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::SafeOp.to_byte())
-  @debug.assert_eq(nic.sm_write_offsets.length(), 0)
-  @debug.assert_eq(nic.fmmu_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::SafeOp.to_byte())
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 0)
+  @debug.assert_eq(raw_nic.fmmu_write_offsets.length(), 0)
 }
 
 ///|
 test "runtime mailbox mapping reports immediate readback mismatch" {
-  let nic = StartupMappingNic::new()
-  nic.deactivated_mailbox_in_readback = true
+  let raw_nic = StartupMappingNic::new()
+  raw_nic.deactivated_mailbox_in_readback = true
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [
       {
@@ -2612,7 +2646,8 @@ test "runtime mailbox mapping reports immediate readback mismatch" {
 
 ///|
 test "runtime process-data mapping writes only process sync managers and fmmu" {
-  let nic = StartupMappingNic::new()
+  let raw_nic = StartupMappingNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [
       {
@@ -2666,25 +2701,25 @@ test "runtime process-data mapping writes only process sync managers and fmmu" {
   ignore(
     write_process_data_mapping(nic, 0x1001U, mapping, @hal.Duration(1000L)),
   )
-  @debug.assert_eq(nic.sm_write_offsets.length(), 4)
+  @debug.assert_eq(raw_nic.sm_write_offsets.length(), 4)
   @debug.assert_eq(
-    nic.sm_write_offsets[0],
+    raw_nic.sm_write_offsets[0],
     @protocol.reg_sm_base + 2U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
   @debug.assert_eq(
-    nic.sm_write_offsets[1],
+    raw_nic.sm_write_offsets[1],
     @protocol.reg_sm_base + 2U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
   @debug.assert_eq(
-    nic.sm_write_offsets[2],
+    raw_nic.sm_write_offsets[2],
     @protocol.reg_sm_base + 3U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
   @debug.assert_eq(
-    nic.sm_write_offsets[3],
+    raw_nic.sm_write_offsets[3],
     @protocol.reg_sm_base + 3U * @protocol.sm_entry_size.reinterpret_as_uint(),
   )
-  @debug.assert_eq(nic.fmmu_write_offsets.length(), 1)
-  @debug.assert_eq(nic.fmmu_write_offsets[0], @protocol.reg_fmmu_base)
+  @debug.assert_eq(raw_nic.fmmu_write_offsets.length(), 1)
+  @debug.assert_eq(raw_nic.fmmu_write_offsets[0], @protocol.reg_fmmu_base)
 }
 
 ///|

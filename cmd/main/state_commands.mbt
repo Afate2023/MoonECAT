@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] run_state_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_state_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -15,7 +15,7 @@ fn[N : @hal.Nic] run_state_command(
   ) catch {
     err => Result::Err(err)
   }
-  nic.close()
+  @hal.Nic::close(nic)
   let report = match report_result {
     Ok(value) => value
     Err(err) => raise err
@@ -28,7 +28,7 @@ fn[N : @hal.Nic] run_state_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_esc_register_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_esc_register_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -36,7 +36,7 @@ fn[N : @hal.Nic] run_esc_register_command(
 ) -> Unit raise @hal.EcError {
   let station = require_station_flag(args)
   let report = read_esc_register_report(nic, station, timeout)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(esc_register_report_json(report).stringify(indent=2))
   } else {
@@ -45,7 +45,7 @@ fn[N : @hal.Nic] run_esc_register_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_expected_register_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_expected_register_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -53,7 +53,7 @@ fn[N : @hal.Nic] run_expected_register_command(
 ) -> Unit raise @hal.EcError {
   let station = require_station_flag(args)
   let report = build_expected_esc_register_report(nic, station, timeout)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(expected_esc_register_report_json(report).stringify(indent=2))
   } else {
@@ -62,7 +62,7 @@ fn[N : @hal.Nic] run_expected_register_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_startup_diff_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_startup_diff_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -70,7 +70,7 @@ fn[N : @hal.Nic] run_startup_diff_command(
 ) -> Unit raise @hal.EcError {
   let station = require_station_flag(args)
   let report = build_startup_diff_report(nic, args, station, timeout)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(startup_diff_report_json(report).stringify(indent=2))
   } else {
@@ -79,7 +79,7 @@ fn[N : @hal.Nic] run_startup_diff_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_mailbox_readback_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_mailbox_readback_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -87,7 +87,7 @@ fn[N : @hal.Nic] run_mailbox_readback_command(
 ) -> Unit raise @hal.EcError {
   let station = require_station_flag(args)
   let report = build_mailbox_readback_report(nic, args, station, timeout)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(mailbox_readback_report_json(report).stringify(indent=2))
   } else {
@@ -96,7 +96,7 @@ fn[N : @hal.Nic] run_mailbox_readback_command(
 }
 
 ///|
-fn[N : @hal.Nic] run_startup_trace_command(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_startup_trace_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -104,7 +104,7 @@ fn[N : @hal.Nic] run_startup_trace_command(
 ) -> Unit raise @hal.EcError {
   let station = require_station_flag(args)
   let report = build_startup_trace_report(nic, args, station, timeout)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(startup_trace_report_json(report).stringify(indent=2))
   } else {

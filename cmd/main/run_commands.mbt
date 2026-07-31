@@ -8,14 +8,14 @@ fn run_mock_command_with_fresh_nic(
   record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  let probe_nic = @mock.MockNic::new()
+  let probe_nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let scan_report = @runtime.scan(probe_nic, timeout)
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
   let run_report = match record_path {
     None => {
-      let run_nic = @mock.MockNic::new()
+      let run_nic = @protocol.DatagramSession::new(@mock.MockNic::new())
       let report = run_with_progress_output(
         run_nic,
         None,
@@ -35,8 +35,9 @@ fn run_mock_command_with_fresh_nic(
     }
     Some(path) => {
       let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+      let run_nic = @protocol.DatagramSession::new(recorder)
       let report = run_with_progress_output(
-        recorder,
+        run_nic,
         None,
         @hal.MasterConfig::default(),
         expected,
@@ -49,8 +50,8 @@ fn run_mock_command_with_fresh_nic(
         progress_output,
         timeout,
       )
-      @hal.Nic::close(recorder)
-      write_recording_log(path, recorder.get_log(), scan_report)
+      @hal.Nic::close(run_nic)
+      write_recording_log(path, recorder.get_log(), scan_report, b'\x00')
       report
     }
   }
@@ -75,16 +76,20 @@ fn run_native_command_with_fresh_nic(
   record_path : String?,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
-  let probe_nic = @native.NativeNic::open_with_config(config)
+  let probe_nic = @protocol.DatagramSession::new(
+    @native.NativeNic::open_with_config(config),
+  )
   let scan_report = @runtime.scan(probe_nic, timeout)
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
-  let run_nic = @native.NativeNic::open_with_config(config)
+  let preparation_nic = @protocol.DatagramSession::new(
+    @native.NativeNic::open_with_config(config),
+  )
   let startup_preparation_override = if target_requires_process_data_configuration(
       startup_state,
     ) {
     resolve_run_startup_preparation_override(
-      run_nic, scan_report, args, timeout,
+      preparation_nic, scan_report, args, timeout,
     )
   } else {
     None
@@ -94,7 +99,7 @@ fn run_native_command_with_fresh_nic(
     None =>
       if target_requires_process_data_configuration(startup_state) {
         @runtime.build_run_startup_preparation(
-          run_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count,
+          preparation_nic, scan_report, pdo_logical_base, process_data_eeprom_word_count,
           timeout,
         )
       } else {
@@ -108,11 +113,15 @@ fn run_native_command_with_fresh_nic(
         }
       }
   }
+  preparation_nic.close()
   let run_config = @runtime.master_config_with_optional_dc(
     preparation.dc_cycle_period_ns,
   )
   let run_report = match record_path {
     None => {
+      let run_nic = @protocol.DatagramSession::new(
+        @native.NativeNic::open_with_config(config),
+      )
       let report = run_with_progress_output(
         run_nic,
         Some(scan_report),
@@ -131,9 +140,12 @@ fn run_native_command_with_fresh_nic(
       report
     }
     Some(path) => {
-      let recorder = @mock.RecordingNicAdapter::wrap(run_nic)
+      let recorder = @mock.RecordingNicAdapter::wrap(
+        @native.NativeNic::open_with_config(config),
+      )
+      let run_nic = @protocol.DatagramSession::new(recorder)
       let report = run_with_progress_output(
-        recorder,
+        run_nic,
         Some(scan_report),
         run_config,
         expected,
@@ -146,8 +158,8 @@ fn run_native_command_with_fresh_nic(
         progress_output,
         timeout,
       )
-      @hal.Nic::close(recorder)
-      write_recording_log(path, recorder.get_log(), scan_report)
+      @hal.Nic::close(run_nic)
+      write_recording_log(path, recorder.get_log(), scan_report, b'\x00')
       report
     }
   }
@@ -208,11 +220,15 @@ fn run_zc_native_command(
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
   // Phase 1: probe/scan using standard Nic
-  let probe_nic = @native.NativeNic::open_with_config(config)
+  let probe_nic = @protocol.DatagramSession::new(
+    @native.NativeNic::open_with_config(config),
+  )
   let scan_report = @runtime.scan(probe_nic, timeout)
   probe_nic.close()
   // Phase 2: state transitions using standard Nic
-  let setup_nic = @native.NativeNic::open_with_config(config)
+  let setup_nic = @protocol.DatagramSession::new(
+    @native.NativeNic::open_with_config(config),
+  )
   let startup_state = optional_esm_state_flag(
     args,
     "--startup-state",
@@ -275,7 +291,9 @@ fn run_zc_native_command(
   // Phase 4: shutdown using standard Nic
   match shutdown_state {
     Some(target) => {
-      let shutdown_nic = @native.NativeNic::open_with_config(config)
+      let shutdown_nic = @protocol.DatagramSession::new(
+        @native.NativeNic::open_with_config(config),
+      )
       for station in stations {
         ignore(
           Result::Ok(
@@ -337,8 +355,9 @@ fn run_virtual_command(
 ) -> Unit raise @hal.EcError {
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_content)
   let nic = @mock.VirtualNic::new(bus)
+  let scan_session = @protocol.DatagramSession::new(nic)
   // Phase 1: scan to discover virtual slaves + assign station addresses
-  let scan_report = @runtime.scan(nic, timeout)
+  let scan_report = @runtime.scan(scan_session, timeout)
   let expected = expected_from_scan(scan_report)
   // Phase 2: build startup preparation from ESI templates
   let startup_preparation = if target_requires_process_data_configuration(
@@ -372,7 +391,7 @@ fn run_virtual_command(
   let run_report = match record_path {
     None => {
       let report = run_with_progress_output(
-        nic,
+        scan_session,
         Some(scan_report),
         run_config,
         expected,
@@ -385,13 +404,18 @@ fn run_virtual_command(
         progress_output,
         timeout,
       )
-      nic.close()
+      scan_session.close()
       report
     }
     Some(path) => {
+      let record_start_index = scan_session.next_index()
       let recorder = @mock.RecordingNicAdapter::wrap(nic)
-      let report = run_with_progress_output(
+      let run_session = @protocol.DatagramSession::new(
         recorder,
+        start_index=record_start_index,
+      )
+      let report = run_with_progress_output(
+        run_session,
         Some(scan_report),
         run_config,
         expected,
@@ -404,8 +428,13 @@ fn run_virtual_command(
         progress_output,
         timeout,
       )
-      @hal.Nic::close(recorder)
-      write_recording_log(path, recorder.get_log(), scan_report)
+      @hal.Nic::close(run_session)
+      write_recording_log(
+        path,
+        recorder.get_log(),
+        scan_report,
+        record_start_index,
+      )
       report
     }
   }
@@ -454,7 +483,7 @@ fn zc_run_report_text(
 }
 
 ///|
-fn[N : @hal.Nic] run_with_progress_output(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_progress_output(
   nic : N,
   scan_report_override : @runtime.ScanReport?,
   config : @hal.MasterConfig,
@@ -548,11 +577,13 @@ fn write_recording_log(
   path : String,
   log : @mock.NicEventLog,
   scan_report : @runtime.ScanReport,
+  initial_datagram_index : Byte,
 ) -> Unit raise @hal.EcError {
   let fingerprint = @runtime.topology_fingerprint(scan_report)
-  let ndjson = log.to_ndjson_with_header(
+  let ndjson = log.to_ndjson_with_datagram_session_header(
     slave_count=scan_report.slave_count,
     fingerprint=@debug.to_string(fingerprint),
+    initial_datagram_index~,
   )
   let result : Result[Unit, Error] = Result::Ok(
     @fs.write_string_to_file(path, ndjson),
@@ -641,7 +672,7 @@ fn apply_pdo_policy_to_preparation(
 }
 
 ///|
-fn[N : @hal.Nic] resolve_run_startup_preparation_override(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] resolve_run_startup_preparation_override(
   nic : N,
   scan_report : @runtime.ScanReport,
   args : Array[String],
@@ -691,7 +722,7 @@ fn[N : @hal.Nic] resolve_run_startup_preparation_override(
 }
 
 ///|
-fn[N : @hal.Nic] prepare_station_startup(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_station_startup(
   nic : N,
   station : UInt,
   logical_base : UInt,
@@ -703,7 +734,7 @@ fn[N : @hal.Nic] prepare_station_startup(
 }
 
 ///|
-fn[N : @hal.Nic] prepare_station_startup_from_args(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_station_startup_from_args(
   nic : N,
   args : Array[String],
   station : UInt,

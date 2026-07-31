@@ -124,17 +124,31 @@ fn resolve_replay_scan_report(
     None => {
       let probe_log = @mock.NicEventLog::from_ndjson(ndjson_text)
       let probe_nic = @mock.ReplayNic::from_log(probe_log)
+      let probe_session = replay_datagram_session(probe_nic, ndjson_text)
       let scan_report_result : Result[@runtime.ScanReport, @hal.EcError] = Result::Ok(
-        @runtime.scan(probe_nic, timeout),
+        @runtime.scan(probe_session, timeout),
       ) catch {
         err => Result::Err(err)
       }
-      probe_nic.close()
+      probe_session.close()
       match scan_report_result {
         Ok(report) => report
         Err(_) => { slave_count: 0, slaves: [] }
       }
     }
+  }
+}
+
+///|
+/// Version-2 traces record frames emitted by an incrementing DatagramSession.
+/// Headerless and version-1 traces retain the former fixed-zero behavior.
+fn replay_datagram_session(
+  nic : @mock.ReplayNic,
+  ndjson_text : String,
+) -> @protocol.DatagramSession[@mock.ReplayNic] {
+  match @mock.ndjson_initial_datagram_index(ndjson_text) {
+    Some(index) => @protocol.DatagramSession::new(nic, start_index=index)
+    None => @protocol.DatagramSession::legacy(nic)
   }
 }
 
@@ -179,11 +193,12 @@ fn run_replay_command(
   let scan_report = resolve_replay_scan_report(ndjson_text, args, timeout)
   let expected = expected_from_scan(scan_report)
   let run_nic = @mock.ReplayNic::from_log(log)
+  let run_session = replay_datagram_session(run_nic, ndjson_text)
   let startup_preparation_override = if target_requires_process_data_configuration(
       startup_state,
     ) {
     resolve_run_startup_preparation_override(
-      run_nic, scan_report, args, timeout,
+      run_session, scan_report, args, timeout,
     )
   } else {
     None
@@ -196,7 +211,7 @@ fn run_replay_command(
     preparation.dc_cycle_period_ns,
   )
   let run_report = run_with_progress_output(
-    run_nic,
+    run_session,
     Some(scan_report),
     run_config,
     expected,
@@ -210,7 +225,7 @@ fn run_replay_command(
     timeout,
   )
   let remaining_events = run_nic.remaining()
-  run_nic.close()
+  run_session.close()
   let verdict = derive_run_verdict(run_report)
   if as_json {
     println(
@@ -293,7 +308,7 @@ fn run_scenario_command(
   let scenario = build_named_scenario(scenario_name)
   let injector = scenario.build_injector()
   // Create mock NIC with fault injection
-  let probe_nic = @mock.MockNic::new()
+  let probe_nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let scan_report = @runtime.scan(probe_nic, timeout)
   let expected = expected_from_scan(scan_report)
   probe_nic.close()
@@ -306,10 +321,11 @@ fn run_scenario_command(
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, identity, b"")])
   let virtual_nic = @mock.VirtualNic::new(bus)
   let fault_nic = @mock.FaultNic::new(virtual_nic, injector)
+  let fault_session = @protocol.DatagramSession::new(fault_nic)
   let pdo_ctx = @protocol.PdoContext::build([], 0U)
   let settings = @runtime.RunLoopSettings::fixed_cycles(cycles)
   let run_report = @runtime.run_with_states_and_settings(
-    fault_nic,
+    fault_session,
     @hal.MasterConfig::default(),
     expected,
     pdo_ctx,
@@ -319,7 +335,7 @@ fn run_scenario_command(
     Some(@protocol.Init),
     timeout,
   )
-  fault_nic.close()
+  fault_session.close()
   // Collect observed verdicts from telemetry
   let observed : Array[@mock.ObservedVerdict] = []
   let final_verdict = if run_report.fault != None {
@@ -509,7 +525,7 @@ fn run_auto_tune_command(
     _ => @analysis.AutoTuneConfig::default()
   }
   // Probe via mock scan to get propagation delay estimates
-  let probe_nic = @mock.MockNic::new()
+  let probe_nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let scan_report = @runtime.scan(probe_nic, timeout)
   probe_nic.close()
   let probes : Array[@analysis.ProbeResult] = scan_report.slaves.mapi(fn(
@@ -598,8 +614,9 @@ fn run_topo_health_command(
   let log = @mock.NicEventLog::from_ndjson(ndjson_text)
   // Build topology from a probe scan
   let probe_nic = @mock.ReplayNic::from_log(log)
-  let scan_report = @runtime.scan(probe_nic, timeout)
-  probe_nic.close()
+  let probe_session = replay_datagram_session(probe_nic, ndjson_text)
+  let scan_report = @runtime.scan(probe_session, timeout)
+  probe_session.close()
   // Set up analyzer with slaves
   let analyzer = @analysis.TopologyHealthAnalyzer::new()
   for i = 0; i < scan_report.slaves.length(); i = i + 1 {
@@ -787,8 +804,9 @@ fn run_comm_quality_command(
   let log = @mock.NicEventLog::from_ndjson(ndjson_text)
   // Probe to get cycle count estimate
   let probe_nic = @mock.ReplayNic::from_log(log)
-  let scan_report = @runtime.scan(probe_nic, timeout)
-  probe_nic.close()
+  let probe_session = replay_datagram_session(probe_nic, ndjson_text)
+  let scan_report = @runtime.scan(probe_session, timeout)
+  probe_session.close()
   // Estimate telemetry from event count
   let event_count = log.events.length().to_int64()
   let cycles = if event_count > 2L { event_count / 2L } else { 1L }

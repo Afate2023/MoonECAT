@@ -71,29 +71,19 @@ fn response_matches_request(request : EcFrame, response : EcFrame) -> Bool {
   if response.pdus.length() != request.pdus.length() {
     return false
   }
-  for request_pdu in request.pdus {
-    guard find_pdu_by_index(response, request_pdu.header.index)
-      is Some(response_pdu) else {
+  // EtherCAT responses preserve datagram order. Match the fields that identify
+  // this transaction, but do not compare address (AP commands mutate ADP) or
+  // WKC (slaves update it while the frame traverses the bus).
+  for i, request_pdu in request.pdus {
+    let response_pdu = response.pdus[i]
+    if response_pdu.header.index != request_pdu.header.index {
       return false
     }
     if response_pdu.header.command != request_pdu.header.command {
       return false
     }
-    match request_pdu.header.command {
-      EcCommand::APRD
-      | EcCommand::APRW
-      | EcCommand::FPRD
-      | EcCommand::FPRW
-      | EcCommand::BRD
-      | EcCommand::BRW
-      | EcCommand::LRD
-      | EcCommand::LRW
-      | EcCommand::ARMW
-      | EcCommand::FRMW =>
-        if response_pdu.data.length() != request_pdu.data.length() {
-          return false
-        }
-      _ => ()
+    if response_pdu.data.length() != request_pdu.data.length() {
+      return false
     }
   }
   true
@@ -113,15 +103,16 @@ fn should_ignore_rx_decode_error(err : @hal.EcError) -> Bool {
 ///|
 /// Send a single PDU transaction and return the response PDU.
 /// Convenience wrapper that builds a frame, sends, receives, and locates the PDU by index.
-pub fn[N : @hal.Nic] transact_pdu(
+pub fn[N : @hal.Nic + DatagramIndexSource] transact_pdu(
   nic : N,
   command : EcCommand,
   address : UInt,
   data : Bytes,
   timeout : @hal.Duration,
 ) -> Pdu raise @hal.EcError {
+  let idx = DatagramIndexSource::next_datagram_index(nic)
   let builder = FrameBuilder::new()
-  let idx = builder.add(command, address, data)
+  builder.add_indexed(idx, command, address, data)
   let frame = builder.build()
   let response = transact(nic, frame, timeout)
   match find_pdu_by_index(response, idx) {
@@ -132,7 +123,7 @@ pub fn[N : @hal.Nic] transact_pdu(
 
 ///|
 /// Send a single PDU and retry up to max_retries times on RecvTimeout.
-pub fn[N : @hal.Nic] transact_pdu_retry(
+pub fn[N : @hal.Nic + DatagramIndexSource] transact_pdu_retry(
   nic : N,
   command : EcCommand,
   address : UInt,

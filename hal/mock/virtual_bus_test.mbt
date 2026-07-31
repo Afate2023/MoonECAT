@@ -81,7 +81,7 @@ fn make_three_slave_bus() -> @mock.VirtualBus {
 ///|
 test "VirtualBus: BRD count_slaves returns correct WKC" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let count = @protocol.count_slaves(nic, @hal.Duration(50_000_000L))
   @debug.assert_eq(count, 3)
 }
@@ -89,7 +89,7 @@ test "VirtualBus: BRD count_slaves returns correct WKC" {
 ///|
 test "VirtualBus: APRD reads register from correct slave" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Read reg 0x0000 (Type) from slave at position 1
   let pdu = @protocol.read_register_ap(
     nic,
@@ -105,7 +105,7 @@ test "VirtualBus: APRD reads register from correct slave" {
 ///|
 test "VirtualBus: APWR assigns station address" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Assign station address 0x1001 to slave at position 0
   @protocol.assign_station_address(nic, 0U, 0x1001U, @hal.Duration(50_000_000L))
   // Verify via FPRD
@@ -123,7 +123,7 @@ test "VirtualBus: APWR assigns station address" {
 ///|
 test "VirtualBus: assign and read station addresses for 3 slaves" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Assign station addresses
   for i in 0..<3 {
     @protocol.assign_station_address(
@@ -147,7 +147,7 @@ test "VirtualBus: assign and read station addresses for 3 slaves" {
 ///|
 test "VirtualBus: ESM state transition Init -> PreOp" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Assign address first
   @protocol.assign_station_address(nic, 0U, 0x1001U, @hal.Duration(50_000_000L))
   // Write AL Control = 0x02 (PreOp)
@@ -177,7 +177,7 @@ test "VirtualBus: CoE SDO roundtrip uses mailbox SM windows" {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, identity, @fixtures.sample_sii_eeprom()),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   ignore(@protocol.request_state(nic, 0x1001U, @protocol.PreOp, timeout))
@@ -205,7 +205,7 @@ test "VirtualBus: CoE SDO roundtrip uses mailbox SM windows" {
 test "VirtualBus: SII EEPROM read via register access" {
   let id = ek1100_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Write SII address = word 8 (vendor ID) into reg 0x0504
   let addr_data = Bytes::from_array([b'\x08', b'\x00', b'\x00', b'\x00'])
   let _ = @protocol.write_register_ap(
@@ -257,7 +257,7 @@ test "VirtualNic: close prevents further send/recv" {
 ///|
 test "VirtualBus: FPWR to non-existent station gives WKC=0" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // No station addresses assigned yet, so FPRD to 0x1001 should have WKC=0
   let pdu = @protocol.read_register_fp(
     nic,
@@ -272,7 +272,7 @@ test "VirtualBus: FPWR to non-existent station gives WKC=0" {
 ///|
 test "VirtualBus: BWR writes to all slaves" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Broadcast write AL Control = PreOp to all slaves
   let builder = @protocol.FrameBuilder::new()
   let al_ctrl = Bytes::from_array([b'\x02', b'\x00'])
@@ -297,7 +297,7 @@ test "VirtualBus: BWR writes to all slaves" {
 test "VirtualSlave: invalid ESM transition sets error bit" {
   let id = ek1100_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Try Init → Op directly (invalid)
   let al_ctrl = Bytes::from_array([b'\x08', b'\x00'])
   let _ = @protocol.write_register_ap(
@@ -331,7 +331,7 @@ test "VirtualSlave: invalid ESM transition sets error bit" {
 ///|
 test "VirtualBus: full discovery flow with 3 slaves" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Step 1: Count slaves
   let count = @protocol.count_slaves(nic, timeout)
@@ -384,7 +384,7 @@ test "VirtualBus: full discovery flow with 3 slaves" {
 /// Helper: write FMMU entry to a slave via FPWR.
 /// direction: 0x01 = read (slave→master), 0x02 = write (master→slave)
 fn write_fmmu_entry(
-  nic : @mock.VirtualNic,
+  nic : @protocol.DatagramSession[@mock.VirtualNic],
   station : UInt,
   fmmu_index : Int,
   logical_start : UInt,
@@ -430,7 +430,7 @@ fn write_fmmu_entry(
 /// Helper: set up a bus with station addresses assigned.
 fn setup_bus_with_addresses(
   bus : @mock.VirtualBus,
-  nic : @mock.VirtualNic,
+  nic : @protocol.DatagramSession[@mock.VirtualNic],
   count : Int,
 ) -> Unit raise @hal.EcError {
   let timeout = @hal.Duration(50_000_000L)
@@ -448,7 +448,7 @@ fn setup_bus_with_addresses(
 ///|
 /// Helper: transition a slave to a target state via FPWR.
 fn transition_slave(
-  nic : @mock.VirtualNic,
+  nic : @protocol.DatagramSession[@mock.VirtualNic],
   station : UInt,
   target_state : Byte,
 ) -> Unit raise @hal.EcError {
@@ -463,7 +463,7 @@ fn transition_slave(
 test "VirtualSlave: FMMU register write and parse" {
   let id = ek1100_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Write FMMU entry 0: logical 0x0000, length 4, physical 0x1000, direction=write, active
@@ -493,7 +493,7 @@ test "VirtualSlave: FMMU register write and parse" {
 test "VirtualBus: LWR writes process data via FMMU" {
   let id = el2004_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Configure FMMU0: logical 0x0000, 4 bytes, physical 0x1000, write (master→slave)
@@ -522,7 +522,7 @@ test "VirtualBus: LWR writes process data via FMMU" {
 test "VirtualBus: LRD reads process data via FMMU" {
   let id = el1008_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Configure FMMU0: logical 0x0000, 2 bytes, physical 0x1000, read (slave→master)
@@ -552,7 +552,7 @@ test "VirtualBus: LRD reads process data via FMMU" {
 test "VirtualBus: LRW with both read and write FMMUs" {
   let id = el2004_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // FMMU0: outputs (write), logical 0x0000, 4 bytes, physical 0x1000
@@ -591,7 +591,7 @@ test "VirtualBus: LRW with both read and write FMMUs" {
 ///|
 test "VirtualBus: LRW multi-slave PDO exchange" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   setup_bus_with_addresses(bus, nic, 3)
   // Slave 1 (EL2004 at 0x1002): outputs via FMMU0
@@ -638,7 +638,7 @@ test "VirtualBus: LRW multi-slave PDO exchange" {
 test "VirtualBus: LRW with no matching FMMU gives WKC=0" {
   let id = ek1100_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // No FMMU configured — LRW should pass through with WKC=0
   let builder = @protocol.FrameBuilder::new()
@@ -657,7 +657,7 @@ test "VirtualBus: LRW with no matching FMMU gives WKC=0" {
 test "VirtualBus: inactive FMMU is ignored" {
   let id = el2004_identity()
   let bus = @mock.VirtualBus::new([@mock.VirtualSlave::new(0, id, make_sii(id))])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Configure FMMU0 but with activate=false
@@ -681,7 +681,7 @@ test "VirtualBus: inactive FMMU is ignored" {
 ///|
 test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Step 1: Count slaves
   let count = @protocol.count_slaves(nic, timeout)
@@ -764,7 +764,7 @@ test "VirtualBus: full Init→Op lifecycle with PDO exchange" {
 ///|
 test "VirtualBus: APRW reads and writes register" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Write some data to slave 0 register 0x0010 first
   let wr_data = Bytes::from_array([b'\x42', b'\x00'])
@@ -785,7 +785,7 @@ test "VirtualBus: APRW reads and writes register" {
 ///|
 test "VirtualBus: FPRW reads and writes by station address" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Assign station address to slave 0
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
@@ -810,7 +810,7 @@ test "VirtualBus: FPRW reads and writes by station address" {
 ///|
 test "VirtualBus: BRW broadcasts read-write to all slaves" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Write unique values to same register on each slave
   let _ = @protocol.write_register_ap(
@@ -856,7 +856,7 @@ test "VirtualBus: BRW broadcasts read-write to all slaves" {
 ///|
 test "VirtualBus: NOP command passes through" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   let builder = @protocol.FrameBuilder::new()
   let nop_data = Bytes::from_array([b'\x00'])
@@ -880,7 +880,7 @@ test "VirtualBus: slave_count returns correct count" {
 ///|
 test "VirtualSlave: Init to Boot transition" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → Boot (0x03)
@@ -897,7 +897,7 @@ test "VirtualSlave: Init to Boot transition" {
 ///|
 test "VirtualSlave: PreOp to Init transition" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → PreOp
@@ -925,7 +925,7 @@ test "VirtualSlave: PreOp to Init transition" {
 ///|
 test "VirtualSlave: SafeOp to PreOp transition" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → PreOp → SafeOp
@@ -963,7 +963,7 @@ test "VirtualSlave: SII read beyond eeprom fills 0xFF" {
   let small_sii = Bytes::make(4, b'\xAA') // only 4 bytes
   let slave = @mock.VirtualSlave::new(0, id, small_sii)
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   // Set SII word address to word 3 (byte 6, beyond small_sii length 4)
   let addr_data = Bytes::from_array([b'\x03', b'\x00', b'\x00', b'\x00'])
@@ -1010,7 +1010,7 @@ test "VirtualSlave: write_process_data" {
 ///|
 test "VirtualBus: ARMW command passes through without modifying" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   let builder = @protocol.FrameBuilder::new()
   let data = Bytes::from_array([b'\x00', b'\x00'])
@@ -1030,7 +1030,7 @@ test "VirtualBus: ARMW command passes through without modifying" {
 ///|
 test "VirtualSlave: Boot to Init transition" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → Boot (0x03)
@@ -1255,7 +1255,7 @@ test "FaultNic: recv with SendFailure during recv passes through" {
 ///|
 test "VirtualSlave: SafeOp to Init transition" {
   let bus = make_three_slave_bus()
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, 0x1001U, timeout)
   // Init → PreOp

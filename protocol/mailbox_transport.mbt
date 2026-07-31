@@ -96,7 +96,7 @@ fn read_sm_window_pdi_control_byte(window : Bytes) -> Byte raise @hal.EcError {
 }
 
 ///|
-fn[N : @hal.Nic] mailbox_repeat_read_fp(
+fn[N : @hal.Nic + DatagramIndexSource] mailbox_repeat_read_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -143,7 +143,7 @@ fn[N : @hal.Nic] mailbox_repeat_read_fp(
 }
 
 ///|
-fn[N : @hal.Nic] mailbox_repeat_read_ap(
+fn[N : @hal.Nic + DatagramIndexSource] mailbox_repeat_read_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -185,7 +185,7 @@ fn[N : @hal.Nic] mailbox_repeat_read_ap(
 ///|
 /// Poll a slave's input mailbox (SM In) to check if data is available.
 /// Returns true if the mailbox contains data ready to be read.
-pub fn[N : @hal.Nic] mailbox_poll(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_poll(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -205,7 +205,7 @@ pub fn[N : @hal.Nic] mailbox_poll(
 ///|
 /// Poll a slave's input mailbox using auto-increment addressing.
 /// Returns true if the mailbox contains data ready to be read.
-pub fn[N : @hal.Nic] mailbox_poll_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_poll_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -228,7 +228,7 @@ pub fn[N : @hal.Nic] mailbox_poll_ap(
 /// 1. Checks that the data fits in the slave's mailbox.
 /// 2. Pads the data to the full SM Out size (required by EtherCAT spec).
 /// 3. Writes to the SM Out physical address via FPWR.
-pub fn[N : @hal.Nic] mailbox_send(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_send(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -277,7 +277,7 @@ pub fn[N : @hal.Nic] mailbox_send(
 
 ///|
 /// Send a mailbox frame to a slave using auto-increment addressing.
-pub fn[N : @hal.Nic] mailbox_send_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_send_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -329,7 +329,7 @@ pub fn[N : @hal.Nic] mailbox_send_ap(
 /// 1. Polls the SM In status until data is available (up to max_polls attempts).
 /// 2. Reads the full SM In address range via FPRD.
 /// 3. Returns the raw mailbox frame bytes.
-pub fn[N : @hal.Nic] mailbox_recv(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_recv(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -357,7 +357,7 @@ pub fn[N : @hal.Nic] mailbox_recv(
 ///|
 /// Receive a mailbox frame and use RMSM Repeat/RepeatAck recovery once when
 /// the initial mailbox read times out.
-pub fn[N : @hal.Nic] mailbox_recv_rmsm(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_recv_rmsm(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -380,7 +380,7 @@ pub fn[N : @hal.Nic] mailbox_recv_rmsm(
 
 ///|
 /// Read the current AP mailbox input buffer once without polling.
-pub fn[N : @hal.Nic] mailbox_read_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_read_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -398,7 +398,7 @@ pub fn[N : @hal.Nic] mailbox_read_ap(
 
 ///|
 /// Receive a mailbox frame from a slave using auto-increment addressing.
-pub fn[N : @hal.Nic] mailbox_recv_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_recv_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -417,7 +417,7 @@ pub fn[N : @hal.Nic] mailbox_recv_ap(
 ///|
 /// Receive a mailbox frame using AP addressing and use RMSM Repeat/RepeatAck
 /// recovery once when the initial mailbox read times out.
-pub fn[N : @hal.Nic] mailbox_recv_ap_rmsm(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_recv_ap_rmsm(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -441,7 +441,7 @@ pub fn[N : @hal.Nic] mailbox_recv_ap_rmsm(
 ///|
 /// Send a mailbox frame and wait for the response.
 /// Combines mailbox_send + mailbox_recv into a single round-trip.
-pub fn[N : @hal.Nic] mailbox_exchange(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_exchange(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -455,7 +455,7 @@ pub fn[N : @hal.Nic] mailbox_exchange(
 
 ///|
 /// Send a mailbox frame and wait for the response using auto-increment addressing.
-pub fn[N : @hal.Nic] mailbox_exchange_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] mailbox_exchange_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,

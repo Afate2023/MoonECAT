@@ -332,7 +332,7 @@ test "find_pdu_by_index returns None for missing index" {
 
 ///|
 test "transact loopback - NOP roundtrip via MockNic" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = Bytes::new(0)
   let pdu = @protocol.transact_pdu(
@@ -349,7 +349,7 @@ test "transact loopback - NOP roundtrip via MockNic" {
 
 ///|
 test "transact loopback - BRD with payload via MockNic" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = Bytes::from_array([b'\x01', b'\x02', b'\x03', b'\x04'])
   let pdu = @protocol.transact_pdu(
@@ -364,8 +364,98 @@ test "transact loopback - BRD with payload via MockNic" {
 }
 
 ///|
+test "DatagramSession assigns sequential indices across transactions" {
+  let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+  let session = @protocol.DatagramSession::new(recorder)
+  let timeout = @hal.Duration(1000L)
+  ignore(
+    @protocol.transact_pdu(
+      session,
+      @protocol.EcCommand::NOP,
+      0U,
+      Bytes::new(0),
+      timeout,
+    ),
+  )
+  ignore(
+    @protocol.transact_pdu(
+      session,
+      @protocol.EcCommand::BRD,
+      @protocol.broadcast_address(0x0130U),
+      Bytes::new(2),
+      timeout,
+    ),
+  )
+  let indices : Array[Byte] = []
+  for event in recorder.get_log().events {
+    match event {
+      @mock.Sent(data, _) => {
+        let frame = @protocol.EcFrame::decode(data)
+        indices.push(frame.pdus[0].header.index)
+      }
+      _ => ()
+    }
+  }
+  @debug.assert_eq(indices, [b'\x00', b'\x01'])
+  @debug.assert_eq(session.next_index(), b'\x02')
+}
+
+///|
+test "DatagramSession wraps index after 0xFF" {
+  let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+  let session = @protocol.DatagramSession::new(recorder, start_index=b'\xFE')
+  let timeout = @hal.Duration(1000L)
+  for _ in 0..<3 {
+    ignore(
+      @protocol.transact_pdu(
+        session,
+        @protocol.EcCommand::NOP,
+        0U,
+        Bytes::new(0),
+        timeout,
+      ),
+    )
+  }
+  let indices : Array[Byte] = []
+  for event in recorder.get_log().events {
+    match event {
+      @mock.Sent(data, _) => {
+        let frame = @protocol.EcFrame::decode(data)
+        indices.push(frame.pdus[0].header.index)
+      }
+      _ => ()
+    }
+  }
+  @debug.assert_eq(indices, [b'\xFE', b'\xFF', b'\x00'])
+  @debug.assert_eq(session.next_index(), b'\x01')
+}
+
+///|
+test "DatagramSession instances own independent index sequences" {
+  let first = @protocol.DatagramSession::new(@mock.MockNic::new())
+  let second = @protocol.DatagramSession::new(@mock.MockNic::new())
+  let timeout = @hal.Duration(1000L)
+  let first_pdu = @protocol.transact_pdu(
+    first,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  let second_pdu = @protocol.transact_pdu(
+    second,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  @debug.assert_eq(first_pdu.header.index, b'\x00')
+  @debug.assert_eq(second_pdu.header.index, b'\x00')
+}
+
+///|
 test "transact loopback - full frame transaction via MockNic" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let builder = @protocol.FrameBuilder::new()
   let idx0 = builder.add(@protocol.EcCommand::APRD, 0U, Bytes::new(2))
@@ -451,7 +541,7 @@ pub impl @hal.Nic for NoiseMockNic with fn close(self) {
 
 ///|
 test "transact ignores non-ethercat noise frames before response" {
-  let nic = NoiseMockNic::new()
+  let nic = @protocol.DatagramSession::new(NoiseMockNic::new())
   let timeout = @hal.Duration(1000L)
   let pdu = @protocol.transact_pdu(
     nic,
@@ -466,7 +556,9 @@ test "transact ignores non-ethercat noise frames before response" {
 
 ///|
 test "transact ignores short noise frames before response" {
-  let nic = NoiseMockNic::new_with_noise(Bytes::new(10))
+  let nic = @protocol.DatagramSession::new(
+    NoiseMockNic::new_with_noise(Bytes::new(10)),
+  )
   let timeout = @hal.Duration(1000L)
   let pdu = @protocol.transact_pdu(
     nic,
@@ -477,6 +569,52 @@ test "transact ignores short noise frames before response" {
   )
   @debug.assert_eq(pdu.header.command, @protocol.EcCommand::NOP)
   @debug.assert_eq(pdu.wkc, 0U)
+}
+
+///|
+test "transact ignores captured-shape stale FPRD index 0x6e length 128" {
+  let address = @protocol.configured_address(0x0004U, 0x1080U)
+  // Prefix from the reported mailbox-window frame. The capture text was
+  // truncated, so pad the remaining bytes while preserving the fields used by
+  // EcFrame decoding and transaction correlation.
+  let captured_prefix = b"\x04\x00\x00\x00\x00\x40\x01\x00\x02\x00\x20\x11\x00\xC0\x00\x00"
+  let captured_data = Bytes::makei(128, fn(i) {
+    if i < captured_prefix.length() {
+      captured_prefix[i]
+    } else {
+      b'\x00'
+    }
+  })
+  let stale : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [
+      {
+        header: {
+          command: @protocol.EcCommand::FPRD,
+          index: b'\x6E',
+          address,
+          len_flags: 128U,
+          irq: 0U,
+        },
+        data: captured_data,
+        wkc: 1U,
+      },
+    ],
+  }
+  let nic = @protocol.DatagramSession::new(
+    NoiseMockNic::new_with_noise(stale.encode()),
+    start_index=b'\x6F',
+  )
+  let pdu = @protocol.transact_pdu(
+    nic,
+    @protocol.EcCommand::FPRD,
+    address,
+    Bytes::new(128),
+    @hal.Duration(1000L),
+  )
+  @debug.assert_eq(pdu.header.index, b'\x6F')
+  @debug.assert_eq(nic.next_index(), b'\x70')
 }
 
 ///|
@@ -497,12 +635,13 @@ test "transact retries receive without resending after one RecvTimeout" {
   )
   let injector = @mock.FaultInjector::new()
   injector.add(@mock.RecvTimeout, @mock.Once)
-  let nic = @mock.RecordingNicAdapter::wrap(
+  let recorder = @mock.RecordingNicAdapter::wrap(
     @mock.FaultNic::new(
       @mock.VirtualNic::new(@mock.VirtualBus::new([slave])),
       injector,
     ),
   )
+  let nic = @protocol.DatagramSession::new(recorder)
   let timeout = @hal.Duration(1_000_000L)
   let current = @protocol.transact_pdu(
     nic,
@@ -517,7 +656,7 @@ test "transact retries receive without resending after one RecvTimeout" {
   @debug.assert_eq(response.subindex, b'\x11')
   let mut sent_count = 0
   let mut timeout_count = 0
-  for event in nic.get_log().events {
+  for event in recorder.get_log().events {
     match event {
       @mock.Sent(_, _) => sent_count = sent_count + 1
       @mock.RecvTimeout => timeout_count = timeout_count + 1
@@ -532,12 +671,13 @@ test "transact retries receive without resending after one RecvTimeout" {
 test "transact stops after one receive-only timeout retry" {
   let injector = @mock.FaultInjector::new()
   injector.add(@mock.RecvTimeout, @mock.Always)
-  let nic = @mock.RecordingNicAdapter::wrap(
+  let recorder = @mock.RecordingNicAdapter::wrap(
     @mock.FaultNic::new(
       @mock.VirtualNic::new(@mock.VirtualBus::new([])),
       injector,
     ),
   )
+  let nic = @protocol.DatagramSession::new(recorder)
   let result : Result[@protocol.Pdu, @hal.EcError] = Result::Ok(
     @protocol.transact_pdu(
       nic,
@@ -552,7 +692,7 @@ test "transact stops after one receive-only timeout retry" {
   assert_true(result is Err(@hal.EcError::RecvTimeout))
   let mut sent_count = 0
   let mut timeout_count = 0
-  for event in nic.get_log().events {
+  for event in recorder.get_log().events {
     match event {
       @mock.Sent(_, _) => sent_count = sent_count + 1
       @mock.RecvTimeout => timeout_count = timeout_count + 1
@@ -565,7 +705,7 @@ test "transact stops after one receive-only timeout retry" {
 
 ///|
 test "transact_pdu_retry - succeeds on first try" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let pdu = @protocol.transact_pdu_retry(
     nic,
@@ -580,7 +720,7 @@ test "transact_pdu_retry - succeeds on first try" {
 
 ///|
 test "count_slaves via mock loopback" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // MockNic echoes frames, so WKC will be 0 (no real slaves)
   let count = @protocol.count_slaves(nic, timeout)
@@ -589,7 +729,7 @@ test "count_slaves via mock loopback" {
 
 ///|
 test "register read/write helpers compile and run" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // Test that read_register_ap sends the right command
   let pdu = @protocol.read_register_ap(
@@ -793,7 +933,7 @@ test "all EcCommand values survive encode/decode" {
 
 ///|
 test "discovery - assign_station_address via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // MockNic echoes with wkc=0 so this will raise SendFailed
   let result = Result::Ok(
@@ -806,7 +946,7 @@ test "discovery - assign_station_address via mock" {
 
 ///|
 test "discovery - read_station_address_ap via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let station_address = @protocol.read_station_address_ap(nic, 0U, timeout)
   @debug.assert_eq(station_address, 0U)
@@ -814,7 +954,7 @@ test "discovery - read_station_address_ap via mock" {
 
 ///|
 test "discovery - read_register_fp command type" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let pdu = @protocol.read_register_fp(
     nic, 0x1001U, @protocol.reg_al_status, 2, timeout,
@@ -824,7 +964,7 @@ test "discovery - read_register_fp command type" {
 
 ///|
 test "discovery - write_register_fp command type" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = Bytes::from_array([b'\x02', b'\x00'])
   let pdu = @protocol.write_register_fp(
@@ -835,7 +975,7 @@ test "discovery - write_register_fp command type" {
 
 ///|
 test "discovery - write_register_ap command type" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = Bytes::from_array([b'\x01', b'\x10'])
   let pdu = @protocol.write_register_ap(
@@ -864,7 +1004,7 @@ test "discovery - register address constants are reasonable" {
 
 ///|
 test "discovery - read_station_alias via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let station_alias = @protocol.read_station_alias(nic, 0x1001U, timeout)
   @debug.assert_eq(station_alias, 0U)
@@ -872,7 +1012,7 @@ test "discovery - read_station_alias via mock" {
 
 ///|
 test "discovery - enable_alias_addressing via mock returns error" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let result = Result::Ok(
     @protocol.enable_alias_addressing(nic, 0x1001U, timeout),
@@ -1013,7 +1153,7 @@ test "FrameBuilder - max PDU capacity" {
 ///|
 test "full discovery flow simulation" {
   // Simulate a scan workflow: count → assign → read registers
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // 1. Count slaves (mock returns 0)
   let count = @protocol.count_slaves(nic, timeout)
@@ -1499,7 +1639,8 @@ test "build_strict_transition_route to Op respects PreOp and SafeOp" {
 
 ///|
 test "transition_to_target_strict rotates through legal direct steps" {
-  let nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let raw_nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let final_state = @protocol.transition_to_target_strict(
     nic,
@@ -1508,24 +1649,26 @@ test "transition_to_target_strict rotates through legal direct steps" {
     timeout,
   )
   @debug.assert_eq(final_state, @protocol.EsmState::Op)
-  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(raw_nic.control_writes.length(), 3)
   @debug.assert_eq(
-    nic.control_writes[0] & b'\x0F',
+    raw_nic.control_writes[0] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::SafeOp.to_byte(),
   )
   @debug.assert_eq(
-    nic.control_writes[2] & b'\x0F',
+    raw_nic.control_writes[2] & b'\x0F',
     @protocol.EsmState::Op.to_byte(),
   )
 }
 
 ///|
 test "request_state_observe captures raw status code and control wkc" {
-  let nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let nic = @protocol.DatagramSession::new(
+    EsmControlNic::new(@protocol.EsmState::Init, false, 0U),
+  )
   let timeout = @hal.Duration(1000L)
   let observed = @protocol.request_state_observe(
     nic,
@@ -1542,7 +1685,9 @@ test "request_state_observe captures raw status code and control wkc" {
 
 ///|
 test "transition_to_target_strict_with_timeout_policy_observe returns last step observation" {
-  let nic = EsmControlNic::new(@protocol.EsmState::Init, false, 0U)
+  let nic = @protocol.DatagramSession::new(
+    EsmControlNic::new(@protocol.EsmState::Init, false, 0U),
+  )
   let timeout = @hal.Duration(1000L)
   let observed = @protocol.transition_to_target_strict_with_timeout_policy_observe(
     nic,
@@ -1559,7 +1704,8 @@ test "transition_to_target_strict_with_timeout_policy_observe returns last step 
 
 ///|
 test "request_state_with_process_data keeps sending PDO until Op is confirmed" {
-  let nic = EsmOpNeedsPdoNic::new(@protocol.EsmState::SafeOp)
+  let raw_nic = EsmOpNeedsPdoNic::new(@protocol.EsmState::SafeOp)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [],
@@ -1576,16 +1722,17 @@ test "request_state_with_process_data keeps sending PDO until Op is confirmed" {
     timeout,
   )
   @debug.assert_eq(final_state, @protocol.EsmState::Op)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
-  assert_true(nic.pdo_after_op_request >= 1)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::Op.to_byte())
+  assert_true(raw_nic.pdo_after_op_request >= 1)
 }
 
 ///|
 test "request_state_with_process_data extends confirmation window beyond fixed 32 polls" {
-  let nic = EsmOpNeedsPdoNic::with_required_pdo_cycles(
+  let raw_nic = EsmOpNeedsPdoNic::with_required_pdo_cycles(
     @protocol.EsmState::SafeOp,
     48,
   )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1_000_000L)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [],
@@ -1602,13 +1749,13 @@ test "request_state_with_process_data extends confirmation window beyond fixed 3
     timeout,
   )
   @debug.assert_eq(final_state, @protocol.EsmState::Op)
-  @debug.assert_eq(nic.current_state, @protocol.EsmState::Op.to_byte())
-  assert_true(nic.pdo_after_op_request >= 48)
+  @debug.assert_eq(raw_nic.current_state, @protocol.EsmState::Op.to_byte())
+  assert_true(raw_nic.pdo_after_op_request >= 48)
 }
 
 ///|
 test "request_state_with_process_data_snapshot captures AL error window" {
-  let nic = EsmOpFailureSnapshotNic::new()
+  let nic = @protocol.DatagramSession::new(EsmOpFailureSnapshotNic::new())
   let timeout = @hal.Duration(1000L)
   let mapping : @mailbox.SlaveMapping = {
     sm_configs: [],
@@ -1631,7 +1778,9 @@ test "request_state_with_process_data_snapshot captures AL error window" {
 
 ///|
 test "transition_to_target_strict rejects pending AL error indication" {
-  let nic = EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
+  let nic = @protocol.DatagramSession::new(
+    EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U),
+  )
   let timeout = @hal.Duration(1000L)
   let result : Result[@protocol.EsmState, Error] = Result::Ok(
     @protocol.transition_to_target_strict(
@@ -1651,7 +1800,8 @@ test "transition_to_target_strict rejects pending AL error indication" {
 
 ///|
 test "clear_al_error stabilizes state before caller chooses next target" {
-  let nic = EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
+  let raw_nic = EsmControlNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cleared = @protocol.clear_al_error(nic, 0x1001U, timeout)
   @debug.assert_eq(cleared.state, @protocol.EsmState::SafeOp)
@@ -1664,24 +1814,25 @@ test "clear_al_error stabilizes state before caller chooses next target" {
     timeout,
   )
   @debug.assert_eq(final_state, @protocol.EsmState::Init)
-  @debug.assert_eq(nic.control_writes.length(), 3)
+  @debug.assert_eq(raw_nic.control_writes.length(), 3)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::PreOp.to_byte(),
   )
   @debug.assert_eq(
-    nic.control_writes[2] & b'\x0F',
+    raw_nic.control_writes[2] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
 }
 
 ///|
 test "recover_al_error_for_transition rolls configuration error back to init" {
-  let nic = EsmRollbackToInitNic::new(@protocol.EsmState::PreOp, 0x001EU)
+  let raw_nic = EsmRollbackToInitNic::new(@protocol.EsmState::PreOp, 0x001EU)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let recovered = @protocol.recover_al_error_for_transition(
     nic, 0x1001U, timeout,
@@ -1689,20 +1840,20 @@ test "recover_al_error_for_transition rolls configuration error back to init" {
   @debug.assert_eq(recovered.state, @protocol.EsmState::Init)
   assert_true(!recovered.error_indication)
   @debug.assert_eq(recovered.status_code, None)
-  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(raw_nic.control_writes.length(), 2)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::PreOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
 }
 
 ///|
 test "transition_through with empty path raises error" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let result = Result::Ok(
     @protocol.transition_through(nic, 0x1001U, [], timeout),
@@ -1714,7 +1865,7 @@ test "transition_through with empty path raises error" {
 
 ///|
 test "broadcast_state via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.broadcast_state(nic, @protocol.EsmState::Init, timeout)
   @debug.assert_eq(wkc, 0U) // MockNic echoes, WKC=0
@@ -1722,7 +1873,7 @@ test "broadcast_state via mock" {
 
 ///|
 test "read_al_status via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // MockNic echoes the sent frame (which has zero-initialized data)
   // EsmState::from_byte(0) will fail because 0 isn't a valid ESM state
@@ -1738,7 +1889,7 @@ test "read_al_status via mock" {
 
 ///|
 test "read_al_status_code via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let code = @protocol.read_al_status_code(nic, 0x1001U, timeout)
   // MockNic returns zeroed data, so status code = 0
@@ -1889,7 +2040,7 @@ test "PdoContext set_slave_outputs rejects unknown station" {
 test "mailbox_poll via mock loopback" {
   // MockNic echoes frames; the response data will be zeroed (from the request)
   // so SM status bit 3 = 0 → mailbox not ready
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -1905,8 +2056,9 @@ test "mailbox_poll via mock loopback" {
 
 ///|
 test "mailbox_poll reports deactivated mailbox sync manager" {
-  let nic = RepeatMailboxMockNic::new()
-  nic.deactivated_mailbox = true
+  let raw_nic = RepeatMailboxMockNic::new()
+  raw_nic.deactivated_mailbox = true
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -1930,7 +2082,7 @@ test "mailbox_poll reports deactivated mailbox sync manager" {
 
 ///|
 test "mailbox_send via mock loopback" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -1946,7 +2098,7 @@ test "mailbox_send via mock loopback" {
 
 ///|
 test "mailbox_send rejects oversized data" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -1972,7 +2124,7 @@ test "mailbox_send rejects oversized data" {
 
 ///|
 test "mailbox_recv times out when poll never succeeds" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2301,9 +2453,10 @@ pub impl @hal.Nic for ApMailboxMockNic with fn close(self) {
 
 ///|
 test "mailbox_poll_ap reads status via APRD" {
-  let nic = ApMailboxMockNic::new()
+  let raw_nic = ApMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
-  nic.mailbox_ready = true
+  raw_nic.mailbox_ready = true
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
     out_size: 128U,
@@ -2317,13 +2470,14 @@ test "mailbox_poll_ap reads status via APRD" {
     cfg.in_sm_index.reinterpret_as_uint() *
     @protocol.sm_entry_size.reinterpret_as_uint()
   assert_true(ready)
-  @debug.assert_eq(nic.last_command, @protocol.APRD.to_byte())
-  @debug.assert_eq(nic.last_offset, expected_status_addr)
+  @debug.assert_eq(raw_nic.last_command, @protocol.APRD.to_byte())
+  @debug.assert_eq(raw_nic.last_offset, expected_status_addr)
 }
 
 ///|
 test "mailbox_send_ap writes output mailbox via APWR" {
-  let nic = ApMailboxMockNic::new()
+  let raw_nic = ApMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2334,13 +2488,14 @@ test "mailbox_send_ap writes output mailbox via APWR" {
     in_sm_index: 1,
   }
   @protocol.mailbox_send_ap(nic, 0U, cfg, Bytes::new(16), timeout)
-  @debug.assert_eq(nic.last_command, @protocol.APWR.to_byte())
-  @debug.assert_eq(nic.last_offset, 0x1000U)
+  @debug.assert_eq(raw_nic.last_command, @protocol.APWR.to_byte())
+  @debug.assert_eq(raw_nic.last_offset, 0x1000U)
 }
 
 ///|
 test "mailbox_read_ap reads input mailbox via APRD" {
-  let nic = ApMailboxMockNic::new()
+  let raw_nic = ApMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2351,14 +2506,15 @@ test "mailbox_read_ap reads input mailbox via APRD" {
     in_sm_index: 1,
   }
   let data = @protocol.mailbox_read_ap(nic, 0U, cfg, timeout)
-  @debug.assert_eq(nic.last_command, @protocol.APRD.to_byte())
-  @debug.assert_eq(nic.last_offset, 0x1080U)
+  @debug.assert_eq(raw_nic.last_command, @protocol.APRD.to_byte())
+  @debug.assert_eq(raw_nic.last_offset, 0x1080U)
   @debug.assert_eq(data.length(), 128)
 }
 
 ///|
 test "mailbox_recv_rmsm requests repeat and returns replayed frame" {
-  let nic = RepeatMailboxMockNic::new()
+  let raw_nic = RepeatMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2379,14 +2535,14 @@ test "mailbox_recv_rmsm requests repeat and returns replayed frame" {
     max_polls=1,
   )
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
-  assert_true(nic.repeat_triggered)
+  assert_true(raw_nic.repeat_triggered)
   @debug.assert_eq(mbh.mb_type, @mailbox.MailboxType::CoE)
   @debug.assert_eq(mbh.counter, b'\x01')
 }
 
 ///|
 test "sdo_upload_retry stops after retry budget is exhausted" {
-  let nic = TimeoutMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(TimeoutMailboxMockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2409,7 +2565,8 @@ test "sdo_upload_retry stops after retry budget is exhausted" {
 
 ///|
 test "mailbox_recv_ap_rmsm requests repeat and returns replayed frame" {
-  let nic = ApMailboxMockNic::new()
+  let raw_nic = ApMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2430,13 +2587,13 @@ test "mailbox_recv_ap_rmsm requests repeat and returns replayed frame" {
     max_polls=1,
   )
   let mbh = @mailbox.MailboxHeader::from_bytes(frame)
-  assert_true(nic.repeat_triggered)
+  assert_true(raw_nic.repeat_triggered)
   @debug.assert_eq(mbh.counter, b'\x01')
 }
 
 ///|
 test "sdo_upload_ap reads expedited payload via AP mailbox transport" {
-  let nic = ApMailboxMockNic::new()
+  let nic = @protocol.DatagramSession::new(ApMailboxMockNic::new())
   let timeout = @hal.Duration(1000L)
   let cfg : @mailbox.MailboxConfig = {
     out_address: 0x1000U,
@@ -2581,7 +2738,7 @@ pub impl @hal.Nic for EepromMockNic with fn close(self) {
 
 ///|
 test "eeprom_read_word via mock loopback" {
-  let nic = EepromMockNic::new()
+  let nic = @protocol.DatagramSession::new(EepromMockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read_word(nic, 0x1001U, 0U, timeout)
   @debug.assert_eq(data.length(), 4)
@@ -2589,7 +2746,7 @@ test "eeprom_read_word via mock loopback" {
 
 ///|
 test "eeprom_read multi-word via mock" {
-  let nic = EepromMockNic::new()
+  let nic = @protocol.DatagramSession::new(EepromMockNic::new())
   let timeout = @hal.Duration(1000L)
   let data = @protocol.eeprom_read(nic, 0x1001U, 0U, 3, timeout)
   @debug.assert_eq(data.length(), 12) // 3 words * 4 bytes
@@ -2615,7 +2772,9 @@ fn make_sii_image(byte_size : Int) -> Bytes {
 
 ///|
 test "read_sii_bytes expands probe to eeprom size" {
-  let nic = EepromMockNic::with_image(make_sii_image(512))
+  let nic = @protocol.DatagramSession::new(
+    EepromMockNic::with_image(make_sii_image(512)),
+  )
   let timeout = @hal.Duration(1000L)
   let data = @protocol.read_sii_bytes(nic, 0x1001U, 8, timeout)
   @debug.assert_eq(data.length(), 512)
@@ -2623,7 +2782,9 @@ test "read_sii_bytes expands probe to eeprom size" {
 
 ///|
 test "read_sii_bytes_ap expands probe to eeprom size" {
-  let nic = EepromMockNic::with_image(make_sii_image(512))
+  let nic = @protocol.DatagramSession::new(
+    EepromMockNic::with_image(make_sii_image(512)),
+  )
   let timeout = @hal.Duration(1000L)
   let data = @protocol.read_sii_bytes_ap(nic, 0U, 8, timeout)
   @debug.assert_eq(data.length(), 512)
@@ -2633,7 +2794,7 @@ test "read_sii_bytes_ap expands probe to eeprom size" {
 
 ///|
 test "read_device_emulation via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // MockNic echoes zero data → bit 7 = 0 → no device emulation
   let is_emu = @protocol.read_device_emulation(nic, 0x1001U, timeout)
@@ -2642,7 +2803,7 @@ test "read_device_emulation via mock" {
 
 ///|
 test "request_state_aware without device_emulation same as request_state" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // MockNic echoes zeros → read_al_status gets 0x00 → EsmStateError
   let result = Result::Ok(
@@ -2660,7 +2821,7 @@ test "request_state_aware without device_emulation same as request_state" {
 
 ///|
 test "request_state_aware with device_emulation" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // With device_emulation flag, should check error indication first,
   // then proceed to request_state (which also gets EsmStateError from mock)
@@ -2680,7 +2841,7 @@ test "request_state_aware with device_emulation" {
 
 ///|
 test "set_sm_enable via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // Enable SM2
   @protocol.set_sm_enable(nic, 0x1001U, 2, true, timeout)
@@ -2690,7 +2851,7 @@ test "set_sm_enable via mock" {
 
 ///|
 test "apply_op_only_policy no-op when not op_only" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // When op_only = false, should do nothing
   @protocol.apply_op_only_policy(
@@ -2705,7 +2866,7 @@ test "apply_op_only_policy no-op when not op_only" {
 
 ///|
 test "apply_op_only_policy disables SM when not Op" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // When op_only = true and state is SafeOp, should disable SM
   @protocol.apply_op_only_policy(
@@ -2720,7 +2881,7 @@ test "apply_op_only_policy disables SM when not Op" {
 
 ///|
 test "apply_op_only_policy enables SM when Op" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // When op_only = true and state is Op, should enable SM
   @protocol.apply_op_only_policy(
@@ -2737,14 +2898,14 @@ test "apply_op_only_policy enables SM when Op" {
 
 ///|
 test "dc_latch_times via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   @protocol.dc_latch_times(nic, timeout)
 }
 
 ///|
 test "dc_read_receive_time via mock returns zero" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let t = @protocol.dc_read_receive_time(nic, 0x1001U, timeout)
   @debug.assert_eq(t, 0U)
@@ -2801,7 +2962,7 @@ test "SmWatchdogConfig inequality on different pdata_time" {
 
 ///|
 test "read_sm_watchdog_config via mock returns zeroed defaults" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let config = @protocol.read_sm_watchdog_config(nic, 0x1001U, timeout)
   // MockNic loopback echoes frame with zero-filled data area for FPRD
@@ -2862,7 +3023,7 @@ test "esm_timeout_policy_from_sii_timeouts zero fields remain None" {
 
 ///|
 test "dc_read_sync_window via mock returns zero" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let w = @protocol.dc_read_sync_window(nic, 0x1001U, timeout)
   @debug.assert_eq(w, 0U)
@@ -2870,14 +3031,14 @@ test "dc_read_sync_window via mock returns zero" {
 
 ///|
 test "dc_configure_sync0 via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   @protocol.dc_configure_sync0(nic, 0x1001U, 1_000_000U, timeout)
 }
 
 ///|
 test "dc_configure_sync0 with SYNC1 via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   // SYNC1 cycle = 2x SYNC0 cycle
   @protocol.dc_configure_sync0(
@@ -2891,14 +3052,14 @@ test "dc_configure_sync0 with SYNC1 via mock" {
 
 ///|
 test "dc_compensate_cycle via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   @protocol.dc_compensate_cycle(nic, 0x1001U, timeout)
 }
 
 ///|
 test "read_dl_error_counters via mock returns all zeros" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let counters = @protocol.read_dl_error_counters(nic, 0x1001U, timeout)
   @debug.assert_eq(counters.ecat_pu_errors, 0U)
@@ -2913,7 +3074,7 @@ test "read_dl_error_counters via mock returns all zeros" {
 
 ///|
 test "read_dl_error_counters_ap via mock returns all zeros" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let counters = @protocol.read_dl_error_counters_ap(nic, 0U, timeout)
   @debug.assert_eq(counters.ecat_pu_errors, 0U)
@@ -2941,7 +3102,7 @@ test "DlErrorCounters struct has expected port count" {
 
 ///|
 test "dc_configure_linear returns reference station" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let result = @protocol.dc_configure_linear(
     nic,
@@ -2962,7 +3123,7 @@ test "dc_configure_linear returns reference station" {
 
 ///|
 test "dc_reestimate_propagation_delays via mock" {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   @protocol.dc_reestimate_propagation_delays(
     nic,
@@ -2996,7 +3157,7 @@ test "pdo_exchange via mock loopback" {
     input_bytes: 2,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
   @debug.assert_eq(wkc, 0U) // MockNic echoes, WKC=0
@@ -3011,7 +3172,7 @@ test "pdo_read via mock loopback" {
     input_bytes: 8,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_read(nic, ctx, timeout)
   @debug.assert_eq(wkc, 0U)
@@ -3026,7 +3187,7 @@ test "pdo_write via mock loopback" {
     input_bytes: 0,
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0U)
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_write(nic, ctx, timeout)
   @debug.assert_eq(wkc, 0U)
@@ -3035,7 +3196,7 @@ test "pdo_write via mock loopback" {
 ///|
 test "pdo_exchange with empty context" {
   let ctx = @protocol.PdoContext::build([], 0U)
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = @hal.Duration(1000L)
   let wkc = @protocol.pdo_exchange(nic, ctx, timeout)
   @debug.assert_eq(wkc, 0U) // no data to exchange
@@ -4550,7 +4711,7 @@ test "dc_latch_times via VirtualNic succeeds" {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, id, Bytes::new(256)),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   @protocol.dc_latch_times(nic, @hal.Duration(50_000_000L))
 }
 
@@ -4564,7 +4725,7 @@ test "dc_read_receive_time via VirtualNic returns 0 initially" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let time = @protocol.dc_read_receive_time(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(time, 0U) // registers are initially zero
 }
@@ -4579,7 +4740,7 @@ test "dc_read_port_times via VirtualNic returns zeros" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let times = @protocol.dc_read_port_times(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(times.port0, 0U)
   @debug.assert_eq(times.port1, 0U)
@@ -4599,7 +4760,7 @@ test "read_device_emulation default type register" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Default type register = 0x02 (bit 7 is 0) → Device Emulation = false
   let de = @protocol.read_device_emulation(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(de, false)
@@ -4615,7 +4776,7 @@ test "set_sm_enable via VirtualNic writes activate register" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   @protocol.set_sm_enable(nic, 0U, 2, true, @hal.Duration(50_000_000L))
   // SM2 activate register = 0x0800 + 2*8 + 6 = 0x0816
   let reg = slave.read_reg(0x0816, 1)
@@ -4632,7 +4793,7 @@ test "set_sm_enable disable writes zero" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   @protocol.set_sm_enable(nic, 0U, 0, false, @hal.Duration(50_000_000L))
   let reg = slave.read_reg(0x0806, 1)
   @debug.assert_eq(reg[0], b'\x00')
@@ -4648,7 +4809,7 @@ test "apply_op_only_policy no-op when op_only is false" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Write 0xFF to SM2 activate so we can detect if it's changed
   slave.registers[0x0816] = b'\xFF'
   @protocol.apply_op_only_policy(
@@ -4673,7 +4834,7 @@ test "apply_op_only_policy disables SM for non-Op target" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   slave.registers[0x0816] = b'\xFF'
   @protocol.apply_op_only_policy(
     nic,
@@ -4697,7 +4858,7 @@ test "apply_op_only_policy enables SM for Op target" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   @protocol.apply_op_only_policy(
     nic,
     0U,
@@ -4715,7 +4876,7 @@ test "apply_op_only_policy enables SM for Op target" {
 ///|
 test "pdo_exchange with zero logical size returns 0 WKC" {
   let bus = @mock.VirtualBus::new([])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let ctx = @protocol.PdoContext::build([], 0x0000U)
   let wkc = @protocol.pdo_exchange(nic, ctx, @hal.Duration(50_000_000L))
   @debug.assert_eq(wkc, 0U)
@@ -4724,7 +4885,7 @@ test "pdo_exchange with zero logical size returns 0 WKC" {
 ///|
 test "pdo_read with zero input size returns 0 WKC" {
   let bus = @mock.VirtualBus::new([])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],
     fmmu_configs: [],
@@ -4739,7 +4900,7 @@ test "pdo_read with zero input size returns 0 WKC" {
 ///|
 test "pdo_write with zero output size returns 0 WKC" {
   let bus = @mock.VirtualBus::new([])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],
     fmmu_configs: [],
@@ -4880,7 +5041,7 @@ test "read_sm_watchdog_config via VirtualNic returns defaults" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(4096))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let config = @protocol.read_sm_watchdog_config(
     nic,
     0U,
@@ -4904,7 +5065,7 @@ test "write_sm_watchdog_config via VirtualNic writes registers" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(4096))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   @protocol.write_sm_watchdog_config(
     nic,
     0U,
@@ -4937,7 +5098,7 @@ test "read_device_emulation with bit 7 set returns true" {
   // Set bit 7 of type register (ESC register 0x0000)
   slave.registers[0x0000] = b'\x80'
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let de = @protocol.read_device_emulation(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(de, true)
 }
@@ -4953,7 +5114,7 @@ test "pdo_exchange_result with block_lrw via VirtualNic" {
     input_bytes: 2,
   }
   let bus = @mock.VirtualBus::new([])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x0000U)
   ctx.block_lrw = true
   // Will fail at transact level (no slaves), but exercises the split path
@@ -4971,7 +5132,7 @@ test "pdo_exchange_result with block_lrw via VirtualNic" {
 ///|
 test "dc_configure_linear empty stations returns None" {
   let bus = @mock.VirtualBus::new([])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let result = @protocol.dc_configure_linear(
     nic,
     [],
@@ -4991,7 +5152,7 @@ test "dc_check_support via VirtualNic" {
   }
   let slave = @mock.VirtualSlave::new(0, id, Bytes::new(256))
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   // Default registers are zero → bit 2 of DL Info is 0 → no DC support
   let supports = @protocol.dc_check_support(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(supports, false)
@@ -5009,7 +5170,7 @@ test "dc_check_support with DC bit set" {
   // Set bit 2 of DL Information register (0x0008) to indicate DC support
   slave.write_reg(0x0008, b"\x04")
   let bus = @mock.VirtualBus::new([slave])
-  let nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(@mock.VirtualNic::new(bus))
   let supports = @protocol.dc_check_support(nic, 0U, @hal.Duration(50_000_000L))
   @debug.assert_eq(supports, true)
 }

@@ -78,6 +78,8 @@ moon run cmd/main run -- --backend native --if <interface> --json
 ### 输入
 
 - `@native.NativeNic::open_with_config(...)`
+- 将 NativeNic 包装为 `@protocol.DatagramSession::new(nic)` 后再调用标准协议/
+  runtime API；Native HAL 本身不持有或改写 EtherCAT Datagram Index
 - 现有库入口：`@runtime.scan`、`@runtime.validate`、`@runtime.run`
 
 ### 输出
@@ -104,7 +106,8 @@ moon test hal/native/native_test.mbt --target native
 - 真实 `scan/validate/run` 回归通过 `scripts/regression-real-device.ps1` 驱动；`--record <ndjson>` 把帧级事件流落盘，`scripts/replay-diff.ps1` 把同一份 NDJSON 通过 `cmd/main replay --trace ... --json` 重放并与 live `run-summary` 做稳定字段（slave_count / topology_fingerprint / verdict）比对
 - 对真实 `--record <ndjson>` 产物做 replay 时，若希望保留 live `slave_count` / topology 证据，应同时保留 `scan --json` 并在 replay 时传入 `--scan-json <path>`；仅依赖 NDJSON 时，replay 的 probe 可能回退成 `0 slaves`
 - CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
-- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现（包括 `NativeNic`）包成可记录链路，不再局限于 `VirtualNic`
+- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现（包括 `NativeNic`）包成可记录链路，不再局限于 `VirtualNic`；记录真实线上 Index 时层次为 `DatagramSession -> RecordingNicAdapter -> NativeNic`
+- 新录制使用 version 2 NDJSON header，保存递增 Index 模式及起始 Index；无 header/version 1 的旧 trace 通过固定零 Index 的 legacy session 严格回放
 
 ### EoE / FoE（L3 交付面）
 

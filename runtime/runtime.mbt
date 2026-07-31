@@ -67,7 +67,7 @@ pub fn Runtime::set_timeout_threshold(self : Runtime, threshold : Int) -> Unit {
 ///|
 /// Initialize distributed clocks for the configured station list.
 /// Returns true when DC was initialized and locked.
-pub fn[N : @hal.Nic] Runtime::init_dc(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::init_dc(
   self : Runtime,
   nic : N,
   stations : Array[UInt],
@@ -139,7 +139,7 @@ pub fn Runtime::configure_emergency_stations(
 ///|
 /// Poll all configured emergency stations for unsolicited mailbox data.
 /// Returns the number of Emergency messages received this cycle.
-fn[N : @hal.Nic] Runtime::poll_emergencies(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::poll_emergencies(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,
@@ -171,7 +171,7 @@ fn[N : @hal.Nic] Runtime::poll_emergencies(
 ///|
 /// Execute one PDO cycle in the runtime loop.
 /// Updates telemetry and tracks consecutive errors.
-pub fn[N : @hal.Nic] Runtime::run_cycle(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycle(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,
@@ -286,7 +286,7 @@ pub fn Runtime::get_telemetry(self : Runtime) -> Telemetry {
 
 ///|
 /// Run N PDO cycles. Returns the number of successful cycles.
-pub fn[N : @hal.Nic] Runtime::run_cycles(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycles(
   self : Runtime,
   nic : N,
   count : Int,
@@ -297,7 +297,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycles(
 
 ///|
 /// Run N PDO cycles and optionally emit progress snapshots.
-pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycles_with_reporting(
   self : Runtime,
   nic : N,
   count : Int,
@@ -316,7 +316,7 @@ pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(
 
 ///|
 /// Run N PDO cycles and emit structured progress snapshots to the provided sink.
-pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(
   self : Runtime,
   nic : N,
   count : Int,
@@ -391,7 +391,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(
 
 ///|
 /// Run PDO cycles until a runtime recovery condition occurs.
-pub fn[N : @hal.Nic] Runtime::run_until_fault(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_until_fault(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,
@@ -402,7 +402,7 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault(
 ///|
 /// Run PDO cycles until a runtime recovery condition occurs and optionally
 /// emit progress snapshots.
-pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_until_fault_with_reporting(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,
@@ -420,7 +420,7 @@ pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(
 ///|
 /// Run PDO cycles until a runtime recovery condition occurs and emit
 /// structured progress snapshots to the provided sink.
-pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(
   self : Runtime,
   nic : N,
   timeout : @hal.Duration,

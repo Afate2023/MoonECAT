@@ -17,6 +17,8 @@ pub fn fuzz_campaign(Int64, Int, Int, FuzzOracle) -> Array[FuzzResult]
 
 pub fn fuzz_run(Int64, Int, FuzzOracle) -> FuzzResult
 
+pub fn ndjson_initial_datagram_index(String) -> Byte?
+
 pub fn nic_event_from_json(String) -> NicEvent?
 
 pub fn nic_event_to_json(NicEvent) -> String
@@ -163,6 +165,7 @@ pub fn NicEventLog::from_ndjson(String) -> Self
 pub fn NicEventLog::len(Self) -> Int
 pub fn NicEventLog::new() -> Self
 pub fn NicEventLog::to_ndjson(Self) -> String
+pub fn NicEventLog::to_ndjson_with_datagram_session_header(Self, slave_count? : Int, fingerprint? : String, initial_datagram_index? : Byte) -> String
 pub fn NicEventLog::to_ndjson_with_header(Self, slave_count? : Int, fingerprint? : String) -> String
 
 pub(all) struct ObservedVerdict {
