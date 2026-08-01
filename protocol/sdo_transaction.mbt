@@ -1,6 +1,6 @@
 ///|
 /// SDO transaction layer: complete SDO Upload/Download using
-/// mailbox transport, RMSM counter management, and CoE encoding/decoding.
+/// mailbox transport, mailbox-session tracking, and CoE encoding/decoding.
 /// Implements ETG.1500 #501 (SDO Up/Download shall).
 
 ///|
@@ -38,7 +38,9 @@ fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_validated_fp(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
@@ -62,7 +64,9 @@ fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_validated_ap(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
@@ -84,7 +88,9 @@ fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_info_validated_fp(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|

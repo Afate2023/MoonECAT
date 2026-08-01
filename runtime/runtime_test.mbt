@@ -260,6 +260,12 @@ fn read_station_address_bytes(data : Bytes) -> UInt {
 }
 
 ///|
+fn scan_station_position(address : UInt) -> Int {
+  let adp = @protocol.address_station(address)
+  ((0x10000U - adp) & 0xFFFFU).reinterpret_as_int()
+}
+
+///|
 pub impl @hal.Nic for ScanStationNic with fn open_(name) {
   ignore(name)
   ScanStationNic::new([])
@@ -273,7 +279,7 @@ pub impl @hal.Nic for ScanStationNic with fn send(self, data) {
   let request = @protocol.EcFrame::decode(data)
   let pdu = request.pdus[0]
   let offset = @protocol.address_offset(pdu.header.address)
-  let position = @protocol.address_station(pdu.header.address).reinterpret_as_int()
+  let position = scan_station_position(pdu.header.address)
   self.next_response = match pdu.header.command {
     @protocol.BRD =>
       build_response_frame(

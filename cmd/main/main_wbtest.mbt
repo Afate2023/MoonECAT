@@ -2272,7 +2272,9 @@ test "cli startup trace od read retries stale and timeout errors" {
   assert_true(startup_trace_should_retry_od_read(@hal.EcError::MailboxTimeout))
   assert_true(
     startup_trace_should_retry_od_read(
-      @hal.EcError::MailboxProtocol("RMSM: too many stale frames received"),
+      @hal.EcError::MailboxProtocol(
+        "mailbox session: too many stale frames received",
+      ),
     ),
   )
 }

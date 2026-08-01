@@ -1276,7 +1276,9 @@ fn[N : @hal.Nic + @protocol.DatagramIndexSource] diagnosis_sdo_upload_ap_once(
     }
     return resp.data
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
@@ -1393,20 +1395,7 @@ fn diagnosis_accept_response_counter(
   rmsm : @mailbox.Rmsm,
   counter : Byte,
 ) -> Bool raise @hal.EcError {
-  let validation = Result::Ok(rmsm.validate_response(counter)) catch {
-    err => Result::Err(err)
-  }
-  match validation {
-    Ok(is_new) => is_new
-    Err(@hal.EcError::MailboxProtocol(message)) =>
-      if message.contains("counter mismatch") {
-        rmsm.reset()
-        false
-      } else {
-        raise @hal.EcError::MailboxProtocol(message)
-      }
-    Err(err) => raise err
-  }
+  rmsm.validate_response(counter)
 }
 
 ///|

@@ -180,19 +180,17 @@ pub fn encode_soe_write_req(
 }
 
 ///|
-/// Decode a SoE response from a mailbox frame (after mailbox header).
-pub fn decode_soe_response(frame : Bytes) -> SoeResponse raise @hal.EcError {
+/// Decode a SoE response from a raw mailbox/SyncManager frame.
+pub fn decode_soe_response(raw : Bytes) -> SoeResponse raise @hal.EcError {
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(SoE)
+  let frame = mailbox_frame.to_bytes()
   if frame.length() < mailbox_header_len + soe_header_len {
     raise @hal.EcError::MailboxProtocol(
       "SoE frame too short: " + frame.length().to_string(),
     )
   }
-  let mbh = MailboxHeader::from_bytes(frame)
-  if mbh.mb_type != SoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected SoE mailbox type, got " + @debug.to_string(mbh.mb_type),
-    )
-  }
+  let mbh = mailbox_frame.header
   let off = mailbox_header_len
   let byte0 = frame[off]
   let op_code = SoeOpCode::from_uint(byte0.to_uint() & 0x7U)

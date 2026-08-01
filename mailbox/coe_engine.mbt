@@ -5,7 +5,7 @@
 /// Mailbox frame layout (ETG.1000.6):
 ///   Bytes 0-1: Length (data area only, little-endian)
 ///   Bytes 2-3: Address (station address, little-endian)
-///   Byte 4: bits [7:6]=Priority, [5:2]=reserved, [1:0]=Channel
+///   Byte 4: bits [7:6]=Priority, [5:0]=Channel
 ///   Byte 5: bit [7]=reserved, [6:4]=Counter, [3:0]=Type
 ///   Bytes 6+: Protocol-specific data
 ///
@@ -18,10 +18,6 @@
 ///   Byte 1-2: Index (little-endian)
 ///   Byte 3: Subindex
 ///   Bytes 4-7: Data (expedited) or size (normal)
-
-///|
-/// Mailbox header size in bytes.
-let mailbox_header_len : Int = 6
 
 ///|
 /// CoE header size in bytes.
@@ -42,78 +38,31 @@ fn mailbox_request_address(_station : UInt) -> UInt {
 }
 
 ///|
-/// Encode a mailbox header into 6 bytes.
-pub fn MailboxHeader::to_bytes(self : MailboxHeader) -> Bytes {
-  let buf = Buffer(size_hint=mailbox_header_len)
-  // Bytes 0-1: Length (LE)
-  buf.write_byte((self.length & 0xFFU).to_byte())
-  buf.write_byte(((self.length >> 8) & 0xFFU).to_byte())
-  // Bytes 2-3: Address (LE)
-  buf.write_byte((self.address & 0xFFU).to_byte())
-  buf.write_byte(((self.address >> 8) & 0xFFU).to_byte())
-  // Byte 4: Channel[1:0] | Priority[7:6]
-  let b4 = (self.channel & b'\x03') | ((self.priority & b'\x03') << 6)
-  buf.write_byte(b4)
-  // Byte 5: Type[3:0] | Counter[6:4], bit 7 remains reserved.
-  let b5 = self.mb_type.to_byte() | ((self.counter & b'\x07') << 4)
-  buf.write_byte(b5)
-  buf.to_bytes()
-}
-
-///|
-/// Decode a mailbox header from bytes (needs at least 6 bytes).
-pub fn MailboxHeader::from_bytes(
-  data : Bytes,
-) -> MailboxHeader raise @hal.EcError {
-  if data.length() < mailbox_header_len {
-    raise @hal.EcError::MailboxProtocol("mailbox header too short")
-  }
-  let length = data[0].to_uint() | (data[1].to_uint() << 8)
-  let address = data[2].to_uint() | (data[3].to_uint() << 8)
-  let channel = data[4] & b'\x03'
-  let priority = (data[4] >> 6) & b'\x03'
-  let type_byte = data[5] & b'\x0F'
-  let counter = (data[5] >> 4) & b'\x07'
-  let mb_type : MailboxType = match type_byte {
-    b'\x00' => Err
-    b'\x01' => AoE
-    b'\x02' => EoE
-    b'\x03' => CoE
-    b'\x04' => FoE
-    b'\x05' => SoE
-    b'\x0F' => VoE
-    _ =>
-      raise @hal.EcError::MailboxProtocol(
-        "unknown mailbox type: " + type_byte.to_int().to_string(),
-      )
-  }
-  { length, address, channel, priority, mb_type, counter }
-}
-
-///|
 /// CoE service type encoding for the CoE header.
-fn CoeService::to_uint(self : CoeService) -> UInt {
+pub fn CoeService::to_uint(self : CoeService) -> UInt {
   match self {
+    Emergency => 1U
     SdoRequest => 2U
     SdoResponse => 3U
+    TxPdo => 4U
+    RxPdo => 5U
+    TxPdoRemoteRequest => 6U
+    RxPdoRemoteRequest => 7U
     SdoInfo => 8U
-    TxPdo => 5U
-    RxPdo => 6U
-    PdoRemoteRequest => 7U
-    Emergency => 1U
   }
 }
 
 ///|
 /// Decode CoE service type from the 4-bit field.
-fn coe_service_from_uint(v : UInt) -> CoeService raise @hal.EcError {
+pub fn CoeService::from_uint(v : UInt) -> CoeService raise @hal.EcError {
   match v {
     1U => Emergency
     2U => SdoRequest
     3U => SdoResponse
-    5U => TxPdo
-    6U => RxPdo
-    7U => PdoRemoteRequest
+    4U => TxPdo
+    5U => RxPdo
+    6U => TxPdoRemoteRequest
+    7U => RxPdoRemoteRequest
     8U => SdoInfo
     _ =>
       raise @hal.EcError::MailboxProtocol(
@@ -264,12 +213,15 @@ fn SdoCommand::to_coe_service(self : SdoCommand) -> CoeService {
 ///|
 /// Decode an SDO response from a raw mailbox frame.
 pub fn decode_sdo_response(
-  data : Bytes,
+  raw : Bytes,
 ) -> (MailboxHeader, SdoResponse) raise @hal.EcError {
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(CoE)
+  let data = mailbox_frame.to_bytes()
   if data.length() < mailbox_header_len + coe_header_len + 1 {
     raise @hal.EcError::MailboxProtocol("SDO response frame too short")
   }
-  let mbh = MailboxHeader::from_bytes(data)
+  let mbh = mailbox_frame.header
   let payload_len = mbh.length.reinterpret_as_int()
   if payload_len < coe_header_len + 1 {
     raise @hal.EcError::MailboxProtocol("SDO response payload too short")
@@ -278,18 +230,17 @@ pub fn decode_sdo_response(
   if data.length() < frame_len {
     raise @hal.EcError::MailboxProtocol("SDO response truncated")
   }
-  // Verify it's a CoE mailbox
-  if mbh.mb_type != CoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox, got " + @debug.to_string(mbh.mb_type),
-    )
-  }
   let off = mailbox_header_len
   let sdo_payload_len = payload_len - coe_header_len
   // CoE header
   let coe_word = data[off].to_uint() | (data[off + 1].to_uint() << 8)
   let svc_field = (coe_word >> 12) & 0xFU
-  let _svc = coe_service_from_uint(svc_field)
+  let svc = CoeService::from_uint(svc_field)
+  if svc != SdoResponse {
+    raise @hal.EcError::MailboxProtocol(
+      "expected SDO response service, got " + @debug.to_string(svc),
+    )
+  }
   // SDO header
   let sdo_off = off + coe_header_len
   let cmd_byte = data[sdo_off]
@@ -790,12 +741,15 @@ pub(all) struct SdoInfoEntryDescription {
 ///|
 /// Decode SDO Info response frame (service=0x08).
 pub fn decode_sdo_info_response(
-  data : Bytes,
+  raw : Bytes,
 ) -> (MailboxHeader, SdoInfoResponse) raise @hal.EcError {
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(CoE)
+  let data = mailbox_frame.to_bytes()
   if data.length() < mailbox_header_len + coe_header_len + sdo_info_header_len {
     raise @hal.EcError::MailboxProtocol("SDO Info response frame too short")
   }
-  let mbh = MailboxHeader::from_bytes(data)
+  let mbh = mailbox_frame.header
   let payload_len = mbh.length.reinterpret_as_int()
   if payload_len < coe_header_len + sdo_info_header_len {
     raise @hal.EcError::MailboxProtocol("SDO Info response payload too short")
@@ -803,11 +757,6 @@ pub fn decode_sdo_info_response(
   let frame_len = mailbox_header_len + payload_len
   if data.length() < frame_len {
     raise @hal.EcError::MailboxProtocol("SDO Info response truncated")
-  }
-  if mbh.mb_type != CoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox, got " + @debug.to_string(mbh.mb_type),
-    )
   }
   let off = mailbox_header_len
   let coe_word = data[off].to_uint() | (data[off + 1].to_uint() << 8)

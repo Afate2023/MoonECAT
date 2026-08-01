@@ -278,17 +278,14 @@ pub fn encode_eoe_get_ip_req(counter : Byte, port : UInt) -> Bytes {
 }
 
 ///|
-/// Decode an EoE response from a mailbox frame (after mailbox header).
-pub fn decode_eoe_response(frame : Bytes) -> EoeResponse raise @hal.EcError {
+/// Decode an EoE response from a raw mailbox/SyncManager frame.
+pub fn decode_eoe_response(raw : Bytes) -> EoeResponse raise @hal.EcError {
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(EoE)
+  let frame = mailbox_frame.to_bytes()
   if frame.length() < mailbox_header_len + eoe_header_len {
     raise @hal.EcError::MailboxProtocol(
       "EoE frame too short: " + frame.length().to_string(),
-    )
-  }
-  let mbh = MailboxHeader::from_bytes(frame)
-  if mbh.mb_type != EoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected EoE mailbox type, got " + @debug.to_string(mbh.mb_type),
     )
   }
   let off = mailbox_header_len

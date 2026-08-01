@@ -233,10 +233,37 @@ test "address helpers - broadcast address" {
 
 ///|
 test "address helpers - auto increment address" {
-  let addr = @protocol.auto_increment_address(0U)
-  @debug.assert_eq(addr, 0U)
-  let addr2 = @protocol.auto_increment_address(3U)
-  @debug.assert_eq(addr2, 3U)
+  @debug.assert_eq(@protocol.auto_increment_address(0U), 0x0000U)
+  @debug.assert_eq(@protocol.auto_increment_address(1U), 0xFFFFU)
+  @debug.assert_eq(@protocol.auto_increment_address(2U), 0xFFFEU)
+  @debug.assert_eq(@protocol.auto_increment_address(3U), 0xFFFDU)
+}
+
+///|
+test "auto increment ADP uses two's-complement wire bytes" {
+  let address = @protocol.auto_increment_address(1U) | (0x0130U << 16)
+  let frame : @protocol.EcFrame = {
+    dst_mac: @protocol.broadcast_mac,
+    src_mac: @protocol.default_master_mac,
+    pdus: [
+      {
+        header: {
+          command: APRD,
+          index: b'\x01',
+          address,
+          len_flags: 1U,
+          irq: 0U,
+        },
+        data: b"\x00",
+        wkc: 0U,
+      },
+    ],
+  }
+  let wire = frame.encode()
+  @debug.assert_eq(wire[18], b'\xFF')
+  @debug.assert_eq(wire[19], b'\xFF')
+  @debug.assert_eq(wire[20], b'\x30')
+  @debug.assert_eq(wire[21], b'\x01')
 }
 
 ///|

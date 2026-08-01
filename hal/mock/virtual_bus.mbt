@@ -12,6 +12,13 @@ pub fn VirtualBus::new(slaves : Array[VirtualSlave]) -> VirtualBus {
 }
 
 ///|
+/// Convert a wire-format auto-increment ADP back to a zero-based bus position.
+fn auto_increment_position(address : UInt) -> Int {
+  let adp = address & 0xFFFFU
+  ((0x10000U - adp) & 0xFFFFU).reinterpret_as_int()
+}
+
+///|
 /// Process a raw Ethernet frame through the virtual bus.
 /// Decodes the frame, routes each PDU, updates WKC, and re-encodes.
 pub fn VirtualBus::process_frame(
@@ -49,7 +56,7 @@ fn VirtualBus::process_pdu(
   match cmd {
     // Auto-increment commands
     @protocol.EcCommand::APRD => {
-      let position = (addr & 0xFFFFU).reinterpret_as_int()
+      let position = auto_increment_position(addr)
       let offset = ((addr >> 16) & 0xFFFFU).reinterpret_as_int()
       for slave in self.slaves {
         if slave.position == position {
@@ -63,7 +70,7 @@ fn VirtualBus::process_pdu(
       }
     }
     @protocol.EcCommand::APWR => {
-      let position = (addr & 0xFFFFU).reinterpret_as_int()
+      let position = auto_increment_position(addr)
       let offset = ((addr >> 16) & 0xFFFFU).reinterpret_as_int()
       for slave in self.slaves {
         if slave.position == position {
@@ -74,7 +81,7 @@ fn VirtualBus::process_pdu(
       }
     }
     @protocol.EcCommand::APRW => {
-      let position = (addr & 0xFFFFU).reinterpret_as_int()
+      let position = auto_increment_position(addr)
       let offset = ((addr >> 16) & 0xFFFFU).reinterpret_as_int()
       for slave in self.slaves {
         if slave.position == position {

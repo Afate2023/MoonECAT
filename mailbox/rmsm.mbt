@@ -1,24 +1,28 @@
 ///|
-/// Resilient Mailbox State Machine (RMSM) per ETG.1000.4.
-/// Tracks per-slave mailbox state, manages counter correlation,
-/// and provides retry logic for lost/stale frames.
+/// MainDevice-side mailbox session tracker.
+///
+/// `Rmsm` is retained as a legacy API name. It is not the SubDevice Receive
+/// Mailbox State Machine from ETG.1000.4, and reset/reset_for_retry only reset
+/// this local transaction tracker; they never reset an ESC state machine.
+/// MainDevice transmit Cnt and SubDevice transmit Cnt are independent.
 
 ///|
 /// RMSM state for a single slave's mailbox channel.
 pub(all) enum RmsmState {
   /// No pending transaction; ready to send.
   Idle
-  /// Waiting for a response with the given counter value.
+  /// Waiting for a response after sending with the given MainDevice counter.
   WaitingForResponse(Byte)
   /// Transaction completed with an error; can be reset.
   Error(String)
 } derive(Eq, Debug)
 
 ///|
-/// Per-slave Resilient Mailbox State Machine.
-/// Manages counter correlation and repeat detection.
+/// Per-slave MainDevice mailbox session state.
+/// Manages the local transmit sequence, independent receive repeat detection,
+/// timeout budget, and SyncManager Repeat Request/RepeatAck recovery.
 pub(all) struct Rmsm {
-  /// Mailbox counter (cycles 1-7).
+  /// MainDevice transmit mailbox counter (cycles 1-7).
   counter : MailboxCounter
   /// Current state.
   mut state : RmsmState
@@ -26,13 +30,19 @@ pub(all) struct Rmsm {
   max_retries : Int
   /// Current retry count within the active transaction.
   mut retries : Int
-  /// Last received counter value for repeat detection.
+  /// Last SubDevice transmit counter value for repeat detection. This sequence
+  /// is independent from `counter`.
   mut last_recv_counter : Byte
   /// Current Repeat Request toggle value tracked for mailbox-read replay.
   mut repeat_request : Bool
   /// True while waiting for the SubDevice to mirror RepeatAck.
   mut awaiting_repeat_ack : Bool
 } derive(Debug)
+
+///|
+/// Preferred name for the MainDevice-side mailbox session tracker.
+/// `Rmsm` remains available for source compatibility.
+pub type MailboxSession = Rmsm
 
 ///|
 pub fn Rmsm::new(max_retries? : Int = 3) -> Rmsm {
@@ -53,7 +63,8 @@ pub fn Rmsm::new(max_retries? : Int = 3) -> Rmsm {
 pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
   guard self.state is Idle else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot begin transaction in state " + @debug.to_string(self.state),
+      "mailbox session: cannot begin transaction in state " +
+      @debug.to_string(self.state),
     )
   }
   let cnt = self.counter.next()
@@ -69,7 +80,7 @@ pub fn Rmsm::begin_transaction(self : Rmsm) -> Byte raise @hal.EcError {
 pub fn Rmsm::begin_retry_transaction(self : Rmsm) -> Byte raise @hal.EcError {
   guard self.state is Idle else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot begin retry transaction in state " +
+      "mailbox session: cannot begin retry transaction in state " +
       @debug.to_string(self.state),
     )
   }
@@ -80,30 +91,25 @@ pub fn Rmsm::begin_retry_transaction(self : Rmsm) -> Byte raise @hal.EcError {
 }
 
 ///|
-/// Validate a received mailbox response counter.
+/// Validate a received SubDevice mailbox counter.
 /// Returns true if this is a valid (new) response; false if it's a stale or
 /// repeat frame that the caller should discard and continue polling.
 pub fn Rmsm::validate_response(
   self : Rmsm,
   recv_counter : Byte,
 ) -> Bool raise @hal.EcError {
-  guard self.state is WaitingForResponse(expected) else {
+  guard self.state is WaitingForResponse(_) else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: unexpected response in state " + @debug.to_string(self.state),
+      "mailbox session: unexpected response in state " +
+      @debug.to_string(self.state),
     )
   }
   // Check for repeat (same counter as last received)
   if recv_counter == self.last_recv_counter && recv_counter != b'\x00' {
     return false // Repeat frame, discard
   }
-  // Validate counter matches expectation
-  if recv_counter != expected && recv_counter != b'\x00' {
-    // A non-zero unexpected counter is most often a stale frame from an
-    // earlier transaction that was still queued in the mailbox. Keep waiting
-    // for the current transaction's response and let the caller discard it.
-    self.last_recv_counter = recv_counter
-    return false
-  }
+  // ETG.1000.4 defines MainDevice and SubDevice Cnt sequences independently;
+  // a response is not required to echo the request Cnt.
   self.last_recv_counter = recv_counter
   self.state = Idle
   self.awaiting_repeat_ack = false
@@ -119,7 +125,7 @@ pub fn Rmsm::begin_read_repeat(
 ) -> Byte raise @hal.EcError {
   guard self.state is WaitingForResponse(_) else {
     raise @hal.EcError::MailboxProtocol(
-      "RMSM: cannot request mailbox repeat in state " +
+      "mailbox session: cannot request mailbox repeat in state " +
       @debug.to_string(self.state),
     )
   }
@@ -156,7 +162,9 @@ pub fn Rmsm::record_timeout(self : Rmsm) -> Bool {
   self.retries = self.retries + 1
   if self.retries > self.max_retries {
     self.state = Error(
-      "RMSM: retries exhausted (" + self.max_retries.to_string() + ")",
+      "mailbox session: retries exhausted (" +
+      self.max_retries.to_string() +
+      ")",
     )
     false
   } else {
@@ -166,15 +174,16 @@ pub fn Rmsm::record_timeout(self : Rmsm) -> Bool {
 }
 
 ///|
-/// Reset the RMSM to Idle between retry attempts while preserving the retry
-/// budget already spent by the caller.
+/// Reset this local tracker to Idle between retry attempts while preserving
+/// the retry budget already spent by the caller. This does not reset the ESC.
 pub fn Rmsm::reset_for_retry(self : Rmsm) -> Unit {
   self.state = Idle
   self.awaiting_repeat_ack = false
 }
 
 ///|
-/// Reset the RMSM to Idle state, discarding any pending transaction.
+/// Reset this local tracker to Idle, discarding any pending transaction.
+/// This does not reset the SubDevice Receive Mailbox State Machine or ESM.
 pub fn Rmsm::reset(self : Rmsm) -> Unit {
   self.state = Idle
   self.retries = 0
@@ -182,7 +191,7 @@ pub fn Rmsm::reset(self : Rmsm) -> Unit {
 }
 
 ///|
-/// Check if the RMSM is ready for a new transaction.
+/// Check if the local mailbox session is ready for a new transaction.
 pub fn Rmsm::is_idle(self : Rmsm) -> Bool {
   self.state is Idle
 }

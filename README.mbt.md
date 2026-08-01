@@ -26,7 +26,7 @@ MoonBit project, add it to the `import` field of `moon.pkg`.
 | `mokomoking2501/MoonECAT/hal/native` | Windows Npcap and Linux Raw Socket native NIC backends |
 | `mokomoking2501/MoonECAT/hal/mcu` | MCU-oriented HAL stubs and event bridge types |
 | `mokomoking2501/MoonECAT/protocol` | EtherCAT frame/PDU codec, addressing, discovery, ESM, EEPROM, PDO, DC, mailbox transport |
-| `mokomoking2501/MoonECAT/mailbox` | CoE/SDO, FoE, SoE, EoE frames, SII parsing, SM/FMMU mapping, Emergency, RMSM |
+| `mokomoking2501/MoonECAT/mailbox` | CoE/SDO, FoE, SoE, EoE frames, SII parsing, SM/FMMU mapping, Emergency, MainDevice mailbox session/repeat recovery |
 | `mokomoking2501/MoonECAT/runtime` | Scan, validate, run, scheduler, telemetry, monitors, verdicts, diagnosis, ESI/ENI projection |
 | `mokomoking2501/MoonECAT/runtime/analysis` | DC jitter, PDO auto-tune, topology health, cycle performance, communication quality analysis |
 | `mokomoking2501/MoonECAT/runtime/hil` | HIL cycle hooks, loop export, and HIL task types |

@@ -16,8 +16,9 @@ pub(all) enum AddressType {
 /// Position 0 = first slave, 1 = second slave, etc.
 pub fn auto_increment_address(position : UInt) -> UInt {
   // PDU address is serialized as ADP then ADO, and codec writes the 32-bit value as LE.
-  // Keep ADP/position in the low 16 bits so the wire bytes are [ADP][ADO].
-  position & 0xFFFFU
+  // ADP is the low-16-bit two's complement of the zero-based bus position:
+  // 0 -> 0x0000, 1 -> 0xFFFF, 2 -> 0xFFFE.
+  (0x10000U - (position & 0xFFFFU)) & 0xFFFFU
 }
 
 ///|

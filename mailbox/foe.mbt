@@ -261,17 +261,15 @@ pub fn encode_foe_ack(counter : Byte, packet_number : UInt) -> Bytes {
 ///|
 /// Decode a FoE response from a raw mailbox frame.
 pub fn decode_foe_response(
-  data : Bytes,
+  raw : Bytes,
 ) -> (MailboxHeader, FoeResponse) raise @hal.EcError {
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(FoE)
+  let data = mailbox_frame.to_bytes()
   if data.length() < mailbox_header_len + 2 {
     raise @hal.EcError::MailboxProtocol("FoE response frame too short")
   }
-  let mbh = MailboxHeader::from_bytes(data)
-  if mbh.mb_type != FoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected FoE mailbox, got " + @debug.to_string(mbh.mb_type),
-    )
-  }
+  let mbh = mailbox_frame.header
   let payload_len = mbh.length.reinterpret_as_int()
   if payload_len < 2 {
     raise @hal.EcError::MailboxProtocol("FoE response payload too short")

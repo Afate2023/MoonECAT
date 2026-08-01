@@ -657,14 +657,11 @@ test "integration/sdo_upload expedited via FP mock" {
 }
 
 ///|
-test "integration/sdo_upload discards stale counter mismatch frame" {
+test "integration/sdo_upload accepts independent SubDevice counter" {
   let expected = Bytes::from_array([b'\xDE', b'\xAD', b'\xBE', b'\xEF'])
   let (raw_nic, nic) = mailbox_mock_session([
     build_sdo_upload_expedited_resp(
       b'\x05', test_station, 0x1018U, b'\x01', expected,
-    ),
-    build_sdo_upload_expedited_resp(
-      b'\x01', test_station, 0x1018U, b'\x01', expected,
     ),
   ])
   let rmsm = @mailbox.Rmsm::new()
@@ -678,7 +675,7 @@ test "integration/sdo_upload discards stale counter mismatch frame" {
     test_timeout,
   )
   @debug.assert_eq(result, expected)
-  @debug.assert_eq(raw_nic.response_index, 2)
+  @debug.assert_eq(raw_nic.response_index, 1)
 }
 
 // ========== SDO Segmented Upload ==========

@@ -106,11 +106,9 @@ async fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_cyclic_sdo_read_r
     },
     "sdo-read.prepare",
   )
-  // Resilient Mailbox State Machine: per-SDO mailbox correlation/retry state,
-  // not the slave EtherCAT State Machine (ESM). reset() returns the local
-  // transaction to Idle while mailbox-counter and Datagram Index sequences
-  // continue.
-  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  // MainDevice-side mailbox session. reset() only returns this local tracker
+  // to Idle; it does not reset the SubDevice RMSM or EtherCAT ESM.
+  let rmsm = @mailbox.MailboxSession::new(max_retries=0)
   let samples : Array[CyclicSdoReadSample] = []
   for cycle in 0..<settings.cycles {
     let payload_result : Result[Bytes, @hal.EcError] = Result::Ok(
@@ -468,11 +466,9 @@ async fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_cyclic_sdo_write_
     },
     "sdo-write.prepare",
   )
-  // Resilient Mailbox State Machine: per-SDO mailbox correlation/retry state,
-  // not the slave EtherCAT State Machine (ESM). reset() returns the local
-  // transaction to Idle while mailbox-counter and Datagram Index sequences
-  // continue.
-  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  // MainDevice-side mailbox session. reset() only returns this local tracker
+  // to Idle; it does not reset the SubDevice RMSM or EtherCAT ESM.
+  let rmsm = @mailbox.MailboxSession::new(max_retries=0)
   let samples : Array[CyclicSdoWriteSample] = []
   for cycle in 0..<settings.cycles {
     let write_result : Result[Unit, @hal.EcError] = Result::Ok(

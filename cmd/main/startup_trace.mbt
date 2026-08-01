@@ -77,8 +77,7 @@ let startup_trace_sdo_max_attempts : Int = 3
 fn startup_trace_should_retry_od_read(err : @hal.EcError) -> Bool {
   match err {
     @hal.EcError::MailboxTimeout => true
-    @hal.EcError::MailboxProtocol(message) =>
-      message.contains("stale") || message.contains("counter mismatch")
+    @hal.EcError::MailboxProtocol(message) => message.contains("stale")
     _ => false
   }
 }
@@ -544,7 +543,9 @@ fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_sdo_upload_once(
     }
     return resp.data
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|

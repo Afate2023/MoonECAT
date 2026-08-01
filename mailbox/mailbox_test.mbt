@@ -1335,7 +1335,7 @@ test "decode_sdo_response detects abort" {
     } else if i == 6 {
       b'\x00'
     } else if i == 7 {
-      b'\x20' // SDO Request service (2) << 4
+      b'\x30' // SDO Response service (3) << 4
     } else if i == 8 {
       b'\x80' // abort command
     } else if i == 12 {
@@ -1744,16 +1744,18 @@ test "Rmsm validate_response accepts counter 0 (slave doesn't support)" {
 }
 
 ///|
-test "Rmsm validate_response treats counter mismatch as stale frame" {
+test "Rmsm accepts independent SubDevice response counter" {
   let rmsm = @mailbox.Rmsm::new()
-  let cnt = rmsm.begin_transaction()
-  let wrong_cnt = if cnt == b'\x07' { b'\x01' } else { cnt + b'\x01' }
-  let is_new = rmsm.validate_response(wrong_cnt)
-  assert_true(!is_new)
-  assert_true(!rmsm.is_idle())
-  @debug.assert_eq(rmsm.current_counter(), cnt)
-  assert_true(rmsm.validate_response(cnt))
+  let tx_counter = rmsm.begin_transaction()
+  let rx_counter = if tx_counter == b'\x07' {
+    b'\x01'
+  } else {
+    tx_counter + b'\x01'
+  }
+  assert_true(rmsm.validate_response(rx_counter))
   assert_true(rmsm.is_idle())
+  let next_tx_counter = rmsm.begin_transaction()
+  @debug.assert_eq(next_tx_counter, tx_counter + b'\x01')
 }
 
 ///|
@@ -2906,7 +2908,7 @@ test "MailboxType to_byte VoE" {
 // ===== Coverage: mailbox/coe_engine.mbt 鈥?CoeService and SdoCommand edge cases =====
 
 ///|
-test "decode_sdo_response with Emergency service" {
+test "decode_sdo_response rejects Emergency service" {
   // Build CoE frame with service=Emergency(1) in CoE header
   // Mailbox header: length=10 (coe_hdr=2 + sdo_hdr=8), type=CoE(3), counter=1
   let frame = Bytes::from_array([
@@ -2924,27 +2926,30 @@ test "decode_sdo_response with Emergency service" {
     // Data (4 bytes)
      b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  // 0x40 has bits[7:5]=010 鈫?UploadResponse in the command decoder
-  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
-  @debug.assert_eq(resp.command, @mailbox.SdoCommand::UploadResponse)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
 ///|
-test "decode_sdo_response with TxPdo service" {
-  // Build CoE frame with service=TxPdo(5)
+test "decode_sdo_response rejects RxPdo service" {
+  // Build CoE frame with service=RxPdo(5)
   let frame = Bytes::from_array([
     b'\x0A', b'\x00', // length = 10
      b'\x00', b'\x00', // address = 0
      b'\x00', b'\x13', // type=CoE(3), counter=1
-    // CoE header: service=TxPdo(5) in bits[15:12] 鈫?word = 0x5000
+    // CoE header: service=RxPdo(5) in bits[15:12] 鈫?word = 0x5000
      b'\x00', b'\x50',
     // SDO header: cmd=DownloadResponse (0x60)
      b'\x60', b'\x01', b'\x10', // index
      b'\x00', // subindex
      b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
-  @debug.assert_eq(resp.command, @mailbox.SdoCommand::DownloadResponse)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
 ///|
@@ -2962,7 +2967,7 @@ test "decode_sdo_response with invalid CoE service raises" {
 }
 
 ///|
-test "decode_sdo_response DownloadRequest command" {
+test "decode_sdo_response rejects SDO Request service" {
   // SDO command specifier bits[7:5] = 001 鈫?DownloadRequest (0x21)
   let frame = Bytes::from_array([
     b'\x0A', b'\x00', b'\x00', b'\x00', b'\x00', b'\x13', // CoE
@@ -2970,8 +2975,10 @@ test "decode_sdo_response DownloadRequest command" {
      b'\x21', // DownloadRequest: bits[7:5]=001
      b'\x01', b'\x10', b'\x00', b'\x00', b'\x00', b'\x00', b'\x00',
   ])
-  let (_mbh, resp) = @mailbox.decode_sdo_response(frame)
-  @debug.assert_eq(resp.command, @mailbox.SdoCommand::DownloadRequest)
+  let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
+    err => Result::Err(err)
+  }
+  assert_true(result is Err(@hal.EcError::MailboxProtocol(_)))
 }
 
 ///|
@@ -2980,7 +2987,7 @@ test "decode_sdo_response AbortTransfer command" {
   let frame = Bytes::from_array([
     b'\x0A', b'\x00', // length = 10
      b'\x00', b'\x00', b'\x00', b'\x13', // CoE
-     b'\x00', b'\x20', // CoE header: SdoRequest(2)
+     b'\x00', b'\x30', // CoE header: SdoResponse(3)
      b'\x80', // AbortTransfer: bits[7:5]=100
      b'\x01', b'\x10', b'\x00', // index=0x1001, subindex=0
      b'\x00', b'\x00', b'\x02', b'\x06', // abort code = 0x06020000
@@ -2988,8 +2995,7 @@ test "decode_sdo_response AbortTransfer command" {
   let result = Result::Ok(@mailbox.decode_sdo_response(frame)) catch {
     err => Result::Err(err)
   }
-  // Should raise SdoAbort
-  assert_true(result is Err(_))
+  assert_true(result is Err(@hal.EcError::SdoAbort(_)))
 }
 
 // ===== Coverage: mailbox/foe.mbt 鈥?decode_foe_response edge cases =====
@@ -4196,7 +4202,7 @@ test "decode_sdo_response truncated frame raises error" {
     e => Err(e)
   }
   assert_true(
-    result is Err(@hal.EcError::MailboxProtocol("SDO response truncated")),
+    result is Err(@hal.EcError::MailboxProtocol("mailbox frame truncated")),
   )
 }
 
