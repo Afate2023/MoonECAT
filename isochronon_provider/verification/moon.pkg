@@ -1,0 +1,9 @@
+import {
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/MoonECAT/isochronon_provider/assurance",
+  "mokomoking2501/lockwire/capture/pcapng",
+  "mokomoking2501/lockwire/trace",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string",
+}

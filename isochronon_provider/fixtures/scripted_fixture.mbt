@@ -94,7 +94,11 @@ fn fixture_padded_frame(frame : @protocol.EcFrame) -> Bytes {
     encoded
   } else {
     Bytes::makei(60, fn(index) {
-      if index < encoded.length() { encoded[index] } else { b'\x00' }
+      if index < encoded.length() {
+        encoded[index]
+      } else {
+        b'\x00'
+      }
     })
   }
 }
@@ -115,9 +119,7 @@ fn fixture_response_data(
       (Bytes::new(1), state.devices.length().reinterpret_as_uint())
     }
     @protocol.APWR => {
-      let position = @protocol.address_station(
-        request.header.address,
-      ).reinterpret_as_int()
+      let position = @protocol.address_station(request.header.address).reinterpret_as_int()
       if position < 0 || position >= state.devices.length() {
         raise @isochronon_provider.TransportFailure(
           "fixture APWR position is outside observed topology",
@@ -125,8 +127,7 @@ fn fixture_response_data(
       }
       state.accessed_registers.push(register)
       if register == @protocol.reg_sii_control && request.data.length() == 6 {
-        let word = request.data[2].to_uint() |
-          (request.data[3].to_uint() << 8)
+        let word = request.data[2].to_uint() | (request.data[3].to_uint() << 8)
         state.current_sii_words[position] = word
         state.accessed_sii_words.push(word)
       } else if register != @protocol.reg_sii_config &&
@@ -138,9 +139,7 @@ fn fixture_response_data(
       (fixture_copy_bytes(request.data), 1U)
     }
     @protocol.APRD => {
-      let position = @protocol.address_station(
-        request.header.address,
-      ).reinterpret_as_int()
+      let position = @protocol.address_station(request.header.address).reinterpret_as_int()
       if position < 0 || position >= state.devices.length() {
         raise @isochronon_provider.TransportFailure(
           "fixture APRD position is outside observed topology",
@@ -152,7 +151,8 @@ fn fixture_response_data(
       } else if register == @protocol.reg_sii_data &&
         (request.data.length() == 4 || request.data.length() == 8) {
         let raw = state.devices[position].raw()
-        let byte_offset = (state.current_sii_words[position] - 8U).reinterpret_as_int() * 2
+        let byte_offset = (state.current_sii_words[position] - 8U).reinterpret_as_int() *
+          2
         if byte_offset < 0 || byte_offset + request.data.length() > raw.length() {
           raise @isochronon_provider.TransportFailure(
             "fixture SII data request escaped identity words 8..15",
@@ -193,15 +193,33 @@ fn fixture_build_response(
   }
   let request = frame.pdus[0]
   let (data, wkc) = fixture_response_data(state, request)
+  let response_address = match request.header.command {
+    @protocol.BRD | @protocol.APRD | @protocol.APWR =>
+      (@protocol.address_offset(request.header.address) << 16) |
+      (
+        (
+          @protocol.address_station(request.header.address) +
+          state.devices.length().reinterpret_as_uint()
+        ) &
+        0xFFFFU
+      )
+    _ => request.header.address
+  }
   fixture_padded_frame({
     dst_mac: FixedArray::makei(6, fn(index) { frame.dst_mac[index] }),
-    src_mac: FixedArray::makei(6, fn(index) { frame.src_mac[index] }),
+    src_mac: FixedArray::makei(6, fn(index) {
+      if index == 0 {
+        (frame.src_mac[index].to_int() | 0x02).to_byte()
+      } else {
+        frame.src_mac[index]
+      }
+    }),
     pdus: [
       {
         header: {
           command: request.header.command,
           index: request.header.index,
-          address: request.header.address,
+          address: response_address,
           len_flags: data.length().reinterpret_as_uint(),
           irq: 0U,
         },
@@ -267,9 +285,7 @@ fn ScriptedIdentityState::poll(
       captured_length=payload.length(),
       original_length=payload.length(),
       logical_length=payload.length(),
-      timestamp=@clock.DomainInstant::new(
-        domain=self.domain, ns=self.now_ns,
-      ),
+      timestamp=@clock.DomainInstant::new(domain=self.domain, ns=self.now_ns),
       direction=@runtime.UnknownDirection,
       backend_sequence=self.sequence,
       provenance=@runtime.CopiedBuffer,
@@ -321,9 +337,9 @@ pub fn IdentityFixtureHarness::new(
   let port = @isochronon_provider.IdentityLinkPort::new(
     source~,
     now_fn=fn() { @clock.DomainInstant::new(domain~, ns=state.now_ns) },
-    submit_fn=(payload) => state.submit(payload),
-    poll_fn=(deadline) => state.poll(deadline),
-    sleep_until_fn=(deadline) => {
+    submit_fn=payload => state.submit(payload),
+    poll_fn=deadline => state.poll(deadline),
+    sleep_until_fn=deadline => {
       if deadline.domain() != state.domain || deadline.ns() < state.now_ns {
         raise @isochronon_provider.InvalidContext(
           "fixture sleep deadline is invalid",

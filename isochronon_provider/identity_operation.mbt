@@ -204,11 +204,19 @@ fn valid_response_frame_context(
   frame : @protocol.EcFrame,
   context : EthernetFrameContext,
 ) -> Bool {
+  let current = context.current_mac()
+  let returned_source = Bytes::makei(6, index => {
+    if index == 0 {
+      (current[index].to_int() | 0x02).to_byte()
+    } else {
+      current[index]
+    }
+  })
   fixed_mac_equals_bytes(
     frame.dst_mac,
     Bytes::from_array(@protocol.broadcast_mac),
   ) &&
-  fixed_mac_equals_bytes(frame.src_mac, context.current_mac())
+  fixed_mac_equals_bytes(frame.src_mac, returned_source)
 }
 
 ///|
@@ -225,6 +233,11 @@ fn response_matches_request(
     return false
   }
   match command {
+    @protocol.BRD =>
+      @protocol.address_offset(response.header.address) ==
+      @protocol.address_offset(address) &&
+      @protocol.address_station(response.header.address) ==
+      ((@protocol.address_station(address) + response.wkc) & 0xFFFFU)
     @protocol.APRD | @protocol.APWR =>
       @protocol.address_offset(response.header.address) ==
       @protocol.address_offset(address)

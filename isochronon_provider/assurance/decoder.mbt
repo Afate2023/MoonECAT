@@ -1,6 +1,5 @@
 ///|
-pub let identity_assurance_scope : String =
-  "moonecat.inspect-bus-identity"
+pub let identity_assurance_scope : String = "moonecat.inspect-bus-identity"
 
 ///|
 pub(all) suberror IdentityAssuranceDecodeError {
@@ -44,11 +43,11 @@ fn decode_length_framed_fields(
     }
     offset = offset + 1
     if length < 0 || offset + length > bytes.length() {
-      raise InvalidIdentityResultArtifact("field payload exceeds artifact bounds")
+      raise InvalidIdentityResultArtifact(
+        "field payload exceeds artifact bounds",
+      )
     }
-    let field_bytes = Bytes::makei(length, fn(index) {
-      bytes[offset + index]
-    })
+    let field_bytes = Bytes::makei(length, fn(index) { bytes[offset + index] })
     let field = @utf8.decode(field_bytes) catch {
       _ => raise InvalidIdentityResultArtifact("field payload is not UTF-8")
     }
@@ -125,9 +124,9 @@ fn decoder_valid_optional_decimal(value : String) -> Bool {
     return false
   }
   decoder_valid_decimal(
-    @utf8.decode(Bytes::makei(bytes.length() - 5, fn(index) {
-      bytes[index + 5]
-    })) catch {
+    @utf8.decode(
+      Bytes::makei(bytes.length() - 5, fn(index) { bytes[index + 5] }),
+    ) catch {
       _ => return false
     },
     6,
@@ -159,7 +158,9 @@ fn consume_section(
   max_count : Int,
 ) -> (Int, Int) raise IdentityAssuranceDecodeError {
   if cursor + 1 >= fields.length() || fields[cursor] != label {
-    raise InvalidIdentityResultArtifact("missing or reordered " + label + " section")
+    raise InvalidIdentityResultArtifact(
+      "missing or reordered " + label + " section",
+    )
   }
   let count = decode_count(fields[cursor + 1])
   if count < 0 || count > max_count {
@@ -182,7 +183,8 @@ fn decode_source(
     "fault-fixture" => @isochronon_provider.FaultFixture
     "native-contract-fixture" => @isochronon_provider.NativeContractFixture
     "runtime-unverified" => @isochronon_provider.RuntimeUnverified
-    _ => raise InvalidIdentityResultArtifact("unknown provider execution source")
+    _ =>
+      raise InvalidIdentityResultArtifact("unknown provider execution source")
   }
 }
 
@@ -239,7 +241,8 @@ pub fn decode_identity_assurance(
   result : @isochronon_provider.InspectBusIdentityResult,
 ) -> DecodedIdentityAssurance {
   try! decode_identity_assurance_artifact(
-    result.canonical_bytes(), expected_digest=result.digest(),
+    result.canonical_bytes(),
+    expected_digest=result.digest(),
   )
 }
 
@@ -261,7 +264,9 @@ pub fn decode_identity_assurance_artifact(
     !decoder_valid_digest(fields[1]) ||
     !decoder_valid_digest(fields[3]) ||
     !decoder_valid_digest(fields[4]) {
-    raise InvalidIdentityResultArtifact("result header or pinned digest is invalid")
+    raise InvalidIdentityResultArtifact(
+      "result header or pinned digest is invalid",
+    )
   }
   let expected_count = decode_count(fields[2])
   if expected_count <= 0 || expected_count > 64 {
@@ -311,7 +316,9 @@ pub fn decode_identity_assurance_artifact(
       match_label != "model-or-revision-mismatch" &&
       match_label != "unit-serial-mismatch" &&
       match_label != "no-selected-profile" {
-      raise InvalidIdentityResultArtifact("observed profile match label is invalid")
+      raise InvalidIdentityResultArtifact(
+        "observed profile match label is invalid",
+      )
     }
     if issue_count == 0 &&
       (match_label != "exact-profile-match" || fields[base + 6] == "none") {
@@ -328,10 +335,12 @@ pub fn decode_identity_assurance_artifact(
   for index in 0..<effect_count {
     let base = after_issues + 2 + index * 5
     let kind = fields[base]
-    if (kind != "probe-bus-population" &&
-      kind != "observe-sii-controller-status" &&
-      kind != "read-identity-metadata" &&
-      kind != "mutate-volatile-sii-controller") ||
+    if (
+        kind != "probe-bus-population" &&
+        kind != "observe-sii-controller-status" &&
+        kind != "read-identity-metadata" &&
+        kind != "mutate-volatile-sii-controller"
+      ) ||
       !decoder_valid_optional_decimal(fields[base + 1]) ||
       !decoder_valid_decimal(fields[base + 2], 6) ||
       !decoder_valid_digest(fields[base + 3]) ||
@@ -351,12 +360,14 @@ pub fn decode_identity_assurance_artifact(
   for index in 0..<trace_count {
     let base = after_echoes + 2 + index * 5
     let kind = fields[base]
-    if (kind != "policy-bound" &&
-      kind != "transaction-submitted" &&
-      kind != "observation-ignored" &&
-      kind != "response-accepted" &&
-      kind != "sii-status-polled" &&
-      kind != "retry-scheduled") ||
+    if (
+        kind != "policy-bound" &&
+        kind != "transaction-submitted" &&
+        kind != "observation-ignored" &&
+        kind != "response-accepted" &&
+        kind != "sii-status-polled" &&
+        kind != "retry-scheduled"
+      ) ||
       !decoder_valid_optional_decimal(fields[base + 1]) ||
       fields[base + 2].is_empty() ||
       !decoder_valid_decimal(fields[base + 3], 19) ||
@@ -364,10 +375,14 @@ pub fn decode_identity_assurance_artifact(
       raise InvalidIdentityResultArtifact("identity trace event is invalid")
     }
   }
-  if (issue_count == 0 && identity_strength ==
-    @isochronon_provider.NoIdentityAssurance) ||
-    (issue_count > 0 && identity_strength !=
-    @isochronon_provider.NoIdentityAssurance) {
+  if (
+      issue_count == 0 &&
+      identity_strength == @isochronon_provider.NoIdentityAssurance
+    ) ||
+    (
+      issue_count > 0 &&
+      identity_strength != @isochronon_provider.NoIdentityAssurance
+    ) {
     raise InvalidIdentityResultArtifact(
       "topology issues and identity strength are inconsistent",
     )

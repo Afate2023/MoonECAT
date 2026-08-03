@@ -28,7 +28,8 @@ fn assurance_expected() -> @isochronon_provider.ExpectedBusTopology {
     expected_profile_digest=profile.digest(),
   )
   let catalog = try! @device_profile.DeviceProfileCatalog::activate(
-    @device_profile.DeviceProfilePreview::new([candidate]), [selection],
+    @device_profile.DeviceProfilePreview::new([candidate]),
+    [selection],
   )
   let config = try! @device_profile.MoonEcatDeviceConfig::new(
     configured_station_address=0x1001U,
@@ -48,7 +49,9 @@ fn assurance_expected() -> @isochronon_provider.ExpectedBusTopology {
 }
 
 ///|
-fn assurance_result(product_code : UInt) -> @isochronon_provider.InspectBusIdentityResult {
+fn assurance_result(
+  product_code : UInt,
+) -> @isochronon_provider.InspectBusIdentityResult {
   let domain = @clock.DomainId::new(name="assurance-fixture")
   let mac = b"\x02\x01\x02\x03\x04\x05"
   let harness = try! @fixtures.IdentityFixtureHarness::new(
@@ -83,28 +86,35 @@ test "assurance decoder normalizes typed facts but never self-issues a claim" {
   let matched = decode_identity_assurance(matched_result)
   @debug.assert_eq(matched.scope(), identity_assurance_scope)
   @debug.assert_eq(
-    matched.disposition(), ProtocolFactsMatchAwaitingExternalEvidence,
+    matched.disposition(),
+    ProtocolFactsMatchAwaitingExternalEvidence,
   )
-  @debug.assert_eq(matched.identity_strength(), @isochronon_provider.ModelAndTopology)
+  @debug.assert_eq(
+    matched.identity_strength(),
+    @isochronon_provider.ModelAndTopology,
+  )
   @debug.assert_eq(matched.external_evidence_complete(), false)
   @debug.assert_eq(matched.claim_eligible(), false)
   @debug.assert_eq(matched.result_digest().length(), 64)
   @debug.assert_eq(matched.expected_count(), 1)
   @debug.assert_eq(matched.transaction_count() > 0, true)
   let decoded_from_bytes = try! decode_identity_assurance_artifact(
-    matched_result.canonical_bytes(), expected_digest=matched_result.digest(),
+    matched_result.canonical_bytes(),
+    expected_digest=matched_result.digest(),
   )
   @debug.assert_eq(decoded_from_bytes.result_digest(), matched.result_digest())
 
-  let wrong_digest : Result[DecodedIdentityAssurance, IdentityAssuranceDecodeError] =
-    Result::Ok(
-      decode_identity_assurance_artifact(
-        matched_result.canonical_bytes(),
-        expected_digest="0000000000000000000000000000000000000000000000000000000000000000",
-      ),
-    ) catch {
-      error => Result::Err(error)
-    }
+  let wrong_digest : Result[
+    DecodedIdentityAssurance,
+    IdentityAssuranceDecodeError,
+  ] = Result::Ok(
+    decode_identity_assurance_artifact(
+      matched_result.canonical_bytes(),
+      expected_digest="0000000000000000000000000000000000000000000000000000000000000000",
+    ),
+  ) catch {
+    error => Result::Err(error)
+  }
   guard wrong_digest is Err(InvalidIdentityResultArtifact(_)) else {
     fail("expected canonical result digest mismatch rejection")
   }

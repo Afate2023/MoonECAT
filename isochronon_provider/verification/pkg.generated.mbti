@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/isochronon_provider/verification"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn identity_tshark_fields() -> Array[String]
+
+pub fn verify_identity_external_evidence(result_bytes~ : Bytes, result_digest~ : String, trace_bytes~ : Bytes, trace_digest~ : String, capture_bytes~ : Bytes, capture_digest~ : String, capture_interface~ : String, tshark_stdout~ : Bytes, expected_topology_digest~ : String, expected_policy_digest~ : String) -> IdentityExternalEvidenceReport raise IdentityExternalEvidenceError
+
+// Errors
+pub(all) suberror IdentityExternalEvidenceError {
+  InvalidExternalIdentityEvidence(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub struct IdentityExternalEvidenceReport {
+  // private fields
+}
+pub fn IdentityExternalEvidenceReport::capture_digest(Self) -> String
+pub fn IdentityExternalEvidenceReport::detail(Self) -> String
+pub fn IdentityExternalEvidenceReport::mapping_digest(Self) -> String
+pub fn IdentityExternalEvidenceReport::packet_count(Self) -> Int
+pub fn IdentityExternalEvidenceReport::result_digest(Self) -> String
+pub fn IdentityExternalEvidenceReport::trace_digest(Self) -> String
+pub fn IdentityExternalEvidenceReport::transaction_count(Self) -> Int
+
+// Type aliases
+
+// Traits

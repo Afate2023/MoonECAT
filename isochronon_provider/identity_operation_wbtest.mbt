@@ -75,6 +75,60 @@ fn test_mac() -> Bytes {
 }
 
 ///|
+test "response frame context requires the ESC locally administered source bit" {
+  let context = try! EthernetFrameContext::new(
+    resolved_binding_digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    current_mac=b"\xc8\xff\xbf\x03\x53\xaf",
+    clock_domain=test_domain(),
+  )
+  let returned : @protocol.EcFrame = {
+    dst_mac: FixedArray::make(6, b'\xff'),
+    src_mac: [b'\xca', b'\xff', b'\xbf', b'\x03', b'\x53', b'\xaf'],
+    pdus: [],
+  }
+  assert_true(valid_response_frame_context(returned, context))
+  let echo : @protocol.EcFrame = {
+    ..returned,
+    src_mac: [b'\xc8', b'\xff', b'\xbf', b'\x03', b'\x53', b'\xaf'],
+  }
+  assert_false(valid_response_frame_context(echo, context))
+}
+
+///|
+test "broadcast response matches the ESC position increment" {
+  let request_address = @protocol.broadcast_address(@protocol.reg_type)
+  let response : @protocol.Pdu = {
+    header: {
+      command: @protocol.BRD,
+      index: b'\x2a',
+      address: request_address | 1U,
+      len_flags: 1U,
+      irq: 0U,
+    },
+    data: b"\x11",
+    wkc: 1U,
+  }
+  assert_true(
+    response_matches_request(
+      response,
+      @protocol.BRD,
+      b'\x2a',
+      request_address,
+      1,
+    ),
+  )
+  assert_false(
+    response_matches_request(
+      { ..response, header: { ..response.header, address: request_address } },
+      @protocol.BRD,
+      b'\x2a',
+      request_address,
+      1,
+    ),
+  )
+}
+
+///|
 fn test_context() -> EthernetFrameContext {
   try! EthernetFrameContext::new(
     resolved_binding_digest="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
