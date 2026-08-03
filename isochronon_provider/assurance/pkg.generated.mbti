@@ -1,0 +1,51 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/isochronon_provider/assurance"
+
+import {
+  "mokomoking2501/MoonECAT/isochronon_provider",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode_identity_assurance(@isochronon_provider.InspectBusIdentityResult) -> DecodedIdentityAssurance
+
+pub fn decode_identity_assurance_artifact(Bytes, expected_digest~ : String) -> DecodedIdentityAssurance raise IdentityAssuranceDecodeError
+
+pub fn identity_assurance_decoder_package_id() -> String
+
+pub let identity_assurance_scope : String
+
+// Errors
+pub(all) suberror IdentityAssuranceDecodeError {
+  InvalidIdentityResultArtifact(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub struct DecodedIdentityAssurance {
+  // private fields
+}
+pub fn DecodedIdentityAssurance::claim_eligible(Self) -> Bool
+pub fn DecodedIdentityAssurance::disposition(Self) -> IdentityAssuranceDisposition
+pub fn DecodedIdentityAssurance::expected_count(Self) -> Int
+pub fn DecodedIdentityAssurance::expected_topology_digest(Self) -> String
+pub fn DecodedIdentityAssurance::external_evidence_complete(Self) -> Bool
+pub fn DecodedIdentityAssurance::frame_context_digest(Self) -> String
+pub fn DecodedIdentityAssurance::identity_strength(Self) -> @isochronon_provider.IdentityStrength
+pub fn DecodedIdentityAssurance::issue_count(Self) -> Int
+pub fn DecodedIdentityAssurance::observed_count(Self) -> Int
+pub fn DecodedIdentityAssurance::policy_digest(Self) -> String
+pub fn DecodedIdentityAssurance::result_digest(Self) -> String
+pub fn DecodedIdentityAssurance::result_schema_id(Self) -> String
+pub fn DecodedIdentityAssurance::scope(Self) -> String
+pub fn DecodedIdentityAssurance::source(Self) -> @isochronon_provider.ProviderExecutionSource
+pub fn DecodedIdentityAssurance::transaction_count(Self) -> Int
+
+pub(all) enum IdentityAssuranceDisposition {
+  ProtocolFactsMatchAwaitingExternalEvidence
+  ProtocolFactsRejected
+} derive(Eq, @debug.Debug)
+pub fn IdentityAssuranceDisposition::label(Self) -> String
+
+// Type aliases
+
+// Traits

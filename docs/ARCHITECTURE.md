@@ -71,15 +71,33 @@ declared in each package's `moon.pkg` file.
 - `FuzzConfig` / `FuzzDriver`: 协议模糊测试支持。
 - `ZeroCopyMockNic`: 零拷贝路径的 mock 实现。
 
-### Native provider harness boundary
+### Native provider and Lockwire boundary
 
 MoonECAT no longer owns a `hal/native/` package or native C stubs. Windows
 Npcap, Linux raw socket, UDP/socket, pcap artifact, and live session ownership
 belongs to the Isochronon Lockwire native layer. The EtherCAT-specific handoff
-belongs to MoonECAT's planned `isochronon_provider/` package rather than a root
-cross-protocol adapter. MoonECAT keeps only the
+is implemented by MoonECAT's `isochronon_provider/` package rather than a root
+cross-protocol adapter. MoonECAT keeps the
 protocol/runtime abstractions: `@hal.Nic`, `@hal.ZeroCopyNic`, `@hal.Clock`,
 mock/replay backends, and generic CLI runner functions that a harness can call.
+
+`isochronon_provider` additionally exposes the bounded
+`inspect-bus-identity` commissioning action. Its public `IdentityLinkPort`
+adapts an already-open Lockwire `LinkSession`; it never owns NIC selection or
+lifecycle. The provider preserves the caller's `DomainInstant` deadline on
+every poll, constructs one-PDU 60-byte Ethernet frames from the exact resolved
+current MAC, and performs only BRD population plus APRD/APWR SII controller
+access needed for header words 8..15. Ordered topology, actual serial,
+profile-match verdict, identity strength, effect truth points and
+`ignored-local-tx-echo` relations remain typed EtherCAT-owned output; Lockwire
+continues to transport and record every byte without parsing them.
+
+`isochronon_provider/assurance` converts that private-field result to scoped
+protocol facts for an independent verifier. It cannot create a passed
+assessment or claim, and every source available in this delivery reports
+`live_verified=false`. Provider-owned capture policy is an immutable Lockwire
+`ProviderCaptureFilterAsset` for EtherCAT and explicit non-VLAN rejection;
+capture lifecycle and pcapng limits remain Lockwire-owned.
 
 ### `hal/mcu/` — MCU Abstraction (骨架)
 
@@ -477,6 +495,8 @@ All tests run via `moon test` with zero external dependencies (Native 实机测�
 | mailbox/ | **L3 Production** | SII 完整类别深读 (A/B/C 分层); CoE/SDO/FoE/EoE/SoE 编解码完整; RMSM 状态机; FMMU/SM 映射推导 |
 | runtime/ | **L3 Production** | scan/validate/run 完整生命周期; DC 集成; diagnosis + DiagnosticSurface 统一事实层; monitor/verdict; topology fingerprint/health; configuration model/ENI; startup preparation; EoE switch/relay; HIL/co-sim 框架; cycle perf; master OD |
 | device_profile/ | **L2 Core** | typed ESI library、bounded candidate→preview→activate、optional serial、exact instance binding；无 live identity/evidence |
+| isochronon_provider/ | **L2 Core** | typed bounded identity operation、single absolute deadline、current-MAC frame、ordered topology/effects/echo、sim/replay/fault/native-contract fixtures；无 live device/capture evidence |
+| isochronon_provider/assurance/ | **L2 Core** | stack-owned normalized identity facts；不签发 assessment/claim，external evidence 永远由独立 verifier 补齐 |
 | cmd/main/ | **L3 Production** | 8 个 CLI 子命令: list-if/scan/validate/run/read-sii/state/diagnosis/od; JSON + text + NDJSON 输出; 多后端支持 |
 | cmd/eni_json/ | **L2 Core** | ENI XML→JSON 桥接功能 |
 | plugin/extism/ | **L2 Core** | Host contract 定义 + envelope 协议 + 占位入口完成; 实际宿主绑定待接入 |

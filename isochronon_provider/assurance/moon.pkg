@@ -1,0 +1,14 @@
+import {
+  "mokomoking2501/MoonECAT/isochronon_provider",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/crypto",
+}
+
+import {
+  "mokomoking2501/MoonECAT/device_profile",
+  "mokomoking2501/MoonECAT/isochronon_provider/fixtures",
+  "mokomoking2501/lockwire/clock",
+  "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/crypto",
+} for "wbtest"

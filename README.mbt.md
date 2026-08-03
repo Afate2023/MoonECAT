@@ -13,6 +13,8 @@ A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B
 | `mailbox/` | Mailbox & Config | CoE/SDO, SII/ESI parsing, FMMU/SM, RMSM, Emergency |
 | `runtime/` | Runtime | Scheduler, PDO loop, telemetry, monitors, verdicts, analysis engine |
 | `device_profile/` | Engineering intake | Bounded embedded ESI→typed profile, closed-world preview/activation, exact instance binding |
+| `isochronon_provider/` | Isochronon integration | Bounded typed `inspect-bus-identity`, exact current-MAC frame context, ordered topology/effects/echo result |
+| `isochronon_provider/assurance/` | Assurance normalization | Stack-owned identity fact decoder; never self-signs or issues claims |
 | `cmd/main/` | CLI | `moonecat` command-line interface |
 | `cmd/eni_json/` | Tool | ENI/ESI XML→JSON converter |
 | `plugin/extism/` | Plugin | Extism Wasm plugin skeleton |
@@ -38,9 +40,15 @@ ESI declarations as observed/live identity.
 
 MoonECAT no longer ships a native FFI backend package. `--backend native*`
 commands produce provider-harness pending output; live NIC/session/capture
-mechanics belong to Lockwire, while the MoonECAT-owned provider adapter is the
-separate `isochronon_provider/` delivery slice. The current repository does not
-claim a connected device, verified runtime, NIC capture, or live timing.
+mechanics belong to Lockwire. `isochronon_provider/` now owns the EtherCAT
+`inspect-bus-identity` operation: it consumes an already-open Lockwire
+`LinkSession`, preserves one caller absolute deadline, constructs frames from
+the resolved current MAC, ignores and records exact local TX echo, and reads
+only SII identity words 8..15. It emits typed ordered-topology/effect artifacts
+and a provider-owned non-VLAN EtherCAT capture filter. Its
+simulation/replay/fault/native-contract fixtures all remain explicitly
+unverified; the current repository does not claim a connected device, verified
+runtime, NIC capture, live timing, accepted assessment, or claim.
 
 ## CLI Commands
 

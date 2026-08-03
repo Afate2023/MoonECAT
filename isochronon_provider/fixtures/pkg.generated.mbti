@@ -1,0 +1,40 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/isochronon_provider/fixtures"
+
+import {
+  "mokomoking2501/MoonECAT/isochronon_provider",
+  "mokomoking2501/lockwire/clock",
+}
+
+// Values
+pub fn identity_fixture_package_id() -> String
+
+// Errors
+
+// Types and methods
+pub struct FixtureDeviceIdentity {
+  // private fields
+}
+pub fn FixtureDeviceIdentity::new(vendor_id~ : UInt, product_code~ : UInt, revision~ : UInt, serial~ : UInt) -> Self
+pub fn FixtureDeviceIdentity::product_code(Self) -> UInt
+pub fn FixtureDeviceIdentity::revision(Self) -> UInt
+pub fn FixtureDeviceIdentity::serial(Self) -> UInt
+pub fn FixtureDeviceIdentity::vendor_id(Self) -> UInt
+
+pub struct IdentityFixtureHarness {
+  // private fields
+}
+pub fn IdentityFixtureHarness::accessed_registers(Self) -> Array[UInt]
+pub fn IdentityFixtureHarness::accessed_sii_words(Self) -> Array[UInt]
+pub fn IdentityFixtureHarness::current_mac(Self) -> Bytes
+pub fn IdentityFixtureHarness::max_outstanding_transactions(Self) -> Int
+pub fn IdentityFixtureHarness::new(source~ : @isochronon_provider.ProviderExecutionSource, domain~ : @clock.DomainId, current_mac~ : Bytes, devices~ : Array[FixtureDeviceIdentity], emit_echo? : Bool, inject_one_poll_failure? : Bool) -> Self raise @isochronon_provider.IdentityProviderError
+pub fn IdentityFixtureHarness::now(Self) -> @clock.DomainInstant
+pub fn IdentityFixtureHarness::poll_deadlines(Self) -> Array[@clock.DomainInstant]
+pub fn IdentityFixtureHarness::port(Self) -> @isochronon_provider.IdentityLinkPort
+pub fn IdentityFixtureHarness::source(Self) -> @isochronon_provider.ProviderExecutionSource
+pub fn IdentityFixtureHarness::submitted_frames(Self) -> Array[Bytes]
+
+// Type aliases
+
+// Traits

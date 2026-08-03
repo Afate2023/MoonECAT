@@ -6,6 +6,7 @@ import {
   "Milky2018/xml@0.2.0",
   "moonbitlang/x@0.4.38",
   "moonbitlang/async@0.16.8",
+  "mokomoking2501/lockwire@0.1.0",
 }
 
 readme = "README.mbt.md"

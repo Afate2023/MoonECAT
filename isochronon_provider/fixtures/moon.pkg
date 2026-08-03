@@ -1,0 +1,7 @@
+import {
+  "mokomoking2501/MoonECAT/isochronon_provider",
+  "mokomoking2501/MoonECAT/protocol",
+  "mokomoking2501/lockwire/clock",
+  "mokomoking2501/lockwire/runtime",
+  "moonbitlang/core/debug",
+}

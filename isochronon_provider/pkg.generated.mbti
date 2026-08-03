@@ -1,0 +1,188 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/isochronon_provider"
+
+import {
+  "mokomoking2501/MoonECAT/device_profile",
+  "mokomoking2501/lockwire/capture/pcapng",
+  "mokomoking2501/lockwire/clock",
+  "mokomoking2501/lockwire/runtime",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn inspect_bus_identity(expected~ : ExpectedBusTopology, context~ : EthernetFrameContext, policy~ : InspectBusIdentityPolicy, deadline~ : @clock.DomainInstant, port~ : IdentityLinkPort) -> InspectBusIdentityResult raise IdentityProviderError
+
+pub fn inspect_bus_identity_capture_filter() -> @pcapng.ProviderCaptureFilterAsset raise @pcapng.PcapngError
+
+pub let inspect_bus_identity_operation_id : String
+
+pub let inspect_bus_identity_result_schema_id : String
+
+pub fn isochronon_provider_package_id() -> String
+
+// Errors
+pub(all) suberror IdentityProviderError {
+  InvalidContext(String)
+  InvalidPolicy(String)
+  InvalidTopology(String)
+  DeadlineExpired
+  TransactionLimitExceeded(Int)
+  RetryableTransportFailure(String)
+  TransportFailure(String)
+  ResponseRejected(String)
+  SiiReadRejected(Int, String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub struct EthernetFrameContext {
+  // private fields
+}
+pub fn EthernetFrameContext::clock_domain(Self) -> @clock.DomainId
+pub fn EthernetFrameContext::current_mac(Self) -> Bytes
+pub fn EthernetFrameContext::digest(Self) -> String
+pub fn EthernetFrameContext::new(resolved_binding_digest~ : String, current_mac~ : Bytes, clock_domain~ : @clock.DomainId) -> Self raise IdentityProviderError
+pub fn EthernetFrameContext::resolved_binding_digest(Self) -> String
+
+pub struct ExpectedBusTopology {
+  // private fields
+}
+pub fn ExpectedBusTopology::bindings(Self) -> Array[@device_profile.ProviderDeviceInstanceBinding]
+pub fn ExpectedBusTopology::count(Self) -> Int
+pub fn ExpectedBusTopology::digest(Self) -> String
+pub fn ExpectedBusTopology::new(Array[@device_profile.ProviderDeviceInstanceBinding]) -> Self raise IdentityProviderError
+
+pub struct IdentityLinkPort {
+  // private fields
+}
+pub fn IdentityLinkPort::from_link_session(@runtime.LinkSession, sleep_until_fn~ : (@clock.DomainInstant) -> Unit raise IdentityProviderError) -> Self
+pub fn IdentityLinkPort::new(source~ : ProviderExecutionSource, now_fn~ : () -> @clock.DomainInstant, submit_fn~ : (Bytes) -> Unit raise IdentityProviderError, poll_fn~ : (@clock.DomainInstant) -> @runtime.RxObservation? raise IdentityProviderError, sleep_until_fn~ : (@clock.DomainInstant) -> Unit raise IdentityProviderError) -> Self
+pub fn IdentityLinkPort::source(Self) -> ProviderExecutionSource
+
+pub(all) enum IdentityStrength {
+  UnitIdentity
+  ModelAndTopology
+  NoIdentityAssurance
+} derive(Eq, @debug.Debug)
+pub fn IdentityStrength::label(Self) -> String
+
+pub struct IdentityTraceEvent {
+  // private fields
+}
+pub fn IdentityTraceEvent::detail(Self) -> String
+pub fn IdentityTraceEvent::kind(Self) -> IdentityTraceKind
+pub fn IdentityTraceEvent::timestamp(Self) -> @clock.DomainInstant
+pub fn IdentityTraceEvent::transaction_ordinal(Self) -> Int?
+
+pub(all) enum IdentityTraceKind {
+  PolicyBound
+  TransactionSubmitted
+  ObservationIgnored
+  ResponseAccepted
+  SiiStatusPolled
+  RetryScheduled
+} derive(Eq, @debug.Debug)
+pub fn IdentityTraceKind::label(Self) -> String
+
+pub struct InspectBusIdentityPolicy {
+  // private fields
+}
+pub fn InspectBusIdentityPolicy::digest(Self) -> String
+pub fn InspectBusIdentityPolicy::max_ignored_observations(Self) -> Int
+pub fn InspectBusIdentityPolicy::max_sii_nack_retries(Self) -> Int
+pub fn InspectBusIdentityPolicy::max_sii_status_polls(Self) -> Int
+pub fn InspectBusIdentityPolicy::max_slaves(Self) -> Int
+pub fn InspectBusIdentityPolicy::max_transport_retries(Self) -> Int
+pub fn InspectBusIdentityPolicy::max_wire_transactions(Self) -> Int
+pub fn InspectBusIdentityPolicy::new(max_slaves~ : Int, max_wire_transactions~ : Int, max_transport_retries~ : Int, max_sii_status_polls~ : Int, max_sii_nack_retries~ : Int, max_ignored_observations~ : Int, retry_backoff_ns~ : Int64) -> Self raise IdentityProviderError
+pub fn InspectBusIdentityPolicy::retry_backoff_ns(Self) -> Int64
+pub fn InspectBusIdentityPolicy::verification_default() -> Self
+
+pub struct InspectBusIdentityResult {
+  // private fields
+}
+pub fn InspectBusIdentityResult::canonical_bytes(Self) -> Bytes
+pub fn InspectBusIdentityResult::deadline(Self) -> @clock.DomainInstant
+pub fn InspectBusIdentityResult::digest(Self) -> String
+pub fn InspectBusIdentityResult::echoes(Self) -> Array[OwnTxEchoRelation]
+pub fn InspectBusIdentityResult::effects(Self) -> Array[ProviderEffectWitness]
+pub fn InspectBusIdentityResult::expected_count(Self) -> Int
+pub fn InspectBusIdentityResult::expected_topology_digest(Self) -> String
+pub fn InspectBusIdentityResult::frame_context_digest(Self) -> String
+pub fn InspectBusIdentityResult::identity_strength(Self) -> IdentityStrength
+pub fn InspectBusIdentityResult::issues(Self) -> Array[TopologyIssue]
+pub fn InspectBusIdentityResult::live_verified(Self) -> Bool
+pub fn InspectBusIdentityResult::observed(Self) -> Array[ObservedDeviceIdentity]
+pub fn InspectBusIdentityResult::passes(Self) -> Bool
+pub fn InspectBusIdentityResult::policy_digest(Self) -> String
+pub fn InspectBusIdentityResult::schema_id(Self) -> String
+pub fn InspectBusIdentityResult::source(Self) -> ProviderExecutionSource
+pub fn InspectBusIdentityResult::trace(Self) -> Array[IdentityTraceEvent]
+pub fn InspectBusIdentityResult::transaction_count(Self) -> Int
+
+pub struct ObservedDeviceIdentity {
+  // private fields
+}
+pub fn ObservedDeviceIdentity::match_verdict(Self) -> ProfileMatchVerdict
+pub fn ObservedDeviceIdentity::physical_position(Self) -> Int
+pub fn ObservedDeviceIdentity::product_code(Self) -> UInt
+pub fn ObservedDeviceIdentity::raw_identity_digest(Self) -> String
+pub fn ObservedDeviceIdentity::revision(Self) -> UInt
+pub fn ObservedDeviceIdentity::selected_profile_digest(Self) -> String?
+pub fn ObservedDeviceIdentity::serial(Self) -> UInt
+pub fn ObservedDeviceIdentity::vendor_id(Self) -> UInt
+
+pub struct OwnTxEchoRelation {
+  // private fields
+}
+pub fn OwnTxEchoRelation::backend_sequence(Self) -> Int64
+pub fn OwnTxEchoRelation::frame_digest(Self) -> String
+pub fn OwnTxEchoRelation::relation(Self) -> String
+pub fn OwnTxEchoRelation::transaction_ordinal(Self) -> Int
+
+pub(all) enum ProfileMatchVerdict {
+  ExactProfileMatch
+  ModelOrRevisionMismatch
+  UnitSerialMismatch
+  NoSelectedProfile
+} derive(Eq, @debug.Debug)
+pub fn ProfileMatchVerdict::label(Self) -> String
+
+pub(all) enum ProviderEffectKind {
+  ProbeBusPopulation
+  ObserveSiiControllerStatus
+  ReadIdentityMetadata
+  MutateVolatileSiiController
+} derive(Eq, @debug.Debug)
+pub fn ProviderEffectKind::label(Self) -> String
+
+pub struct ProviderEffectWitness {
+  // private fields
+}
+pub fn ProviderEffectWitness::frame_digest(Self) -> String
+pub fn ProviderEffectWitness::kind(Self) -> ProviderEffectKind
+pub fn ProviderEffectWitness::physical_position(Self) -> Int?
+pub fn ProviderEffectWitness::transaction_ordinal(Self) -> Int
+pub fn ProviderEffectWitness::truth_point(Self) -> String
+
+pub(all) enum ProviderExecutionSource {
+  SimulationFixture
+  ReplayFixture
+  FaultFixture
+  NativeContractFixture
+  RuntimeUnverified
+} derive(Eq, @debug.Debug)
+pub fn ProviderExecutionSource::label(Self) -> String
+pub fn ProviderExecutionSource::live_verified(Self) -> Bool
+
+pub(all) enum TopologyIssue {
+  ExtraDevice(Int)
+  MissingDevice(Int)
+  ReorderedDevice(observed_position~ : Int, expected_position~ : Int)
+  ModelOrRevisionMismatchAt(Int)
+  UnitSerialMismatchAt(Int)
+} derive(Eq, @debug.Debug)
+pub fn TopologyIssue::label(Self) -> String
+
+// Type aliases
+
+// Traits
