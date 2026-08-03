@@ -926,7 +926,7 @@ fn sample_esi_json_text() -> String {
         vendor_id: 1894U,
         product_code: 2320U,
         revision: 1U,
-        serial: 0U,
+        serial: None,
         physics: "YY",
         device_name: "RZN2 CoE Demo",
         type_name: "rzn2",

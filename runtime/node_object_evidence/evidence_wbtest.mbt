@@ -59,7 +59,7 @@ fn test_esi_device() -> @runtime.EsiJsonDevice {
     vendor_id: 0x1111U,
     product_code: 0x2222U,
     revision: 0x0001U,
-    serial: 0x0002U,
+    serial: Some(0x0002U),
     physics: "YY",
     device_name: "MC1C servo",
     type_name: "DS402 virtual drive",

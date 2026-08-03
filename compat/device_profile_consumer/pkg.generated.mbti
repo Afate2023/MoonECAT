@@ -1,0 +1,17 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "isochronon-fixtures/moonecat-device-profile-consumer"
+
+import {
+  "mokomoking2501/MoonECAT/device_profile",
+}
+
+// Values
+pub fn build_external_binding() -> @device_profile.ProviderDeviceInstanceBinding raise @device_profile.DeviceProfileError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

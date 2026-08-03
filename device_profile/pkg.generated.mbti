@@ -1,0 +1,136 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mokomoking2501/MoonECAT/device_profile"
+
+import {
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/runtime",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn convert_esi_xml_to_json_string(String) -> String raise @hal.EcError
+
+pub fn device_profile_package_id() -> String
+
+pub fn esi_json_document_from_xml(String) -> @runtime.EsiJsonDocument raise @hal.EcError
+
+// Errors
+pub(all) suberror DeviceProfileError {
+  InvalidAssetId(String)
+  AssetTooLarge(String, Int)
+  InvalidDigest(String)
+  SourceDigestMismatch(String, String, String)
+  InvalidUtf8(String)
+  InvalidEsi(String, String)
+  EmptyCandidate(String)
+  DuplicateAsset(String)
+  DuplicateProfile(String)
+  MissingProfile(String)
+  DuplicateSelection(String)
+  ProfileDigestMismatch(String, String, String)
+  InvalidBinding(String)
+} derive(Eq, @debug.Debug)
+
+// Types and methods
+pub struct ActivatedDeviceProfile {
+  // private fields
+}
+pub fn ActivatedDeviceProfile::digest(Self) -> String
+pub fn ActivatedDeviceProfile::profile(Self) -> DeviceProfile
+pub fn ActivatedDeviceProfile::typed_document(Self) -> @runtime.EsiJsonDocument raise DeviceProfileError
+
+pub struct DeviceProfile {
+  // private fields
+}
+pub fn DeviceProfile::canonical_json(Self) -> String
+pub fn DeviceProfile::device_name(Self) -> String
+pub fn DeviceProfile::digest(Self) -> String
+pub fn DeviceProfile::physics(Self) -> String
+pub fn DeviceProfile::product_code(Self) -> UInt
+pub fn DeviceProfile::profile_no(Self) -> UInt?
+pub fn DeviceProfile::revision(Self) -> UInt
+pub fn DeviceProfile::serial(Self) -> UInt?
+pub fn DeviceProfile::source_asset_id(Self) -> String
+pub fn DeviceProfile::source_sha256(Self) -> String
+pub fn DeviceProfile::type_name(Self) -> String
+pub fn DeviceProfile::typed_document(Self) -> @runtime.EsiJsonDocument raise DeviceProfileError
+pub fn DeviceProfile::vendor_id(Self) -> UInt
+
+pub struct DeviceProfileCandidate {
+  // private fields
+}
+pub fn DeviceProfileCandidate::asset_id(Self) -> String
+pub fn DeviceProfileCandidate::digest(Self) -> String
+pub fn DeviceProfileCandidate::from_esi_xml(asset_id~ : String, declared_source_sha256~ : String, Bytes) -> Self raise DeviceProfileError
+pub fn DeviceProfileCandidate::profiles(Self) -> Array[DeviceProfile]
+pub fn DeviceProfileCandidate::source_sha256(Self) -> String
+
+pub struct DeviceProfileCatalog {
+  // private fields
+}
+pub fn DeviceProfileCatalog::activate(DeviceProfilePreview, Array[DeviceProfileSelection]) -> Self raise DeviceProfileError
+pub fn DeviceProfileCatalog::digest(Self) -> String
+pub fn DeviceProfileCatalog::profiles(Self) -> Array[ActivatedDeviceProfile]
+pub fn DeviceProfileCatalog::resolve_exact(Self, DeviceProfileSelection) -> ActivatedDeviceProfile raise DeviceProfileError
+
+pub struct DeviceProfilePin {
+  // private fields
+}
+pub fn DeviceProfilePin::product_code(Self) -> UInt
+pub fn DeviceProfilePin::profile_digest(Self) -> String
+pub fn DeviceProfilePin::revision(Self) -> UInt
+pub fn DeviceProfilePin::serial(Self) -> UInt?
+pub fn DeviceProfilePin::source_asset_id(Self) -> String
+pub fn DeviceProfilePin::source_sha256(Self) -> String
+pub fn DeviceProfilePin::vendor_id(Self) -> UInt
+
+pub struct DeviceProfilePreview {
+  // private fields
+}
+pub fn DeviceProfilePreview::candidates(Self) -> Array[DeviceProfileCandidate]
+pub fn DeviceProfilePreview::digest(Self) -> String
+pub fn DeviceProfilePreview::new(Array[DeviceProfileCandidate]) -> Self raise DeviceProfileError
+pub fn DeviceProfilePreview::profiles(Self) -> Array[DeviceProfile]
+
+pub struct DeviceProfileSelection {
+  // private fields
+}
+pub fn DeviceProfileSelection::expected_profile_digest(Self) -> String
+pub fn DeviceProfileSelection::new(source_asset_id~ : String, vendor_id~ : UInt, product_code~ : UInt, revision~ : UInt, expected_profile_digest~ : String) -> Self raise DeviceProfileError
+pub fn DeviceProfileSelection::product_code(Self) -> UInt
+pub fn DeviceProfileSelection::revision(Self) -> UInt
+pub fn DeviceProfileSelection::source_asset_id(Self) -> String
+pub fn DeviceProfileSelection::vendor_id(Self) -> UInt
+
+pub struct MoonEcatDeviceConfig {
+  // private fields
+}
+pub fn MoonEcatDeviceConfig::configured_station_address(Self) -> UInt
+pub fn MoonEcatDeviceConfig::cycle_time_ns(Self) -> Int64
+pub fn MoonEcatDeviceConfig::new(configured_station_address~ : UInt, cycle_time_ns~ : Int64, watchdog_timeout_ns~ : Int64, startup_target~ : MoonEcatStartupTarget) -> Self raise DeviceProfileError
+pub fn MoonEcatDeviceConfig::startup_target(Self) -> MoonEcatStartupTarget
+pub fn MoonEcatDeviceConfig::watchdog_timeout_ns(Self) -> Int64
+
+pub(all) enum MoonEcatStartupTarget {
+  PreOperational
+  SafeOperational
+  Operational
+} derive(Eq, ToJson, @debug.Debug)
+pub fn MoonEcatStartupTarget::operational() -> Self
+pub fn MoonEcatStartupTarget::pre_operational() -> Self
+pub fn MoonEcatStartupTarget::safe_operational() -> Self
+
+pub struct ProviderDeviceInstanceBinding {
+  // private fields
+}
+pub fn ProviderDeviceInstanceBinding::config(Self) -> MoonEcatDeviceConfig
+pub fn ProviderDeviceInstanceBinding::device_node_id(Self) -> String
+pub fn ProviderDeviceInstanceBinding::digest(Self) -> String
+pub fn ProviderDeviceInstanceBinding::new(device_node_id~ : String, protocol_role_binding_id~ : String, activated_profile~ : ActivatedDeviceProfile, physical_position~ : Int, config~ : MoonEcatDeviceConfig) -> Self raise DeviceProfileError
+pub fn ProviderDeviceInstanceBinding::physical_position(Self) -> Int
+pub fn ProviderDeviceInstanceBinding::profile_pin(Self) -> DeviceProfilePin
+pub fn ProviderDeviceInstanceBinding::protocol_role_binding_id(Self) -> String
+
+// Type aliases
+
+// Traits

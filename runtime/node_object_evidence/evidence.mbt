@@ -74,7 +74,10 @@ pub fn node_model_evidence_from_esi_device(
       vendor_id: device.vendor_id,
       product_code: device.product_code,
       revision: device.revision,
-      serial: device.serial,
+      serial: match device.serial {
+        Some(serial) => serial
+        None => 0U
+      },
     },
     device_name=device.device_name,
     type_name=device.type_name,

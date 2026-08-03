@@ -1,0 +1,8 @@
+import {
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/runtime",
+  "Milky2018/xml",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/debug",
+  "moonbitlang/x/crypto",
+}

@@ -22,6 +22,7 @@ It is intended to be updated incrementally as new behavior or regressions are id
 | Scan-time CSA reassignment isolation | Scan must separate current-CSA observation, reassignment planning, and writeback so duplicate/zero addresses can be reallocated without hardcoding policy into the main scan loop | `protocol/protocol_test.mbt`: `discovery - read_station_address_ap via mock`; `runtime/runtime_test.mbt`: `scan preserves unique pre-existing station addresses`; `scan reassigns duplicate or zero station addresses into scan pool` |
 | Validation mismatch handling | Discovery/validation mismatch must stop run workflow before cyclic operation | `runtime/runtime_test.mbt`: `run with mock loopback: validation fails when slaves expected but not found` |
 | Minimal end-to-end replay path | Scan/validate/run/stop path must succeed on mock backend baseline | `runtime/runtime_test.mbt`: `replay integration minimal flow: scan->validate->run->stop` |
+| ESI reference lookup convenience must not enter runtime selection | ESI bytes are bounded and digest-pinned; activation requires exact asset/vendor/product/revision/profile digest and never scans directories or falls back to the highest revision | `device_profile/device_profile_test.mbt`: `activation selects exact closed world and ignores extra unselected profile`; `activation rejects missing highest-revision fallback duplicate and digest mismatch`; external `compat/device_profile_consumer` root-facade test |
 
 ## Update Rule
 

@@ -383,7 +383,7 @@ pub(all) struct EsiJsonDevice {
   vendor_id : UInt
   product_code : UInt
   revision : UInt
-  serial : UInt
+  serial : UInt?
   physics : String
   device_name : String
   type_name : String

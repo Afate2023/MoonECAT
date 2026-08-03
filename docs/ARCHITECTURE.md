@@ -75,8 +75,9 @@ declared in each package's `moon.pkg` file.
 
 MoonECAT no longer owns a `hal/native/` package or native C stubs. Windows
 Npcap, Linux raw socket, UDP/socket, pcap artifact, and live session ownership
-belongs to the Isochronon Lockwire native layer and provider harness packages
-such as `fieldbus_core/moonecat_master_harness`. MoonECAT keeps only the
+belongs to the Isochronon Lockwire native layer. The EtherCAT-specific handoff
+belongs to MoonECAT's planned `isochronon_provider/` package rather than a root
+cross-protocol adapter. MoonECAT keeps only the
 protocol/runtime abstractions: `@hal.Nic`, `@hal.ZeroCopyNic`, `@hal.Clock`,
 mock/replay backends, and generic CLI runner functions that a harness can call.
 
@@ -311,7 +312,24 @@ CLI 子命令 (`moon run cmd/main <command> -- --backend <backend> ...`):
 
 ENI (EtherCAT Network Information) XML 描述文件到 JSON 的转换工具，
 基于 Milky2018/xml 库解析 ETG.2100 标准 XML，生成
-`EsiJsonDocument` 供离线配置、ESI 投影和启动准备使用。
+`EsiJsonDocument` 供离线配置、ESI 投影和启动准备使用。ESI projection
+实现由 `device_profile/` typed library 持有，CLI 只是文件 I/O 薄适配器。
+
+### `device_profile/` — Closed-world ESI Profile Intake
+
+- `DeviceProfileCandidate::from_esi_xml` 只接受至多 4 MiB 的 embedded bytes、
+  asset ID 与 exact lowercase SHA-256；先校验原始 bytes digest，再 UTF-8/XML
+  decode，不提供路径、目录扫描或上传执行 API。
+- 一个 ESI source 可投影多个 `DeviceProfile` model/revision；`SerialNo`
+  保持 `UInt?`，`None` 表示没有声明 unit serial，而不是 serial `0`。
+- `DeviceProfilePreview` 拒绝 duplicate asset/ambiguous exact identity；
+  `DeviceProfileCatalog::activate` 只保留 exact selection closure，额外未选
+  profile 不影响 activated digest。
+- runtime 只能通过 activated catalog 的 `resolve_exact` 获得 typed document；
+  不存在 name/product-only/highest-revision fallback。
+- `ProviderDeviceInstanceBinding` 固定 device node、protocol role、profile pin、
+  physical position 和 `MoonEcatDeviceConfig`。它是 expected engineering
+  declaration，不含 observed topology、live device 或 vendor-authenticated fact。
 
 ### `plugin/extism/` — Extism WASM Plugin Adapter
 
@@ -458,6 +476,7 @@ All tests run via `moon test` with zero external dependencies (Native 实机测�
 | protocol/ | **L3 Production** | Frame/PDU/ESM/DC/PDO 协议核心完整; 零拷贝编解码; mailbox transport + SDO/FoE/EEPROM 事务层完整; SM/FMMU/DL 操作 |
 | mailbox/ | **L3 Production** | SII 完整类别深读 (A/B/C 分层); CoE/SDO/FoE/EoE/SoE 编解码完整; RMSM 状态机; FMMU/SM 映射推导 |
 | runtime/ | **L3 Production** | scan/validate/run 完整生命周期; DC 集成; diagnosis + DiagnosticSurface 统一事实层; monitor/verdict; topology fingerprint/health; configuration model/ENI; startup preparation; EoE switch/relay; HIL/co-sim 框架; cycle perf; master OD |
+| device_profile/ | **L2 Core** | typed ESI library、bounded candidate→preview→activate、optional serial、exact instance binding；无 live identity/evidence |
 | cmd/main/ | **L3 Production** | 8 个 CLI 子命令: list-if/scan/validate/run/read-sii/state/diagnosis/od; JSON + text + NDJSON 输出; 多后端支持 |
 | cmd/eni_json/ | **L2 Core** | ENI XML→JSON 桥接功能 |
 | plugin/extism/ | **L2 Core** | Host contract 定义 + envelope 协议 + 占位入口完成; 实际宿主绑定待接入 |

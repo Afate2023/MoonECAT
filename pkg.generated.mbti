@@ -1,7 +1,19 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mokomoking2501/MoonECAT"
 
+import {
+  "mokomoking2501/MoonECAT/device_profile",
+  "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/runtime",
+}
+
 // Values
+pub fn convert_esi_xml_to_json_string(String) -> String raise @hal.EcError
+
+pub fn device_profile_package_id() -> String
+
+pub fn esi_json_document_from_xml(String) -> @runtime.EsiJsonDocument raise @hal.EcError
+
 pub let version : String
 
 // Errors
@@ -9,6 +21,27 @@ pub let version : String
 // Types and methods
 
 // Type aliases
+pub using @device_profile {type ActivatedDeviceProfile}
+
+pub using @device_profile {type DeviceProfile}
+
+pub using @device_profile {type DeviceProfileCandidate}
+
+pub using @device_profile {type DeviceProfileCatalog}
+
+pub using @device_profile {type DeviceProfileError}
+
+pub using @device_profile {type DeviceProfilePin}
+
+pub using @device_profile {type DeviceProfilePreview}
+
+pub using @device_profile {type DeviceProfileSelection}
+
+pub using @device_profile {type MoonEcatDeviceConfig}
+
+pub using @device_profile {type MoonEcatStartupTarget}
+
+pub using @device_profile {type ProviderDeviceInstanceBinding}
 
 // Traits
 

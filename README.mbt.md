@@ -12,6 +12,7 @@ A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B
 | `protocol/` | Protocol Core | Frame/PDU codec, ESM, PDO, zero-copy codec, addressing |
 | `mailbox/` | Mailbox & Config | CoE/SDO, SII/ESI parsing, FMMU/SM, RMSM, Emergency |
 | `runtime/` | Runtime | Scheduler, PDO loop, telemetry, monitors, verdicts, analysis engine |
+| `device_profile/` | Engineering intake | Bounded embedded ESI→typed profile, closed-world preview/activation, exact instance binding |
 | `cmd/main/` | CLI | `moonecat` command-line interface |
 | `cmd/eni_json/` | Tool | ENI/ESI XML→JSON converter |
 | `plugin/extism/` | Plugin | Extism Wasm plugin skeleton |
@@ -26,10 +27,20 @@ moon test hal/mock     # Run mock HAL tests only
 moon build --target native  # Build native binary
 ```
 
+## Current Boundary
+
+MoonECAT owns EtherCAT protocol/application semantics. `device_profile/`
+accepts only bounded embedded ESI bytes with an exact lowercase SHA-256, then
+uses candidate → preview → activate before runtime consumption. It supports
+multiple models/revisions and optional declared serials, but never scans a
+directory, reads a ProjectDocument path, chooses a highest revision, or treats
+ESI declarations as observed/live identity.
+
 MoonECAT no longer ships a native FFI backend package. `--backend native*`
-commands now produce provider-harness pending output; live NIC access is owned
-by the Isochronon `fieldbus_core/moonecat_master_harness` delivery path on top
-of Lockwire native sessions.
+commands produce provider-harness pending output; live NIC/session/capture
+mechanics belong to Lockwire, while the MoonECAT-owned provider adapter is the
+separate `isochronon_provider/` delivery slice. The current repository does not
+claim a connected device, verified runtime, NIC capture, or live timing.
 
 ## CLI Commands
 
@@ -37,8 +48,8 @@ MoonBit CLI flags belong to `moon run`, so MoonECAT parameters must be placed
 after `--`, otherwise flags like `--backend` and `--if` will be consumed by
 `moon` itself.
 
-`--backend native` resolves to Windows Npcap when available, otherwise Linux Raw
-Socket. Use `native-windows-npcap` or `native-linux-raw` for explicit control.
+`native`, `native-windows-npcap`, and `native-linux-raw` currently name harness
+handoff intent only; they do not open a NIC in this module.
 
 ### Discovery
 
@@ -197,6 +208,7 @@ moon run cmd/eni_json -- --input References/sample.xml --kind esi --output sampl
 - **Analysis engine**: DC jitter profiling, PDO auto-tuning, topology health, cycle perf, comm quality scoring
 - **Distributed Clock**: SYNC0 configuration + FRMW drift compensation + propagation delay
 - **ENI/ESI tooling**: XML→JSON converter with unified configuration model
+- **Closed-world DeviceProfile**: bounded embedded ESI candidate/preview/activate, exact model/revision pin and instance binding
 - **VirtualBus**: Multi-slave protocol-level simulation with SDO/Emergency emulation
 - **VirtualSlaveTemplate**: ESI JSON → synthesized EEPROM → VirtualSlave pipeline
 

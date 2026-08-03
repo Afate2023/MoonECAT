@@ -93,7 +93,7 @@ pub(all) struct EsiJsonDevice {
   vendor_id : UInt
   product_code : UInt
   revision : UInt
-  serial : UInt
+  serial : UInt?
   physics : String
   device_name : String
   type_name : String
@@ -219,16 +219,22 @@ fn parse_esi_json_document_value(
 
 ///|
 fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
+  let serial_json : Json? = match json {
+    { "serial": value, .. } => Some(value)
+    _ => None
+  }
+  let profile_no_json : Json? = match json {
+    { "profile_no": value, .. } => Some(value)
+    _ => None
+  }
   guard json
     is {
       "vendor_id": vendor_id_json,
       "product_code": product_code_json,
       "revision": revision_json,
-      "serial": serial_json,
       "physics": physics_json,
       "device_name": device_name_json,
       "type_name": type_name_json,
-      "profile_no": profile_no_json,
       "slot_index_increment": slot_index_increment_json,
       "slot_pdo_increment": slot_pdo_increment_json,
       "mailbox": mailbox_json,
@@ -252,11 +258,17 @@ fn parse_esi_json_device(json : Json) -> EsiJsonDevice raise @hal.EcError {
     vendor_id: decode_esi_json_uint(vendor_id_json),
     product_code: decode_esi_json_uint(product_code_json),
     revision: decode_esi_json_uint(revision_json),
-    serial: decode_esi_json_uint(serial_json),
+    serial: match serial_json {
+      Some(value) => decode_esi_json_optional_uint(value)
+      None => None
+    },
     physics: decode_esi_json_string(physics_json),
     device_name: decode_esi_json_string(device_name_json),
     type_name: decode_esi_json_string(type_name_json),
-    profile_no: decode_esi_json_optional_uint(profile_no_json),
+    profile_no: match profile_no_json {
+      Some(value) => decode_esi_json_optional_uint(value)
+      None => None
+    },
     slot_index_increment: decode_esi_json_uint(slot_index_increment_json),
     slot_pdo_increment: decode_esi_json_uint(slot_pdo_increment_json),
     mailbox: parse_esi_json_mailbox(mailbox_json),
@@ -1108,7 +1120,10 @@ fn build_sii_header(
     vendor_id: device.vendor_id,
     product_code: device.product_code,
     revision: device.revision,
-    serial: device.serial,
+    serial: match device.serial {
+      Some(serial) => serial
+      None => 0U
+    },
     bootstrap_rx_offset: read_u16_from_bytes(device.bootstrap, 0),
     bootstrap_rx_size: read_u16_from_bytes(device.bootstrap, 2),
     bootstrap_tx_offset: read_u16_from_bytes(device.bootstrap, 4),
