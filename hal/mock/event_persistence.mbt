@@ -75,6 +75,32 @@ pub fn NicEventLog::to_ndjson_with_header(
 }
 
 ///|
+/// Export a trace captured below an incrementing protocol DatagramSession.
+/// The version-2 marker lets replay distinguish it from legacy fixed-zero
+/// Datagram Index traces.
+pub fn NicEventLog::to_ndjson_with_datagram_session_header(
+  self : NicEventLog,
+  slave_count? : Int = 0,
+  fingerprint? : String = "",
+  initial_datagram_index? : Byte = b'\x00',
+) -> String {
+  let buf = StringBuilder::new()
+  buf.write_string("{\"header\":true,\"version\":2,\"slave_count\":")
+  buf.write_string(slave_count.to_string())
+  buf.write_string(",\"fingerprint\":\"")
+  buf.write_string(escape_json_string(fingerprint))
+  buf.write_string("\",\"datagram_index_mode\":\"incrementing\",")
+  buf.write_string("\"initial_datagram_index\":")
+  buf.write_string(initial_datagram_index.to_int().to_string())
+  buf.write_string("}")
+  for event in self.events {
+    buf.write_char('\n')
+    buf.write_string(nic_event_to_json(event))
+  }
+  buf.to_string()
+}
+
+///|
 /// Parse a single NDJSON line into a NicEvent.
 /// Returns None for header lines or unparseable lines.
 pub fn nic_event_from_json(line : String) -> NicEvent? {
@@ -117,6 +143,36 @@ pub fn NicEventLog::from_ndjson(text : String) -> NicEventLog {
     }
   }
   log
+}
+
+///|
+/// Return the initial Index recorded by a version-2 DatagramSession trace.
+/// Legacy/headerless traces return None and must use fixed-zero replay.
+pub fn ndjson_initial_datagram_index(text : String) -> Byte? {
+  for line in split_lines(text) {
+    let trimmed = line.trim()
+    if trimmed.length() == 0 {
+      continue
+    }
+    let json = @json.parse(trimmed) catch { _ => return None }
+    guard json is Object(fields) else { return None }
+    guard fields.get("header") is Some(True) else { return None }
+    guard fields.get("version") is Some(version_json) else { return None }
+    let version : Int = @json.from_json(version_json) catch { _ => return None }
+    guard version == 2 else { return None }
+    guard fields.get("datagram_index_mode") is Some(String("incrementing")) else {
+      return None
+    }
+    guard fields.get("initial_datagram_index") is Some(index_json) else {
+      return None
+    }
+    let value : Int = @json.from_json(index_json) catch { _ => return None }
+    if value < 0 || value > 255 {
+      return None
+    }
+    return Some(value.to_byte())
+  }
+  None
 }
 
 ///|

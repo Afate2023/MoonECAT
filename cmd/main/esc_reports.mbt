@@ -43,7 +43,7 @@ struct ExpectedEscRegisterReport {
 }
 
 ///|
-fn[N : @hal.Nic] read_esc_register_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_esc_register_report(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -82,7 +82,7 @@ fn[N : @hal.Nic] read_esc_register_report(
 }
 
 ///|
-fn[N : @hal.Nic] build_expected_esc_register_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_expected_esc_register_report(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -494,7 +494,7 @@ fn expected_esc_register_report_text(
 }
 
 ///|
-fn[N : @hal.Nic] read_sync_manager_reports(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_sync_manager_reports(
   nic : N,
   station : UInt,
   start_index : Int,
@@ -515,7 +515,7 @@ fn[N : @hal.Nic] read_sync_manager_reports(
 }
 
 ///|
-fn[N : @hal.Nic] read_fmmu_reports(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_fmmu_reports(
   nic : N,
   station : UInt,
   start_index : Int,

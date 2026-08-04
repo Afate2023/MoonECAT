@@ -32,7 +32,7 @@ fn require_esi_json_startup_preparation(
 }
 
 ///|
-fn[N : @hal.Nic] build_startup_diff_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_startup_diff_report(
   nic : N,
   args : Array[String],
   station : UInt,

@@ -216,4 +216,3 @@ pub(open) trait Timebase {
   fn resolution_ns(Self) -> Int64
   fn is_monotonic(Self) -> Bool
 }
-

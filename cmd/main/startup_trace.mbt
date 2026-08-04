@@ -77,8 +77,7 @@ let startup_trace_sdo_max_attempts : Int = 3
 fn startup_trace_should_retry_od_read(err : @hal.EcError) -> Bool {
   match err {
     @hal.EcError::MailboxTimeout => true
-    @hal.EcError::MailboxProtocol(message) =>
-      message.contains("stale") || message.contains("counter mismatch")
+    @hal.EcError::MailboxProtocol(message) => message.contains("stale")
     _ => false
   }
 }
@@ -115,7 +114,7 @@ fn startup_trace_od_entry_success(
 }
 
 ///|
-fn[N : @hal.Nic] startup_trace_reset_notes(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_reset_notes(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -401,7 +400,7 @@ fn startup_trace_report_text(report : StartupTraceReport) -> String {
 }
 
 ///|
-fn[N : @hal.Nic] capture_startup_trace_phase(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] capture_startup_trace_phase(
   nic : N,
   station : UInt,
   name : String,
@@ -462,7 +461,7 @@ fn[N : @hal.Nic] capture_startup_trace_phase(
 }
 
 ///|
-fn[N : @hal.Nic] startup_trace_drain_mailbox(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_drain_mailbox(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -497,7 +496,7 @@ fn[N : @hal.Nic] startup_trace_drain_mailbox(
 }
 
 ///|
-fn[N : @hal.Nic] startup_trace_sdo_upload_once(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_sdo_upload_once(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -544,11 +543,13 @@ fn[N : @hal.Nic] startup_trace_sdo_upload_once(
     }
     return resp.data
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
-fn[N : @hal.Nic] startup_trace_sdo_upload(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_sdo_upload(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -586,7 +587,7 @@ fn[N : @hal.Nic] startup_trace_sdo_upload(
 }
 
 ///|
-fn[N : @hal.Nic] read_startup_trace_od_object(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_startup_trace_od_object(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -645,7 +646,7 @@ fn[N : @hal.Nic] read_startup_trace_od_object(
 }
 
 ///|
-fn[N : @hal.Nic] read_startup_trace_od_objects(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_startup_trace_od_objects(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -732,7 +733,7 @@ fn[N : @hal.Nic] read_startup_trace_od_objects(
 }
 
 ///|
-fn[N : @hal.Nic] startup_trace_phase_with_od(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_trace_phase_with_od(
   nic : N,
   station : UInt,
   name : String,
@@ -745,7 +746,7 @@ fn[N : @hal.Nic] startup_trace_phase_with_od(
 }
 
 ///|
-fn[N : @hal.Nic] build_startup_trace_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_startup_trace_report(
   nic : N,
   args : Array[String],
   station : UInt,

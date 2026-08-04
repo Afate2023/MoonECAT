@@ -203,9 +203,9 @@ test "CoeService to_uint SdoResponse arm" {
 }
 
 ///|
-test "coe_service_from_uint RxPdo arm" {
-  let svc = coe_service_from_uint(6U)
-  assert_true(svc is RxPdo)
+test "CoeService from_uint TxPdoRemoteRequest arm" {
+  let svc = CoeService::from_uint(6U)
+  assert_true(svc is TxPdoRemoteRequest)
 }
 
 ///|
@@ -357,9 +357,9 @@ test "CoeService to_uint SdoInfo arm" {
 }
 
 ///|
-test "coe_service_from_uint PdoRemoteRequest arm" {
-  let svc = coe_service_from_uint(7U)
-  assert_true(svc is PdoRemoteRequest)
+test "CoeService from_uint RxPdoRemoteRequest arm" {
+  let svc = CoeService::from_uint(7U)
+  assert_true(svc is RxPdoRemoteRequest)
 }
 
 ///|
@@ -474,11 +474,11 @@ test "hex_digit 9 returns nine" {
 
 ///|
 test "coe_service TxPdo to_uint" {
-  assert_eq(CoeService::TxPdo.to_uint(), 5U)
+  assert_eq(CoeService::TxPdo.to_uint(), 4U)
 }
 
 ///|
-test "coe_service_from_uint 8 returns SdoInfo" {
-  let s = coe_service_from_uint(8U)
+test "CoeService from_uint 8 returns SdoInfo" {
+  let s = CoeService::from_uint(8U)
   assert_true(s is SdoInfo)
 }

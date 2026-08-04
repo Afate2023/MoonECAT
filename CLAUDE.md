@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-MoonECAT is a modular **EtherCAT master library written in [MoonBit](https://docs.moonbitlang.com)**, targeting ETG.1500 Class B. The build tool is `moon`; module name is `mokomoking2501/MoonECAT` (`moon.mod.json`).
+MoonECAT is a modular **EtherCAT master library written in [MoonBit](https://docs.moonbitlang.com)**, targeting ETG.1500 Class B. The build tool is `moon`; module name is `mokomoking2501/MoonECAT` (declared in `moon.mod`, with `preferred_target = "native"`).
 
 ## Commands
 
@@ -23,10 +23,10 @@ Finishing-touches for any change: run `moon info && moon fmt`, then inspect the 
 ### CLI gotchas (read before running `cmd/main`)
 
 - **MoonBit flags belong to `moon`, MoonECAT flags go after `--`.** Without the `--` separator, flags like `--backend` and `--if` are swallowed by `moon run` itself. Example: `moon run cmd/main scan -- --backend native --if eth0 --json`.
-- **The CLI still builds only on the native target** (`cmd/main` declares `supported_targets = "+native"`), but live NIC access has moved out of this package. Native backend flags now produce provider-harness pending output/errors; use the Isochronon `fieldbus_core/moonecat_master_harness` delivery path for Lockwire-backed live sessions.
-- `--backend native` resolves to Windows Npcap when available, else Linux Raw Socket; use `native-windows-npcap` / `native-linux-raw` to force one. `--backend mock` needs no hardware and is what tests use.
+- **The CLI still builds only on the native target** (`cmd/main` declares `supported_targets = "+native"`), but live NIC access has moved out of this package. Native backend flags now produce provider-harness pending output/errors; compose MoonECAT's stack-owned `isochronon_provider` operation with an already-open Lockwire session from Isochronon.
+- `--backend native` / `native-windows-npcap` / `native-linux-raw` select bounded external harness descriptors; they do not open a NIC inside MoonECAT. `--backend mock` needs no hardware and is what tests use.
 
-See [README.mbt.md](README.mbt.md) for the full CLI surface (scan/validate/run/run-zc/diagnosis/od/state/replay/scenario/analysis subcommands) and parameter table.
+See [README.mbt.md](README.mbt.md) for the full CLI surface and parameter table — the `cmd/main` subcommands span topology discovery (`scan`, `list-if`), validation/run (`validate`, `run`, `run-zc`, `run-virtual`), inspection (`diagnosis`, `od`, `master-od`, `state`, `esc-regs`, `esi-sii`, `read-sii`), diagnostics (`startup-trace`, `startup-diff`, `mailbox-readback`, `replay`, `scenario`), and an analysis group (`jitter-profile`, `auto-tune`, `topo-health`, `cycle-perf`, `comm-quality`).
 
 ## Architecture
 
@@ -42,10 +42,10 @@ mailbox/                     SII/ESI parse · FMMU/SM · CoE/SDO · FoE · EoE �
         │
 protocol/                    Frame · PDU · addressing · ESM · DC · PDO · zero-copy codec
         │
-hal/  + mock/ native/ mcu/   Nic / ZeroCopyNic / Clock / FileAccess traits · FramePool
+hal/  + mock/ mcu/           Nic / ZeroCopyNic / Clock / FileAccess traits · FramePool
 ```
 
-The repository root is itself the library package `mokomoking2501/MoonECAT` (`MoonECAT.mbt`, imported as `@lib`). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the authoritative deep reference: per-package API inventory, data-flow diagrams (startup, PDO hot path, diagnosis, HIL), the testing matrix, and a per-package maturity assessment (L1–L4).
+Side packages that sit alongside the layered core: `cmd/eni_json` (ESI/ENI XML→JSON converter CLI) and `fixtures/` (shared test fixtures consumed across packages; has no tests of its own). The repository root is itself the library package `mokomoking2501/MoonECAT` (`MoonECAT.mbt`, imported as `@lib`). [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) is the authoritative deep reference: per-package API inventory, data-flow diagrams (startup, PDO hot path, diagnosis, HIL), the testing matrix, and a per-package maturity assessment (L1–L4).
 
 ### HAL backends
 
@@ -58,7 +58,7 @@ Do not add native C stubs in MoonECAT. Lockwire owns the NIC/session C ABI surfa
 ## MoonBit conventions (project-specific)
 
 - Code is organized in **blocks separated by `///|`**; block order is irrelevant, so refactors can proceed block-by-block.
-- Each package has `<name>_test.mbt` (blackbox) and `<name>_wbtest.mbt` (whitebox) test files, plus a generated `pkg.generated.mbti` interface — **regenerate `.mbti` with `moon info`, never hand-edit it**.
+- Each package has a generated `pkg.generated.mbti` interface — **regenerate `.mbti` with `moon info`, never hand-edit it**. Tests follow a `<name>_test.mbt` (blackbox) / `<name>_wbtest.mbt` (whitebox) split where both make sense; not every package has both (e.g. `fixtures/` and some `cmd/` packages have whitebox only).
 - Keep deprecated blocks in a `deprecated.mbt` file per directory.
 - Prefer `assert_eq` / `assert_true(x is Pattern(...))` for stable, well-defined results; reserve snapshot tests for recording current behavior.
 - For navigation use `moon ide` helpers (`peek-def`, `outline`, `find-references`); the `moonbit-agent-guide` skill (a git submodule at `.github/skills/`) documents them.

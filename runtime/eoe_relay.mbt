@@ -88,7 +88,7 @@ pub fn EoeRelay::set_active(self : EoeRelay, active : Bool) -> Unit {
 ///   None when no more frames are available this cycle.
 ///
 /// Returns (rx_count, tx_count) processed this cycle.
-pub fn[N : @hal.Nic] EoeRelay::relay_cycle(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeRelay::relay_cycle(
   self : EoeRelay,
   sw : EoeSwitch,
   nic : N,

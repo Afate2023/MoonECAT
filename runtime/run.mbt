@@ -181,7 +181,7 @@ pub fn required_sii_read_word_count(
 }
 
 ///|
-pub fn[N : @hal.Nic] read_sii_with_metadata_fp(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_sii_with_metadata_fp(
   nic : N,
   station : UInt,
   initial_word_count : Int,
@@ -191,7 +191,7 @@ pub fn[N : @hal.Nic] read_sii_with_metadata_fp(
 }
 
 ///|
-pub fn[N : @hal.Nic] read_sii_with_metadata_ap(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_sii_with_metadata_ap(
   nic : N,
   position : UInt,
   initial_word_count : Int,
@@ -237,7 +237,7 @@ fn sii_prefers_not_lrw(sii : @mailbox.SiiFullInfo) -> Bool {
 }
 
 ///|
-pub fn[N : @hal.Nic] build_run_startup_preparation(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_run_startup_preparation(
   nic : N,
   scan_report : ScanReport,
   logical_base : UInt,
@@ -305,7 +305,7 @@ pub fn[N : @hal.Nic] build_run_startup_preparation(
 }
 
 ///|
-pub fn[N : @hal.Nic] prepare_slave_startup(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_startup(
   nic : N,
   station : UInt,
   logical_base : UInt,
@@ -516,7 +516,7 @@ pub fn run_startup_preparation_from_slave_preparations(
 }
 
 ///|
-fn[N : @hal.Nic] refine_run_startup_preparation_override_in_preop(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] refine_run_startup_preparation_override_in_preop(
   nic : N,
   slave_preparations : Array[(UInt, SlaveStartupPreparation)],
   logical_base : UInt,
@@ -566,7 +566,7 @@ fn decode_le_u32_payload(payload : Bytes) -> UInt? {
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_payload_retry(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] sdo_upload_payload_retry(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -581,7 +581,7 @@ fn[N : @hal.Nic] sdo_upload_payload_retry(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_u32_retry(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] sdo_upload_u32_retry(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -606,7 +606,7 @@ fn[N : @hal.Nic] sdo_upload_u32_retry(
 }
 
 ///|
-fn[N : @hal.Nic] assigned_pdo_indices(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] assigned_pdo_indices(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -634,7 +634,7 @@ fn[N : @hal.Nic] assigned_pdo_indices(
 }
 
 ///|
-fn[N : @hal.Nic] mapped_pdo_bit_length(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] mapped_pdo_bit_length(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -662,7 +662,7 @@ fn[N : @hal.Nic] mapped_pdo_bit_length(
 }
 
 ///|
-fn[N : @hal.Nic] active_process_data_lengths_in_preop(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] active_process_data_lengths_in_preop(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -766,7 +766,7 @@ fn should_retry_process_data_lengths_after_mailbox_refresh(
 }
 
 ///|
-fn[N : @hal.Nic] active_process_data_lengths_after_mailbox_refresh(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] active_process_data_lengths_after_mailbox_refresh(
   nic : N,
   station : UInt,
   preparation : SlaveStartupPreparation,
@@ -800,7 +800,7 @@ fn[N : @hal.Nic] active_process_data_lengths_after_mailbox_refresh(
 }
 
 ///|
-pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] refine_startup_preparation_in_preop(
   nic : N,
   station : UInt,
   logical_base : UInt,
@@ -884,7 +884,7 @@ pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(
 }
 
 ///|
-fn[N : @hal.Nic] build_run_startup_preparation_from_preop(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_run_startup_preparation_from_preop(
   nic : N,
   stations : Array[UInt],
   logical_base : UInt,
@@ -1304,7 +1304,7 @@ fn startup_command_subindex_sequence_entry_data(
 }
 
 ///|
-fn[N : @hal.Nic] apply_startup_mailbox_subindex_sequence(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_startup_mailbox_subindex_sequence(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -1363,7 +1363,7 @@ fn preferred_ds402_mode_seed(rx_pdos : Array[@mailbox.SiiPdo]) -> Byte? {
 let startup_mailbox_drain_limit : Int = 4
 
 ///|
-fn[N : @hal.Nic] drain_startup_mailbox(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] drain_startup_mailbox(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -1396,7 +1396,7 @@ fn[N : @hal.Nic] drain_startup_mailbox(
 }
 
 ///|
-pub fn[N : @hal.Nic] apply_startup_mailbox_commands(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_startup_mailbox_commands(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -1449,7 +1449,7 @@ pub fn[N : @hal.Nic] apply_startup_mailbox_commands(
 }
 
 ///|
-pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_presafeop_startup_mailbox_commands(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -1467,7 +1467,7 @@ pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(
 }
 
 ///|
-pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_safeop_startup_mailbox_commands(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -1569,7 +1569,7 @@ fn mailbox_sm_hex(bytes : Bytes) -> String {
 }
 
 ///|
-fn[N : @hal.Nic] verify_mailbox_sm_readback(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] verify_mailbox_sm_readback(
   nic : N,
   station : UInt,
   sm_index : Int,
@@ -1596,7 +1596,7 @@ fn[N : @hal.Nic] verify_mailbox_sm_readback(
 
 ///|
 /// Write only mailbox SyncManager configuration derived from SII.
-pub fn[N : @hal.Nic] write_mailbox_mapping(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] write_mailbox_mapping(
   nic : N,
   station : UInt,
   mapping : @mailbox.SlaveMapping,
@@ -1624,7 +1624,7 @@ pub fn[N : @hal.Nic] write_mailbox_mapping(
 /// Write process-data SyncManager and FMMU configuration derived from SII.
 /// Call this only after mailbox configuration is accepted and the station is
 /// already in PreOp.
-pub fn[N : @hal.Nic] write_process_data_mapping(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] write_process_data_mapping(
   nic : N,
   station : UInt,
   mapping : @mailbox.SlaveMapping,
@@ -1707,7 +1707,7 @@ fn expected_wkc_from_slave_mappings(
 /// 4. Run PDO cycles.
 /// 5. Transition slaves back to Init.
 /// 6. Return a summary report.
-pub fn[N : @hal.Nic] run(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1730,7 +1730,7 @@ pub fn[N : @hal.Nic] run(
 }
 
 ///|
-pub fn[N : @hal.Nic] run_with_settings(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_settings(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1753,7 +1753,7 @@ pub fn[N : @hal.Nic] run_with_settings(
 }
 
 ///|
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_settings_reporting_to(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1780,7 +1780,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(
 }
 
 ///|
-pub fn[N : @hal.Nic] run_until_fault(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_until_fault(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1802,7 +1802,7 @@ pub fn[N : @hal.Nic] run_until_fault(
 }
 
 ///|
-pub fn[N : @hal.Nic] run_with_states(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1827,7 +1827,7 @@ pub fn[N : @hal.Nic] run_with_states(
 }
 
 ///|
-pub fn[N : @hal.Nic] run_with_states_until_fault(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states_until_fault(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1851,7 +1851,7 @@ pub fn[N : @hal.Nic] run_with_states_until_fault(
 }
 
 ///|
-pub fn[N : @hal.Nic] run_with_states_and_settings(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states_and_settings(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1878,7 +1878,7 @@ pub fn[N : @hal.Nic] run_with_states_and_settings(
 }
 
 ///|
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1908,7 +1908,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_prepared_
 }
 
 ///|
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_scan_and_states_and_settings_prepared_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_scan_and_states_and_settings_prepared_reporting_to(
   nic : N,
   scan_report : ScanReport,
   config : @hal.MasterConfig,
@@ -1939,7 +1939,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_scan_and_states_and_settings_
 }
 
 ///|
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting_to(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_states_and_settings_reporting_to(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -1967,7 +1967,7 @@ pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting
 }
 
 ///|
-fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_impl(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_states_and_settings_impl(
   nic : N,
   config : @hal.MasterConfig,
   expected : Array[@hal.SlaveConfig],
@@ -2223,7 +2223,7 @@ fn classify_startup_recovery_strategy(
 }
 
 ///|
-fn[N : @hal.Nic] stabilize_failed_startup_station(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] stabilize_failed_startup_station(
   nic : N,
   station : UInt,
   strategy : StartupRecoveryStrategy,
@@ -2265,7 +2265,7 @@ fn[N : @hal.Nic] stabilize_failed_startup_station(
 }
 
 ///|
-fn[N : @hal.Nic] read_startup_fault_details(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_startup_fault_details(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -2359,7 +2359,7 @@ fn startup_mailbox_transition_current(
 }
 
 ///|
-fn[N : @hal.Nic] startup_mailbox_plan_failed_fault(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] startup_mailbox_plan_failed_fault(
   nic : N,
   station : UInt,
   transition : StartupCommandTransition,
@@ -2383,7 +2383,7 @@ fn[N : @hal.Nic] startup_mailbox_plan_failed_fault(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_for_startup(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_for_startup(
   nic : N,
   stations : Array[UInt],
   startup_state : @protocol.EsmState,
@@ -2486,7 +2486,7 @@ fn[N : @hal.Nic] transition_stations_for_startup(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_preop_with_mailbox(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_preop_with_mailbox(
   nic : N,
   stations : Array[UInt],
   timeout : @hal.Duration,
@@ -2506,7 +2506,7 @@ fn[N : @hal.Nic] transition_stations_to_preop_with_mailbox(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_preop_with_preparations(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_preop_with_preparations(
   nic : N,
   slave_preparations : Array[(UInt, SlaveStartupPreparation)],
   timeout : @hal.Duration,
@@ -2527,7 +2527,7 @@ fn[N : @hal.Nic] transition_stations_to_preop_with_preparations(
 }
 
 ///|
-fn[N : @hal.Nic] transition_slave_to_target_strict_after_recovery(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_slave_to_target_strict_after_recovery(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -2580,7 +2580,7 @@ fn[N : @hal.Nic] transition_slave_to_target_strict_after_recovery(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_safeop_with_preparations(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_safeop_with_preparations(
   nic : N,
   slave_preparations : Array[(UInt, SlaveStartupPreparation)],
   timeout : @hal.Duration,
@@ -2667,7 +2667,7 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_preparations(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_safeop_with_process_mapping(
   nic : N,
   stations : Array[UInt],
   pdo_ctx : @protocol.PdoContext,
@@ -2714,7 +2714,7 @@ fn[N : @hal.Nic] transition_stations_to_safeop_with_process_mapping(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_target(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_target(
   nic : N,
   stations : Array[UInt],
   target : @protocol.EsmState,
@@ -2735,7 +2735,7 @@ fn[N : @hal.Nic] transition_stations_to_target(
 }
 
 ///|
-fn[N : @hal.Nic] transition_stations_to_op_with_process_data(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_stations_to_op_with_process_data(
   nic : N,
   stations : Array[UInt],
   pdo_ctx : @protocol.PdoContext,
@@ -2754,7 +2754,7 @@ fn[N : @hal.Nic] transition_stations_to_op_with_process_data(
 }
 
 ///|
-fn[N : @hal.Nic] apply_station_startup_mailbox_plans(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_station_startup_mailbox_plans(
   nic : N,
   plans : Array[StationStartupMailboxPlan],
   transition : StartupCommandTransition,
@@ -2782,7 +2782,7 @@ fn[N : @hal.Nic] apply_station_startup_mailbox_plans(
 }
 
 ///|
-fn[N : @hal.Nic] transition_slave_to_target(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_slave_to_target(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -2839,7 +2839,7 @@ fn[N : @hal.Nic] transition_slave_to_target(
 }
 
 ///|
-fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_slave_to_preop_with_mailbox(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -2864,7 +2864,7 @@ fn[N : @hal.Nic] transition_slave_to_preop_with_mailbox(
 }
 
 ///|
-fn[N : @hal.Nic] transition_slave_to_preop_with_preparation(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_slave_to_preop_with_preparation(
   nic : N,
   station : UInt,
   preparation : SlaveStartupPreparation,
@@ -2929,7 +2929,7 @@ fn pdo_logical_base_for_station(
 }
 
 ///|
-fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] configure_slave_process_mapping_from_pdo_ctx(
   nic : N,
   station : UInt,
   pdo_ctx : @protocol.PdoContext,
@@ -2976,7 +2976,7 @@ fn[N : @hal.Nic] configure_slave_process_mapping_from_pdo_ctx(
 }
 
 ///|
-fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_slave_to_op_with_process_data(
   nic : N,
   station : UInt,
   pdo_ctx : @protocol.PdoContext,
@@ -3019,7 +3019,7 @@ fn[N : @hal.Nic] transition_slave_to_op_with_process_data(
 }
 
 ///|
-fn[N : @hal.Nic] attempt_transition_slave_to_target(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] attempt_transition_slave_to_target(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -3050,7 +3050,7 @@ fn[N : @hal.Nic] attempt_transition_slave_to_target(
 }
 
 ///|
-fn[N : @hal.Nic] warmup_process_data_for_op(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] warmup_process_data_for_op(
   nic : N,
   pdo_ctx : @protocol.PdoContext,
   timeout : @hal.Duration,
@@ -3078,7 +3078,7 @@ pub(all) struct SmWatchdogValidation {
 /// block the transition. Devices without a configured SM watchdog will still
 /// be promoted to Op (the ESC itself enforces watchdog-related faults via
 /// AL Status Code 0x001B during runtime).
-fn[N : @hal.Nic] validate_sm_watchdog_before_op(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] validate_sm_watchdog_before_op(
   nic : N,
   stations : Array[UInt],
   timeout : @hal.Duration,

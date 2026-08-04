@@ -358,13 +358,18 @@ pub fn recorded_count_slaves_oracle() -> RecordedCountSlavesOracle raise @hal.Ec
   let recording = @mock.RecordingNic::wrap(
     @mock.VirtualNic::with_slaves([slave]),
   )
+  let recording_session = @protocol.DatagramSession::new(recording)
   let recorded_count = @protocol.count_slaves(
-    recording,
+    recording_session,
     @hal.Duration(1_000_000L),
   )
   let log = recording.get_log()
   let replay = @mock.ReplayNic::from_log(log)
-  let replay_count = @protocol.count_slaves(replay, @hal.Duration(1_000_000L))
+  let replay_session = @protocol.DatagramSession::new(replay)
+  let replay_count = @protocol.count_slaves(
+    replay_session,
+    @hal.Duration(1_000_000L),
+  )
   { recorded_count, replay_count, log, replay_exhausted: replay.is_exhausted() }
 }
 
@@ -394,7 +399,7 @@ pub fn offline_runtime_run_report() -> @runtime.RunReport {
   let expected : Array[@hal.SlaveConfig] = []
   let config = @hal.MasterConfig::default()
   @runtime.run_with_scan_and_states_and_settings_prepared_reporting_to(
-    @mock.MockNic::new(),
+    @protocol.DatagramSession::new(@mock.MockNic::new()),
     scan,
     config,
     expected,

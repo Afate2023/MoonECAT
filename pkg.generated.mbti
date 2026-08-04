@@ -44,4 +44,3 @@ pub using @device_profile {type MoonEcatStartupTarget}
 pub using @device_profile {type ProviderDeviceInstanceBinding}
 
 // Traits
-

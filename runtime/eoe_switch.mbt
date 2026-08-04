@@ -255,7 +255,7 @@ pub fn eoe_max_fragment_size(mb_config : @mailbox.MailboxConfig) -> Int {
 ///|
 /// Fragment and send an Ethernet frame to a specific EoE station.
 /// Returns the number of fragments sent.
-pub fn[N : @hal.Nic] EoeSwitch::send_frame(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::send_frame(
   self : EoeSwitch,
   nic : N,
   station : UInt,
@@ -355,7 +355,7 @@ pub fn EoeSwitch::drain_rx(self : EoeSwitch) -> Array[EoeReceivedFrame] {
 ///|
 /// Poll all registered EoE stations for incoming mailbox data.
 /// Returns the number of complete Ethernet frames reassembled this cycle.
-pub fn[N : @hal.Nic] EoeSwitch::poll(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::poll(
   self : EoeSwitch,
   nic : N,
   timeout : @hal.Duration,
@@ -390,7 +390,7 @@ pub fn[N : @hal.Nic] EoeSwitch::poll(
 
 ///|
 /// Send a Set IP parameters request to an EoE station.
-pub fn[N : @hal.Nic] EoeSwitch::set_ip(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::set_ip(
   self : EoeSwitch,
   nic : N,
   station : UInt,
@@ -420,7 +420,7 @@ pub fn[N : @hal.Nic] EoeSwitch::set_ip(
 
 ///|
 /// Send a Get IP parameters request to an EoE station.
-pub fn[N : @hal.Nic] EoeSwitch::get_ip(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::get_ip(
   self : EoeSwitch,
   nic : N,
   station : UInt,

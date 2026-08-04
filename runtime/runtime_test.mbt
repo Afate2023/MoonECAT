@@ -260,6 +260,12 @@ fn read_station_address_bytes(data : Bytes) -> UInt {
 }
 
 ///|
+fn scan_station_position(address : UInt) -> Int {
+  let adp = @protocol.address_station(address)
+  ((0x10000U - adp) & 0xFFFFU).reinterpret_as_int()
+}
+
+///|
 pub impl @hal.Nic for ScanStationNic with fn open_(name) {
   ignore(name)
   ScanStationNic::new([])
@@ -273,7 +279,7 @@ pub impl @hal.Nic for ScanStationNic with fn send(self, data) {
   let request = @protocol.EcFrame::decode(data)
   let pdu = request.pdus[0]
   let offset = @protocol.address_offset(pdu.header.address)
-  let position = @protocol.address_station(pdu.header.address).reinterpret_as_int()
+  let position = scan_station_position(pdu.header.address)
   self.next_response = match pdu.header.command {
     @protocol.BRD =>
       build_response_frame(
@@ -601,7 +607,8 @@ pub impl @hal.Nic for ConfirmedRunNic with fn close(self) {
 test "Runtime init_dc disabled keeps state Disabled" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
   @debug.assert_eq(ok, false)
   assert_true(rt.dc_state is Disabled)
@@ -612,7 +619,8 @@ test "Runtime init_dc disabled keeps state Disabled" {
 test "Runtime init_dc enabled sets Locked" {
   let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
   let rt = @runtime.Runtime::new(config)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let ok = rt.init_dc(nic, [0x1001U], @hal.Duration(1000L))
   @debug.assert_eq(ok, true)
   assert_true(rt.dc_state is Locked)
@@ -623,7 +631,8 @@ test "Runtime init_dc enabled sets Locked" {
 test "Runtime run_cycles stops on dc drift" {
   let config = { ..@hal.MasterConfig::default(), dc_enabled: true }
   let rt = @runtime.Runtime::new(config)
-  let nic = ConfirmedRunNic::new(1U, true, true)
+  let raw_nic = ConfirmedRunNic::new(1U, true, true)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   rt.configure_pdo(single_slave_pdo_context(), 1U)
   rt.dc_reference_station = Some(0x1001U)
   rt.dc_stations = [0x1001U]
@@ -638,7 +647,8 @@ test "Runtime run_cycles stops on dc drift" {
 test "Runtime run_until_fault stops on repeated wkc mismatch" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  let nic = ConfirmedRunNic::new(0U, true, false)
+  let raw_nic = ConfirmedRunNic::new(0U, true, false)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   rt.configure_pdo(single_slave_pdo_context(), 1U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
   let ok = rt.run_until_fault(nic, @hal.Duration(1000L))
@@ -651,7 +661,8 @@ test "Runtime run_until_fault stops on repeated wkc mismatch" {
 test "Runtime run_until_fault stops on repeated recv timeout" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  let nic = TimeoutNic::new()
+  let raw_nic = TimeoutNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let sm : @mailbox.SlaveMapping = {
     sm_configs: [],
     fmmu_configs: [],
@@ -673,7 +684,8 @@ test "Runtime run_until_fault stops on repeated recv timeout" {
 test "Runtime run_cycle without pdo_ctx raises Internal error" {
   let config = @hal.MasterConfig::default()
   let rt = @runtime.Runtime::new(config)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let result = try rt.run_cycle(nic, @hal.Duration(1000L)) catch {
     @hal.EcError::Internal(msg) => msg
     _ => "unexpected"
@@ -733,7 +745,8 @@ test "Free-run: run_cycle succeeds when expected_wkc is 0" {
   // MockNic echoes back frames with WKC=0
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let result = rt.run_cycle(nic, @hal.Duration(1000L))
   @debug.assert_eq(result.ok, true)
   @debug.assert_eq(result.wkc, 0U)
@@ -757,7 +770,8 @@ test "DcSync: run_cycle performs compensation and PDO" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x1000U)
   rt.configure_pdo(ctx, 0U)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   ignore(rt.init_dc(nic, [0x1001U], @hal.Duration(1000L)))
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
   let result = rt.run_cycle(nic, @hal.Duration(1000L))
@@ -778,7 +792,8 @@ test "Free-run: run_cycles executes multiple cycles" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
   @debug.assert_eq(success, 10)
   let t = rt.get_telemetry()
@@ -801,7 +816,8 @@ test "Pressure: free-run core loop remains stable at high cycle count" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let cycles = 1000
   let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
   @debug.assert_eq(success, cycles)
@@ -826,7 +842,8 @@ test "Pressure: timeout-heavy loop keeps accounting consistent" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = TimeoutNic::new()
+  let raw_nic = TimeoutNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let cycles = 1000
   rt.set_timeout_threshold(cycles + 1)
   let success = rt.run_cycles(nic, cycles, @hal.Duration(1000L))
@@ -854,7 +871,8 @@ test "Pressure: telemetry remains monotonic across different loads" {
     let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
     rt.configure_pdo(ctx, 0U)
     rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-    let nic = @mock.MockNic::new()
+    let raw_nic = @mock.MockNic::new()
+    let nic = @protocol.DatagramSession::new(raw_nic)
     let success = rt.run_cycles(nic, load, @hal.Duration(1000L))
     @debug.assert_eq(success, load)
     let t = rt.get_telemetry()
@@ -879,7 +897,8 @@ test "Recovery: run_cycles records RecvTimeout and continues" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = TimeoutNic::new()
+  let raw_nic = TimeoutNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let success = rt.run_cycles(nic, 4, @hal.Duration(1000L))
   @debug.assert_eq(success, 0)
   let t = rt.get_telemetry()
@@ -902,8 +921,9 @@ test "Runtime run_cycle propagates LinkDown on broken NIC" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = TimeoutNic::new()
-  nic.close()
+  let raw_nic = TimeoutNic::new()
+  raw_nic.close()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let result = Result::Ok(rt.run_cycle(nic, @hal.Duration(1000L))) catch {
     err => Result::Err(err)
   }
@@ -924,7 +944,8 @@ test "Recovery: WKC mismatch increments error counter" {
   // Expect WKC=3, but MockNic echoes WKC=0 → mismatch
   rt.configure_pdo(ctx, 3U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let result = rt.run_cycle(nic, @hal.Duration(1000L))
   @debug.assert_eq(result.ok, false)
   @debug.assert_eq(result.wkc, 0U)
@@ -947,7 +968,8 @@ test "Recovery: consecutive WKC errors trigger recovery state" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 3U) // expect 3, get 0 → always fail
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   // Run 10 cycles; after 5 consecutive errors, should enter Error state
   let success = rt.run_cycles(nic, 10, @hal.Duration(1000L))
   @debug.assert_eq(success, 0)
@@ -970,7 +992,8 @@ test "Recovery: reset_error_counter allows resumption" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 3U)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   // Accumulate some errors
   for _i = 0; _i < 3; _i = _i + 1 {
     let _r = rt.run_cycle(nic, @hal.Duration(1000L))
@@ -1045,7 +1068,8 @@ test "Emergency: no stations configured means no polling overhead" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let success = rt.run_cycles(nic, 5, @hal.Duration(1000L))
   @debug.assert_eq(success, 5)
   let tel = rt.get_telemetry()
@@ -1180,7 +1204,8 @@ test "Free-run: set_slave_outputs and get_slave_inputs" {
 
 ///|
 test "scan with mock loopback returns empty report" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let report = @runtime.scan(nic, timeout)
   // MockNic echoes back WKC=0, so count_slaves returns 0
@@ -2626,7 +2651,8 @@ test "DcSync: periodic delay re-estimation updates telemetry" {
   }
   let ctx = @protocol.PdoContext::build([(sm, 0x1001U)], 0x1000U)
   rt.configure_pdo(ctx, 0U)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   ignore(rt.init_dc(nic, [0x1001U], @hal.Duration(1000L)))
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::DcSync))
   let _ = rt.run_cycles(nic, 105, @hal.Duration(1000L))
@@ -2636,7 +2662,8 @@ test "DcSync: periodic delay re-estimation updates telemetry" {
 
 ///|
 test "run with mock loopback: empty bus, no expected slaves succeeds" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let expected : Array[@hal.SlaveConfig] = []
   let ctx : @protocol.PdoContext = {
@@ -2662,7 +2689,8 @@ test "run with mock loopback: empty bus, no expected slaves succeeds" {
 
 ///|
 test "scan reads slave identity from sii header" {
-  let nic = SiiIdentityNic::new()
+  let raw_nic = SiiIdentityNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let report = @runtime.scan(nic, @hal.Duration(1000L))
   @debug.assert_eq(report.slave_count, 1)
   @debug.assert_eq(report.slaves[0].vendor_id, 0x2U)
@@ -2673,7 +2701,8 @@ test "scan reads slave identity from sii header" {
 
 ///|
 test "scan preserves unique pre-existing station addresses" {
-  let nic = ScanStationNic::new([0x2001U, 0x2002U])
+  let raw_nic = ScanStationNic::new([0x2001U, 0x2002U])
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let report = @runtime.scan(nic, @hal.Duration(1000L))
   @debug.assert_eq(report.slave_count, 2)
   @debug.assert_eq(report.slaves[0].station_address, 0x2001U)
@@ -2682,7 +2711,8 @@ test "scan preserves unique pre-existing station addresses" {
 
 ///|
 test "scan reassigns duplicate or zero station addresses into scan pool" {
-  let nic = ScanStationNic::new([0U, 0U, 0x2001U, 0x2001U])
+  let raw_nic = ScanStationNic::new([0U, 0U, 0x2001U, 0x2001U])
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let report = @runtime.scan(nic, @hal.Duration(1000L))
   @debug.assert_eq(report.slave_count, 4)
   @debug.assert_eq(report.slaves[0].station_address, 0x1001U)
@@ -2693,7 +2723,8 @@ test "scan reassigns duplicate or zero station addresses into scan pool" {
 
 ///|
 test "run with empty bus skips ESM broadcasts" {
-  let nic = RejectEmptyBusTransitionNic::new()
+  let raw_nic = RejectEmptyBusTransitionNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let expected : Array[@hal.SlaveConfig] = []
   let ctx : @protocol.PdoContext = {
@@ -2717,12 +2748,13 @@ test "run with empty bus skips ESM broadcasts" {
   @debug.assert_eq(report.cycles_ok, 3)
   assert_true(report.final_phase is @runtime.Done)
   assert_true(report.fault is None)
-  @debug.assert_eq(nic.state_transition_attempts, 0)
+  @debug.assert_eq(raw_nic.state_transition_attempts, 0)
 }
 
 ///|
 test "run confirms op via per-station transition without broadcast" {
-  let nic = ConfirmedRunNic::new(1U, true, false)
+  let raw_nic = ConfirmedRunNic::new(1U, true, false)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let report = @runtime.run(
     nic,
@@ -2742,13 +2774,14 @@ test "run confirms op via per-station transition without broadcast" {
   assert_true(report.final_phase is @runtime.Done)
   assert_true(report.fault is None)
   @debug.assert_eq(report.cycles_ok, 1)
-  @debug.assert_eq(nic.al_control_broadcast_attempts, 0)
-  @debug.assert_eq(nic.current_state, @protocol.Init.to_byte())
+  @debug.assert_eq(raw_nic.al_control_broadcast_attempts, 0)
+  @debug.assert_eq(raw_nic.current_state, @protocol.Init.to_byte())
 }
 
 ///|
 test "run reports runtime recovery fault after repeated wkc mismatch" {
-  let nic = ConfirmedRunNic::new(0U, true, false)
+  let raw_nic = ConfirmedRunNic::new(0U, true, false)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let report = @runtime.run(
     nic,
@@ -2861,7 +2894,8 @@ test "diagnostic surface from run includes runtime fault issues" {
 
 ///|
 test "run with mock loopback: validation fails when slaves expected but not found" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let expected : Array[@hal.SlaveConfig] = [
     {
@@ -2901,7 +2935,8 @@ test "run with mock loopback: validation fails when slaves expected but not foun
 
 ///|
 test "replay integration minimal flow: scan->validate->run->stop" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let config = @hal.MasterConfig::default()
   let expected : Array[@hal.SlaveConfig] = []
   let ctx : @protocol.PdoContext = {
@@ -2967,7 +3002,8 @@ test "Decoupling: mailbox diagnosis failure does not block PDO run loop" {
   let ctx = @protocol.PdoContext::build([(sm, 1U)], 0U)
   rt.configure_pdo(ctx, 0U)
   rt.set_state(@runtime.RuntimeState::Running(@runtime.RunMode::FreeRun))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
 
   // PDO path works before mailbox diagnosis call.
   let before = rt.run_cycles(nic, 2, @hal.Duration(1000L))
@@ -3395,7 +3431,8 @@ test "bridge_eoe_cycle delivers rx frames to endpoint" {
   let _ = sw.process_received(0x1001U, frame)
   // Bridge cycle: tx_pending is empty, rx should deliver 1 frame
   let ep = @runtime.QueueEndpoint::new()
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
   @debug.assert_eq(tx, 0)
   @debug.assert_eq(rx, 1)
@@ -3424,7 +3461,8 @@ test "bridge_eoe_cycle drains tx_pending via switch" {
   let ep = @runtime.QueueEndpoint::new()
   let data = Bytes::makei(20, fn(i) { i.to_byte() })
   ignore(ep.submit_tx(0x1001U, data))
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let (tx, rx) = @runtime.bridge_eoe_cycle(sw, ep, nic, @hal.Duration(10_000L))
   // MockNic accepts send, so tx_sent = 1
   @debug.assert_eq(tx, 1)
@@ -3464,7 +3502,8 @@ test "EoeRelay inactive relay_cycle returns zero" {
   let relay = @runtime.EoeRelay::new()
   relay.set_active(false)
   let sw = @runtime.EoeSwitch::new()
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let (rx, tx) = relay.relay_cycle(
     sw,
     nic,
@@ -3496,7 +3535,8 @@ test "EoeRelay relay_cycle delivers rx frames via handler" {
   let _ = sw.process_received(0x1001U, frame)
   // Collect frames delivered to handler
   let delivered : Array[@runtime.EoeRelayFrame] = []
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let (rx, tx) = relay.relay_cycle(
     sw,
     nic,
@@ -3533,7 +3573,8 @@ test "EoeRelay relay_cycle handler rejection increments dropped" {
     b'\x01', 0U, true, 0U, 0U, 0U, payload,
   )
   let _ = sw.process_received(0x1001U, frame)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   // Handler rejects frames
   let (rx, _tx) = relay.relay_cycle(
     sw,
@@ -3560,7 +3601,8 @@ test "EoeRelay relay_cycle tx_provider sends frames" {
     in_sm_index: 1,
   }
   sw.add_station(0x1001U, cfg)
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let mut provided = 0
   // Provide one frame then stop
   let (_rx, _tx) = relay.relay_cycle(
@@ -7742,7 +7784,8 @@ test "EoeSwitch send_frame unknown station raises" {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, id, Bytes::new(256)),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let frame = b"\x01\x02\x03\x04"
   // station 0x9999U not registered → should raise MailboxProtocol
   let result : Result[Int, _] = Result::Ok(
@@ -7775,7 +7818,8 @@ test "EoeSwitch send_frame mailbox too small raises" {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, id, Bytes::new(256)),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let frame = b"\x01\x02\x03\x04"
   let result : Result[Int, _] = Result::Ok(
     sw.send_frame(nic, 0x1001U, frame, @hal.Duration(50_000_000L)),

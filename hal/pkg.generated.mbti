@@ -183,4 +183,3 @@ pub(open) trait ZeroCopyNic {
   fn release(Self, FrameRef) -> Unit
   fn close(Self) -> Unit
 }
-

@@ -3,28 +3,29 @@ package "mokomoking2501/MoonECAT/cmd/main"
 
 import {
   "mokomoking2501/MoonECAT/hal",
+  "mokomoking2501/MoonECAT/protocol",
   "mokomoking2501/MoonECAT/runtime",
   "moonbitlang/core/debug",
 }
 
 // Values
-pub fn[N : @hal.Nic] run_diagnosis_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_diagnosis_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_esc_register_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_esc_register_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_expected_register_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_expected_register_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_mailbox_readback_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_mailbox_readback_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_od_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_od_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_read_sii_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_read_sii_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_startup_diff_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_startup_diff_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_startup_trace_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_startup_trace_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_state_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_state_command(N, Array[String], Bool, @hal.Duration) -> Unit raise @hal.EcError
 
 // Errors
 
@@ -36,6 +37,18 @@ pub impl @runtime.RunProgressSink for CliNdjsonRunProgressSink
 
 type CliTextRunProgressSink
 pub impl @runtime.RunProgressSink for CliTextRunProgressSink
+
+type CyclicSdoReadReport
+
+type CyclicSdoReadSample
+
+type CyclicSdoReadSettings
+
+type CyclicSdoWriteReport
+
+type CyclicSdoWriteSample
+
+type CyclicSdoWriteSettings
 
 type EscFmmuRegisterReport
 
@@ -80,4 +93,3 @@ type StationStartupDecision
 // Type aliases
 
 // Traits
-

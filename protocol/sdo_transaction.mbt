@@ -1,6 +1,6 @@
 ///|
 /// SDO transaction layer: complete SDO Upload/Download using
-/// mailbox transport, RMSM counter management, and CoE encoding/decoding.
+/// mailbox transport, mailbox-session tracking, and CoE encoding/decoding.
 /// Implements ETG.1500 #501 (SDO Up/Download shall).
 
 ///|
@@ -23,7 +23,7 @@ let max_stale_retries : Int = 3
 /// Receive and validate an SDO response (FP addressing).
 /// Discards stale/repeat frames by re-reading until a fresh response arrives
 /// or the stale-retry budget is exhausted.
-fn[N : @hal.Nic] recv_sdo_validated_fp(
+fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_validated_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -38,14 +38,16 @@ fn[N : @hal.Nic] recv_sdo_validated_fp(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
 /// Receive and validate an SDO response (AP addressing).
 /// Discards stale/repeat frames by re-reading until a fresh response arrives
 /// or the stale-retry budget is exhausted.
-fn[N : @hal.Nic] recv_sdo_validated_ap(
+fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_validated_ap(
   nic : N,
   position : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -62,14 +64,16 @@ fn[N : @hal.Nic] recv_sdo_validated_ap(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
 /// Receive and validate an SDO Info response (FP addressing).
 /// Discards stale/repeat frames by re-reading until a fresh response arrives
 /// or the stale-retry budget is exhausted.
-fn[N : @hal.Nic] recv_sdo_info_validated_fp(
+fn[N : @hal.Nic + DatagramIndexSource] recv_sdo_info_validated_fp(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -84,11 +88,13 @@ fn[N : @hal.Nic] recv_sdo_info_validated_fp(
     }
     // Stale/repeat frame: discard and re-read
   }
-  raise @hal.EcError::MailboxProtocol("RMSM: too many stale frames received")
+  raise @hal.EcError::MailboxProtocol(
+    "mailbox session: too many stale frames received",
+  )
 }
 
 ///|
-fn[N : @hal.Nic] sdo_download_once(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_download_once(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -124,7 +130,7 @@ fn[N : @hal.Nic] sdo_download_once(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_once(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_once(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -160,7 +166,7 @@ fn[N : @hal.Nic] sdo_upload_once(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_ap_once(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_ap_once(
   nic : N,
   position : UInt,
   station : UInt,
@@ -200,7 +206,7 @@ fn[N : @hal.Nic] sdo_upload_ap_once(
 /// Execute an SDO Download (write to slave Object Dictionary).
 /// Encodes the request, sends via mailbox, waits for response, validates.
 /// Supports expedited transfer (data ≤ 4 bytes).
-pub fn[N : @hal.Nic] sdo_download(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_download(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -219,7 +225,7 @@ pub fn[N : @hal.Nic] sdo_download(
 /// Execute an SDO Upload (read from slave Object Dictionary).
 /// Encodes the request, sends via mailbox, waits for response, returns data.
 /// Supports expedited transfer (data ≤ 4 bytes).
-pub fn[N : @hal.Nic] sdo_upload(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_upload(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -235,7 +241,7 @@ pub fn[N : @hal.Nic] sdo_upload(
 
 ///|
 /// Execute an SDO Upload using auto-increment mailbox transport.
-pub fn[N : @hal.Nic] sdo_upload_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -253,7 +259,7 @@ pub fn[N : @hal.Nic] sdo_upload_ap(
 ///|
 /// Execute an SDO Download with RMSM retry support.
 /// Retries on MailboxTimeout up to RMSM's max_retries limit.
-pub fn[N : @hal.Nic] sdo_download_retry(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_download_retry(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -298,7 +304,7 @@ pub fn[N : @hal.Nic] sdo_download_retry(
 ///|
 /// Execute an SDO Upload with RMSM retry support.
 /// Retries on MailboxTimeout up to RMSM's max_retries limit.
-pub fn[N : @hal.Nic] sdo_upload_retry(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_retry(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -341,7 +347,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry(
 
 ///|
 /// Execute an SDO Upload with RMSM retry support using auto-increment transport.
-pub fn[N : @hal.Nic] sdo_upload_retry_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_retry_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -385,7 +391,7 @@ pub fn[N : @hal.Nic] sdo_upload_retry_ap(
 
 ///|
 /// Execute an SDO Download with Complete Access enabled.
-pub fn[N : @hal.Nic] sdo_download_complete_access(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_download_complete_access(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -418,7 +424,7 @@ pub fn[N : @hal.Nic] sdo_download_complete_access(
 
 ///|
 /// Execute an SDO Upload with Complete Access enabled.
-pub fn[N : @hal.Nic] sdo_upload_complete_access(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_complete_access(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -449,7 +455,7 @@ pub fn[N : @hal.Nic] sdo_upload_complete_access(
 
 ///|
 /// Read CoE SDO Info OD list and return object indices.
-pub fn[N : @hal.Nic] sdo_info_get_od_list(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_info_get_od_list(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -469,7 +475,7 @@ pub fn[N : @hal.Nic] sdo_info_get_od_list(
 
 ///|
 /// Read SDO Info Get OD (object description) for one object index.
-pub fn[N : @hal.Nic] sdo_info_get_od_description(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_info_get_od_description(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -487,7 +493,7 @@ pub fn[N : @hal.Nic] sdo_info_get_od_description(
 
 ///|
 /// Read SDO Info Get OE (entry description) for one object entry.
-pub fn[N : @hal.Nic] sdo_info_get_oe_description(
+pub fn[N : @hal.Nic + DatagramIndexSource] sdo_info_get_oe_description(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -508,7 +514,7 @@ pub fn[N : @hal.Nic] sdo_info_get_oe_description(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_collect_segmented(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_collect_segmented(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -566,7 +572,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_upload_collect_segmented_ap(
   nic : N,
   position : UInt,
   station : UInt,
@@ -627,7 +633,7 @@ fn[N : @hal.Nic] sdo_upload_collect_segmented_ap(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_download_segmented(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_download_segmented(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,
@@ -640,23 +646,11 @@ fn[N : @hal.Nic] sdo_download_segmented(
   retry : Bool,
 ) -> Unit raise @hal.EcError {
   let total_len = data.length().reinterpret_as_uint()
-  let size_payload = Bytes::from_array([
-    (total_len & 0xFFU).to_byte(),
-    ((total_len >> 8) & 0xFFU).to_byte(),
-    ((total_len >> 16) & 0xFFU).to_byte(),
-    ((total_len >> 24) & 0xFFU).to_byte(),
-  ])
   let init_counter = rmsm_begin_transaction(rmsm, retry)
-  let init_txn = if complete_access {
-    @mailbox.build_sdo_download_ca(
-      init_counter, station, index, subindex, size_payload,
-    )
-  } else {
-    @mailbox.build_sdo_download(
-      init_counter, station, index, subindex, size_payload,
-    )
-  }
-  mailbox_send(nic, station, mb_config, init_txn.encode(), timeout)
+  let init_frame = @mailbox.build_sdo_download_segmented_init_request(
+    init_counter, station, index, subindex, total_len, complete_access,
+  )
+  mailbox_send(nic, station, mb_config, init_frame, timeout)
   let init_resp = recv_sdo_validated_fp(nic, station, mb_config, rmsm, timeout)
   if init_resp.command != @mailbox.SdoCommand::DownloadResponse {
     raise @hal.EcError::MailboxProtocol(
@@ -694,7 +688,7 @@ fn[N : @hal.Nic] sdo_download_segmented(
 }
 
 ///|
-fn[N : @hal.Nic] sdo_info_collect_payload(
+fn[N : @hal.Nic + DatagramIndexSource] sdo_info_collect_payload(
   nic : N,
   station : UInt,
   mb_config : @mailbox.MailboxConfig,

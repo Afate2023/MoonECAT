@@ -111,7 +111,13 @@ capture lifecycle and pcapng limits remain Lockwire-owned.
 - **PDU**: `Pdu` struct, `find_pdu_by_index`, pipeline 多 PDU datagram。
 - **Addressing**: `auto_increment_address`, `configured_address`,
   `broadcast_address`, `logical_address`; `AddressType`/`AddressMode` enum。
+- **Transaction session**: `DatagramSession[N]` 持有串行主站会话的 Datagram
+  Index 游标；标准协议入口要求 `Nic + DatagramIndexSource`。同一业务会话应只包装
+  一次，并贯穿 scan、状态切换、mailbox/SDO 与周期交换。事务失败仍消耗已分配
+  Index；`transact` 内部的 receive-only 补收不重发，也不再分配新 Index。
 - **Transactions**: `transact` / `transact_pdu` / `transact_pdu_retry`;
+  `transact` 是调用者已提供 Index 的底层帧入口，其余标准协议事务从
+  `DatagramSession` 分配 Index；
   register read/write: `read_register_fp` / `read_register_ap` /
   `write_register_fp` / `write_register_ap`。
 - **Discovery**: `count_slaves`, `assign_station_address`,
@@ -138,7 +144,8 @@ capture lifecycle and pcapng limits remain Lockwire-owned.
   `pdo_read`/`pdo_write` (LRD/LWR),
   `PdoExchangeResult` 含 WKC 结果。
 - **零拷贝 PDO**: `pdo_exchange_zero_copy`/`pdo_read_zero_copy`/
-  `pdo_write_zero_copy` — MutablePdoContext 路径零 GC 分配。
+  `pdo_write_zero_copy` — MutablePdoContext 路径零 GC 分配。该独立通道尚未接入
+  `DatagramSession` 游标，后续需要专用的 zero-copy Index allocator。
 - **Mailbox Transport**: `mailbox_send`/`mailbox_recv`/`mailbox_poll`/
   `mailbox_exchange` (AP/FP 变体), RMSM 重发支持
   (`mailbox_recv_rmsm`/`mailbox_recv_ap_rmsm`)。
@@ -481,7 +488,7 @@ All tests run via `moon test` with zero external dependencies (Native 实机测�
 | Fault Injection | Drop/delay/corrupt/WKC mismatch injection | hal/mock/ |
 | Replay | Frame recording → deterministic replay | hal/mock/ |
 | Scenario | Scripted protocol deviation scenarios | hal/mock/ |
-| Native provider harness | Lockwire session binding descriptor, pending live handoff | fieldbus_core/moonecat_master_harness/ |
+| Native provider operation | Stack-owned EtherCAT operation over an already-open Lockwire session; NIC lifecycle remains composition-owned | isochronon_provider/ |
 | Extism | Envelope encode/decode, host contract validation | plugin/extism/ |
 
 ## Maturity Assessment
@@ -527,8 +534,8 @@ Test fixtures live in `fixtures/fixtures.mbt` and provide
 
 ### Adding a new NIC backend
 
-1. Implement the Lockwire native/session side in the Isochronon provider
-   harness, not inside MoonECAT.
+1. Implement the Lockwire native/session side in Isochronon composition, not
+   inside MoonECAT protocol packages.
 2. Provide a wrapper that satisfies `@hal.Nic` or `@hal.ZeroCopyNic`.
 3. Call MoonECAT's generic runtime/CLI runner functions from that harness.
 

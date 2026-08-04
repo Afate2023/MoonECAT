@@ -68,9 +68,9 @@ pub fn run_entry(req : PluginRequest) -> PluginResponse {
 ///|
 fn run_with_mock(
   req : PluginRequest,
-  action : (@mock.MockNic, @hal.Duration) -> PluginResponse raise @hal.EcError,
+  action : (@protocol.DatagramSession[@mock.MockNic], @hal.Duration) -> PluginResponse raise @hal.EcError,
 ) -> PluginResponse {
-  let nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(@mock.MockNic::new())
   let timeout = request_timeout(req)
   action(nic, timeout) catch {
     err => {

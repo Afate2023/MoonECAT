@@ -56,7 +56,7 @@ pub(all) struct ObservedSlaveAddress {
 /// Run the scan procedure: count slaves, assign addresses, read identity
 /// from SII EEPROM registers.
 /// Returns a ScanReport summarizing what was found.
-pub fn[N : @hal.Nic] scan(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan(
   nic : N,
   timeout : @hal.Duration,
 ) -> ScanReport raise @hal.EcError {
@@ -65,7 +65,7 @@ pub fn[N : @hal.Nic] scan(
 
 ///|
 /// Run the scan procedure with a configurable IdentificationAdo register.
-pub fn[N : @hal.Nic] scan_with_identification_ado(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan_with_identification_ado(
   nic : N,
   timeout : @hal.Duration,
   identification_ado : UInt,
@@ -76,7 +76,7 @@ pub fn[N : @hal.Nic] scan_with_identification_ado(
 }
 
 ///|
-pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan_with_identification_ado_and_station_address_strategy(
   nic : N,
   timeout : @hal.Duration,
   identification_ado : UInt,
@@ -123,7 +123,7 @@ pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(
 }
 
 ///|
-fn[N : @hal.Nic] observe_slave_station_addresses(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] observe_slave_station_addresses(
   nic : N,
   count : Int,
   timeout : @hal.Duration,
@@ -230,7 +230,7 @@ fn array_contains_uint(values : Array[UInt], target : UInt) -> Bool {
 }
 
 ///|
-fn[N : @hal.Nic] apply_scan_station_addresses(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_scan_station_addresses(
   nic : N,
   observed : Array[ObservedSlaveAddress],
   planned : Array[UInt],
@@ -251,7 +251,7 @@ fn[N : @hal.Nic] apply_scan_station_addresses(
 }
 
 ///|
-fn[N : @hal.Nic] read_best_identity(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_best_identity(
   nic : N,
   position : UInt,
   station : UInt,
@@ -297,7 +297,7 @@ fn identity_is_zero(identity : @hal.SlaveIdentity) -> Bool {
 }
 
 ///|
-fn[N : @hal.Nic] read_identity_from_sii_ap(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_identity_from_sii_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -315,7 +315,7 @@ fn[N : @hal.Nic] read_identity_from_sii_ap(
 }
 
 ///|
-fn[N : @hal.Nic] read_identity_from_sii(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_identity_from_sii(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -333,7 +333,7 @@ fn[N : @hal.Nic] read_identity_from_sii(
 }
 
 ///|
-fn[N : @hal.Nic] read_identity_from_registers(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_identity_from_registers(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -355,7 +355,7 @@ fn[N : @hal.Nic] read_identity_from_registers(
 }
 
 ///|
-fn[N : @hal.Nic] read_identity_from_registers_ap(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_identity_from_registers_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,

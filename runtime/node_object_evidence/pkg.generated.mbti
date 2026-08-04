@@ -119,4 +119,3 @@ pub(all) struct VirtualObjectDictionaryEvidence {
 // Type aliases
 
 // Traits
-

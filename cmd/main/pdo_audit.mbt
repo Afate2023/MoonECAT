@@ -369,7 +369,7 @@ fn pdo_audit_report_text(report : PdoAuditReport) -> String {
 }
 
 ///|
-fn[N : @hal.Nic] pdo_sdo_u32(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] pdo_sdo_u32(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -393,7 +393,7 @@ fn[N : @hal.Nic] pdo_sdo_u32(
 }
 
 ///|
-fn[N : @hal.Nic] read_live_pdo_direction(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_live_pdo_direction(
   nic : N,
   station : UInt,
   mailbox_config : @mailbox.MailboxConfig,
@@ -442,7 +442,7 @@ fn[N : @hal.Nic] read_live_pdo_direction(
 }
 
 ///|
-fn[N : @hal.Nic] read_live_pdo_reports(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_live_pdo_reports(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -487,7 +487,7 @@ fn[N : @hal.Nic] read_live_pdo_reports(
 }
 
 ///|
-fn[N : @hal.Nic] build_pdo_audit_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_pdo_audit_report(
   nic : N,
   args : Array[String],
   station : UInt,
@@ -553,7 +553,7 @@ fn[N : @hal.Nic] build_pdo_audit_report(
 }
 
 ///|
-fn[N : @hal.Nic] resolve_station_startup_decision(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] resolve_station_startup_decision(
   nic : N,
   args : Array[String],
   station : UInt,

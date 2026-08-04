@@ -15,6 +15,8 @@ pub fn build_sdo_download_ca(Byte, UInt, UInt, Byte, Bytes) -> SdoTransaction
 
 pub fn build_sdo_download_segment_request(Byte, UInt, Bool, Bool, Bytes) -> Bytes raise @hal.EcError
 
+pub fn build_sdo_download_segmented_init_request(Byte, UInt, UInt, Byte, UInt, Bool) -> Bytes
+
 pub fn build_sdo_info_get_od_list_request(Byte, UInt, UInt) -> Bytes
 
 pub fn build_sdo_info_get_od_request(Byte, UInt, UInt) -> Bytes
@@ -111,14 +113,17 @@ pub fn soe_element_flags(Array[SoeElementFlag]) -> Byte
 
 // Types and methods
 pub(all) enum CoeService {
+  Emergency
   SdoRequest
   SdoResponse
-  SdoInfo
-  PdoRemoteRequest
   TxPdo
   RxPdo
-  Emergency
+  TxPdoRemoteRequest
+  RxPdoRemoteRequest
+  SdoInfo
 } derive(Eq, @debug.Debug)
+pub fn CoeService::from_uint(UInt) -> Self raise @hal.EcError
+pub fn CoeService::to_uint(Self) -> UInt
 
 pub(all) struct EmergencyMessage {
   error_code : UInt
@@ -234,6 +239,43 @@ pub(all) struct MailboxCounter {
 pub fn MailboxCounter::new() -> Self
 pub fn MailboxCounter::next(Self) -> Byte
 
+pub(all) struct MailboxError {
+  error_type : MailboxErrorType
+  detail : MailboxErrorDetail
+} derive(Eq, @debug.Debug)
+
+pub(all) enum MailboxErrorDetail {
+  Syntax
+  UnsupportedProtocol
+  InvalidChannel
+  ServiceNotSupported
+  InvalidHeader
+  SizeTooShort
+  NoMoreMemory
+  InvalidSize
+  ServiceInWork
+  Unknown(UInt)
+} derive(Eq, @debug.Debug)
+pub fn MailboxErrorDetail::from_uint(UInt) -> Self
+pub fn MailboxErrorDetail::label(Self) -> String
+pub fn MailboxErrorDetail::to_uint(Self) -> UInt
+
+pub(all) enum MailboxErrorType {
+  MailboxCommand
+  Unknown(UInt)
+} derive(Eq, @debug.Debug)
+pub fn MailboxErrorType::from_uint(UInt) -> Self
+pub fn MailboxErrorType::to_uint(Self) -> UInt
+
+pub(all) struct MailboxFrame {
+  header : MailboxHeader
+  payload : Bytes
+} derive(Eq, @debug.Debug)
+pub fn MailboxFrame::decode_error(Self) -> MailboxError raise @hal.EcError
+pub fn MailboxFrame::from_bytes(Bytes) -> Self raise @hal.EcError
+pub fn MailboxFrame::require_type(Self, MailboxType) -> Unit raise @hal.EcError
+pub fn MailboxFrame::to_bytes(Self) -> Bytes raise @hal.EcError
+
 pub(all) struct MailboxHeader {
   length : UInt
   address : UInt
@@ -266,6 +308,7 @@ pub(all) enum MailboxType {
 } derive(Eq, @debug.Debug)
 pub fn MailboxType::to_byte(Self) -> Byte
 
+#alias(MailboxSession)
 pub(all) struct Rmsm {
   counter : MailboxCounter
   mut state : RmsmState
@@ -643,4 +686,3 @@ pub(all) enum SoeResponse {
 // Type aliases
 
 // Traits
-

@@ -46,7 +46,7 @@ fn decode_al_status_snapshot(
 /// Request an ESM state transition on a specific slave (by configured address).
 /// Writes AL Control, then reads AL Status to confirm.
 /// Returns the confirmed state or raises an error.
-pub fn[N : @hal.Nic] request_state_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_observe(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -85,7 +85,7 @@ pub fn[N : @hal.Nic] request_state_observe(
 }
 
 ///|
-pub fn[N : @hal.Nic] request_state(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -97,7 +97,7 @@ pub fn[N : @hal.Nic] request_state(
 ///|
 /// Request an ESM state transition while continuing cyclic PDO exchange,
 /// and return the last confirmed AL snapshot observed during polling.
-pub fn[N : @hal.Nic] request_state_with_process_data_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_with_process_data_observe(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -131,7 +131,7 @@ pub fn[N : @hal.Nic] request_state_with_process_data_observe(
 }
 
 ///|
-pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_with_process_data_snapshot(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -154,7 +154,7 @@ pub fn[N : @hal.Nic] request_state_with_process_data_snapshot(
 /// This is primarily needed for SAFEOP -> OP on actuator-style devices where
 /// the SubDevice only confirms OP once output process data has been received
 /// during the confirmation window.
-pub fn[N : @hal.Nic] request_state_with_process_data(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_with_process_data(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -180,7 +180,7 @@ pub fn[N : @hal.Nic] request_state_with_process_data(
 
 ///|
 /// Request an ESM state transition using auto-increment addressing.
-pub fn[N : @hal.Nic] request_state_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] request_state_ap(
   nic : N,
   position : UInt,
   target : EsmState,
@@ -215,7 +215,7 @@ pub fn[N : @hal.Nic] request_state_ap(
 }
 
 ///|
-pub fn[N : @hal.Nic] read_al_status_snapshot(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status_snapshot(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -230,7 +230,7 @@ pub fn[N : @hal.Nic] read_al_status_snapshot(
 }
 
 ///|
-pub fn[N : @hal.Nic] read_al_status_snapshot_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status_snapshot_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -245,7 +245,7 @@ pub fn[N : @hal.Nic] read_al_status_snapshot_ap(
 }
 
 ///|
-pub fn[N : @hal.Nic] clear_al_error(
+pub fn[N : @hal.Nic + DatagramIndexSource] clear_al_error(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -294,7 +294,7 @@ fn should_rollback_al_error_to_init(status_code : UInt?) -> Bool {
 /// Recover from a pending AL error before the caller selects a new target
 /// state. Configuration-stage failures are stabilized by rolling back to Init;
 /// other errors are acknowledged in place.
-pub fn[N : @hal.Nic] recover_al_error_for_transition(
+pub fn[N : @hal.Nic + DatagramIndexSource] recover_al_error_for_transition(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -314,7 +314,7 @@ pub fn[N : @hal.Nic] recover_al_error_for_transition(
 }
 
 ///|
-pub fn[N : @hal.Nic] clear_al_error_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] clear_al_error_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -352,7 +352,7 @@ pub fn[N : @hal.Nic] clear_al_error_ap(
 }
 
 ///|
-fn[N : @hal.Nic] wait_for_state_fp(
+fn[N : @hal.Nic + DatagramIndexSource] wait_for_state_fp(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -370,7 +370,7 @@ fn[N : @hal.Nic] wait_for_state_fp(
 }
 
 ///|
-fn[N : @hal.Nic] snapshot_from_status_fp(
+fn[N : @hal.Nic + DatagramIndexSource] snapshot_from_status_fp(
   nic : N,
   station : UInt,
   status : Byte,
@@ -385,7 +385,7 @@ fn[N : @hal.Nic] snapshot_from_status_fp(
 }
 
 ///|
-fn[N : @hal.Nic] wait_for_state_fp_with_process_data_snapshot(
+fn[N : @hal.Nic + DatagramIndexSource] wait_for_state_fp_with_process_data_snapshot(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -406,7 +406,7 @@ fn[N : @hal.Nic] wait_for_state_fp_with_process_data_snapshot(
 }
 
 ///|
-fn[N : @hal.Nic] wait_for_state_ap(
+fn[N : @hal.Nic + DatagramIndexSource] wait_for_state_ap(
   nic : N,
   position : UInt,
   target : EsmState,
@@ -446,7 +446,7 @@ fn request_state_poll_budget(target : EsmState, timeout : @hal.Duration) -> Int 
 }
 
 ///|
-fn[N : @hal.Nic] request_state_control_fp(
+fn[N : @hal.Nic + DatagramIndexSource] request_state_control_fp(
   nic : N,
   station : UInt,
   control : Byte,
@@ -459,7 +459,7 @@ fn[N : @hal.Nic] request_state_control_fp(
 }
 
 ///|
-fn[N : @hal.Nic] request_state_control_fp_with_wkc(
+fn[N : @hal.Nic + DatagramIndexSource] request_state_control_fp_with_wkc(
   nic : N,
   station : UInt,
   control : Byte,
@@ -475,7 +475,7 @@ fn[N : @hal.Nic] request_state_control_fp_with_wkc(
 }
 
 ///|
-fn[N : @hal.Nic] read_al_status_raw_fp(
+fn[N : @hal.Nic + DatagramIndexSource] read_al_status_raw_fp(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -488,7 +488,7 @@ fn[N : @hal.Nic] read_al_status_raw_fp(
 }
 
 ///|
-fn[N : @hal.Nic] request_state_control_ap(
+fn[N : @hal.Nic + DatagramIndexSource] request_state_control_ap(
   nic : N,
   position : UInt,
   control : Byte,
@@ -504,7 +504,7 @@ fn[N : @hal.Nic] request_state_control_ap(
 }
 
 ///|
-fn[N : @hal.Nic] read_al_status_raw_ap(
+fn[N : @hal.Nic + DatagramIndexSource] read_al_status_raw_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -517,7 +517,7 @@ fn[N : @hal.Nic] read_al_status_raw_ap(
 }
 
 ///|
-fn[N : @hal.Nic] maybe_read_al_status_code_fp(
+fn[N : @hal.Nic + DatagramIndexSource] maybe_read_al_status_code_fp(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -528,7 +528,7 @@ fn[N : @hal.Nic] maybe_read_al_status_code_fp(
 }
 
 ///|
-fn[N : @hal.Nic] request_observation_from_status_fp(
+fn[N : @hal.Nic + DatagramIndexSource] request_observation_from_status_fp(
   nic : N,
   station : UInt,
   status : Byte,
@@ -547,7 +547,7 @@ fn[N : @hal.Nic] request_observation_from_status_fp(
 }
 
 ///|
-fn[N : @hal.Nic] request_observation_from_snapshot_fp(
+fn[N : @hal.Nic + DatagramIndexSource] request_observation_from_snapshot_fp(
   nic : N,
   station : UInt,
   snapshot : EsmStatusSnapshot,
@@ -621,7 +621,7 @@ pub fn esm_timeout_for(
 /// Transition a slave through a sequence of ESM states.
 /// Each step validates `can_transition` before issuing the request.
 /// On failure it attempts rollback to the previous state.
-pub fn[N : @hal.Nic] transition_through(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_through(
   nic : N,
   station : UInt,
   path : Array[EsmState],
@@ -658,7 +658,7 @@ pub fn[N : @hal.Nic] transition_through(
 ///
 /// Callers may feed SII/ESI-derived timeouts through `policy` while retaining
 /// sane defaults for missing entries.
-pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_through_with_timeout_policy(
   nic : N,
   station : UInt,
   path : Array[EsmState],
@@ -695,7 +695,7 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy(
 
 ///|
 /// Transition through an ESM path and return the final step observation.
-pub fn[N : @hal.Nic] transition_through_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_through_observe(
   nic : N,
   station : UInt,
   path : Array[EsmState],
@@ -731,7 +731,7 @@ pub fn[N : @hal.Nic] transition_through_observe(
 ///|
 /// Transition through an ESM path using per-target timeout policy and return
 /// the final step observation.
-pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_through_with_timeout_policy_observe(
   nic : N,
   station : UInt,
   path : Array[EsmState],
@@ -769,7 +769,7 @@ pub fn[N : @hal.Nic] transition_through_with_timeout_policy_observe(
 }
 
 ///|
-pub fn[N : @hal.Nic] transition_through_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_through_ap(
   nic : N,
   position : UInt,
   path : Array[EsmState],
@@ -880,7 +880,7 @@ pub fn build_strict_transition_route(
 /// `recover_al_error_for_transition(...)` (or `clear_al_error(...)` when the
 /// caller knows an in-place acknowledge is correct), then explicitly choose
 /// the next target state.
-pub fn[N : @hal.Nic] transition_to_target_strict(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_to_target_strict(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -898,7 +898,7 @@ pub fn[N : @hal.Nic] transition_to_target_strict(
 
 ///|
 /// Strict state transition entry point that returns the final request observation.
-pub fn[N : @hal.Nic] transition_to_target_strict_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_to_target_strict_observe(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -915,7 +915,7 @@ pub fn[N : @hal.Nic] transition_to_target_strict_observe(
 }
 
 ///|
-pub fn[N : @hal.Nic] transition_to_target_strict_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_to_target_strict_ap(
   nic : N,
   position : UInt,
   target : EsmState,
@@ -971,7 +971,7 @@ pub fn esm_timeout_policy_from_sii_timeouts(
 ///
 /// Same as `transition_to_target_strict` but resolves per-step timeouts from
 /// the supplied policy, allowing SII/ESI-derived timeout overrides.
-pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_to_target_strict_with_timeout_policy(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -991,7 +991,7 @@ pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy(
 ///|
 /// Strict transitions via multi-step route with per-target timeout policy,
 /// returning the final step observation when a control write was issued.
-pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy_observe(
+pub fn[N : @hal.Nic + DatagramIndexSource] transition_to_target_strict_with_timeout_policy_observe(
   nic : N,
   station : UInt,
   target : EsmState,
@@ -1010,7 +1010,7 @@ pub fn[N : @hal.Nic] transition_to_target_strict_with_timeout_policy_observe(
 
 ///|
 /// Read the current ESM state from a slave.
-pub fn[N : @hal.Nic] read_al_status(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -1024,7 +1024,7 @@ pub fn[N : @hal.Nic] read_al_status(
 
 ///|
 /// Read the current ESM state using auto-increment addressing.
-pub fn[N : @hal.Nic] read_al_status_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -1038,7 +1038,7 @@ pub fn[N : @hal.Nic] read_al_status_ap(
 
 ///|
 /// Read the AL Status Code from a slave (error code for failed transitions).
-pub fn[N : @hal.Nic] read_al_status_code(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status_code(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -1052,7 +1052,7 @@ pub fn[N : @hal.Nic] read_al_status_code(
 }
 
 ///|
-pub fn[N : @hal.Nic] read_al_status_code_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_al_status_code_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -1068,7 +1068,7 @@ pub fn[N : @hal.Nic] read_al_status_code_ap(
 ///|
 /// Request all slaves to transition to a target state via broadcast.
 /// Uses BWR to AL Control register. Returns the working counter.
-pub fn[N : @hal.Nic] broadcast_state(
+pub fn[N : @hal.Nic + DatagramIndexSource] broadcast_state(
   nic : N,
   target : EsmState,
   timeout : @hal.Duration,
@@ -1088,7 +1088,7 @@ pub fn[N : @hal.Nic] broadcast_state(
 /// Broadcasts zero-writes to FMMU, SM, DC, CRC, IRQ, and EEPROM registers,
 /// matching the sequence used by SOEM `ecx_set_slaves_to_default`.
 /// This ensures a clean slate regardless of any previous master session state.
-pub fn[N : @hal.Nic] set_slaves_to_default(
+pub fn[N : @hal.Nic + DatagramIndexSource] set_slaves_to_default(
   nic : N,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {

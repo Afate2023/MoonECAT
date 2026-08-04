@@ -10,17 +10,17 @@ import {
 }
 
 // Values
-pub fn[N : @hal.Nic] apply_presafeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_presafeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_safeop_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] apply_startup_mailbox_commands(N, UInt, @mailbox.MailboxConfig, Array[StartupMailboxCommand], StartupCommandTransition, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] bridge_eoe_cycle(EoeSwitch, QueueEndpoint, N, @hal.Duration) -> (Int, Int)
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] bridge_eoe_cycle(EoeSwitch, QueueEndpoint, N, @hal.Duration) -> (Int, Int)
 
 pub fn build_master_od(MasterIdentity, ScanReport?, Telemetry?, DiagnosticSurface?) -> MasterObjectDictionary
 
-pub fn[N : @hal.Nic] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_run_startup_preparation(N, ScanReport, UInt, Int, @hal.Duration) -> RunStartupPreparation raise @hal.EcError
 
 pub fn compare_configurations(ConfigurationModel, ConfigurationModel) -> ConfigurationComparisonReport
 
@@ -88,65 +88,65 @@ pub fn plan_scan_station_addresses_with_strategy(Array[ObservedSlaveAddress], Sc
 
 pub fn preferred_sii_dc_clock(Array[@mailbox.SiiDcClock]) -> @mailbox.SiiDcClock?
 
-pub fn[N : @hal.Nic] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) -> DiagnosisSession raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_diagnosis_ap(N, UInt, UInt, @hal.Duration) -> DiagnosisSession raise @hal.EcError
 
-pub fn[N : @hal.Nic] prepare_slave_mailbox_ap(N, UInt, UInt, @hal.Duration) -> MailboxSession raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_mailbox_ap(N, UInt, UInt, @hal.Duration) -> MailboxSession raise @hal.EcError
 
-pub fn[N : @hal.Nic] prepare_slave_startup(N, UInt, UInt, Int, @hal.Duration) -> SlaveStartupPreparation raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] prepare_slave_startup(N, UInt, UInt, Int, @hal.Duration) -> SlaveStartupPreparation raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_diagnosis_counter(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_diagnosis_counter_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_diagnosis_counter_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> UInt raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_error_register(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_error_register(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_error_register_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_error_register_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> Byte raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_sii_with_metadata_ap(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_sii_with_metadata_ap(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_sii_with_metadata_fp(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_sii_with_metadata_fp(N, UInt, Int, @hal.Duration) -> Bytes raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_slave_diagnosis(N, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
-pub fn[N : @hal.Nic] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] read_slave_diagnosis_ap(N, UInt, UInt, @mailbox.MailboxConfig, @mailbox.Rmsm, @hal.Duration) -> SlaveDiagnosis raise @hal.EcError
 
-pub fn[N : @hal.Nic] refine_startup_preparation_in_preop(N, UInt, UInt, SlaveStartupPreparation, @hal.Duration) -> SlaveStartupPreparation
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] refine_startup_preparation_in_preop(N, UInt, UInt, SlaveStartupPreparation, @hal.Duration) -> SlaveStartupPreparation
 
 pub fn required_sii_read_word_count(Bytes, Int) -> Int
 
-pub fn[N : @hal.Nic] restore_slave_diagnosis_state(N, UInt, @protocol.EsmState, @hal.Duration) -> @protocol.EsmState raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] restore_slave_diagnosis_state(N, UInt, @protocol.EsmState, @hal.Duration) -> @protocol.EsmState raise @hal.EcError
 
-pub fn[N : @hal.Nic] restore_slave_mailbox_state(N, UInt, @protocol.EsmState, @hal.Duration) -> @protocol.EsmState raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] restore_slave_mailbox_state(N, UInt, @protocol.EsmState, @hal.Duration) -> @protocol.EsmState raise @hal.EcError
 
-pub fn[N : @hal.Nic] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @hal.Duration) -> RunReport raise @hal.EcError
 
 pub fn run_monitors(Runtime) -> (Array[MonitorResult], Verdict)
 
 pub fn run_startup_preparation_from_slave_preparations(Array[(UInt, SlaveStartupPreparation)], UInt) -> RunStartupPreparation raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @hal.Duration) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_scan_and_states_and_settings_prepared_reporting_to(N, ScanReport, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_scan_and_states_and_settings_prepared_reporting_to(N, ScanReport, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration, S) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @hal.Duration, S) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, Int, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_with_states_and_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states_and_settings(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_states_and_settings_prepared_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, RunStartupPreparation?, @hal.Duration, S) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic, S : RunProgressSink] run_with_states_and_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration, S) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] run_with_states_and_settings_reporting_to(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, RunLoopSettings, @protocol.EsmState, @protocol.EsmState?, @hal.Duration, S) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] run_with_states_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_with_states_until_fault(N, @hal.MasterConfig, Array[@hal.SlaveConfig], @protocol.PdoContext, UInt, @protocol.EsmState, @protocol.EsmState?, @hal.Duration) -> RunReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan(N, @hal.Duration) -> ScanReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan_with_identification_ado(N, @hal.Duration, UInt) -> ScanReport raise @hal.EcError
 
-pub fn[N : @hal.Nic] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] scan_with_identification_ado_and_station_address_strategy(N, @hal.Duration, UInt, ScanStationAddressStrategy) -> ScanReport raise @hal.EcError
 
 pub fn startup_preparation_from_esi_json(String, Int, UInt) -> SlaveStartupPreparation raise @hal.EcError
 
@@ -168,9 +168,9 @@ pub fn verdict_to_diagnostic_level(Verdict) -> DiagnosticLevel
 
 pub fn worst_verdict(Array[MonitorResult]) -> Verdict
 
-pub fn[N : @hal.Nic] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] write_mailbox_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
-pub fn[N : @hal.Nic] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] write_process_data_mapping(N, UInt, @mailbox.SlaveMapping, @hal.Duration) -> Unit raise @hal.EcError
 
 // Errors
 
@@ -320,7 +320,7 @@ pub(all) struct EoeRelay {
 } derive(@debug.Debug)
 pub fn EoeRelay::format_text(Self) -> String
 pub fn EoeRelay::new() -> Self
-pub fn[N : @hal.Nic] EoeRelay::relay_cycle(Self, EoeSwitch, N, @hal.Duration, (EoeRelayFrame) -> Bool, () -> EoeRelayFrame?) -> (Int, Int)
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeRelay::relay_cycle(Self, EoeSwitch, N, @hal.Duration, (EoeRelayFrame) -> Bool, () -> EoeRelayFrame?) -> (Int, Int)
 pub fn EoeRelay::set_active(Self, Bool) -> Unit
 pub fn EoeRelay::to_json(Self) -> Json
 
@@ -362,12 +362,12 @@ pub(all) struct EoeSwitch {
 pub fn EoeSwitch::add_station(Self, UInt, @mailbox.MailboxConfig) -> Unit
 pub fn EoeSwitch::drain_rx(Self) -> Array[EoeReceivedFrame]
 pub fn EoeSwitch::format_text(Self) -> String
-pub fn[N : @hal.Nic] EoeSwitch::get_ip(Self, N, UInt, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::get_ip(Self, N, UInt, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
 pub fn EoeSwitch::new() -> Self
-pub fn[N : @hal.Nic] EoeSwitch::poll(Self, N, @hal.Duration) -> Int
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::poll(Self, N, @hal.Duration) -> Int
 pub fn EoeSwitch::process_received(Self, UInt, Bytes) -> Bool
-pub fn[N : @hal.Nic] EoeSwitch::send_frame(Self, N, UInt, Bytes, @hal.Duration) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic] EoeSwitch::set_ip(Self, N, UInt, Bytes, Bytes, Bytes, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::send_frame(Self, N, UInt, Bytes, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] EoeSwitch::set_ip(Self, N, UInt, Bytes, Bytes, Bytes, @hal.Duration) -> @mailbox.EoeResponse raise @hal.EcError
 pub fn EoeSwitch::to_json(Self) -> Json
 
 pub(all) struct EsiJsonDcMode {
@@ -684,19 +684,19 @@ pub(all) struct Runtime {
 pub fn Runtime::configure_emergency_stations(Self, Array[(UInt, @mailbox.MailboxConfig)]) -> Unit
 pub fn Runtime::configure_pdo(Self, @protocol.PdoContext, UInt) -> Unit
 pub fn Runtime::get_telemetry(Self) -> Telemetry
-pub fn[N : @hal.Nic] Runtime::init_dc(Self, N, Array[UInt], @hal.Duration) -> Bool raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::init_dc(Self, N, Array[UInt], @hal.Duration) -> Bool raise @hal.EcError
 pub fn Runtime::needs_recovery(Self) -> Bool
 pub fn Runtime::new(@hal.MasterConfig) -> Self
 pub fn Runtime::record_retry(Self) -> Unit
 pub fn Runtime::record_timeout(Self) -> Unit
 pub fn Runtime::reset_error_counter(Self) -> Unit
-pub fn[N : @hal.Nic] Runtime::run_cycle(Self, N, @hal.Duration) -> @hil.CycleResult raise @hal.EcError
-pub fn[N : @hal.Nic] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic] Runtime::run_cycles_with_reporting(Self, N, Int, @hal.Duration, Int?) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(Self, N, Int, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic] Runtime::run_until_fault(Self, N, @hal.Duration) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic] Runtime::run_until_fault_with_reporting(Self, N, @hal.Duration, Int?) -> Int raise @hal.EcError
-pub fn[N : @hal.Nic, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(Self, N, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycle(Self, N, @hal.Duration) -> @hil.CycleResult raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycles(Self, N, Int, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_cycles_with_reporting(Self, N, Int, @hal.Duration, Int?) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] Runtime::run_cycles_with_reporting_to(Self, N, Int, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_until_fault(Self, N, @hal.Duration) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] Runtime::run_until_fault_with_reporting(Self, N, @hal.Duration, Int?) -> Int raise @hal.EcError
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource, S : RunProgressSink] Runtime::run_until_fault_with_reporting_to(Self, N, @hal.Duration, Int?, Int?, S) -> Int raise @hal.EcError
 pub fn Runtime::set_state(Self, RuntimeState) -> Unit
 pub fn Runtime::set_timeout_threshold(Self, Int) -> Unit
 
@@ -909,4 +909,3 @@ pub(open) trait EoeEndpoint {
 pub(open) trait RunProgressSink {
   fn emit(Self, RunProgress) -> Unit
 }
-

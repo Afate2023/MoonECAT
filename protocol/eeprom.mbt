@@ -55,7 +55,7 @@ let sii_max_polls : Int = 1000
 ///|
 /// Read a single 32-bit (4-byte) word from a slave's EEPROM at the given
 /// word address. Returns 4 bytes of EEPROM data.
-pub fn[N : @hal.Nic] eeprom_read_word(
+pub fn[N : @hal.Nic + DatagramIndexSource] eeprom_read_word(
   nic : N,
   station : UInt,
   word_address : UInt,
@@ -68,7 +68,7 @@ pub fn[N : @hal.Nic] eeprom_read_word(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_read_word_owned(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_read_word_owned(
   nic : N,
   station : UInt,
   word_address : UInt,
@@ -82,7 +82,7 @@ fn[N : @hal.Nic] eeprom_read_word_owned(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_read_chunk_owned(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_read_chunk_owned(
   nic : N,
   station : UInt,
   word_address : UInt,
@@ -124,7 +124,7 @@ fn[N : @hal.Nic] eeprom_read_chunk_owned(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_prepare_master(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_prepare_master(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -134,7 +134,7 @@ fn[N : @hal.Nic] eeprom_prepare_master(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_restore_pdi(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_restore_pdi(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -143,7 +143,7 @@ fn[N : @hal.Nic] eeprom_restore_pdi(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_write_config(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_config(
   nic : N,
   station : UInt,
   value : Byte,
@@ -166,7 +166,7 @@ fn[N : @hal.Nic] eeprom_write_config(
 
 ///|
 /// Wait for the SII controller to become ready (not busy).
-fn[N : @hal.Nic] eeprom_wait_ready(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_wait_ready(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -184,7 +184,7 @@ fn[N : @hal.Nic] eeprom_wait_ready(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_wait_ready_after_command(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_wait_ready_after_command(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -212,7 +212,7 @@ fn[N : @hal.Nic] eeprom_wait_ready_after_command(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_clear_errors(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_clear_errors(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -228,7 +228,7 @@ fn[N : @hal.Nic] eeprom_clear_errors(
 /// Read a contiguous range of EEPROM data starting at a word address.
 /// Returns `word_count * 4` bytes. Each read returns one 32-bit SII data window,
 /// so consecutive reads advance by two 16-bit EEPROM words.
-pub fn[N : @hal.Nic] eeprom_read(
+pub fn[N : @hal.Nic + DatagramIndexSource] eeprom_read(
   nic : N,
   station : UInt,
   start_word : UInt,
@@ -299,7 +299,7 @@ fn required_sii_total_word_count(
 ///|
 /// Read a complete SII EEPROM image using the fixed metadata block to expand
 /// the initial probe to the EEPROM-declared total byte size.
-pub fn[N : @hal.Nic] read_sii_bytes(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_sii_bytes(
   nic : N,
   station : UInt,
   initial_word_count : Int,
@@ -321,7 +321,7 @@ pub fn[N : @hal.Nic] read_sii_bytes(
 /// Read a contiguous EEPROM range using auto-increment addressing.
 /// This is useful during scan while slave positions are stable but configured
 /// station addressing may not yet be reliable on all devices.
-pub fn[N : @hal.Nic] eeprom_read_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] eeprom_read_ap(
   nic : N,
   position : UInt,
   start_word : UInt,
@@ -352,7 +352,7 @@ pub fn[N : @hal.Nic] eeprom_read_ap(
 
 ///|
 /// Read a complete SII EEPROM image using auto-increment addressing.
-pub fn[N : @hal.Nic] read_sii_bytes_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] read_sii_bytes_ap(
   nic : N,
   position : UInt,
   initial_word_count : Int,
@@ -373,7 +373,7 @@ pub fn[N : @hal.Nic] read_sii_bytes_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_read_chunk_owned_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_read_chunk_owned_ap(
   nic : N,
   position : UInt,
   word_address : UInt,
@@ -415,7 +415,7 @@ fn[N : @hal.Nic] eeprom_read_chunk_owned_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_prepare_master_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_prepare_master_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -425,7 +425,7 @@ fn[N : @hal.Nic] eeprom_prepare_master_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_restore_pdi_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_restore_pdi_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -434,7 +434,7 @@ fn[N : @hal.Nic] eeprom_restore_pdi_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_write_config_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_config_ap(
   nic : N,
   position : UInt,
   value : Byte,
@@ -456,7 +456,7 @@ fn[N : @hal.Nic] eeprom_write_config_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_wait_ready_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_wait_ready_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -474,7 +474,7 @@ fn[N : @hal.Nic] eeprom_wait_ready_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_wait_ready_after_command_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_wait_ready_after_command_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -502,7 +502,7 @@ fn[N : @hal.Nic] eeprom_wait_ready_after_command_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_clear_errors_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_clear_errors_ap(
   nic : N,
   position : UInt,
   timeout : @hal.Duration,
@@ -528,7 +528,7 @@ let sii_ctrl_write_cmd : UInt = 0x0201U
 ///   3. Write command (0x0201) + address to SII control register (0x0502)
 ///   4. Wait for busy flag to clear
 ///   5. Restore PDI ownership
-pub fn[N : @hal.Nic] eeprom_write_word(
+pub fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_word(
   nic : N,
   station : UInt,
   word_address : UInt,
@@ -541,7 +541,7 @@ pub fn[N : @hal.Nic] eeprom_write_word(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_write_word_owned(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_word_owned(
   nic : N,
   station : UInt,
   word_address : UInt,
@@ -583,7 +583,7 @@ fn[N : @hal.Nic] eeprom_write_word_owned(
 
 ///|
 /// Write a single 16-bit word to a slave's EEPROM using auto-increment addressing.
-pub fn[N : @hal.Nic] eeprom_write_word_ap(
+pub fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_word_ap(
   nic : N,
   position : UInt,
   word_address : UInt,
@@ -596,7 +596,7 @@ pub fn[N : @hal.Nic] eeprom_write_word_ap(
 }
 
 ///|
-fn[N : @hal.Nic] eeprom_write_word_owned_ap(
+fn[N : @hal.Nic + DatagramIndexSource] eeprom_write_word_owned_ap(
   nic : N,
   position : UInt,
   word_address : UInt,

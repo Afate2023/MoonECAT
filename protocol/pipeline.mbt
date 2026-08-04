@@ -49,8 +49,35 @@ pub fn FrameBuilder::add(
   if self.would_exceed(data.length()) {
     raise @hal.EcError::Internal("frame capacity exceeded")
   }
-  let index = (self.next_index % 256).to_byte()
-  self.next_index = self.next_index + 1
+  let index = (self.next_index & 0xFF).to_byte()
+  self.next_index = (self.next_index + 1) & 0xFF
+  self.push_indexed(index, command, address, data)
+  index
+}
+
+///|
+/// Add a PDU using an Index allocated by the owning DatagramSession.
+fn FrameBuilder::add_indexed(
+  self : FrameBuilder,
+  index : Byte,
+  command : EcCommand,
+  address : UInt,
+  data : Bytes,
+) -> Unit raise @hal.EcError {
+  if self.would_exceed(data.length()) {
+    raise @hal.EcError::Internal("frame capacity exceeded")
+  }
+  self.push_indexed(index, command, address, data)
+}
+
+///|
+fn FrameBuilder::push_indexed(
+  self : FrameBuilder,
+  index : Byte,
+  command : EcCommand,
+  address : UInt,
+  data : Bytes,
+) -> Unit {
   let len_flags = data.length().reinterpret_as_uint() & 0x7FFU
   self.pending.push({
     header: { command, index, address, len_flags, irq: 0U },
@@ -61,7 +88,6 @@ pub fn FrameBuilder::add(
     pdu_header_len +
     data.length() +
     wkc_len
-  index
 }
 
 ///|

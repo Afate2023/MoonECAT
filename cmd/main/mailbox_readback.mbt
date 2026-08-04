@@ -167,7 +167,7 @@ fn mailbox_readback_report_text(report : MailboxReadbackReport) -> String {
 }
 
 ///|
-fn[N : @hal.Nic] build_mailbox_readback_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] build_mailbox_readback_report(
   nic : N,
   args : Array[String],
   station : UInt,

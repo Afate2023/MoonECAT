@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] compute_state_transition_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_state_transition_report(
   nic : N,
   args : Array[String],
   target : @protocol.EsmState,
@@ -32,7 +32,7 @@ fn[N : @hal.Nic] compute_state_transition_report(
 }
 
 ///|
-fn[N : @hal.Nic] compute_station_transition_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_station_transition_report(
   nic : N,
   args : Array[String],
   target : @protocol.EsmState,
@@ -212,7 +212,7 @@ fn[N : @hal.Nic] compute_station_transition_report(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery_observe(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_target_strict_after_recovery_observe(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -226,7 +226,7 @@ fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery_observe(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_op_after_recovery_observe(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_op_after_recovery_observe(
   nic : N,
   station : UInt,
   pdo_ctx : @protocol.PdoContext,
@@ -267,7 +267,7 @@ fn startup_mailbox_transition_from_route(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_with_startup_mailbox_route_observe(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_with_startup_mailbox_route_observe(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -304,7 +304,7 @@ fn[N : @hal.Nic] transition_station_with_startup_mailbox_route_observe(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_target_with_preparation_observe(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_target_with_preparation_observe(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,
@@ -326,7 +326,7 @@ fn[N : @hal.Nic] transition_station_to_target_with_preparation_observe(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_preop_with_mailbox(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
@@ -352,7 +352,7 @@ fn[N : @hal.Nic] transition_station_to_preop_with_mailbox(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_safeop_with_process_mapping(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
@@ -369,7 +369,7 @@ fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping_observe(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_safeop_with_process_mapping_observe(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
@@ -416,7 +416,7 @@ fn[N : @hal.Nic] transition_station_to_safeop_with_process_mapping_observe(
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_op_with_preparation(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_op_with_preparation(
   nic : N,
   station : UInt,
   current : @protocol.EsmState,
@@ -535,7 +535,7 @@ struct StateTransitionReport {
 }
 
 ///|
-fn[N : @hal.Nic] refine_station_startup_preparation_in_preop_if_needed(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] refine_station_startup_preparation_in_preop_if_needed(
   nic : N,
   station : UInt,
   state : @protocol.EsmState?,
@@ -664,7 +664,7 @@ fn state_transition_report_text(report : StateTransitionReport) -> String {
 }
 
 ///|
-fn[N : @hal.Nic] transition_station_to_target_strict_after_recovery(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] transition_station_to_target_strict_after_recovery(
   nic : N,
   station : UInt,
   target : @protocol.EsmState,

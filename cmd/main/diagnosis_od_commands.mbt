@@ -1,5 +1,5 @@
 ///|
-pub fn[N : @hal.Nic] run_diagnosis_command(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_diagnosis_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -75,7 +75,7 @@ pub fn[N : @hal.Nic] run_diagnosis_command(
       },
     )
   }
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(diagnosis_output_json(scan_report, report).stringify(indent=2))
   } else {
@@ -132,7 +132,7 @@ fn resolve_od_query(args : Array[String]) -> OdBrowseQuery raise @hal.EcError {
 }
 
 ///|
-pub fn[N : @hal.Nic] run_od_command(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_od_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -144,7 +144,7 @@ pub fn[N : @hal.Nic] run_od_command(
   ) catch {
     err => Result::Err(err)
   }
-  nic.close()
+  @hal.Nic::close(nic)
   let report = match report_result {
     Ok(value) => value
     Err(err) =>
@@ -158,7 +158,7 @@ pub fn[N : @hal.Nic] run_od_command(
 }
 
 ///|
-fn[N : @hal.Nic] compute_od_report(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] compute_od_report(
   nic : N,
   args : Array[String],
   query : OdBrowseQuery,

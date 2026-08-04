@@ -146,7 +146,7 @@ pub fn QueueEndpoint::is_up(self : QueueEndpoint) -> Bool {
 /// reassembled frames into rx_pending for host consumption.
 ///
 /// Returns (tx_sent, rx_delivered) counts.
-pub fn[N : @hal.Nic] bridge_eoe_cycle(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] bridge_eoe_cycle(
   sw : EoeSwitch,
   ep : QueueEndpoint,
   nic : N,

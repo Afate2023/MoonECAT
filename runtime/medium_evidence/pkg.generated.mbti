@@ -62,4 +62,3 @@ pub(all) enum MediumEvidenceStage {
 // Type aliases
 
 // Traits
-

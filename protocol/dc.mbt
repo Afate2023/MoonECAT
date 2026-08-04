@@ -113,7 +113,7 @@ fn write_u64(value : UInt64) -> Bytes {
 
 ///|
 /// Latch DC receive times on all slaves by broadcast-writing to 0x0900.
-pub fn[N : @hal.Nic] dc_latch_times(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_latch_times(
   nic : N,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
@@ -128,7 +128,7 @@ pub fn[N : @hal.Nic] dc_latch_times(
 
 ///|
 /// Read latched DC receive time (port 0 timestamp) of one slave.
-pub fn[N : @hal.Nic] dc_read_receive_time(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_read_receive_time(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -148,7 +148,7 @@ pub(all) struct DcPortTimes {
 
 ///|
 /// Read all 4 port receive times in a single FPRD (16 bytes from 0x0900).
-pub fn[N : @hal.Nic] dc_read_port_times(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_read_port_times(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -175,7 +175,7 @@ pub fn[N : @hal.Nic] dc_read_port_times(
 ///|
 /// Check whether a slave supports Distributed Clocks.
 /// Reads DL Information register (0x0008) bit 2.
-pub fn[N : @hal.Nic] dc_check_support(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_check_support(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -189,7 +189,7 @@ pub fn[N : @hal.Nic] dc_check_support(
 
 ///|
 /// Read the full 64-bit DC system time from a slave (0x0910, 8 bytes).
-pub fn[N : @hal.Nic] dc_read_system_time_64(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_read_system_time_64(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -200,7 +200,7 @@ pub fn[N : @hal.Nic] dc_read_system_time_64(
 
 ///|
 /// Read the 64-bit DC Start of Frame register (0x0918, 8 bytes).
-pub fn[N : @hal.Nic] dc_read_sof(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_read_sof(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -211,7 +211,7 @@ pub fn[N : @hal.Nic] dc_read_sof(
 
 ///|
 /// Read DC sync window / system difference register (0x092C).
-pub fn[N : @hal.Nic] dc_read_sync_window(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_read_sync_window(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -225,7 +225,7 @@ pub fn[N : @hal.Nic] dc_read_sync_window(
 /// Uses full 64-bit DC system time to choose a future aligned start tick.
 /// When `sync1_cycle_ns` > 0, also configures SYNC1 and activates both
 /// (activation byte 0x07 instead of 0x03).
-pub fn[N : @hal.Nic] dc_configure_sync0(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_configure_sync0(
   nic : N,
   station : UInt,
   cycle_ns : UInt,
@@ -296,7 +296,7 @@ pub fn[N : @hal.Nic] dc_configure_sync0(
 
 ///|
 /// Send one FRMW DC frame to distribute reference system time.
-pub fn[N : @hal.Nic] dc_compensate_cycle(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_compensate_cycle(
   nic : N,
   reference_station : UInt,
   timeout : @hal.Duration,
@@ -312,7 +312,7 @@ pub fn[N : @hal.Nic] dc_compensate_cycle(
 
 ///|
 /// Run static FRMW pre-compensation during startup.
-pub fn[N : @hal.Nic] dc_static_sync(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_static_sync(
   nic : N,
   reference_station : UInt,
   iterations : Int,
@@ -326,7 +326,7 @@ pub fn[N : @hal.Nic] dc_static_sync(
 ///|
 /// Configure DC for a set of configured station addresses.
 /// Returns None when station list is empty.
-pub fn[N : @hal.Nic] dc_configure_linear(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_configure_linear(
   nic : N,
   stations : Array[UInt],
   cycle_ns : UInt,
@@ -374,7 +374,7 @@ pub fn[N : @hal.Nic] dc_configure_linear(
 ///|
 /// Re-estimate and update propagation delay during runtime.
 /// This closes the loop for ETG.1500 #1102 by periodically updating 0x0928.
-pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_reestimate_propagation_delays(
   nic : N,
   reference_station : UInt,
   stations : Array[UInt],
@@ -414,7 +414,7 @@ pub fn[N : @hal.Nic] dc_reestimate_propagation_delays(
 ///|
 /// Deactivate DC sync for a single slave.
 /// Writes 0 to the sync activation register and clears cycle times.
-pub fn[N : @hal.Nic] dc_deactivate_sync(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_deactivate_sync(
   nic : N,
   station : UInt,
   timeout : @hal.Duration,
@@ -432,7 +432,7 @@ pub fn[N : @hal.Nic] dc_deactivate_sync(
 
 ///|
 /// Broadcast-deactivate DC sync on all slaves.
-pub fn[N : @hal.Nic] dc_deactivate_sync_all(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_deactivate_sync_all(
   nic : N,
   timeout : @hal.Duration,
 ) -> Unit raise @hal.EcError {
@@ -454,7 +454,7 @@ pub fn[N : @hal.Nic] dc_deactivate_sync_all(
 ///
 /// Returns the ORed 32-bit system time difference value and the working
 /// counter (number of DC slaves that responded).
-pub fn[N : @hal.Nic] dc_broadcast_sync_window(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_broadcast_sync_window(
   nic : N,
   timeout : @hal.Duration,
 ) -> (UInt, UInt) raise @hal.EcError {
@@ -474,7 +474,7 @@ pub fn[N : @hal.Nic] dc_broadcast_sync_window(
 /// The `limit_ns` parameter is the maximum tolerable clock deviation in
 /// nanoseconds. Returns true when the ORed system time difference from
 /// all DC slaves is below the limit.
-pub fn[N : @hal.Nic] dc_check_sync_window(
+pub fn[N : @hal.Nic + DatagramIndexSource] dc_check_sync_window(
   nic : N,
   limit_ns : UInt,
   timeout : @hal.Duration,

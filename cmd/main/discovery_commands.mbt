@@ -1,5 +1,5 @@
 ///|
-fn[N : @hal.Nic] run_command_with_nic(
+fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_command_with_nic(
   command : String,
   nic : N,
   args : Array[String],
@@ -9,7 +9,7 @@ fn[N : @hal.Nic] run_command_with_nic(
   match command {
     "scan" => {
       let report = @runtime.scan(nic, timeout)
-      nic.close()
+      @hal.Nic::close(nic)
       if as_json {
         println(scan_report_json(report).stringify(indent=2))
       } else {
@@ -18,7 +18,7 @@ fn[N : @hal.Nic] run_command_with_nic(
     }
     "validate" => {
       let report = @runtime.scan(nic, timeout)
-      nic.close()
+      @hal.Nic::close(nic)
       let actual = @runtime.configuration_from_scan(report)
       let expected = resolve_validate_expected_configuration(report, args)
       let validate_report = @runtime.validate_configuration(actual, expected)
@@ -34,7 +34,7 @@ fn[N : @hal.Nic] run_command_with_nic(
       let scan_report : @runtime.ScanReport? = Some(@runtime.scan(nic, timeout)) catch {
         _ => None
       }
-      nic.close()
+      @hal.Nic::close(nic)
       let identity = @runtime.default_master_identity()
       let od = @runtime.build_master_od(identity, scan_report, None, None)
       if as_json {
@@ -51,7 +51,7 @@ fn[N : @hal.Nic] run_command_with_nic(
 fn print_usage() -> Unit {
   println("moonecat v" + @lib.version)
   println(
-    "Usage: moonecat <list-if|scan|validate|run|run-zc|run-virtual|read-sii|esi-sii|state|diagnosis|od|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--record <path>] [--trace <path>] [--scan-json <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
+    "Usage: moonecat <list-if|scan|validate|run|run-zc|run-virtual|read-sii|esi-sii|state|diagnosis|od|sdo-read|sdo-write|master-od|esc-regs|expected-regs|startup-diff|mailbox-readback|startup-trace|replay|scenario|jitter-profile|auto-tune|topo-health|cycle-perf|comm-quality> [--json] [--progress-ndjson] [--backend <mock|native|native-windows-npcap|native-linux-raw>] [--if <interface>] [--timeout-ms <n>] [--cycles <n>] [--until-fault] [--cycle-period-us <n>] [--cycle-period-ms <n>] [--output-period-ms <n>] [--max-consecutive-timeouts <n>] [--position <n>] [--words <n>] [--state <init|preop|safeop|op|boot>] [--startup-state <init|preop|safeop|op|boot>] [--shutdown-state <init|preop|safeop|op|boot|none>] [--station <configured-address>] [--index <n>] [--subindex <n>] [--data-hex <hex>] [--read-value] [--list-type <n>] [--eni-json <path>] [--esi-json <path>] [--device-index <n>] [--path] [--reset-init] [--pdo-strategy <prefer-live|force-esi>] [--force-pdo-remap] [--record <path>] [--trace <path>] [--scan-json <path>] [--scenario <name>] [--period-ns <n>] [--strategy <balanced|conservative|aggressive>] [--pool-capacity <n>]",
   )
   println(
     "  moon run cmd/main state -- --backend native --if <interface> --state safeop --station 4097 --path --esi-json sample.esi.json --force-pdo-remap --json",
@@ -105,6 +105,12 @@ fn print_usage() -> Unit {
     "  moon run cmd/main od -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --json",
   )
   println(
+    "  moon run cmd/main sdo-read -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --cycles 100 --cycle-period-ms 100 --json",
+  )
+  println(
+    "  moon run cmd/main sdo-write -- --backend native --if <interface> --station 4097 --index 6656 --subindex 1 --data-hex 2A00 --cycles 100 --cycle-period-ms 100 --json",
+  )
+  println(
     "  moon run cmd/main esc-regs -- --backend native --if <interface> --station 4097 --json",
   )
   println(
@@ -147,7 +153,7 @@ fn print_usage() -> Unit {
 }
 
 ///|
-pub fn[N : @hal.Nic] run_read_sii_command(
+pub fn[N : @hal.Nic + @protocol.DatagramIndexSource] run_read_sii_command(
   nic : N,
   args : Array[String],
   as_json : Bool,
@@ -160,7 +166,7 @@ pub fn[N : @hal.Nic] run_read_sii_command(
   )
   let word_count = eeprom.length() / 4
   let sii = @mailbox.parse_sii_full_info(eeprom)
-  nic.close()
+  @hal.Nic::close(nic)
   if as_json {
     println(read_sii_json(position, word_count, sii).stringify(indent=2))
   } else {

@@ -111,7 +111,7 @@ pub fn PdoContext::build(
 ///|
 /// Execute one PDO cycle: send outputs via LRW, receive inputs.
 /// Returns the working counter from the response.
-pub fn[N : @hal.Nic] pdo_exchange(
+pub fn[N : @hal.Nic + DatagramIndexSource] pdo_exchange(
   nic : N,
   ctx : PdoContext,
   timeout : @hal.Duration,
@@ -121,7 +121,7 @@ pub fn[N : @hal.Nic] pdo_exchange(
 
 ///|
 /// Execute one PDO cycle and return both WKC and IRQ from the response datagram.
-pub fn[N : @hal.Nic] pdo_exchange_result(
+pub fn[N : @hal.Nic + DatagramIndexSource] pdo_exchange_result(
   nic : N,
   ctx : PdoContext,
   timeout : @hal.Duration,
@@ -161,7 +161,7 @@ pub fn[N : @hal.Nic] pdo_exchange_result(
 /// Execute one PDO cycle using separate LRD + LWR instead of LRW.
 /// Used when any slave in the group sets the PreferNotLRW SII flag.
 /// WKC from LWR is doubled to normalise against LRW semantics (per SOEM convention).
-fn[N : @hal.Nic] pdo_exchange_split_result(
+fn[N : @hal.Nic + DatagramIndexSource] pdo_exchange_split_result(
   nic : N,
   ctx : PdoContext,
   timeout : @hal.Duration,
@@ -208,7 +208,7 @@ fn[N : @hal.Nic] pdo_exchange_split_result(
 
 ///|
 /// Execute a read-only PDO cycle (LRD): fetch inputs without writing outputs.
-pub fn[N : @hal.Nic] pdo_read(
+pub fn[N : @hal.Nic + DatagramIndexSource] pdo_read(
   nic : N,
   ctx : PdoContext,
   timeout : @hal.Duration,
@@ -233,7 +233,7 @@ pub fn[N : @hal.Nic] pdo_read(
 
 ///|
 /// Execute a write-only PDO cycle (LWR): send outputs without reading.
-pub fn[N : @hal.Nic] pdo_write(
+pub fn[N : @hal.Nic + DatagramIndexSource] pdo_write(
   nic : N,
   ctx : PdoContext,
   timeout : @hal.Duration,

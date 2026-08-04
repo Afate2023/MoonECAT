@@ -37,14 +37,12 @@ pub fn decode_emergency(payload : Bytes) -> EmergencyMessage raise @hal.EcError 
 /// Parses mailbox header, verifies CoE type and Emergency service,
 /// then decodes the emergency payload.
 pub fn decode_emergency_frame(
-  frame : Bytes,
+  raw : Bytes,
 ) -> (MailboxHeader, EmergencyMessage) raise @hal.EcError {
-  let mbh = MailboxHeader::from_bytes(frame)
-  if mbh.mb_type != CoE {
-    raise @hal.EcError::MailboxProtocol(
-      "expected CoE mailbox for emergency, got " + @debug.to_string(mbh.mb_type),
-    )
-  }
+  let mailbox_frame = MailboxFrame::from_bytes(raw)
+  mailbox_frame.require_type(CoE)
+  let frame = mailbox_frame.to_bytes()
+  let mbh = mailbox_frame.header
   // Verify we have enough data for CoE header + Emergency payload
   // Mailbox header = 6 bytes, CoE header = 2 bytes, Emergency = 8 bytes
   if frame.length() < 16 {

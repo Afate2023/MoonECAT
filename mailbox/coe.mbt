@@ -1,13 +1,14 @@
 ///|
 /// CoE service types (CAN application protocol over EtherCAT).
 pub(all) enum CoeService {
+  Emergency
   SdoRequest
   SdoResponse
-  SdoInfo
-  PdoRemoteRequest
   TxPdo
   RxPdo
-  Emergency
+  TxPdoRemoteRequest
+  RxPdoRemoteRequest
+  SdoInfo
 } derive(Eq, Debug)
 
 ///|

@@ -2,7 +2,15 @@
 
 A modular EtherCAT master library written in MoonBit, targeting ETG.1500 Class B.
 
-## Package Structure
+## Installation
+
+When this package is available from the MoonBit registry or a configured mirror:
+
+```bash
+moon add mokomoking2501/MoonECAT@0.2.0
+```
+
+## Packages
 
 | Package | Layer | Description |
 |---------|-------|-------------|
@@ -108,6 +116,12 @@ moon run cmd/main esc-regs -- --backend native --if <interface> --station 4097 -
 moon run cmd/main expected-regs -- --backend native --if <interface> --station 4097 --json
 ```
 
+The merged stack contains generic cyclic SDO read/write and bounded frame-trace
+helpers, but MoonECAT's built-in `native*` CLI intentionally rejects those
+commands. A live composition must expose them through the stack-owned provider
+operation over an already-open Lockwire session; until that binding exists,
+these helpers are protocol implementation, not a supported live CLI claim.
+
 ### Operation
 
 ```bash
@@ -188,12 +202,15 @@ moon run cmd/eni_json -- --input References/sample.xml --kind esi --output sampl
 | `--timeout-ms <n>` | Command timeout in milliseconds | All |
 | `--station <addr>` | Target slave configured address | Per-slave commands |
 | `--position <n>` | Target slave link position (0-based) | `read-sii` |
-| `--cycles <n>` | PDO cycle count | `run`, `run-zc`, `scenario` |
+| `--cycles <n>` | Operation cycle count | `run`, `run-zc`, `scenario`, `sdo-read`, `sdo-write` |
 | `--until-fault` | Run until fault detected | `run` |
 | `--progress-ndjson` | Stream NDJSON progress events | `run` |
 | `--startup-state <s>` | Startup target ESM state | `run`, `run-zc`, `replay` |
 | `--shutdown-state <s>` | Shutdown target or `none` | `run`, `run-zc`, `replay` |
 | `--cycle-period-us <n>` | Override cycle period (microseconds) | `run` |
+| `--cycle-period-ms <n>` | SDO operation period (milliseconds) | `sdo-read`, `sdo-write` |
+| `--data-hex <hex>` | SDO write payload as hexadecimal bytes | `sdo-write` |
+| `--record <path>` | Save complete raw NIC events as NDJSON | `run`, `sdo-read` |
 | `--output-period-ms <n>` | NDJSON progress output interval | `run` |
 | `--pool-capacity <n>` | Zero-copy frame pool capacity | `run-zc` |
 | `--trace <path>` | NDJSON trace file path | `replay`, `jitter-profile`, `topo-health`, `cycle-perf`, `comm-quality` |

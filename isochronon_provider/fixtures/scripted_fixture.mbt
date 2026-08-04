@@ -104,6 +104,12 @@ fn fixture_padded_frame(frame : @protocol.EcFrame) -> Bytes {
 }
 
 ///|
+fn fixture_auto_increment_position(address : UInt) -> Int {
+  let raw_adp = @protocol.address_station(address)
+  ((0x10000U - raw_adp) & 0xFFFFU).reinterpret_as_int()
+}
+
+///|
 fn fixture_response_data(
   state : ScriptedIdentityState,
   request : @protocol.Pdu,
@@ -119,7 +125,7 @@ fn fixture_response_data(
       (Bytes::new(1), state.devices.length().reinterpret_as_uint())
     }
     @protocol.APWR => {
-      let position = @protocol.address_station(request.header.address).reinterpret_as_int()
+      let position = fixture_auto_increment_position(request.header.address)
       if position < 0 || position >= state.devices.length() {
         raise @isochronon_provider.TransportFailure(
           "fixture APWR position is outside observed topology",
@@ -139,7 +145,7 @@ fn fixture_response_data(
       (fixture_copy_bytes(request.data), 1U)
     }
     @protocol.APRD => {
-      let position = @protocol.address_station(request.header.address).reinterpret_as_int()
+      let position = fixture_auto_increment_position(request.header.address)
       if position < 0 || position >= state.devices.length() {
         raise @isochronon_provider.TransportFailure(
           "fixture APRD position is outside observed topology",

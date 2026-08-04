@@ -86,4 +86,3 @@ pub(open) trait CycleHook {
   fn on_post_cycle(Self, CycleSnapshot, @protocol.PdoContext) -> CycleDirective
   fn on_fault(Self, CycleSnapshot, @hal.EcError) -> CycleDirective
 }
-

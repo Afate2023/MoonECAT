@@ -158,6 +158,18 @@ fn try_handle_native_cli_command(
     return true
   }
 
+  if command == "sdo-read" {
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
+    return true
+  }
+
+  if command == "sdo-write" {
+    ignore(as_json)
+    reject_native_cli_command(command, args, backend, timeout)
+    return true
+  }
+
   if command == "esc-regs" {
     ignore(as_json)
     reject_native_cli_command(command, args, backend, timeout)
@@ -305,7 +317,7 @@ fn run_default_cli_command(
     Mock =>
       run_command_with_nic(
         command,
-        @mock.MockNic::new(),
+        @protocol.DatagramSession::new(@mock.MockNic::new()),
         args,
         as_json,
         timeout,

@@ -442,6 +442,151 @@ test "cli resolve od query rejects orphan subindex" {
 }
 
 ///|
+test "cli resolves cyclic sdo read settings" {
+  let settings = resolve_cyclic_sdo_read_settings([
+    "moonecat", "sdo-read", "--index", "8192", "--subindex", "1", "--cycles", "3",
+    "--cycle-period-ms", "25",
+  ])
+  @debug.assert_eq(settings.index, 0x2000U)
+  @debug.assert_eq(settings.subindex, b'\x01')
+  @debug.assert_eq(settings.cycles, 3)
+  @debug.assert_eq(settings.period_ms, 25)
+}
+
+///|
+test "cli cyclic sdo read requires index and positive timing" {
+  let missing_index : Result[CyclicSdoReadSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_read_settings(["moonecat", "sdo-read"]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(missing_index is Err(@hal.EcError::ConfigMismatch(_)))
+  let invalid_period : Result[CyclicSdoReadSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_read_settings([
+      "moonecat", "sdo-read", "--index", "8192", "--cycle-period-ms", "0",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(invalid_period is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli cyclic sdo read output preserves samples and errors" {
+  let report : CyclicSdoReadReport = {
+    station_address: 0x1001U,
+    index: 0x2000U,
+    subindex: b'\x01',
+    cycles_requested: 2,
+    period_ms: 25,
+    samples: [
+      {
+        cycle: 1,
+        value_hex: Some("0x2A00"),
+        value_u32: Some(42U),
+        error_category: None,
+        error_detail: None,
+        abort_code: None,
+      },
+      {
+        cycle: 2,
+        value_hex: None,
+        value_u32: None,
+        error_category: Some("protocol-failure"),
+        error_detail: Some("test abort"),
+        abort_code: Some(0x06020000U),
+      },
+    ],
+  }
+  let json = cyclic_sdo_read_report_json(report).stringify(indent=2)
+  assert_true(json.contains("\"command\": \"sdo-read\""))
+  assert_true(json.contains("\"success_count\": 1"))
+  assert_true(json.contains("\"failure_count\": 1"))
+  assert_true(json.contains("\"abort_code\": 100794368"))
+  let text = cyclic_sdo_read_report_text(report)
+  assert_true(text.contains("Periodic EtherCAT SDO Read"))
+  assert_true(text.contains("[1] 0x2A00 (u32 le: 42)"))
+  assert_true(text.contains("0x06020000"))
+  assert_true(text.contains("1 succeeded, 1 failed"))
+}
+
+///|
+test "cli resolves cyclic sdo write settings and hex payload" {
+  let settings = resolve_cyclic_sdo_write_settings([
+    "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--subindex",
+    "1", "--data-hex", "0x2A00", "--cycles", "3", "--cycle-period-ms", "25",
+  ])
+  @debug.assert_eq(settings.station, 0x1001U)
+  @debug.assert_eq(settings.index, 0x2000U)
+  @debug.assert_eq(settings.subindex, b'\x01')
+  @debug.assert_eq(settings.data, Bytes::from_array([b'\x2A', b'\x00']))
+  @debug.assert_eq(settings.cycles, 3)
+  @debug.assert_eq(settings.period_ms, 25)
+}
+
+///|
+test "cli cyclic sdo write requires target and valid data" {
+  let missing_station : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--index", "8192", "--data-hex", "2A",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(missing_station is Err(@hal.EcError::ConfigMismatch(_)))
+  let odd_data : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--data-hex",
+      "ABC",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(odd_data is Err(@hal.EcError::ConfigMismatch(_)))
+  let invalid_data : Result[CyclicSdoWriteSettings, Error] = Result::Ok(
+    resolve_cyclic_sdo_write_settings([
+      "moonecat", "sdo-write", "--station", "4097", "--index", "8192", "--data-hex",
+      "GG",
+    ]),
+  ) catch {
+    err => Result::Err(err)
+  }
+  assert_true(invalid_data is Err(@hal.EcError::ConfigMismatch(_)))
+}
+
+///|
+test "cli cyclic sdo write output preserves payload and errors" {
+  let report : CyclicSdoWriteReport = {
+    station_address: 0x1001U,
+    index: 0x2000U,
+    subindex: b'\x01',
+    data: Bytes::from_array([b'\x2A', b'\x00']),
+    cycles_requested: 2,
+    period_ms: 25,
+    samples: [
+      { cycle: 1, error_category: None, error_detail: None, abort_code: None },
+      {
+        cycle: 2,
+        error_category: Some("protocol-failure"),
+        error_detail: Some("test abort"),
+        abort_code: Some(0x06010002U),
+      },
+    ],
+  }
+  let json = cyclic_sdo_write_report_json(report).stringify(indent=2)
+  assert_true(json.contains("\"command\": \"sdo-write\""))
+  assert_true(json.contains("\"data_hex\": \"0x2A00\""))
+  assert_true(json.contains("\"success_count\": 1"))
+  assert_true(json.contains("\"failure_count\": 1"))
+  let text = cyclic_sdo_write_report_text(report)
+  assert_true(text.contains("Periodic EtherCAT SDO Write"))
+  assert_true(text.contains("Data: 0x2A00"))
+  assert_true(text.contains("[1] OK"))
+  assert_true(text.contains("0x06010002"))
+  assert_true(text.contains("1 succeeded, 1 failed"))
+}
+
+///|
 test "cli resolve diagnosis station uses explicit or single slave" {
   let scan_report : @runtime.ScanReport = {
     slave_count: 1,
@@ -1112,7 +1257,8 @@ test "cli transition path falls back through init when needed" {
 
 ///|
 test "cli state transition report uses broadcast when station is omitted" {
-  let nic = @mock.MockNic::new()
+  let raw_nic = @mock.MockNic::new()
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let report = compute_state_transition_report(
     nic,
@@ -1252,7 +1398,7 @@ pub impl @hal.Nic for StrictTransitionNic with fn send(self, data) {
           }
         }
       }
-      build_esm_response_frame(request, strict_status_bytes(self), 1U)
+      build_esm_response_frame(request, pdu.data, 1U)
     }
     _ => build_esm_response_frame(request, Bytes::new(pdu.data.length()), 1U)
   }
@@ -1349,15 +1495,136 @@ fn virtual_bus_route_preparation(
 }
 
 ///|
-fn single_virtual_station_nic() -> (@mock.VirtualNic, UInt, @hal.Duration) raise @hal.EcError {
+fn single_virtual_station_nic() -> (
+  @protocol.DatagramSession[@mock.VirtualNic],
+  UInt,
+  @hal.Duration,
+) raise @hal.EcError {
   let bus = @mock.VirtualBus::new([
     @mock.VirtualSlave::new(0, virtual_bus_identity(), virtual_bus_sii_eeprom()),
   ])
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let station = 0x1001U
   let timeout = @hal.Duration(50_000_000L)
   @protocol.assign_station_address(nic, 0U, station, timeout)
   (nic, station, timeout)
+}
+
+///|
+async test "cli cyclic sdo read repeats one prepared mailbox session" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  let mailbox_session = @runtime.prepare_slave_mailbox_ap(
+    nic, 0U, station, timeout,
+  )
+  let rmsm = @mailbox.Rmsm::new(max_retries=0)
+  @protocol.sdo_download_retry(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    rmsm,
+    0x2000U,
+    b'\x01',
+    Bytes::from_array([b'\x2A', b'\x00']),
+    timeout,
+  )
+  let report = compute_cyclic_sdo_read_report(
+    nic,
+    ["moonecat", "sdo-read", "--station", station.to_string()],
+    { index: 0x2000U, subindex: b'\x01', cycles: 3, period_ms: 1 },
+    timeout,
+  )
+  nic.close()
+  @debug.assert_eq(report.station_address, station)
+  @debug.assert_eq(report.samples.length(), 3)
+  for sample in report.samples {
+    @debug.assert_eq(sample.value_hex, Some("0x2A000000"))
+    @debug.assert_eq(sample.value_u32, Some(42U))
+    @debug.assert_eq(sample.error_category, None)
+  }
+}
+
+///|
+test "cli frame trace decodes FPRD around receive timeout" {
+  let builder = @protocol.FrameBuilder::new()
+  ignore(
+    builder.add(
+      @protocol.EcCommand::FPRD,
+      @protocol.configured_address(0x1001U, 0x080DU),
+      Bytes::new(8),
+    ),
+  )
+  let request = builder.build().encode()
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Sent(request, request.length()))
+  log.append(@mock.RecvTimeout)
+  log.append(@mock.Sent(request, request.length()))
+  log.append(@mock.Received(request))
+  let text = nic_timeout_windows_text(log, 2)
+  assert_true(text.contains("Frame Trace Around RecvTimeout"))
+  assert_true(text.contains("RX TIMEOUT"))
+  assert_true(text.contains("FPRD"))
+  assert_true(text.contains("adp=0x1001"))
+  assert_true(text.contains("ado=0x080D"))
+  assert_true(text.contains("data_len=8"))
+  assert_true(text.contains("raw="))
+}
+
+///|
+test "cli frame trace preserves malformed receive before timeout" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Received(b"\x01\x02\x03"))
+  log.append(@mock.RecvTimeout)
+  let text = nic_timeout_windows_text(log, 1)
+  assert_true(text.contains("RX raw_len=3"))
+  assert_true(text.contains("decode_error="))
+  assert_true(text.contains("raw=0x01 0x02 0x03"))
+}
+
+///|
+test "cli frame trace is empty without timeout" {
+  let log = @mock.NicEventLog::new()
+  log.append(@mock.Received(b"\x01\x02\x03"))
+  @debug.assert_eq(nic_timeout_windows_text(log, 4), "")
+}
+
+///|
+async test "cli cyclic sdo write repeats one prepared mailbox session" {
+  let (nic, station, timeout) = single_virtual_station_nic()
+  let mailbox_session = @runtime.prepare_slave_mailbox_ap(
+    nic, 0U, station, timeout,
+  )
+  let report = compute_cyclic_sdo_write_report(
+    nic,
+    {
+      station,
+      index: 0x2001U,
+      subindex: b'\x02',
+      data: Bytes::from_array([b'\x2A', b'\x00']),
+      cycles: 3,
+      period_ms: 1,
+    },
+    timeout,
+  )
+  @debug.assert_eq(report.station_address, station)
+  @debug.assert_eq(report.samples.length(), 3)
+  for sample in report.samples {
+    @debug.assert_eq(sample.error_category, None)
+  }
+  let payload = @protocol.sdo_upload_retry(
+    nic,
+    station,
+    mailbox_session.mailbox_config,
+    @mailbox.Rmsm::new(max_retries=0),
+    0x2001U,
+    b'\x02',
+    timeout,
+  )
+  nic.close()
+  @debug.assert_eq(
+    payload,
+    Bytes::from_array([b'\x2A', b'\x00', b'\x00', b'\x00']),
+  )
 }
 
 ///|
@@ -1452,7 +1719,12 @@ test "cli station mailbox route applies op to safeop command on virtual bus" {
 
 ///|
 test "cli state path recovers configuration error to init" {
-  let nic = StrictTransitionNic::new(@protocol.EsmState::SafeOp, true, 0x0016U)
+  let raw_nic = StrictTransitionNic::new(
+    @protocol.EsmState::SafeOp,
+    true,
+    0x0016U,
+  )
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(1000L)
   let report = compute_station_transition_report(
     nic,
@@ -1469,13 +1741,13 @@ test "cli state path recovers configuration error to init" {
   @debug.assert_eq(report.status_code, None)
   @debug.assert_eq(report.raw_status_code, None)
   @debug.assert_eq(report.control_wkc, None)
-  @debug.assert_eq(nic.control_writes.length(), 2)
+  @debug.assert_eq(raw_nic.control_writes.length(), 2)
   @debug.assert_eq(
-    nic.control_writes[0],
+    raw_nic.control_writes[0],
     @protocol.EsmState::SafeOp.to_byte() | b'\x10',
   )
   @debug.assert_eq(
-    nic.control_writes[1] & b'\x0F',
+    raw_nic.control_writes[1] & b'\x0F',
     @protocol.EsmState::Init.to_byte(),
   )
 }
@@ -1883,7 +2155,9 @@ test "cli startup trace od read retries stale and timeout errors" {
   assert_true(startup_trace_should_retry_od_read(@hal.EcError::MailboxTimeout))
   assert_true(
     startup_trace_should_retry_od_read(
-      @hal.EcError::MailboxProtocol("RMSM: too many stale frames received"),
+      @hal.EcError::MailboxProtocol(
+        "mailbox session: too many stale frames received",
+      ),
     ),
   )
 }
@@ -2632,7 +2906,8 @@ test "VirtualBus from ESI JSON scans and discovers slaves" {
   let json_text = sample_esi_json_text()
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
   @debug.assert_eq(templates.length(), 1)
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(50_000_000L)
   let scan_report = @runtime.scan(nic, timeout)
   @debug.assert_eq(scan_report.slave_count, 1)
@@ -2646,7 +2921,8 @@ test "VirtualBus from ESI JSON scans and discovers slaves" {
 test "run-virtual builds RunStartupPreparation from templates" {
   let json_text = sample_esi_json_text()
   let (bus, templates) = @mock.VirtualBus::from_esi_json(json_text)
-  let nic = @mock.VirtualNic::new(bus)
+  let raw_nic = @mock.VirtualNic::new(bus)
+  let nic = @protocol.DatagramSession::new(raw_nic)
   let timeout = @hal.Duration(50_000_000L)
   let scan_report = @runtime.scan(nic, timeout)
   let slave_preparations : Array[(UInt, @runtime.SlaveStartupPreparation)] = []
@@ -2661,4 +2937,77 @@ test "run-virtual builds RunStartupPreparation from templates" {
   )
   assert_true(preparation.expected_wkc > 0U)
   nic.close()
+}
+
+///|
+test "run-virtual recording continues Datagram Index after scan" {
+  let trace_path = "_build/run-virtual-datagram-session-\{@env.now()}.ndjson"
+  if @fs.path_exists(trace_path) {
+    @fs.remove_file(trace_path)
+  }
+  run_virtual_command(
+    sample_esi_json_text(),
+    true,
+    @protocol.PreOp,
+    None,
+    @runtime.RunLoopSettings::fixed_cycles(1),
+    Silent,
+    Some(trace_path),
+    @hal.Duration(50_000_000L),
+  )
+  let ndjson = @fs.read_file_to_string(trace_path)
+  @fs.remove_file(trace_path)
+  guard @mock.ndjson_initial_datagram_index(ndjson) is Some(seed) else {
+    fail("expected a version-2 DatagramSession trace header")
+  }
+  assert_true(seed != b'\x00')
+  let log = @mock.NicEventLog::from_ndjson(ndjson)
+  let mut first_sent_index : Byte? = None
+  for event in log.events {
+    match event {
+      @mock.Sent(data, _) => {
+        let frame = @protocol.EcFrame::decode(data)
+        guard frame.pdus is [first, ..] else {
+          fail("expected the first recorded frame to contain a datagram")
+        }
+        first_sent_index = Some(first.header.index)
+        break
+      }
+      _ => ()
+    }
+  }
+  @debug.assert_eq(first_sent_index, Some(seed))
+}
+
+///|
+test "v2 NDJSON replay honors a nonzero DatagramSession seed" {
+  let recorder = @mock.RecordingNicAdapter::wrap(@mock.MockNic::new())
+  let record_session = @protocol.DatagramSession::new(
+    recorder,
+    start_index=b'\xFE',
+  )
+  let timeout = @hal.Duration(1000L)
+  ignore(
+    @protocol.transact_pdu(
+      record_session,
+      @protocol.EcCommand::NOP,
+      0U,
+      Bytes::new(0),
+      timeout,
+    ),
+  )
+  let ndjson = recorder
+    .get_log()
+    .to_ndjson_with_datagram_session_header(initial_datagram_index=b'\xFE')
+  let replay = @mock.ReplayNic::from_log(@mock.NicEventLog::from_ndjson(ndjson))
+  let replay_session = replay_datagram_session(replay, ndjson)
+  let pdu = @protocol.transact_pdu(
+    replay_session,
+    @protocol.EcCommand::NOP,
+    0U,
+    Bytes::new(0),
+    timeout,
+  )
+  @debug.assert_eq(pdu.header.index, b'\xFE')
+  assert_true(replay.is_exhausted())
 }

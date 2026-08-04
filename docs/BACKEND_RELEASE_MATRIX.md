@@ -2,8 +2,8 @@
 
 > **迁移状态（2026-07-02）**：本文档中 2026-04 的 Native CLI /
 > Native Library 实机记录是历史证据。MoonECAT 已删除 `hal/native/` package；
-> 新的 live NIC 交付边界是 Isochronon Lockwire native session +
-> `fieldbus_core/moonecat_master_harness` provider harness。MoonECAT 自身只保留
+> 新的 live NIC 交付边界是 Isochronon Lockwire native session + MoonECAT
+> stack-owned `isochronon_provider` operation。MoonECAT 自身只保留
 > mock/replay/virtual CLI、协议栈、runtime 和泛型 `@hal.Nic` runner。
 
 本文档把当前三类交付物的边界固定下来：Provider Harness Live Entry、MoonECAT Library、Extism Plugin。
@@ -13,8 +13,8 @@
 
 ### 输入
 
-- provider harness command：由 `fieldbus_core/moonecat_master_harness` 或后续
-  companion package 提供。
+- provider operation：由 MoonECAT `isochronon_provider` 提供 EtherCAT 语义，
+  Isochronon composition 注入已打开的 Lockwire session。
 - MoonECAT reusable runner：`run_read_sii_command`、`run_diagnosis_command`、
   `run_od_command`、`run_state_command` 等泛型 `@hal.Nic` 函数。
 - 真实网卡：由 Lockwire native session descriptor / guarded live runner
@@ -78,7 +78,8 @@
 ### 输入
 
 - 现有库入口：`@runtime.scan`、`@runtime.validate`、`@runtime.run`
-- 调用方提供任意实现 `@hal.Nic` / `@hal.ZeroCopyNic` 的 backend。
+- 调用方提供任意实现 `@hal.Nic` / `@hal.ZeroCopyNic` 的 backend；标准协议/
+  runtime API 通过 `@protocol.DatagramSession::new(nic)` 持有 Datagram Index。
 
 ### 输出
 
@@ -103,7 +104,8 @@ moon test hal/mock runtime cmd/main --target native
 - 真实 `scan/validate/run` 回归通过 `scripts/regression-real-device.ps1` 驱动；`--record <ndjson>` 把帧级事件流落盘，`scripts/replay-diff.ps1` 把同一份 NDJSON 通过 `cmd/main replay --trace ... --json` 重放并与 live `run-summary` 做稳定字段（slave_count / topology_fingerprint / verdict）比对
 - 对真实 `--record <ndjson>` 产物做 replay 时，若希望保留 live `slave_count` / topology 证据，应同时保留 `scan --json` 并在 replay 时传入 `--scan-json <path>`；仅依赖 NDJSON 时，replay 的 probe 可能回退成 `0 slaves`
 - CLI `run` 对真实网卡采用“先探测、再重新打开 NIC 执行 run”的路径，避免在同一真实句柄上重复扫描导致 smoke 回归
-- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现包成可记录链路，不再局限于 `VirtualNic`；live-provider NIC wrapper 由 harness 侧提供
+- `RecordingNicAdapter[N]` 适配器允许把任意 `@hal.Nic` 实现包成可记录链路，不再局限于 `VirtualNic`；live-provider NIC wrapper 由 harness 侧提供，记录真实线上 Index 时层次为 `DatagramSession -> RecordingNicAdapter -> provider NIC`
+- 新录制使用 version 2 NDJSON header，保存递增 Index 模式及起始 Index；无 header/version 1 的旧 trace 通过固定零 Index 的 legacy session 严格回放
 
 ### EoE / FoE（L3 交付面）
 

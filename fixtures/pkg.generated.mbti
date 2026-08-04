@@ -21,4 +21,3 @@ pub fn sample_sii_eeprom_with_pdo() -> Bytes
 // Type aliases
 
 // Traits
-
