@@ -669,6 +669,11 @@ pub fn parse_sii_sync_units(data : BytesView) -> Array[SiiSyncUnit] {
 
 ///|
 /// SM info from SII SM category. Each SM entry is 8 bytes.
+///
+/// `activate` is the SII "Enable Sync Manager" metadata byte kept under its
+/// legacy API name. It is not the ESC SM Activate register image: bit 0 is the
+/// enable flag, bits 1-3 describe fixed/virtual/opOnly metadata, and bits 4-7
+/// are reserved.
 pub(all) struct SiiSmEntry {
   physical_start : UInt
   length : UInt
@@ -689,7 +694,7 @@ pub fn parse_sii_sm(data : BytesView) -> Array[SiiSmEntry] {
     let length = read_sii_word(data, offset / 2 + 1)
     let control = data[offset + 4]
     let status = data[offset + 5]
-    let activate = data[offset + 6]
+    let enable_flags = data[offset + 6]
     let type_byte = data[offset + 7]
     let sm_type : SmType = match type_byte {
       b'\x01' => MailboxOut
@@ -705,7 +710,7 @@ pub fn parse_sii_sm(data : BytesView) -> Array[SiiSmEntry] {
       length,
       control,
       status,
-      activate,
+      activate: enable_flags,
       sm_type,
     })
     offset = offset + entry_size

@@ -125,4 +125,3 @@ pub impl @hal.ZeroCopyNic for NativeZeroCopyNic
 // Type aliases
 
 // Traits
-

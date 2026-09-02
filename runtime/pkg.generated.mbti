@@ -909,4 +909,3 @@ pub(open) trait EoeEndpoint {
 pub(open) trait RunProgressSink {
   fn emit(Self, RunProgress) -> Unit
 }
-

@@ -99,4 +99,3 @@ pub fn SharedMemoryRegion::new(String, UInt, Int, cache_coherent? : Bool) -> Sel
 // Type aliases
 
 // Traits
-

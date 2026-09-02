@@ -316,4 +316,3 @@ pub fn VirtualSlaveTemplate::to_virtual_slave(Self, Int) -> VirtualSlave
 // Type aliases
 
 // Traits
-

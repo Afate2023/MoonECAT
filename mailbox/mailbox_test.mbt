@@ -564,14 +564,37 @@ test "calculate_sm_configs uses sii header for mailbox" {
       activate: b'\x01',
       sm_type: @mailbox.SmType::MailboxIn,
     },
+    {
+      physical_start: 0x1100U,
+      length: 8U,
+      control: b'\x64',
+      status: b'\x00',
+      // SII enable metadata: enable + fixed + virtual + opOnly.
+      activate: b'\x0F',
+      sm_type: @mailbox.SmType::ProcessDataOut,
+    },
+    {
+      physical_start: 0x1180U,
+      length: 8U,
+      control: b'\x20',
+      status: b'\x00',
+      // SII enable metadata without the enable bit.
+      activate: b'\x0E',
+      sm_type: @mailbox.SmType::ProcessDataIn,
+    },
   ]
   let configs = @mailbox.calculate_sm_configs(sii_header, sm_entries)
-  @debug.assert_eq(configs.length(), 2)
+  @debug.assert_eq(configs.length(), 4)
   // Mailbox SM should use header offsets, not the SII SM entry values
   @debug.assert_eq(configs[0].physical_start, 0x1000U)
   @debug.assert_eq(configs[0].length, 128U)
   @debug.assert_eq(configs[1].physical_start, 0x1080U)
   @debug.assert_eq(configs[1].length, 128U)
+  // Only SII Enable bit 0 maps to ESC SM Activate.ChannelEnable.
+  @debug.assert_eq(configs[2].activate, b'\x01')
+  @debug.assert_eq(configs[2].to_bytes()[6], b'\x01')
+  @debug.assert_eq(configs[3].activate, b'\x00')
+  @debug.assert_eq(configs[3].to_bytes()[6], b'\x00')
 }
 
 ///|

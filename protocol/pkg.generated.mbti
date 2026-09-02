@@ -589,4 +589,3 @@ pub(all) struct SmWatchdogConfig {
 pub trait DatagramIndexSource {
   fn next_datagram_index(Self) -> Byte
 }
-

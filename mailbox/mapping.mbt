@@ -20,6 +20,7 @@ pub(all) struct SlaveMapping {
 /// Compute SmConfig array from SII SM entries and mailbox header info.
 /// Mailbox SM entries use the SII header offsets/sizes; process-data SM
 /// entries keep the physical addresses from the SII SM category.
+/// SII bytes 6 and 7 are metadata, not an ESC SM register image.
 pub fn calculate_sm_configs(
   sii_header : SiiData,
   sii_sm_entries : Array[SiiSmEntry],
@@ -37,11 +38,20 @@ pub fn calculate_sm_configs(
       length: len,
       control: e.control,
       status: b'\x00',
-      activate: e.activate,
+      activate: sii_sm_channel_enable(e),
       sm_type: e.sm_type,
     })
   }
   configs
+}
+
+///|
+/// Convert the SII Enable Sync Manager metadata byte to the ESC SM Activate
+/// register value. Only SII bit 0 maps to ESC ChannelEnable; fixed-content,
+/// virtual, and opOnly are category metadata and must not be written as ESC
+/// Activate bits.
+fn sii_sm_channel_enable(entry : SiiSmEntry) -> Byte {
+  entry.activate & b'\x01'
 }
 
 ///|
@@ -286,9 +296,9 @@ pub fn SmConfig::to_bytes(self : SmConfig) -> Bytes {
   buf.write_byte(self.control)
   // Byte 5: status (always 0 for writes)
   buf.write_byte(self.status)
-  // Byte 6: activation register, preserve all SII-provided bits.
+  // Byte 6: ESC SM Activate register.
   buf.write_byte(self.activate)
-  // Byte 7: reserved
+  // Byte 7: ESC SM PDI Control. The master leaves PDI-owned control cleared.
   buf.write_byte(b'\x00')
   buf.to_bytes()
 }
